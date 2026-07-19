@@ -313,6 +313,10 @@ function CobrancasPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
+
+
 
       {selecionada && (
         <CobrancaDialog
