@@ -163,14 +163,19 @@ async function baixarFoto(path: string, filename: string) {
 }
 
 async function compartilharFotoWhats(path: string, whatsapp: string | null | undefined, petNome: string, clienteNome: string) {
-  const fone = (whatsapp ?? "").replace(/\D/g, "");
-  if (!fone) { toast.error("Cliente sem WhatsApp"); return; }
+  if (!whatsapp) { toast.error("Cliente sem WhatsApp"); return; }
   const { data, error } = await supabase.storage.from("spa-fotos").createSignedUrl(path, 60 * 60 * 24 * 7);
   if (error || !data?.signedUrl) { toast.error("Erro ao gerar link"); return; }
   const msg = `Olá, ${clienteNome}! 🐾 Foto do ${petNome} pronto no Spa da Tia Jéssica:\n\n${data.signedUrl}`;
-  const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
-  window.open(`https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`, "_blank");
+  openWhatsAppComposerGlobal({
+    tipo: "pet_pronto",
+    destinatario: clienteNome,
+    telefone: whatsapp,
+    mensagem: msg,
+    motivo: "Foto do pet pronto",
+  });
 }
+
 
 function ResultadoFotoCard({
   path, principal, disabled, hero, onZoom, onStar, onRemove, onDownload, onShare, filename,
