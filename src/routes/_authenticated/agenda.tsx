@@ -173,6 +173,7 @@ const brl = (v: number | null | undefined) =>
 function AgendaPage() {
   const search = Route.useSearch();
   const navigateSelf = useNavigate({ from: Route.fullPath });
+  const composer = useWhatsAppComposer();
   const [date, setDate] = useState(todayISO());
   const [statusFilter, setStatusFilter] = useState<"todos" | Status>("todos");
   const [openNew, setOpenNew] = useState(false);
