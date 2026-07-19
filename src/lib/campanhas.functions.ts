@@ -53,7 +53,7 @@ export type DestinatarioRow = {
 
 const FiltrosSchema = z
   .object({
-    porte_ids: z.array(z.string().uuid()).optional().default([]),
+    portes: z.array(z.string().trim().min(1).max(40)).optional().default([]),
     cidade: z.string().trim().max(80).optional().default(""),
     min_dias_ultimo_atend: z.number().int().min(0).max(3650).nullable().optional(),
     max_dias_ultimo_atend: z.number().int().min(0).max(3650).nullable().optional(),
