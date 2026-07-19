@@ -391,6 +391,192 @@ export type Database = {
         }
         Relationships: []
       }
+      cobrancas: {
+        Row: {
+          atendimento_id: string | null
+          cliente_id: string
+          created_at: string
+          id: string
+          pagamento_id: string
+          pausada: boolean
+          pausada_motivo: string | null
+          promessa_data: string | null
+          saldo: number
+          status: Database["public"]["Enums"]["cobranca_status"]
+          tentativas: number
+          ultima_cobranca_em: string | null
+          updated_at: string
+          valor_original: number
+          valor_pago: number
+          vencimento: string
+        }
+        Insert: {
+          atendimento_id?: string | null
+          cliente_id: string
+          created_at?: string
+          id?: string
+          pagamento_id: string
+          pausada?: boolean
+          pausada_motivo?: string | null
+          promessa_data?: string | null
+          saldo: number
+          status?: Database["public"]["Enums"]["cobranca_status"]
+          tentativas?: number
+          ultima_cobranca_em?: string | null
+          updated_at?: string
+          valor_original: number
+          valor_pago?: number
+          vencimento: string
+        }
+        Update: {
+          atendimento_id?: string | null
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          pagamento_id?: string
+          pausada?: boolean
+          pausada_motivo?: string | null
+          promessa_data?: string | null
+          saldo?: number
+          status?: Database["public"]["Enums"]["cobranca_status"]
+          tentativas?: number
+          ultima_cobranca_em?: string | null
+          updated_at?: string
+          valor_original?: number
+          valor_pago?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: true
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cobrancas_config: {
+        Row: {
+          horario_envio: string
+          id: string
+          modo: Database["public"]["Enums"]["cobranca_modo"]
+          nao_repetir_no_dia: boolean
+          pix_chave: string | null
+          pix_tipo: string | null
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          horario_envio?: string
+          id?: string
+          modo?: Database["public"]["Enums"]["cobranca_modo"]
+          nao_repetir_no_dia?: boolean
+          pix_chave?: string | null
+          pix_tipo?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          horario_envio?: string
+          id?: string
+          modo?: Database["public"]["Enums"]["cobranca_modo"]
+          nao_repetir_no_dia?: boolean
+          pix_chave?: string | null
+          pix_tipo?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cobrancas_eventos: {
+        Row: {
+          canal: string | null
+          cobranca_id: string
+          created_at: string
+          id: string
+          payload: Json
+          tipo: Database["public"]["Enums"]["cobranca_evento_tipo"]
+          usuario_email: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          canal?: string | null
+          cobranca_id: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          tipo: Database["public"]["Enums"]["cobranca_evento_tipo"]
+          usuario_email?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          canal?: string | null
+          cobranca_id?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          tipo?: Database["public"]["Enums"]["cobranca_evento_tipo"]
+          usuario_email?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_eventos_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cobrancas_templates: {
+        Row: {
+          ativo: boolean
+          corpo: string
+          created_at: string
+          gatilho: Database["public"]["Enums"]["cobranca_gatilho"]
+          id: string
+          ordem: number
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          corpo: string
+          created_at?: string
+          gatilho: Database["public"]["Enums"]["cobranca_gatilho"]
+          id?: string
+          ordem?: number
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          corpo?: string
+          created_at?: string
+          gatilho?: Database["public"]["Enums"]["cobranca_gatilho"]
+          id?: string
+          ordem?: number
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       compras: {
         Row: {
           anexo_url: string | null
@@ -1366,6 +1552,37 @@ export type Database = {
         | "cancelado"
         | "nao_compareceu"
       app_role: "admin" | "user"
+      cobranca_evento_tipo:
+        | "criada"
+        | "envio_manual"
+        | "envio_auto"
+        | "resposta"
+        | "mudanca_status"
+        | "promessa"
+        | "pagamento"
+        | "pausa"
+        | "retomada"
+        | "nota"
+        | "ia_sugestao"
+      cobranca_gatilho:
+        | "d_menos_1"
+        | "d_zero"
+        | "d_mais_3"
+        | "d_mais_7"
+        | "d_mais_15"
+        | "agradecimento"
+      cobranca_modo: "manual" | "auto" | "pausado"
+      cobranca_status:
+        | "a_vencer"
+        | "vencido"
+        | "enviada"
+        | "respondeu"
+        | "promessa"
+        | "pago_parcial"
+        | "pago"
+        | "negociado"
+        | "sem_retorno"
+        | "pausada"
       comportamento_pet:
         | "muito_tranquilo"
         | "tranquilo"
@@ -1529,6 +1746,40 @@ export const Constants = {
         "nao_compareceu",
       ],
       app_role: ["admin", "user"],
+      cobranca_evento_tipo: [
+        "criada",
+        "envio_manual",
+        "envio_auto",
+        "resposta",
+        "mudanca_status",
+        "promessa",
+        "pagamento",
+        "pausa",
+        "retomada",
+        "nota",
+        "ia_sugestao",
+      ],
+      cobranca_gatilho: [
+        "d_menos_1",
+        "d_zero",
+        "d_mais_3",
+        "d_mais_7",
+        "d_mais_15",
+        "agradecimento",
+      ],
+      cobranca_modo: ["manual", "auto", "pausado"],
+      cobranca_status: [
+        "a_vencer",
+        "vencido",
+        "enviada",
+        "respondeu",
+        "promessa",
+        "pago_parcial",
+        "pago",
+        "negociado",
+        "sem_retorno",
+        "pausada",
+      ],
       comportamento_pet: [
         "muito_tranquilo",
         "tranquilo",
