@@ -296,5 +296,3 @@ export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
 
     return { resultados, totalOk, totalFalha };
   });
-
-  });
