@@ -17,6 +17,7 @@ import {
   HandCoins,
   HeartHandshake,
   BellRing,
+  Megaphone,
   Settings,
   PawPrint,
 } from "lucide-react";
@@ -63,6 +64,7 @@ const groups = [
       { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
       { title: "Lembretes", url: "/lembretes", icon: BellRing },
       { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
+      { title: "Campanhas", url: "/campanhas", icon: Megaphone },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],
