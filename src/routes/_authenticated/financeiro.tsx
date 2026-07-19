@@ -760,15 +760,25 @@ function FinanceiroPage() {
                           {brl(Number(p.valor))}
                         </TableCell>
                         <TableCell className="text-right">
-                          {p.status !== "pago" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => marcarParcelaPaga.mutate(p)}
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Pagar
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-1">
+                            {p.status !== "pago" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => marcarParcelaPaga.mutate(p)}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Pagar
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => abrirReciboDespesa(p)}
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1" /> Comprovante
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
