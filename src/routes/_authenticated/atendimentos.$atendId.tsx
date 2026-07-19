@@ -954,34 +954,56 @@ function AtendimentoDetalhe() {
                 <p className="text-sm text-muted-foreground italic">Nenhuma foto do resultado ainda.</p>
                 <p className="text-xs text-muted-foreground mt-1">Capriche na foto do pet lindo!</p>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {fotosDepois.map((f, i) => (
-                    <ResultadoFotoCard
-                      key={i}
-                      path={f.path}
-                      principal={!!f.principal}
-                      disabled={readOnly}
-                      filename={`${(pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-")}-pronto-${i + 1}.jpg`}
-                      onZoom={() => setZoomFoto(f.path)}
-                      onStar={() => setPrincipal(i)}
-                      onRemove={() => removeFoto("depois", i)}
-                      onDownload={() => baixarFoto(
-                        f.path,
-                        `${(pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-")}-pronto-${i + 1}.jpg`,
-                      )}
-                      onShare={() => compartilharFotoWhats(
-                        f.path, cliente?.whatsapp, pet?.nome ?? "seu pet", cliente?.nome ?? "",
-                      )}
-                    />
-                  ))}
-                </div>
-                <p className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
-                  <Star className="h-3 w-3" /> Clique na estrela para marcar a foto principal do resultado.
-                </p>
-              </>
-            )}
+            ) : (() => {
+              const principalIdx = fotosDepois.findIndex((f) => f.principal);
+              const heroIdx = principalIdx >= 0 ? principalIdx : 0;
+              const petSlug = (pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-");
+              const cardFor = (i: number, opts: { hero?: boolean } = {}) => {
+                const f = fotosDepois[i];
+                const filename = `${petSlug}-pronto-${i + 1}.jpg`;
+                return (
+                  <ResultadoFotoCard
+                    key={i}
+                    path={f.path}
+                    principal={!!f.principal}
+                    disabled={readOnly}
+                    hero={opts.hero}
+                    filename={filename}
+                    onZoom={() => setZoomFoto(f.path)}
+                    onStar={f.principal ? undefined : () => setPrincipal(i)}
+                    onRemove={() => removeFoto("depois", i)}
+                    onDownload={() => baixarFoto(f.path, filename)}
+                    onShare={() => compartilharFotoWhats(
+                      f.path, cliente?.whatsapp, pet?.nome ?? "seu pet", cliente?.nome ?? "",
+                    )}
+                  />
+                );
+              };
+              const outros = fotosDepois.map((_, i) => i).filter((i) => i !== heroIdx);
+              return (
+                <>
+                  {/* Foto principal — destaque hero, sticky no topo em mobile */}
+                  <div className="sticky top-2 z-10 -mx-2 px-2 pb-4 sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:mb-4">
+                    {cardFor(heroIdx, { hero: true })}
+                  </div>
+                  {outros.length > 0 && (
+                    <>
+                      <div className="mb-3 mt-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <span className="h-px flex-1 bg-border" />
+                        Outras fotos ({outros.length})
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                        {outros.map((i) => cardFor(i))}
+                      </div>
+                    </>
+                  )}
+                  <p className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+                    <Star className="h-3 w-3" /> Clique na estrela para marcar a foto principal do resultado.
+                  </p>
+                </>
+              );
+            })()}
             {!readOnly && !isEtapaConfirmada(atendimento, 5) && (
               <Button className="mt-5 w-full h-11 uppercase" onClick={() => confirmarEtapa(5)}>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
