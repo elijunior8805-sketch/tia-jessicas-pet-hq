@@ -261,7 +261,7 @@ function AtendimentoDetalhe() {
       }
 
       // marca etapa 8 concluída
-      const map = { ...(atendimento.etapas_status ?? {}) } as Record<string, EtapaStatus>;
+      const map = { ...((atendimento.etapas_status as Record<string, EtapaStatus>) ?? {}) };
       map["8"] = {
         status: "concluida",
         confirmado_em: new Date().toISOString(),
