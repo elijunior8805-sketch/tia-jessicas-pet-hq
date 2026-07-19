@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus,
+  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, eachDayOfInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
