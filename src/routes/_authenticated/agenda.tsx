@@ -23,6 +23,8 @@ import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
   ChevronLeft, ChevronRight, MessageCircle, Send,
 } from "lucide-react";
+import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
+
 
 // ---------- WhatsApp helpers ----------
 
@@ -40,7 +42,7 @@ function fmtDataBR(iso: string) {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
-function waMessage(row: any): string {
+function waMessage(row: any, signer?: { name: string; initials: string }): string {
   const nomeCliente = row.clientes?.nome?.split(" ")[0] ?? "";
   const pet = row.pets?.nome ?? "seu pet";
   const servico = row.servicos?.nome ?? "atendimento";
@@ -49,6 +51,10 @@ function waMessage(row: any): string {
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
   const valor = total > 0
     ? total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+    : "";
+
+  const signature = signer?.name
+    ? `\n\nAtenciosamente,\n*${signer.name}* (${signer.initials})\nSpa de Pet Tia Jéssica`
     : "";
 
   switch (row.status) {
@@ -60,7 +66,8 @@ function waMessage(row: any): string {
         `• Data: ${data}\n` +
         `• Horário: ${hora}\n` +
         (valor ? `• Valor previsto: ${valor}\n` : "") +
-        `\nPodemos confirmar sua presença? 💚`
+        `\nPodemos confirmar sua presença? 💚` +
+        signature
       );
     case "confirmado":
       return (
@@ -69,27 +76,41 @@ function waMessage(row: any): string {
         `• Serviço: ${servico}\n` +
         `• Data: ${data}\n` +
         `• Horário: ${hora}\n\n` +
-        `Estamos ansiosas para receber vocês! 🐶💚`
+        `Estamos ansiosas para receber vocês! 🐶💚` +
+        signature
       );
     case "aguardando":
       return (
         `Oi${nomeCliente ? `, ${nomeCliente}` : ""}! 🕒\n\n` +
         `Estamos *aguardando a chegada* de *${pet}* para o ${servico} das ${hora}.\n` +
-        `Está tudo certo? Qualquer imprevisto, é só nos avisar por aqui. 💚`
+        `Está tudo certo? Qualquer imprevisto, é só nos avisar por aqui. 💚` +
+        signature
+      );
+    case "finalizado":
+      return (
+        `Oi${nomeCliente ? `, ${nomeCliente}` : ""}! 💚\n\n` +
+        `O atendimento de *${pet}* (${servico}) foi *finalizado com carinho* aqui no *Spa de Pet Tia Jéssica*.\n` +
+        (valor ? `• Total: ${valor}\n` : "") +
+        `\nVocê já pode buscá-lo(a) — e qualquer dúvida sobre o cuidado em casa é só chamar por aqui. 🐾` +
+        signature
       );
     default:
-      return `Olá${nomeCliente ? `, ${nomeCliente}` : ""}! Sobre o atendimento de ${pet} em ${data} às ${hora}.`;
+      return (
+        `Olá${nomeCliente ? `, ${nomeCliente}` : ""}! Sobre o atendimento de ${pet} em ${data} às ${hora}.` +
+        signature
+      );
   }
 }
-function openWhatsApp(row: any) {
+function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
   const phone = waPhone(row.clientes?.whatsapp);
   if (!phone) {
     toast.error("Cliente sem WhatsApp cadastrado");
     return;
   }
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(row))}`;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(row, signer))}`;
   window.open(url, "_blank", "noopener,noreferrer");
 }
+
 
 
 export const Route = createFileRoute("/_authenticated/agenda")({
@@ -142,6 +163,10 @@ function AgendaPage() {
   const [statusFilter, setStatusFilter] = useState<"todos" | Status>("todos");
   const [openNew, setOpenNew] = useState(false);
   const qc = useQueryClient();
+  const { data: profile } = useMyProfile();
+  const signer = { name: displayName(profile), initials: initials(profile) };
+
+
 
   const { data: agendamentos, isLoading } = useQuery({
     queryKey: ["agendamentos", date, statusFilter],
@@ -268,7 +293,9 @@ function AgendaPage() {
               key={a.id}
               row={a}
               onChangeStatus={(status) => updateStatus.mutate({ id: a.id, status })}
+              signer={signer}
             />
+
           ))}
         </div>
       )}
@@ -281,10 +308,13 @@ function AgendaPage() {
 function AgendamentoRow({
   row,
   onChangeStatus,
+  signer,
 }: {
   row: any;
   onChangeStatus: (s: Status) => void;
+  signer: { name: string; initials: string };
 }) {
+
   const meta = statusMeta(row.status);
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
 
@@ -346,23 +376,32 @@ function AgendamentoRow({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando") && (
+            {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando" || row.status === "finalizado") && (
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-1 border-success/40 text-success hover:bg-success/10"
-                onClick={() => openWhatsApp(row)}
+                onClick={() => openWhatsApp(row, signer)}
                 title={
                   row.status === "agendado"
                     ? "Enviar confirmação por WhatsApp"
                     : row.status === "confirmado"
                     ? "Enviar lembrete por WhatsApp"
-                    : "Enviar mensagem de aguardando"
+                    : row.status === "aguardando"
+                    ? "Enviar mensagem de aguardando"
+                    : "Enviar aviso de encerramento por WhatsApp"
                 }
               >
                 <Send className="h-3.5 w-3.5" />
-                {row.status === "agendado" ? "Confirmar" : row.status === "confirmado" ? "Lembrar" : "Cobrar"}
+                {row.status === "agendado"
+                  ? "Confirmar"
+                  : row.status === "confirmado"
+                  ? "Lembrar"
+                  : row.status === "aguardando"
+                  ? "Cobrar"
+                  : "Avisar encerramento"}
               </Button>
+
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
