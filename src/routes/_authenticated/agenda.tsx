@@ -551,12 +551,62 @@ function AgendamentoRow({
   iniciando: boolean;
   signer: { name: string; initials: string };
 }) {
+  const qc = useQueryClient();
   const previewStorageKey = `wa-preview:finalizado:${row.id}`;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState("");
   const [editServicosOpen, setEditServicosOpen] = useState(false);
+  const [reagendarOpen, setReagendarOpen] = useState(false);
+  const [novaData, setNovaData] = useState<string>(row.data ?? "");
+  const [novaHora, setNovaHora] = useState<string>(row.hora ? String(row.hora).slice(0, 5) : "");
+  const [cancelarOpen, setCancelarOpen] = useState(false);
+  const [motivoCancel, setMotivoCancel] = useState("");
 
   const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
+  const podeReagendar = ["agendado", "confirmado", "aguardando"].includes(row.status);
+  const podeCancelar = !["cancelado", "finalizado"].includes(row.status);
+  const podeCheckIn = ["agendado", "confirmado"].includes(row.status);
+
+  const reagendarMut = useMutation({
+    mutationFn: async () => {
+      if (!novaData || !novaHora) throw new Error("Informe data e hora");
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ data: novaData, hora: novaHora, status: "agendado" })
+        .eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Agendamento reagendado");
+      setReagendarOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao reagendar"),
+  });
+
+  const cancelarMut = useMutation({
+    mutationFn: async () => {
+      const obsAntes: string = row.observacoes ?? "";
+      const stamp = new Date().toLocaleString("pt-BR");
+      const nota = motivoCancel.trim()
+        ? `${obsAntes ? obsAntes + "\n" : ""}[Cancelado em ${stamp}] ${motivoCancel.trim()}`
+        : obsAntes || null;
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ status: "cancelado", observacoes: nota })
+        .eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Agendamento cancelado");
+      setCancelarOpen(false);
+      setMotivoCancel("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao cancelar"),
+  });
 
   const openFinalizadoPreview = () => {
     let saved: string | null = null;
