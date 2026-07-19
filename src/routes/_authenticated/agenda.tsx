@@ -1404,7 +1404,10 @@ function NovoAgendamentoDialog({
 
 // hook auxiliar: executa reset toda vez que `key` muda para true
 function useMemoReset(key: boolean, fn: () => void) {
-  useMemo(() => { if (key) fn(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Precisa ser useEffect: useMemo pode ser re-executado pelo React a qualquer
+  // momento (cache descartável), o que reseta o formulário durante a digitação
+  // (ex.: campo hora "travado" em 09:00 após o usuário alterar).
+  useEffect(() => { if (key) fn(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 }
 
