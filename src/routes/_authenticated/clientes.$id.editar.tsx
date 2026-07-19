@@ -9,6 +9,10 @@ import { ArrowLeft, Save } from "lucide-react";
 import {
   ClienteFormFields, ClienteFormState, emptyClienteForm, clienteFormFromRow, clienteFormToInsert,
 } from "@/components/cliente-form-fields";
+import { FotoPicker } from "@/components/foto-picker";
+import { uploadFoto, removeFoto } from "@/lib/foto-upload";
+import { Card } from "@/components/ui/card";
+import { User } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id/editar")({
   component: EditarClientePage,
