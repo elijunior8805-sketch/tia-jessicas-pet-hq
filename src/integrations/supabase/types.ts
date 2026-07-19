@@ -1032,6 +1032,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gerar_parcelas_compra: {
+        Args: { _compra_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
