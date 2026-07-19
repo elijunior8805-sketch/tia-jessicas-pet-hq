@@ -25,6 +25,8 @@ function EditarClientePage() {
 
   const [form, setForm] = useState<ClienteFormState>(emptyClienteForm);
   const [loaded, setLoaded] = useState(false);
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoRemoved, setFotoRemoved] = useState(false);
   const dirtyRef = useRef(false);
 
   const { data: cliente, isLoading } = useQuery({
@@ -45,7 +47,7 @@ function EditarClientePage() {
     }
   }, [cliente, loaded]);
 
-  useEffect(() => { if (loaded) dirtyRef.current = true; }, [form, loaded]);
+  useEffect(() => { if (loaded) dirtyRef.current = true; }, [form, loaded, fotoFile, fotoRemoved]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -60,7 +62,18 @@ function EditarClientePage() {
   const mut = useMutation({
     mutationFn: async () => {
       if (!form.nome.trim()) throw new Error("Nome é obrigatório.");
-      const { error } = await supabase.from("clientes").update(clienteFormToInsert(form)).eq("id", id);
+      const patch: any = { ...clienteFormToInsert(form) };
+      if (fotoFile) {
+        const path = await uploadFoto("clientes", id, fotoFile);
+        patch.foto_url = path;
+        if ((cliente as any)?.foto_url && (cliente as any).foto_url !== path) {
+          removeFoto((cliente as any).foto_url).catch(() => {});
+        }
+      } else if (fotoRemoved && (cliente as any)?.foto_url) {
+        patch.foto_url = null;
+        removeFoto((cliente as any).foto_url).catch(() => {});
+      }
+      const { error } = await supabase.from("clientes").update(patch).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -95,6 +108,16 @@ function EditarClientePage() {
         }
       />
       <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-6">
+        <Card className="p-4 sm:p-6 flex justify-center">
+          <FotoPicker
+            currentPath={(cliente as any)?.foto_url ?? null}
+            onFileChange={setFotoFile}
+            onRemoveExisting={() => setFotoRemoved(true)}
+            placeholderIcon={User}
+            size="md"
+            label="Foto do tutor"
+          />
+        </Card>
         <ClienteFormFields value={form} onChange={(patch) => setForm((s) => ({ ...s, ...patch }))} />
         <div className="flex justify-end gap-2 sticky bottom-4">
           <Button type="button" variant="outline" onClick={tryBack}>Cancelar</Button>
