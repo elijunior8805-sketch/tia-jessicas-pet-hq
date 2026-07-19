@@ -122,7 +122,7 @@ function DashboardPage() {
       {/* Saudação */}
       <div className="mb-6">
         <h1 className="font-display text-4xl sm:text-5xl font-semibold text-primary tracking-tight">
-          {greeting()}, {profile?.nome?.split(" ")[0] || "seja bem-vinda"}
+          {greeting()}, {firstName(profile)}
         </h1>
         <p className="text-muted-foreground mt-2 capitalize">
           {format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}
