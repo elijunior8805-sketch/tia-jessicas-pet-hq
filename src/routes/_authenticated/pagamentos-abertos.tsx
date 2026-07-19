@@ -187,6 +187,21 @@ function PagamentosAbertosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          filtrados.length > 0 &&
+                          filtrados.every((p) => selecionados.has(p.id))
+                        }
+                        onCheckedChange={(v) => {
+                          const next = new Set(selecionados);
+                          if (v) filtrados.forEach((p) => next.add(p.id));
+                          else filtrados.forEach((p) => next.delete(p.id));
+                          setSelecionados(next);
+                        }}
+                        aria-label="Selecionar todos"
+                      />
+                    </TableHead>
                     <TableHead>Cliente / Pet</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Status</TableHead>
@@ -198,11 +213,24 @@ function PagamentosAbertosPage() {
                   {filtrados.map((p) => (
                     <TableRow key={p.id} className={p.dias_atraso > 0 ? "bg-destructive/5" : ""}>
                       <TableCell>
+                        <Checkbox
+                          checked={selecionados.has(p.id)}
+                          onCheckedChange={(v) => {
+                            const next = new Set(selecionados);
+                            if (v) next.add(p.id);
+                            else next.delete(p.id);
+                            setSelecionados(next);
+                          }}
+                          aria-label={`Selecionar ${p.cliente_nome}`}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <div className="font-medium">{p.cliente_nome}</div>
                         {p.pet_nome && (
                           <div className="text-xs text-muted-foreground">🐾 {p.pet_nome}</div>
                         )}
                       </TableCell>
+
                       <TableCell>
                         {p.vencimento
                           ? new Date(p.vencimento + "T00:00:00").toLocaleDateString("pt-BR")
