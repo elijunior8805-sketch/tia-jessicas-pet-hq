@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
-  ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2,
+  ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
 } from "lucide-react";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 
@@ -551,12 +551,62 @@ function AgendamentoRow({
   iniciando: boolean;
   signer: { name: string; initials: string };
 }) {
+  const qc = useQueryClient();
   const previewStorageKey = `wa-preview:finalizado:${row.id}`;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState("");
   const [editServicosOpen, setEditServicosOpen] = useState(false);
+  const [reagendarOpen, setReagendarOpen] = useState(false);
+  const [novaData, setNovaData] = useState<string>(row.data ?? "");
+  const [novaHora, setNovaHora] = useState<string>(row.hora ? String(row.hora).slice(0, 5) : "");
+  const [cancelarOpen, setCancelarOpen] = useState(false);
+  const [motivoCancel, setMotivoCancel] = useState("");
 
   const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
+  const podeReagendar = ["agendado", "confirmado", "aguardando"].includes(row.status);
+  const podeCancelar = !["cancelado", "finalizado"].includes(row.status);
+  const podeCheckIn = ["agendado", "confirmado"].includes(row.status);
+
+  const reagendarMut = useMutation({
+    mutationFn: async () => {
+      if (!novaData || !novaHora) throw new Error("Informe data e hora");
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ data: novaData, hora: novaHora, status: "agendado" })
+        .eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Agendamento reagendado");
+      setReagendarOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao reagendar"),
+  });
+
+  const cancelarMut = useMutation({
+    mutationFn: async () => {
+      const obsAntes: string = row.observacoes ?? "";
+      const stamp = new Date().toLocaleString("pt-BR");
+      const nota = motivoCancel.trim()
+        ? `${obsAntes ? obsAntes + "\n" : ""}[Cancelado em ${stamp}] ${motivoCancel.trim()}`
+        : obsAntes || null;
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ status: "cancelado", observacoes: nota })
+        .eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Agendamento cancelado");
+      setCancelarOpen(false);
+      setMotivoCancel("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao cancelar"),
+  });
 
   const openFinalizadoPreview = () => {
     let saved: string | null = null;
@@ -760,15 +810,58 @@ function AgendamentoRow({
               </Button>
 
             )}
+            {podeCheckIn && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-gold/50 text-gold-foreground hover:bg-gold/10"
+                onClick={() => onChangeStatus("aguardando")}
+                title="Registrar chegada do pet (check-in)"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                Check-in
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1">
-                  Status <MoreHorizontal className="h-3.5 w-3.5" />
+                  Ações <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Ações rápidas</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {podeReagendar && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setNovaData(row.data ?? "");
+                      setNovaHora(row.hora ? String(row.hora).slice(0, 5) : "");
+                      setReagendarOpen(true);
+                    }}
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5 mr-2" /> Reagendar…
+                  </DropdownMenuItem>
+                )}
+                {podeCheckIn && (
+                  <DropdownMenuItem onClick={() => onChangeStatus("aguardando")}>
+                    <LogIn className="h-3.5 w-3.5 mr-2" /> Marcar check-in
+                  </DropdownMenuItem>
+                )}
+                {row.status === "aguardando" && (
+                  <DropdownMenuItem onClick={onIniciar} disabled={iniciando}>
+                    <Play className="h-3.5 w-3.5 mr-2" /> Iniciar atendimento
+                  </DropdownMenuItem>
+                )}
+                {podeCancelar && (
+                  <DropdownMenuItem
+                    onClick={() => setCancelarOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Cancelar agendamento
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
                 {STATUS.map((s) => (
                   <DropdownMenuItem
                     key={s.value}
@@ -835,6 +928,74 @@ function AgendamentoRow({
         onOpenChange={setEditServicosOpen}
         agendamento={row}
       />
+
+      <Dialog open={reagendarOpen} onOpenChange={setReagendarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reagendar</DialogTitle>
+            <DialogDescription>
+              {row.pets?.nome ? `${row.pets.nome} · ` : ""}{row.clientes?.nome ?? ""} — escolha a nova data e horário.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Nova data</Label>
+              <Input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
+            </div>
+            <div>
+              <Label>Nova hora</Label>
+              <Input type="time" value={novaHora} onChange={(e) => setNovaHora(e.target.value)} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            O status volta para <strong>Agendado</strong> após reagendar. Envie uma nova confirmação pelo WhatsApp em seguida.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReagendarOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => reagendarMut.mutate()}
+              disabled={reagendarMut.isPending || !novaData || !novaHora}
+            >
+              {reagendarMut.isPending ? "Salvando…" : "Confirmar reagendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelarOpen} onOpenChange={setCancelarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar agendamento</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja cancelar o agendamento de{" "}
+              <strong>{row.pets?.nome ?? "pet"}</strong> às{" "}
+              <strong>{row.hora ? String(row.hora).slice(0, 5) : "—"}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Motivo (opcional)</Label>
+            <Textarea
+              rows={3}
+              value={motivoCancel}
+              onChange={(e) => setMotivoCancel(e.target.value)}
+              placeholder="Ex.: cliente pediu para remarcar por motivo pessoal"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              O motivo é anexado às observações do agendamento para histórico.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelarOpen(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelarMut.mutate()}
+              disabled={cancelarMut.isPending}
+            >
+              {cancelarMut.isPending ? "Cancelando…" : "Cancelar agendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
