@@ -350,7 +350,7 @@ function AgendaPage() {
       // Sincroniza valor_previsto do agendamento se estiver divergente dos itens
       if (Math.abs(Number(row.valor_previsto ?? 0) - totalItens) > 0.001) {
         await supabase.from("agendamentos")
-          .update({ valor_previsto: totalItens, duracao_min: totalDuracao > 0 ? totalDuracao : null })
+          .update({ valor_previsto: totalItens, duracao_min: totalDuracao > 0 ? totalDuracao : undefined })
           .eq("id", row.id);
       }
 
