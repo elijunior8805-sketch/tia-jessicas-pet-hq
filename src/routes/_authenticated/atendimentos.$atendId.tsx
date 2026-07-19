@@ -132,29 +132,38 @@ async function compartilharFotoWhats(path: string, whatsapp: string | null | und
 }
 
 function ResultadoFotoCard({
-  path, principal, disabled, onZoom, onStar, onRemove, onDownload, onShare, filename,
+  path, principal, disabled, hero, onZoom, onStar, onRemove, onDownload, onShare, filename,
 }: {
-  path: string; principal?: boolean; disabled?: boolean; filename: string;
+  path: string; principal?: boolean; disabled?: boolean; hero?: boolean; filename: string;
   onZoom: () => void; onStar?: () => void; onRemove?: () => void;
   onDownload: () => void; onShare?: () => void;
 }) {
   const { data: url } = useSignedUrl(path);
   return (
-    <div className={`group relative overflow-hidden rounded-xl border bg-muted ${principal ? "ring-2 ring-primary shadow-elegant" : ""}`}>
+    <div className={`group relative overflow-hidden bg-muted ${
+      hero
+        ? "rounded-2xl border-2 border-primary/40 ring-1 ring-gold/40 shadow-premium"
+        : `rounded-xl border ${principal ? "ring-2 ring-primary shadow-elegant" : ""}`
+    }`}>
       {url ? (
         <img
           src={url}
           alt={filename}
           onClick={onZoom}
-          className="aspect-square w-full object-cover cursor-zoom-in transition group-hover:scale-[1.02]"
+          className={`w-full object-cover cursor-zoom-in transition group-hover:scale-[1.02] ${
+            hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"
+          }`}
         />
       ) : (
-        <div className="aspect-square w-full bg-muted animate-pulse" />
+        <div className={`w-full bg-muted animate-pulse ${hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"}`} />
       )}
 
       {principal && (
-        <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-primary/95 text-primary-foreground text-[10px] font-semibold px-2 py-1 uppercase tracking-wider shadow-md">
-          <Star className="h-3 w-3 fill-current" /> Principal
+        <span className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-gold to-primary text-primary-foreground font-semibold uppercase tracking-wider shadow-md ${
+          hero ? "text-[11px] px-3 py-1.5" : "text-[10px] px-2 py-1"
+        }`}>
+          <Star className={`fill-current ${hero ? "h-3.5 w-3.5" : "h-3 w-3"}`} />
+          {hero ? "Foto principal" : "Principal"}
         </span>
       )}
 
@@ -179,21 +188,21 @@ function ResultadoFotoCard({
       )}
 
       {/* Actions overlay: always visible on mobile, hover on desktop */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent p-2 flex gap-2">
+      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex gap-2 ${hero ? "p-3 sm:p-4" : "p-2"}`}>
         <Button
           type="button" size="sm" variant="secondary"
-          className="flex-1 h-9 text-xs backdrop-blur bg-white/95 hover:bg-white text-foreground"
+          className={`flex-1 backdrop-blur bg-white/95 hover:bg-white text-foreground ${hero ? "h-11 text-sm font-semibold" : "h-9 text-xs"}`}
           onClick={(e) => { e.stopPropagation(); onDownload(); }}
         >
-          <Download className="h-3.5 w-3.5 mr-1" /> Baixar
+          <Download className={`mr-1.5 ${hero ? "h-4 w-4" : "h-3.5 w-3.5"}`} /> Baixar
         </Button>
         {onShare && (
           <Button
             type="button" size="sm"
-            className="flex-1 h-9 text-xs bg-[#25D366] hover:bg-[#20b858] text-white"
+            className={`flex-1 bg-[#25D366] hover:bg-[#20b858] text-white ${hero ? "h-11 text-sm font-semibold" : "h-9 text-xs"}`}
             onClick={(e) => { e.stopPropagation(); onShare(); }}
           >
-            <MessageCircle className="h-3.5 w-3.5 mr-1" /> Enviar
+            <MessageCircle className={`mr-1.5 ${hero ? "h-4 w-4" : "h-3.5 w-3.5"}`} /> Enviar
           </Button>
         )}
       </div>
@@ -954,34 +963,56 @@ function AtendimentoDetalhe() {
                 <p className="text-sm text-muted-foreground italic">Nenhuma foto do resultado ainda.</p>
                 <p className="text-xs text-muted-foreground mt-1">Capriche na foto do pet lindo!</p>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {fotosDepois.map((f, i) => (
-                    <ResultadoFotoCard
-                      key={i}
-                      path={f.path}
-                      principal={!!f.principal}
-                      disabled={readOnly}
-                      filename={`${(pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-")}-pronto-${i + 1}.jpg`}
-                      onZoom={() => setZoomFoto(f.path)}
-                      onStar={() => setPrincipal(i)}
-                      onRemove={() => removeFoto("depois", i)}
-                      onDownload={() => baixarFoto(
-                        f.path,
-                        `${(pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-")}-pronto-${i + 1}.jpg`,
-                      )}
-                      onShare={() => compartilharFotoWhats(
-                        f.path, cliente?.whatsapp, pet?.nome ?? "seu pet", cliente?.nome ?? "",
-                      )}
-                    />
-                  ))}
-                </div>
-                <p className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
-                  <Star className="h-3 w-3" /> Clique na estrela para marcar a foto principal do resultado.
-                </p>
-              </>
-            )}
+            ) : (() => {
+              const principalIdx = fotosDepois.findIndex((f) => f.principal);
+              const heroIdx = principalIdx >= 0 ? principalIdx : 0;
+              const petSlug = (pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-");
+              const cardFor = (i: number, opts: { hero?: boolean } = {}) => {
+                const f = fotosDepois[i];
+                const filename = `${petSlug}-pronto-${i + 1}.jpg`;
+                return (
+                  <ResultadoFotoCard
+                    key={i}
+                    path={f.path}
+                    principal={!!f.principal}
+                    disabled={readOnly}
+                    hero={opts.hero}
+                    filename={filename}
+                    onZoom={() => setZoomFoto(f.path)}
+                    onStar={f.principal ? undefined : () => setPrincipal(i)}
+                    onRemove={() => removeFoto("depois", i)}
+                    onDownload={() => baixarFoto(f.path, filename)}
+                    onShare={() => compartilharFotoWhats(
+                      f.path, cliente?.whatsapp, pet?.nome ?? "seu pet", cliente?.nome ?? "",
+                    )}
+                  />
+                );
+              };
+              const outros = fotosDepois.map((_, i) => i).filter((i) => i !== heroIdx);
+              return (
+                <>
+                  {/* Foto principal — destaque hero, sticky no topo em mobile */}
+                  <div className="sticky top-2 z-10 -mx-2 px-2 pb-4 sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:mb-4">
+                    {cardFor(heroIdx, { hero: true })}
+                  </div>
+                  {outros.length > 0 && (
+                    <>
+                      <div className="mb-3 mt-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <span className="h-px flex-1 bg-border" />
+                        Outras fotos ({outros.length})
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                        {outros.map((i) => cardFor(i))}
+                      </div>
+                    </>
+                  )}
+                  <p className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+                    <Star className="h-3 w-3" /> Clique na estrela para marcar a foto principal do resultado.
+                  </p>
+                </>
+              );
+            })()}
             {!readOnly && !isEtapaConfirmada(atendimento, 5) && (
               <Button className="mt-5 w-full h-11 uppercase" onClick={() => confirmarEtapa(5)}>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
