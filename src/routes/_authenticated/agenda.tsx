@@ -298,11 +298,25 @@ function AgendaPage() {
   });
 
   const iniciarAtendimentoMut = useMutation({
-    mutationFn: async (row: any) => {
+    mutationFn: async (rowIn: any) => {
       // Se já existir atendimento vinculado, reutiliza
       const { data: existing } = await supabase.from("atendimentos")
-        .select("id").eq("agendamento_id", row.id).maybeSingle();
+        .select("id").eq("agendamento_id", rowIn.id).maybeSingle();
       if (existing?.id) return existing.id as string;
+
+      // Busca versão fresca do agendamento e seus itens (evita usar cache desatualizado
+      // após a edição de serviços)
+      const { data: fresh, error: errFresh } = await supabase
+        .from("agendamentos")
+        .select(`
+          id, cliente_id, pet_id, profissional_id, valor_previsto, taxa_leva_traz, observacoes,
+          servicos(id, nome, valor, duracao_min),
+          agendamento_servicos(id, servico_id, nome, valor_unit, duracao_min, ordem)
+        `)
+        .eq("id", rowIn.id)
+        .single();
+      if (errFresh) throw errFresh;
+      const row: any = { ...rowIn, ...fresh };
 
       const itens = Array.isArray(row.agendamento_servicos) && row.agendamento_servicos.length > 0
         ? [...row.agendamento_servicos].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
@@ -312,6 +326,11 @@ function AgendaPage() {
             valor_unit: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
             duracao_min: row.servicos.duracao_min ?? null,
           }] : []);
+
+      if (itens.length === 0) {
+        throw new Error("Este agendamento não possui serviços. Edite os serviços antes de iniciar.");
+      }
+
       const servicoSolicitado = itens.map((it: any) => ({
         servico_id: it.servico_id,
         nome: it.nome,
@@ -319,7 +338,21 @@ function AgendaPage() {
         quantidade: 1,
         valor_unit: Number(it.valor_unit ?? 0),
         valor_total: Number(it.valor_unit ?? 0),
+        duracao_min: it.duracao_min ?? null,
       }));
+
+      // Totais calculados a partir dos itens editados (fonte da verdade)
+      const totalItens = servicoSolicitado.reduce((s, it) => s + Number(it.valor_total ?? 0), 0);
+      const totalDuracao = itens.reduce((s: number, it: any) => s + Number(it.duracao_min ?? 0), 0);
+      const taxa = Number(row.taxa_leva_traz ?? 0);
+      const valorPlanejado = Number((totalItens + taxa).toFixed(2));
+
+      // Sincroniza valor_previsto do agendamento se estiver divergente dos itens
+      if (Math.abs(Number(row.valor_previsto ?? 0) - totalItens) > 0.001) {
+        await supabase.from("agendamentos")
+          .update({ valor_previsto: totalItens, duracao_min: totalDuracao > 0 ? totalDuracao : undefined })
+          .eq("id", row.id);
+      }
 
       const { data: novo, error } = await supabase.from("atendimentos").insert({
         agendamento_id: row.id,
@@ -331,9 +364,9 @@ function AgendaPage() {
         servicos_planejados: servicoSolicitado as any,
         servicos_executados: [] as any,
         servicos_extras: [] as any,
-        valor_planejado: Number(row.valor_previsto ?? 0),
+        valor_planejado: valorPlanejado,
         valor_executado: 0,
-        taxa_leva_traz: Number(row.taxa_leva_traz ?? 0),
+        taxa_leva_traz: taxa,
         observacoes_checkin: row.observacoes ?? null,
         etapa_atual: 1,
         etapas_status: {} as any,
@@ -347,6 +380,7 @@ function AgendaPage() {
 
       return novo.id as string;
     },
+
     onSuccess: (atendId) => {
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
       navigate({ to: "/atendimentos/$atendId", params: { atendId } });
