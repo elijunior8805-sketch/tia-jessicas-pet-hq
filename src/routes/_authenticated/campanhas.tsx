@@ -89,11 +89,13 @@ function CampanhasPage() {
   const [busca, setBusca] = useState("");
   const [criarOpen, setCriarOpen] = useState(false);
   const [detalheId, setDetalheId] = useState<string | null>(null);
+  const [pendingDestId, setPendingDestId] = useState<string | null>(null);
 
   const listar = useServerFn(listarCampanhas);
   const kpisFn = useServerFn(kpisCampanhas);
   const excluirFn = useServerFn(excluirCampanha);
   const duplicarFn = useServerFn(duplicarCampanha);
+  const marcarFn = useServerFn(marcarDestinatarioEnviado);
 
   const composer = useWhatsAppComposer();
 
