@@ -232,17 +232,34 @@ export async function gerarExecucoesInterno(supabase: any) {
       n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const diaFmt = new Date(`${dia}T12:00:00Z`).toLocaleDateString("pt-BR");
 
+    const kpisSel: string[] = Array.isArray(a.kpis) && a.kpis.length
+      ? a.kpis
+      : ["faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber"];
+
+    const linhaKpi = (id: string): string | null => {
+      switch (id) {
+        case "faturamento": return `• Faturamento: ${brl(faturamento)}`;
+        case "atendimentos": return `• Atendimentos: ${qtd}`;
+        case "ticket": return `• Ticket médio: ${brl(ticket)}`;
+        case "clientes": return `• Clientes atendidos: ${clientes}`;
+        case "leva_traz": return `• Leva e traz: ${brl(taxaLT)}`;
+        case "a_receber": return `• A receber: ${brl(aReceber)}`;
+        case "atraso": return `• Valor em atraso: ${brl(atraso)}`;
+        default: return null;
+      }
+    };
+
+    const titulo = (a.titulo_mensagem?.trim())
+      || `Spa da Tia Jéssica — Relatório diário (${diaFmt})`;
+    const rodape = (a.rodape_mensagem?.trim()) || "Detalhes completos no painel. 🐾";
+
     for (const d of (a.destinatarios ?? []) as Array<{ nome: string; whatsapp: string }>) {
+      const linhas = kpisSel.map(linhaKpi).filter((s): s is string => !!s).join("\n");
       const mensagem =
-        `*Spa da Tia Jéssica — Relatório diário (${diaFmt})*\n\n` +
+        `*${titulo}*\n\n` +
         `Olá, ${d.nome}! Segue o resumo do dia:\n\n` +
-        `• Faturamento: ${brl(faturamento)}\n` +
-        `• Atendimentos: ${qtd}\n` +
-        `• Ticket médio: ${brl(ticket)}\n` +
-        `• Clientes atendidos: ${clientes}\n` +
-        `• Leva e traz: ${brl(taxaLT)}\n` +
-        `• A receber: ${brl(aReceber)}${atraso > 0 ? ` (atraso ${brl(atraso)})` : ""}\n\n` +
-        `Detalhes completos no painel. 🐾`;
+        `${linhas}\n\n` +
+        `${rodape}`;
 
       const fone = d.whatsapp.replace(/\D/g, "");
       const wa_url = `https://wa.me/${fone.startsWith("55") ? fone : `55${fone}`}?text=${encodeURIComponent(mensagem)}`;
