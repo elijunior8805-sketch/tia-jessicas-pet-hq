@@ -27,6 +27,8 @@ import {
   brl, sumItens, itemFromServico, isBanho, isTosa,
   COMPORTAMENTOS, OCORRENCIA_TIPOS, type ServicoItem,
 } from "@/lib/atendimento-utils";
+import { generateAtendimentoPDF } from "@/lib/atendimento-pdf";
+import { useMyProfile } from "@/hooks/use-my-profile";
 
 export const Route = createFileRoute("/_authenticated/atendimentos/$atendId")({
   component: AtendimentoDetalhe,
