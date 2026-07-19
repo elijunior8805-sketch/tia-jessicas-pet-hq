@@ -168,7 +168,7 @@ function ComunicacaoPage() {
       return;
     }
     composer.open({
-      tipo,
+      tipo: tipo as any,
       destinatario: clienteSel.nome,
       telefone: clienteSel.whatsapp,
       mensagem,
