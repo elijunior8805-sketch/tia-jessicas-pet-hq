@@ -20,6 +20,7 @@ import {
   Megaphone,
   Settings,
   PawPrint,
+  Cake,
 } from "lucide-react";
 import {
   Sidebar,
