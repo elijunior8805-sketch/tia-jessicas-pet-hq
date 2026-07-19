@@ -383,10 +383,13 @@ function ServicosList({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            </div>
-          </Card>
-        );
-      })}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
