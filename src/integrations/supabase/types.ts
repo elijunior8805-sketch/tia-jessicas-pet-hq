@@ -790,6 +790,7 @@ export type Database = {
           id: string
           logo_url: string | null
           nome_fantasia: string
+          pix_chave: string | null
           razao_social: string | null
           taxa_leva_traz_padrao: number | null
           telefone: string | null
@@ -806,6 +807,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           nome_fantasia?: string
+          pix_chave?: string | null
           razao_social?: string | null
           taxa_leva_traz_padrao?: number | null
           telefone?: string | null
@@ -822,6 +824,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           nome_fantasia?: string
+          pix_chave?: string | null
           razao_social?: string | null
           taxa_leva_traz_padrao?: number | null
           telefone?: string | null
@@ -1574,6 +1577,89 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      whatsapp_contatos: {
+        Row: {
+          atendimento_id: string | null
+          cliente_id: string | null
+          cobranca_id: string | null
+          created_at: string
+          destinatario: string
+          id: string
+          marcado_em: string | null
+          mensagem: string
+          motivo: string | null
+          observacao: string | null
+          pagamento_id: string | null
+          status: string
+          telefone: string
+          tipo: string
+          user_id: string | null
+        }
+        Insert: {
+          atendimento_id?: string | null
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          created_at?: string
+          destinatario: string
+          id?: string
+          marcado_em?: string | null
+          mensagem: string
+          motivo?: string | null
+          observacao?: string | null
+          pagamento_id?: string | null
+          status?: string
+          telefone: string
+          tipo: string
+          user_id?: string | null
+        }
+        Update: {
+          atendimento_id?: string | null
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          created_at?: string
+          destinatario?: string
+          id?: string
+          marcado_em?: string | null
+          mensagem?: string
+          motivo?: string | null
+          observacao?: string | null
+          pagamento_id?: string | null
+          status?: string
+          telefone?: string
+          tipo?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_contatos_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_contatos_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_contatos_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
