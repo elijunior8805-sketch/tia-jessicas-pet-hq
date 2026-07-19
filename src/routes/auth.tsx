@@ -152,7 +152,7 @@ function AuthPage() {
     if (!email) return toast.error("Informe seu e-mail acima primeiro");
     const { error } = await withRetry(() =>
       supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/reset-password`,
       }),
     );
     if (error) return handleAuthError("reset", error);
