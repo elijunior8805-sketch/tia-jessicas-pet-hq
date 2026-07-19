@@ -314,8 +314,27 @@ function AgendamentoRow({
   onChangeStatus: (s: Status) => void;
   signer: { name: string; initials: string };
 }) {
+  const previewStorageKey = `wa-preview:finalizado:${row.id}`;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState("");
+
+  const openFinalizadoPreview = () => {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(previewStorageKey); } catch {}
+    setPreviewText(saved ?? waMessage(row, signer));
+    setPreviewOpen(true);
+  };
+
+  const updatePreviewText = (v: string) => {
+    setPreviewText(v);
+    try { localStorage.setItem(previewStorageKey, v); } catch {}
+  };
+
+  const resetPreviewText = () => {
+    const def = waMessage(row, signer);
+    setPreviewText(def);
+    try { localStorage.removeItem(previewStorageKey); } catch {}
+  };
 
   const meta = statusMeta(row.status);
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
