@@ -255,7 +255,8 @@ function AgendaPage() {
           id, data, hora, duracao_min, valor_previsto, taxa_leva_traz, observacoes, status,
           clientes(id, nome, whatsapp, vip),
           pets(id, nome, raca, porte),
-          servicos(id, nome, valor, duracao_min)
+          servicos(id, nome, valor, duracao_min),
+          agendamento_servicos(id, servico_id, nome, valor_unit, duracao_min, ordem)
         `)
         .eq("data", date)
         .order("hora", { ascending: true });
