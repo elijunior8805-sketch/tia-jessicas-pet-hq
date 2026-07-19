@@ -24,6 +24,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedComunicacaoRouteImport } from './routes/_authenticated/comunicacao'
 import { Route as AuthenticatedComprasRouteImport } from './routes/_authenticated/compras'
+import { Route as AuthenticatedCobrancasRouteImport } from './routes/_authenticated/cobrancas'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes.index'
 import { Route as AuthenticatedAtendimentosIndexRouteImport } from './routes/_authenticated/atendimentos.index'
@@ -32,6 +33,7 @@ import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authent
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
 import { Route as ApiPublicHooksRelatoriosDiariosRouteImport } from './routes/api/public/hooks/relatorios-diarios'
+import { Route as ApiPublicHooksReguaCobrancaRouteImport } from './routes/api/public/hooks/regua-cobranca'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
 import { Route as AuthenticatedPetsPetIdEditarRouteImport } from './routes/_authenticated/pets.$petId.editar'
 import { Route as AuthenticatedClientesIdEditarRouteImport } from './routes/_authenticated/clientes.$id.editar'
@@ -114,6 +116,11 @@ const AuthenticatedComprasRoute = AuthenticatedComprasRouteImport.update({
   path: '/compras',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCobrancasRoute = AuthenticatedCobrancasRouteImport.update({
+  id: '/cobrancas',
+  path: '/cobrancas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -159,6 +166,12 @@ const ApiPublicHooksRelatoriosDiariosRoute =
     path: '/api/public/hooks/relatorios-diarios',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksReguaCobrancaRoute =
+  ApiPublicHooksReguaCobrancaRouteImport.update({
+    id: '/api/public/hooks/regua-cobranca',
+    path: '/api/public/hooks/regua-cobranca',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedPetsPetIdFichaRoute =
   AuthenticatedPetsPetIdFichaRouteImport.update({
     id: '/pets/$petId/ficha',
@@ -183,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agenda': typeof AuthenticatedAgendaRoute
+  '/cobrancas': typeof AuthenticatedCobrancasRoute
   '/compras': typeof AuthenticatedComprasRoute
   '/comunicacao': typeof AuthenticatedComunicacaoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
@@ -203,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRoutesByTo {
@@ -210,6 +225,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agenda': typeof AuthenticatedAgendaRoute
+  '/cobrancas': typeof AuthenticatedCobrancasRoute
   '/compras': typeof AuthenticatedComprasRoute
   '/comunicacao': typeof AuthenticatedComunicacaoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
@@ -230,6 +246,7 @@ export interface FileRoutesByTo {
   '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRoutesById {
@@ -239,6 +256,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
+  '/_authenticated/cobrancas': typeof AuthenticatedCobrancasRoute
   '/_authenticated/compras': typeof AuthenticatedComprasRoute
   '/_authenticated/comunicacao': typeof AuthenticatedComunicacaoRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
@@ -259,6 +277,7 @@ export interface FileRoutesById {
   '/_authenticated/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/_authenticated/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRouteTypes {
@@ -268,6 +287,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agenda'
+    | '/cobrancas'
     | '/compras'
     | '/comunicacao'
     | '/configuracoes'
@@ -288,6 +308,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
+    | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -295,6 +316,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agenda'
+    | '/cobrancas'
     | '/compras'
     | '/comunicacao'
     | '/configuracoes'
@@ -315,6 +337,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
+    | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
   id:
     | '__root__'
@@ -323,6 +346,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/agenda'
+    | '/_authenticated/cobrancas'
     | '/_authenticated/compras'
     | '/_authenticated/comunicacao'
     | '/_authenticated/configuracoes'
@@ -343,6 +367,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes/$id/editar'
     | '/_authenticated/pets/$petId/editar'
     | '/_authenticated/pets/$petId/ficha'
+    | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
   fileRoutesById: FileRoutesById
 }
@@ -351,6 +376,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicHooksReguaCobrancaRoute: typeof ApiPublicHooksReguaCobrancaRoute
   ApiPublicHooksRelatoriosDiariosRoute: typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 
@@ -461,6 +487,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedComprasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/cobrancas': {
+      id: '/_authenticated/cobrancas'
+      path: '/cobrancas'
+      fullPath: '/cobrancas'
+      preLoaderRoute: typeof AuthenticatedCobrancasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/agenda': {
       id: '/_authenticated/agenda'
       path: '/agenda'
@@ -517,6 +550,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksRelatoriosDiariosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/regua-cobranca': {
+      id: '/api/public/hooks/regua-cobranca'
+      path: '/api/public/hooks/regua-cobranca'
+      fullPath: '/api/public/hooks/regua-cobranca'
+      preLoaderRoute: typeof ApiPublicHooksReguaCobrancaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/pets/$petId/ficha': {
       id: '/_authenticated/pets/$petId/ficha'
       path: '/pets/$petId/ficha'
@@ -557,6 +597,7 @@ const AuthenticatedClientesIdRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
+  AuthenticatedCobrancasRoute: typeof AuthenticatedCobrancasRoute
   AuthenticatedComprasRoute: typeof AuthenticatedComprasRoute
   AuthenticatedComunicacaoRoute: typeof AuthenticatedComunicacaoRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
@@ -580,6 +621,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
+  AuthenticatedCobrancasRoute: AuthenticatedCobrancasRoute,
   AuthenticatedComprasRoute: AuthenticatedComprasRoute,
   AuthenticatedComunicacaoRoute: AuthenticatedComunicacaoRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
@@ -609,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicHooksReguaCobrancaRoute: ApiPublicHooksReguaCobrancaRoute,
   ApiPublicHooksRelatoriosDiariosRoute: ApiPublicHooksRelatoriosDiariosRoute,
 }
 export const routeTree = rootRouteImport

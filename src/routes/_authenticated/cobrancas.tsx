@@ -1,0 +1,923 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  listarCobrancas,
+  kpisCobrancas,
+  historicoCobranca,
+  registrarEnvio,
+  registrarPromessa,
+  alterarStatusCobranca,
+  pausarCobranca,
+  marcarPagamento,
+  sugerirMensagemCobranca,
+  obterConfigCobranca,
+  salvarConfigCobranca,
+  salvarTemplateCobranca,
+  renderTemplate,
+  type CobrancaDTO,
+  type CobrancaStatus,
+} from "@/lib/cobrancas.functions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import {
+  HandCoins,
+  AlertTriangle,
+  CalendarClock,
+  TrendingUp,
+  MessageCircle,
+  Sparkles,
+  PauseCircle,
+  PlayCircle,
+  CheckCircle2,
+  Clock,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/_authenticated/cobrancas")({
+  component: CobrancasPage,
+});
+
+const STATUS_LABEL: Record<CobrancaStatus, string> = {
+  a_vencer: "A vencer",
+  vencido: "Vencido",
+  enviada: "Enviada",
+  respondeu: "Respondeu",
+  promessa: "Promessa",
+  pago_parcial: "Pago parcial",
+  pago: "Pago",
+  negociado: "Negociado",
+  sem_retorno: "Sem retorno",
+  pausada: "Pausada",
+};
+
+const STATUS_CLASS: Record<CobrancaStatus, string> = {
+  a_vencer: "bg-amber-100 text-amber-900 border-amber-200",
+  vencido: "bg-rose-100 text-rose-900 border-rose-200",
+  enviada: "bg-sky-100 text-sky-900 border-sky-200",
+  respondeu: "bg-indigo-100 text-indigo-900 border-indigo-200",
+  promessa: "bg-violet-100 text-violet-900 border-violet-200",
+  pago_parcial: "bg-teal-100 text-teal-900 border-teal-200",
+  pago: "bg-emerald-100 text-emerald-900 border-emerald-200",
+  negociado: "bg-blue-100 text-blue-900 border-blue-200",
+  sem_retorno: "bg-zinc-200 text-zinc-800 border-zinc-300",
+  pausada: "bg-neutral-200 text-neutral-800 border-neutral-300",
+};
+
+function brl(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function fmtDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso + (iso.length === 10 ? "T00:00:00Z" : "")).toLocaleDateString("pt-BR");
+}
+
+function CobrancasPage() {
+  const listar = useServerFn(listarCobrancas);
+  const kpis = useServerFn(kpisCobrancas);
+
+  const [filtro, setFiltro] = useState<{
+    status: string[];
+    clienteNome: string;
+    atrasoFaixa: "todos" | "0_3" | "4_7" | "8_15" | "15p";
+  }>({ status: [], clienteNome: "", atrasoFaixa: "todos" });
+
+  const qKpis = useQuery({ queryKey: ["cobrancas", "kpis"], queryFn: () => kpis() });
+  const qLista = useQuery({
+    queryKey: ["cobrancas", "lista", filtro],
+    queryFn: () =>
+      listar({
+        data: {
+          status: filtro.status.length ? filtro.status : undefined,
+          clienteNome: filtro.clienteNome || null,
+          atrasoFaixa: filtro.atrasoFaixa,
+        },
+      }),
+  });
+
+  const [selecionada, setSelecionada] = useState<CobrancaDTO | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+            <HandCoins className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl">Central de Cobrança</h1>
+            <p className="text-sm text-muted-foreground">
+              Recuperação de receita com régua de contato, IA e histórico completo.
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" onClick={() => setShowConfig(true)}>
+          Régua e templates
+        </Button>
+      </header>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard
+          icon={<AlertTriangle className="h-4 w-4" />}
+          label="Total em atraso"
+          value={qKpis.data ? brl(qKpis.data.total_atraso) : "—"}
+          hint={qKpis.data ? `${qKpis.data.qtd_inadimplentes} clientes` : ""}
+          tone="rose"
+        />
+        <KpiCard
+          icon={<CalendarClock className="h-4 w-4" />}
+          label="Vence hoje"
+          value={qKpis.data ? String(qKpis.data.vence_hoje) : "—"}
+          tone="amber"
+        />
+        <KpiCard
+          icon={<Clock className="h-4 w-4" />}
+          label="Atraso > 7 dias"
+          value={qKpis.data ? brl(qKpis.data.atraso_maior_7d) : "—"}
+          tone="violet"
+        />
+        <KpiCard
+          icon={<TrendingUp className="h-4 w-4" />}
+          label="Recuperado no mês"
+          value={qKpis.data ? brl(qKpis.data.recuperado_mes) : "—"}
+          hint={
+            qKpis.data ? `${Math.round(qKpis.data.taxa_recuperacao * 100)}% de recuperação` : ""
+          }
+          tone="emerald"
+        />
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[220px]">
+              <Label className="text-xs">Buscar cliente</Label>
+              <Input
+                placeholder="Nome do tutor"
+                value={filtro.clienteNome}
+                onChange={(e) => setFiltro((f) => ({ ...f, clienteNome: e.target.value }))}
+              />
+            </div>
+            <div className="w-40">
+              <Label className="text-xs">Atraso</Label>
+              <Select
+                value={filtro.atrasoFaixa}
+                onValueChange={(v) => setFiltro((f) => ({ ...f, atrasoFaixa: v as any }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="0_3">0-3 dias</SelectItem>
+                  <SelectItem value="4_7">4-7 dias</SelectItem>
+                  <SelectItem value="8_15">8-15 dias</SelectItem>
+                  <SelectItem value="15p">15+ dias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(
+                ["a_vencer", "vencido", "enviada", "promessa", "pago"] as CobrancaStatus[]
+              ).map((s) => {
+                const on = filtro.status.includes(s);
+                return (
+                  <button
+                    key={s}
+                    onClick={() =>
+                      setFiltro((f) => ({
+                        ...f,
+                        status: on ? f.status.filter((x) => x !== s) : [...f.status, s],
+                      }))
+                    }
+                    className={`text-xs rounded-full px-3 py-1 border ${on ? STATUS_CLASS[s] : "bg-background border-border text-muted-foreground"}`}
+                  >
+                    {STATUS_LABEL[s]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {qLista.isLoading ? (
+            <div className="py-12 text-center text-muted-foreground">
+              <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+            </div>
+          ) : (qLista.data ?? []).length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              Nenhuma cobrança para os filtros atuais.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pr-3">Cliente / Pet</th>
+                    <th className="py-2 pr-3">Vencimento</th>
+                    <th className="py-2 pr-3">Atraso</th>
+                    <th className="py-2 pr-3">Valor</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Última tentativa</th>
+                    <th className="py-2 pr-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(qLista.data ?? []).map((c) => (
+                    <tr
+                      key={c.id}
+                      className="border-t hover:bg-muted/40 cursor-pointer"
+                      onClick={() => setSelecionada(c)}
+                    >
+                      <td className="py-2 pr-3">
+                        <div className="font-medium">{c.cliente_nome}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {c.pet_nome ?? "—"} • {fmtDate(c.data_atendimento)}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3">{fmtDate(c.vencimento)}</td>
+                      <td className="py-2 pr-3">
+                        {c.dias_atraso > 0 ? (
+                          <span className="text-rose-700 font-medium">{c.dias_atraso}d</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 font-medium">{brl(c.saldo)}</td>
+                      <td className="py-2 pr-3">
+                        <Badge variant="outline" className={STATUS_CLASS[c.status]}>
+                          {STATUS_LABEL[c.status]}
+                        </Badge>
+                      </td>
+                      <td className="py-2 pr-3 text-muted-foreground">
+                        {c.ultima_cobranca_em
+                          ? new Date(c.ultima_cobranca_em).toLocaleDateString("pt-BR")
+                          : "—"}
+                        {c.tentativas > 0 ? ` • ${c.tentativas}x` : ""}
+                      </td>
+                      <td className="py-2 pr-3 text-right">
+                        <Button size="sm" variant="outline">
+                          Abrir
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {selecionada && (
+        <CobrancaDialog
+          cobranca={selecionada}
+          onClose={() => setSelecionada(null)}
+        />
+      )}
+
+      {showConfig && <ConfigDialog onClose={() => setShowConfig(false)} />}
+    </div>
+  );
+}
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+  tone: "rose" | "amber" | "violet" | "emerald";
+}) {
+  const toneMap: Record<string, string> = {
+    rose: "before:bg-rose-500",
+    amber: "before:bg-amber-500",
+    violet: "before:bg-violet-500",
+    emerald: "before:bg-emerald-500",
+  };
+  return (
+    <Card
+      className={`relative overflow-hidden before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-1 ${toneMap[tone]}`}
+    >
+      <CardContent className="pt-4 pb-4 pl-5">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {icon}
+          <span>{label}</span>
+        </div>
+        <div className="mt-1 text-2xl font-display">{value}</div>
+        {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ===================================================================
+// Detalhe da cobrança
+// ===================================================================
+function CobrancaDialog({
+  cobranca,
+  onClose,
+}: {
+  cobranca: CobrancaDTO;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const historico = useServerFn(historicoCobranca);
+  const enviar = useServerFn(registrarEnvio);
+  const promessa = useServerFn(registrarPromessa);
+  const status = useServerFn(alterarStatusCobranca);
+  const pausar = useServerFn(pausarCobranca);
+  const pagar = useServerFn(marcarPagamento);
+  const sugerir = useServerFn(sugerirMensagemCobranca);
+
+  const qHist = useQuery({
+    queryKey: ["cobrancas", "historico", cobranca.id],
+    queryFn: () => historico({ data: { cobrancaId: cobranca.id } }),
+  });
+
+  const [mensagem, setMensagem] = useState("");
+  const [carregandoIa, setCarregandoIa] = useState(false);
+  const [promessaData, setPromessaData] = useState("");
+
+  const invalidar = () => {
+    qc.invalidateQueries({ queryKey: ["cobrancas"] });
+  };
+
+  const abrirWhats = () => {
+    if (!cobranca.cliente_whatsapp) {
+      toast.error("Cliente sem WhatsApp cadastrado");
+      return;
+    }
+    const numero = cobranca.cliente_whatsapp.replace(/\D+/g, "");
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, "_blank", "noopener");
+  };
+
+  const registrarEnviado = useMutation({
+    mutationFn: () =>
+      enviar({ data: { cobrancaId: cobranca.id, mensagem, canal: "whatsapp" } }),
+    onSuccess: () => {
+      toast.success("Envio registrado no histórico");
+      invalidar();
+      qHist.refetch();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro"),
+  });
+
+  const gerarIA = async (
+    intencao: "cobranca" | "lembrete" | "agradecimento" | "negociacao",
+  ) => {
+    setCarregandoIa(true);
+    try {
+      const r = await sugerir({ data: { cobrancaId: cobranca.id, intencao } });
+      setMensagem(r.mensagem);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha na IA");
+    } finally {
+      setCarregandoIa(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <HandCoins className="h-4 w-4 text-gold" />
+            Cobrança — {cobranca.cliente_nome}
+          </DialogTitle>
+          <DialogDescription>
+            {cobranca.pet_nome ?? "—"} • Atendimento em {fmtDate(cobranca.data_atendimento)}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+          <Info label="Saldo" value={brl(cobranca.saldo)} />
+          <Info label="Vencimento" value={fmtDate(cobranca.vencimento)} />
+          <Info
+            label="Atraso"
+            value={cobranca.dias_atraso > 0 ? `${cobranca.dias_atraso}d` : "—"}
+          />
+          <Info
+            label="Status"
+            value={
+              <Badge variant="outline" className={STATUS_CLASS[cobranca.status]}>
+                {STATUS_LABEL[cobranca.status]}
+              </Badge>
+            }
+          />
+        </div>
+
+        <Tabs defaultValue="mensagem">
+          <TabsList>
+            <TabsTrigger value="mensagem">Mensagem</TabsTrigger>
+            <TabsTrigger value="acoes">Ações</TabsTrigger>
+            <TabsTrigger value="historico">Histórico</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="mensagem" className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => gerarIA("lembrete")}
+                disabled={carregandoIa}
+              >
+                <Sparkles className="h-3 w-3 mr-1" /> Lembrete gentil
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => gerarIA("cobranca")}
+                disabled={carregandoIa}
+              >
+                <Sparkles className="h-3 w-3 mr-1" /> Cobrança cordial
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => gerarIA("negociacao")}
+                disabled={carregandoIa}
+              >
+                <Sparkles className="h-3 w-3 mr-1" /> Negociação
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => gerarIA("agradecimento")}
+                disabled={carregandoIa}
+              >
+                <Sparkles className="h-3 w-3 mr-1" /> Agradecimento
+              </Button>
+            </div>
+            <Textarea
+              rows={6}
+              placeholder="Redija ou peça uma sugestão à IA…"
+              value={mensagem}
+              onChange={(e) => setMensagem(e.target.value)}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => registrarEnviado.mutate()}
+                disabled={!mensagem.trim() || registrarEnviado.isPending}
+              >
+                Apenas registrar
+              </Button>
+              <Button
+                onClick={() => {
+                  abrirWhats();
+                  registrarEnviado.mutate();
+                }}
+                disabled={!mensagem.trim()}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <MessageCircle className="h-4 w-4 mr-1" /> Enviar no WhatsApp
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="acoes" className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Promessa de pagamento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Input
+                    type="date"
+                    value={promessaData}
+                    onChange={(e) => setPromessaData(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!promessaData) return;
+                      await promessa({
+                        data: { cobrancaId: cobranca.id, data: promessaData },
+                      });
+                      toast.success("Promessa registrada");
+                      invalidar();
+                      qHist.refetch();
+                    }}
+                  >
+                    <CalendarClock className="h-4 w-4 mr-1" /> Registrar promessa
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Marcar pagamento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={async () => {
+                      await pagar({
+                        data: {
+                          cobrancaId: cobranca.id,
+                          valor: cobranca.saldo,
+                          integral: true,
+                        },
+                      });
+                      toast.success("Pagamento integral registrado");
+                      invalidar();
+                      qHist.refetch();
+                      onClose();
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Recebi integral
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Select
+                    defaultValue={cobranca.status}
+                    onValueChange={async (v) => {
+                      await status({
+                        data: { cobrancaId: cobranca.id, status: v as CobrancaStatus },
+                      });
+                      toast.success("Status atualizado");
+                      invalidar();
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(STATUS_LABEL) as CobrancaStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {STATUS_LABEL[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Pausa</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {cobranca.pausada ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        await pausar({
+                          data: { cobrancaId: cobranca.id, pausar: false },
+                        });
+                        invalidar();
+                        toast.success("Cobrança retomada");
+                      }}
+                    >
+                      <PlayCircle className="h-4 w-4 mr-1" /> Retomar
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        await pausar({
+                          data: {
+                            cobrancaId: cobranca.id,
+                            pausar: true,
+                            motivo: "Pausada pelo operador",
+                          },
+                        });
+                        invalidar();
+                        toast.success("Cobrança pausada");
+                      }}
+                    >
+                      <PauseCircle className="h-4 w-4 mr-1" /> Pausar
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="historico">
+            {qHist.isLoading ? (
+              <div className="py-6 text-center text-muted-foreground">
+                <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+              </div>
+            ) : (qHist.data ?? []).length === 0 ? (
+              <div className="py-6 text-center text-muted-foreground text-sm">
+                Ainda sem eventos registrados.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {(qHist.data ?? []).map((e: any) => (
+                  <li key={e.id} className="border rounded-md p-2 text-sm">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {e.tipo} {e.canal ? `• ${e.canal}` : ""}
+                      </span>
+                      <span>{new Date(e.created_at).toLocaleString("pt-BR")}</span>
+                    </div>
+                    {e.payload?.mensagem && (
+                      <div className="mt-1 whitespace-pre-wrap">{e.payload.mensagem}</div>
+                    )}
+                    {e.payload?.data && (
+                      <div className="mt-1">Promessa para {fmtDate(e.payload.data)}</div>
+                    )}
+                    {e.payload?.status && (
+                      <div className="mt-1">Novo status: {e.payload.status}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-md border bg-muted/30 px-2 py-1">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium">{value}</div>
+    </div>
+  );
+}
+
+// ===================================================================
+// Configuração
+// ===================================================================
+function ConfigDialog({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const obter = useServerFn(obterConfigCobranca);
+  const salvar = useServerFn(salvarConfigCobranca);
+  const salvarTpl = useServerFn(salvarTemplateCobranca);
+
+  const q = useQuery({ queryKey: ["cobrancas", "config"], queryFn: () => obter() });
+
+  const cfg = q.data?.config as any;
+  const tpls = q.data?.templates ?? [];
+
+  const [modo, setModo] = useState<"manual" | "auto" | "pausado">("manual");
+  const [naoRepetir, setNaoRepetir] = useState(true);
+  const [pixChave, setPixChave] = useState("");
+  const [pixTipo, setPixTipo] = useState("celular");
+
+  useMemo(() => {
+    if (cfg) {
+      setModo(cfg.modo);
+      setNaoRepetir(!!cfg.nao_repetir_no_dia);
+      setPixChave(cfg.pix_chave ?? "");
+      setPixTipo(cfg.pix_tipo ?? "celular");
+    }
+  }, [cfg]);
+
+  const [tplEdit, setTplEdit] = useState<any | null>(null);
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Régua de cobrança e templates</DialogTitle>
+          <DialogDescription>
+            Configure o modo de disparo, chave Pix e os textos usados em cada gatilho.
+          </DialogDescription>
+        </DialogHeader>
+
+        {q.isLoading ? (
+          <div className="py-6 text-center text-muted-foreground">
+            <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <section className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Modo</Label>
+                <Select value={modo} onValueChange={(v) => setModo(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual (com aprovação)</SelectItem>
+                    <SelectItem value="auto">Automático</SelectItem>
+                    <SelectItem value="pausado">Pausado</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  No modo manual, o sistema apenas destaca clientes elegíveis. O envio final é sempre pelo operador via WhatsApp.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Não repetir no mesmo dia</Label>
+                <div className="flex items-center gap-2 pt-2">
+                  <Switch checked={naoRepetir} onCheckedChange={setNaoRepetir} />
+                  <span className="text-sm text-muted-foreground">
+                    Evita disparar mais de uma cobrança para o mesmo cliente no mesmo dia.
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Chave Pix</Label>
+                <Input value={pixChave} onChange={(e) => setPixChave(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={pixTipo} onValueChange={setPixTipo}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="celular">Celular</SelectItem>
+                    <SelectItem value="email">E-mail</SelectItem>
+                    <SelectItem value="cpf">CPF/CNPJ</SelectItem>
+                    <SelectItem value="aleatoria">Aleatória</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button
+                  onClick={async () => {
+                    await salvar({
+                      data: {
+                        modo,
+                        nao_repetir_no_dia: naoRepetir,
+                        pix_chave: pixChave,
+                        pix_tipo: pixTipo,
+                      },
+                    });
+                    toast.success("Régua atualizada");
+                    qc.invalidateQueries({ queryKey: ["cobrancas", "config"] });
+                  }}
+                >
+                  Salvar régua
+                </Button>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="font-medium mb-2">Templates por gatilho</h3>
+              <div className="grid md:grid-cols-2 gap-2">
+                {tpls.map((t: any) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTplEdit(t)}
+                    className={`text-left border rounded-md p-3 hover:bg-muted/50 ${t.ativo ? "" : "opacity-60"}`}
+                  >
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {t.gatilho}
+                    </div>
+                    <div className="font-medium">{t.titulo}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                      {t.corpo}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Fechar
+          </Button>
+        </DialogFooter>
+
+        {tplEdit && (
+          <TemplateEditor
+            template={tplEdit}
+            onClose={() => setTplEdit(null)}
+            onSaved={() => {
+              setTplEdit(null);
+              qc.invalidateQueries({ queryKey: ["cobrancas", "config"] });
+            }}
+            salvarTpl={salvarTpl}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TemplateEditor({
+  template,
+  onClose,
+  onSaved,
+  salvarTpl,
+}: {
+  template: any;
+  onClose: () => void;
+  onSaved: () => void;
+  salvarTpl: any;
+}) {
+  const [titulo, setTitulo] = useState(template.titulo);
+  const [corpo, setCorpo] = useState(template.corpo);
+  const [ativo, setAtivo] = useState(!!template.ativo);
+
+  const preview = useMemo(
+    () =>
+      renderTemplate(corpo, {
+        cliente: "Maria",
+        pet: "Thor",
+        valor: "R$ 90,00",
+        vencimento: "15/07",
+        pix: "(11) 99999-9999",
+      }),
+    [corpo],
+  );
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Editar template — {template.gatilho}</DialogTitle>
+          <DialogDescription>
+            Use variáveis: <code>{"{{cliente}}"}</code>, <code>{"{{pet}}"}</code>,{" "}
+            <code>{"{{valor}}"}</code>, <code>{"{{vencimento}}"}</code>,{" "}
+            <code>{"{{pix}}"}</code>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Título</Label>
+            <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+          </div>
+          <div>
+            <Label>Mensagem</Label>
+            <Textarea rows={6} value={corpo} onChange={(e) => setCorpo(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={ativo} onCheckedChange={setAtivo} />
+            <span className="text-sm">Ativo</span>
+          </div>
+          <div className="rounded-md border bg-emerald-50 p-3 text-sm whitespace-pre-wrap">
+            <div className="text-xs uppercase tracking-wide text-emerald-800 mb-1">
+              Prévia
+            </div>
+            {preview}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={async () => {
+              await salvarTpl({
+                data: { id: template.id, titulo, corpo, ativo },
+              });
+              toast.success("Template salvo");
+              onSaved();
+            }}
+          >
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
