@@ -21,6 +21,7 @@ import {
   Megaphone,
   Settings,
   PawPrint,
+  Cake,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
