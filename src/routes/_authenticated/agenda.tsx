@@ -314,6 +314,8 @@ function AgendamentoRow({
   onChangeStatus: (s: Status) => void;
   signer: { name: string; initials: string };
 }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewText, setPreviewText] = useState("");
 
   const meta = statusMeta(row.status);
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
