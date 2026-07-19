@@ -115,6 +115,10 @@ function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
 
 export const Route = createFileRoute("/_authenticated/agenda")({
   component: AgendaPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    cliente: typeof search.cliente === "string" ? search.cliente : undefined,
+    pet: typeof search.pet === "string" ? search.pet : undefined,
+  }),
 });
 
 type Status =
