@@ -98,6 +98,28 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     setMensagem(applyVars(tpl, vars));
   }, [open, config, isReceita, vars]);
 
+  // Prévia do PDF: gera blob URL sempre que abrir/dados mudarem
+  useEffect(() => {
+    if (!open) {
+      setConfirmado(false);
+      return;
+    }
+    let revoked: string | null = null;
+    try {
+      const res = generateReciboPDF(data, true) as { blob: Blob; fileName: string };
+      const url = URL.createObjectURL(res.blob);
+      revoked = url;
+      setPreviewUrl(url);
+    } catch (e) {
+      console.error(e);
+    }
+    return () => {
+      if (revoked) URL.revokeObjectURL(revoked);
+      setPreviewUrl(null);
+    };
+  }, [open, data]);
+
+
   const baixar = () => {
     generateReciboPDF(data);
   };
