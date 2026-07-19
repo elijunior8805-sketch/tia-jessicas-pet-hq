@@ -170,6 +170,38 @@ function fmtDateLong(iso: string) {
 const brl = (v: number | null | undefined) =>
   v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+const HORARIOS_AGENDA = Array.from({ length: ((20 - 7) * 4) + 1 }, (_, i) => {
+  const totalMinutos = (7 * 60) + (i * 15);
+  const h = String(Math.floor(totalMinutos / 60)).padStart(2, "0");
+  const m = String(totalMinutos % 60).padStart(2, "0");
+  return `${h}:${m}`;
+});
+
+function normalizarHora(v: string | null | undefined) {
+  const hora = String(v ?? "").slice(0, 5);
+  return /^\d{2}:\d{2}$/.test(hora) ? hora : "09:00";
+}
+
+function TimeField({ value, onChange, id }: { value: string; onChange: (value: string) => void; id?: string }) {
+  const normalized = normalizarHora(value);
+  const options = HORARIOS_AGENDA.includes(normalized)
+    ? HORARIOS_AGENDA
+    : [...HORARIOS_AGENDA, normalized].sort();
+
+  return (
+    <Select value={normalized} onValueChange={onChange}>
+      <SelectTrigger id={id} className="h-10 bg-background">
+        <SelectValue placeholder="Selecionar hora" />
+      </SelectTrigger>
+      <SelectContent className="max-h-72">
+        {options.map((h) => (
+          <SelectItem key={h} value={h}>{h}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function AgendaPage() {
   const search = Route.useSearch();
   const navigateSelf = useNavigate({ from: Route.fullPath });
@@ -606,7 +638,7 @@ function AgendamentoRow({
   const [editServicosOpen, setEditServicosOpen] = useState(false);
   const [reagendarOpen, setReagendarOpen] = useState(false);
   const [novaData, setNovaData] = useState<string>(row.data ?? "");
-  const [novaHora, setNovaHora] = useState<string>(row.hora ? String(row.hora).slice(0, 5) : "");
+  const [novaHora, setNovaHora] = useState<string>(normalizarHora(row.hora));
   const [cancelarOpen, setCancelarOpen] = useState(false);
   const [motivoCancel, setMotivoCancel] = useState("");
 
@@ -883,7 +915,7 @@ function AgendamentoRow({
                   <DropdownMenuItem
                     onClick={() => {
                       setNovaData(row.data ?? "");
-                      setNovaHora(row.hora ? String(row.hora).slice(0, 5) : "");
+                      setNovaHora(normalizarHora(row.hora));
                       setReagendarOpen(true);
                     }}
                   >
@@ -999,7 +1031,7 @@ function AgendamentoRow({
             </div>
             <div>
               <Label>Nova hora</Label>
-              <Input type="time" value={novaHora} onChange={(e) => setNovaHora(e.target.value)} />
+              <TimeField value={novaHora} onChange={setNovaHora} />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -1366,7 +1398,7 @@ function NovoAgendamentoDialog({
           </div>
           <div>
             <Label>Hora *</Label>
-            <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+            <TimeField value={hora} onChange={setHora} />
           </div>
 
           <div>
