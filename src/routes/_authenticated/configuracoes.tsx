@@ -116,6 +116,8 @@ function ConfiguracoesPage() {
         </form>
       </Card>
 
+      <WhatsAppTemplatesCard />
+      <RecibosEnviadosCard />
       <ChangePasswordCard authEmail={profile?.authEmail ?? ""} />
     </PageShell>
   );
