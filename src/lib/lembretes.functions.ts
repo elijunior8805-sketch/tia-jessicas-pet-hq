@@ -98,7 +98,7 @@ export const salvarLembretesConfig = createServerFn({ method: "POST" })
 const ListaSchema = z
   .object({
     status: z.enum(["pendente", "enviado", "falhou", "cancelado", "todos"]).optional().default("pendente"),
-    tipo: z.enum(["lembrete_24h", "pos_atendimento", "aniversario_pet", "todos"]).optional().default("todos"),
+    tipo: z.enum(["lembrete_24h", "pos_atendimento", "aniversario_pet", "aniversario_tutor", "petversario", "data_especial", "todos"]).optional().default("todos"),
     busca: z.string().trim().max(120).optional().default(""),
   })
   .default({});
