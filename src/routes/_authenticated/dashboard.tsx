@@ -113,7 +113,7 @@ function DashboardPage() {
   return (
     <PageShell>
       {/* Busca + CTA (70/30) */}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-4">
         <div className="relative min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -121,8 +121,8 @@ function DashboardPage() {
             className="pl-9 h-10 bg-card rounded-full border-border/60 w-full max-w-full"
           />
         </div>
-        <Link to="/agenda" className="w-full">
-          <Button size="default" className="rounded-full gap-2 shadow-elegant h-10 w-full">
+        <Link to="/agenda" className="w-full sm:w-auto">
+          <Button size="default" className="rounded-full gap-2 shadow-elegant h-10 w-full sm:w-auto px-5 whitespace-nowrap">
             <Plus className="h-4 w-4" /> Novo Agendamento
           </Button>
         </Link>
