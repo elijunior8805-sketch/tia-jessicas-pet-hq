@@ -5,7 +5,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+
+import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateReciboPDF, type ReciboData } from "@/lib/recibo-pdf";
@@ -44,6 +46,8 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [storagePath, setStoragePath] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [confirmado, setConfirmado] = useState(false);
 
   const isReceita = data.tipo === "receita";
   const numeroRaw = digits(telefone || "");
@@ -93,6 +97,28 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       FALLBACK_TEMPLATES[isReceita ? "receita" : "despesa"];
     setMensagem(applyVars(tpl, vars));
   }, [open, config, isReceita, vars]);
+
+  // Prévia do PDF: gera blob URL sempre que abrir/dados mudarem
+  useEffect(() => {
+    if (!open) {
+      setConfirmado(false);
+      return;
+    }
+    let revoked: string | null = null;
+    try {
+      const res = generateReciboPDF(data, true) as { blob: Blob; fileName: string };
+      const url = URL.createObjectURL(res.blob);
+      revoked = url;
+      setPreviewUrl(url);
+    } catch (e) {
+      console.error(e);
+    }
+    return () => {
+      if (revoked) URL.revokeObjectURL(revoked);
+      setPreviewUrl(null);
+    };
+  }, [open, data]);
+
 
   const baixar = () => {
     generateReciboPDF(data);
@@ -165,7 +191,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isReceita ? "Recibo emitido" : "Comprovante emitido"}
@@ -175,24 +201,72 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
-          <div>
-            <span className="text-muted-foreground">
-              {isReceita ? "Cliente:" : "Fornecedor:"}
-            </span>{" "}
-            <span className="font-medium">{data.contraparte}</span>
-          </div>
-          <div className="line-clamp-2">
-            <span className="text-muted-foreground">Descrição:</span>{" "}
-            {data.descricao || "—"}
-          </div>
-          {data.forma && (
-            <div>
-              <span className="text-muted-foreground">Forma:</span>{" "}
-              <span className="capitalize">{data.forma.replace(/_/g, " ")}</span>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-3">
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+              <div>
+                <span className="text-muted-foreground">
+                  {isReceita ? "Cliente:" : "Fornecedor:"}
+                </span>{" "}
+                <span className="font-medium">{data.contraparte}</span>
+              </div>
+              <div className="line-clamp-2">
+                <span className="text-muted-foreground">Descrição:</span>{" "}
+                {data.descricao || "—"}
+              </div>
+              {data.forma && (
+                <div>
+                  <span className="text-muted-foreground">Forma:</span>{" "}
+                  <span className="capitalize">{data.forma.replace(/_/g, " ")}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  <Eye className="h-3.5 w-3.5" /> Prévia do documento
+                </div>
+                {previewUrl && (
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-primary underline"
+                  >
+                    Abrir em nova aba
+                  </a>
+                )}
+              </div>
+              {previewUrl ? (
+                <iframe
+                  key={previewUrl}
+                  src={previewUrl}
+                  title="Prévia do recibo"
+                  className="w-full h-[420px] bg-white"
+                />
+              ) : (
+                <div className="h-[420px] flex items-center justify-center text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Gerando prévia…
+                </div>
+              )}
+            </div>
+
+            <label className="flex items-start gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3 cursor-pointer">
+              <Checkbox
+                checked={confirmado}
+                onCheckedChange={(v) => setConfirmado(v === true)}
+                className="mt-0.5"
+              />
+              <span className="text-xs leading-relaxed">
+                <span className="font-semibold text-primary">Confirmo que revisei a prévia</span>
+                {" "}e que o documento nº <span className="font-mono">{data.numero}</span> está correto e atualizado.
+              </span>
+            </label>
+          </div>
+
+          <div className="space-y-3">
+
 
         {envioAnterior && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs flex items-start gap-2">
@@ -234,14 +308,29 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           </p>
         </div>
 
-        {!numero && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-            Sem WhatsApp/telefone cadastrado para envio automático.
-          </p>
-        )}
+          {!numero && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              Sem WhatsApp/telefone cadastrado para envio automático.
+            </p>
+          )}
+          </div>
+        </div>
+
+
+
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={baixar} className="w-full sm:w-auto">
+          {!confirmado && (
+            <p className="text-[11px] text-muted-foreground sm:mr-auto">
+              Confirme a prévia acima para habilitar as ações.
+            </p>
+          )}
+          <Button
+            variant="outline"
+            onClick={baixar}
+            disabled={!confirmado}
+            className="w-full sm:w-auto"
+          >
             <Download className="h-4 w-4 mr-1" /> Baixar PDF
           </Button>
           {signedUrl && (
@@ -253,7 +342,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           )}
           <Button
             onClick={enviarWhats}
-            disabled={!numero || uploading}
+            disabled={!numero || uploading || !confirmado}
             className="w-full sm:w-auto"
           >
             {uploading ? (
