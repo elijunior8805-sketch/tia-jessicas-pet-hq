@@ -477,7 +477,7 @@ function AgendamentoRow({
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Cancelar</Button>
             <Button
               variant="outline"
-              onClick={() => setPreviewText(waMessage(row, signer))}
+              onClick={resetPreviewText}
             >
               Restaurar padrão
             </Button>
