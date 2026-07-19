@@ -320,7 +320,17 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
 
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={baixar} className="w-full sm:w-auto">
+          {!confirmado && (
+            <p className="text-[11px] text-muted-foreground sm:mr-auto">
+              Confirme a prévia acima para habilitar as ações.
+            </p>
+          )}
+          <Button
+            variant="outline"
+            onClick={baixar}
+            disabled={!confirmado}
+            className="w-full sm:w-auto"
+          >
             <Download className="h-4 w-4 mr-1" /> Baixar PDF
           </Button>
           {signedUrl && (
@@ -332,7 +342,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           )}
           <Button
             onClick={enviarWhats}
-            disabled={!numero || uploading}
+            disabled={!numero || uploading || !confirmado}
             className="w-full sm:w-auto"
           >
             {uploading ? (
