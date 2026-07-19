@@ -261,8 +261,9 @@ function AgendaPage() {
 
       <PageHeader
         title="Agenda"
-        description={<span className="capitalize">{fmtDateLong(date)}</span>}
+        description={fmtDateLong(date)}
       />
+
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
         {/* Coluna principal */}
