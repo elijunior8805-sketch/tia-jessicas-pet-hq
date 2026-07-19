@@ -103,14 +103,21 @@ function waMessage(row: any, signer?: { name: string; initials: string }): strin
   }
 }
 function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
-  const phone = waPhone(row.clientes?.whatsapp);
-  if (!phone) {
+  const raw = row.clientes?.whatsapp;
+  if (!raw) {
     toast.error("Cliente sem WhatsApp cadastrado");
     return;
   }
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(row, signer))}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+  openWhatsAppComposerGlobal({
+    tipo: (row.status === "aguardando" || row.status === "em_atendimento") ? "aviso_atraso" : "confirmacao_agendamento",
+    destinatario: row.clientes?.nome ?? "",
+    telefone: raw,
+    mensagem: waMessage(row, signer),
+    motivo: `Agenda — ${row.status}`,
+    cliente_id: row.cliente_id ?? null,
+  });
 }
+
 
 
 
