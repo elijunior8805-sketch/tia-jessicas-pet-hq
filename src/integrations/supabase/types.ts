@@ -1017,6 +1017,7 @@ export type Database = {
           descricao: string | null
           duracao_min: number
           id: string
+          is_combo: boolean
           nome: string
           updated_at: string
           valor: number
@@ -1028,6 +1029,7 @@ export type Database = {
           descricao?: string | null
           duracao_min?: number
           id?: string
+          is_combo?: boolean
           nome: string
           updated_at?: string
           valor?: number
@@ -1039,11 +1041,93 @@ export type Database = {
           descricao?: string | null
           duracao_min?: number
           id?: string
+          is_combo?: boolean
           nome?: string
           updated_at?: string
           valor?: number
         }
         Relationships: []
+      }
+      servicos_combo_itens: {
+        Row: {
+          combo_id: string
+          created_at: string
+          id: string
+          quantidade: number
+          servico_id: string
+        }
+        Insert: {
+          combo_id: string
+          created_at?: string
+          id?: string
+          quantidade?: number
+          servico_id: string
+        }
+        Update: {
+          combo_id?: string
+          created_at?: string
+          id?: string
+          quantidade?: number
+          servico_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicos_combo_itens_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_combo_itens_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      servicos_precos: {
+        Row: {
+          created_at: string
+          id: string
+          porte_id: string
+          servico_id: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          porte_id: string
+          servico_id: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          porte_id?: string
+          servico_id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicos_precos_porte_id_fkey"
+            columns: ["porte_id"]
+            isOneToOne: false
+            referencedRelation: "portes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_precos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       temperamentos: {
         Row: {
