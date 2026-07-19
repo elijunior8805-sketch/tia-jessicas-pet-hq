@@ -8,6 +8,8 @@ import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
+
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
