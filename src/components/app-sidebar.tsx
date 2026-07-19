@@ -17,6 +17,7 @@ import {
   HandCoins,
   HeartHandshake,
   BellRing,
+  Megaphone,
   Settings,
   PawPrint,
 } from "lucide-react";
