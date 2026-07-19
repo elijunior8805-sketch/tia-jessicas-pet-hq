@@ -217,7 +217,7 @@ function DashboardPage() {
             </span>
           </div>
           {data && data.serie.some((p) => p.valor > 0) ? (
-            <div className="h-56 sm:h-64">
+            <div className="h-44 sm:h-56 lg:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
