@@ -306,10 +306,13 @@ function AgendaPage() {
 function AgendamentoRow({
   row,
   onChangeStatus,
+  signer,
 }: {
   row: any;
   onChangeStatus: (s: Status) => void;
+  signer: { name: string; initials: string };
 }) {
+
   const meta = statusMeta(row.status);
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
 
