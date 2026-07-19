@@ -383,7 +383,14 @@ function AgendamentoRow({
                 variant="outline"
                 size="sm"
                 className="gap-1 border-success/40 text-success hover:bg-success/10"
-                onClick={() => openWhatsApp(row, signer)}
+                onClick={() => {
+                  if (row.status === "finalizado") {
+                    setPreviewText(waMessage(row, signer));
+                    setPreviewOpen(true);
+                  } else {
+                    openWhatsApp(row, signer);
+                  }
+                }}
                 title={
                   row.status === "agendado"
                     ? "Enviar confirmação por WhatsApp"
