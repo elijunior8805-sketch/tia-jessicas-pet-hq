@@ -370,6 +370,7 @@ function FinanceiroPage() {
       },
       telefone:
         p.compra?.fornecedor?.whatsapp || p.compra?.fornecedor?.telefone || null,
+      referenciaId: p.id,
     });
   };
 
