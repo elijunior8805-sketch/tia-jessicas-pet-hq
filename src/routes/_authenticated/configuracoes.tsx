@@ -10,11 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { User, Lock, Eye, EyeOff, MessageCircle, History } from "lucide-react";
+import { User, Lock, Eye, EyeOff, MessageCircle, History, Building2 } from "lucide-react";
 import { z } from "zod";
 import { useMyProfile } from "@/hooks/use-my-profile";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { FotoPicker } from "@/components/foto-picker";
+import { uploadFoto, removeFoto } from "@/lib/foto-upload";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: ConfiguracoesPage,
@@ -26,6 +28,8 @@ function ConfiguracoesPage() {
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
 
   const { data: profile, isLoading } = useMyProfile();
 
@@ -50,15 +54,31 @@ function ConfiguracoesPage() {
       setSaving(false);
       return;
     }
-    const { error } = await supabase
-      .from("profiles")
-      .update({ nome: nome.trim(), telefone: telefone.trim() || null })
-      .eq("id", u.user.id);
+    const patch: any = { nome: nome.trim(), telefone: telefone.trim() || null };
+    if (avatarFile) {
+      try {
+        const path = await uploadFoto("avatars", u.user.id, avatarFile);
+        patch.avatar_url = path;
+        if (profile?.avatar_url && profile.avatar_url !== path) {
+          removeFoto(profile.avatar_url).catch(() => {});
+        }
+      } catch (e: any) {
+        setSaving(false);
+        toast.error("Falha ao enviar foto", { description: e?.message });
+        return;
+      }
+    } else if (avatarRemoved && profile?.avatar_url) {
+      patch.avatar_url = null;
+      removeFoto(profile.avatar_url).catch(() => {});
+    }
+    const { error } = await supabase.from("profiles").update(patch).eq("id", u.user.id);
     setSaving(false);
     if (error) {
       toast.error("Não foi possível salvar", { description: error.message });
       return;
     }
+    setAvatarFile(null);
+    setAvatarRemoved(false);
     toast.success("Perfil atualizado");
     qc.invalidateQueries({ queryKey: ["me-profile"] });
   }
