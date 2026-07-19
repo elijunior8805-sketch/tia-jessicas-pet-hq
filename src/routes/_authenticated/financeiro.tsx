@@ -98,6 +98,8 @@ type Parc = {
 type ReciboState = {
   data: ReciboData;
   telefone: string | null;
+  referenciaId: string;
+
 };
 
 const brl = (v: number) =>
@@ -345,6 +347,7 @@ function FinanceiroPage() {
         empresa: empresaInfo,
       },
       telefone: p.cliente?.whatsapp || p.cliente?.telefone || null,
+      referenciaId: p.id,
     });
   };
 
@@ -367,6 +370,7 @@ function FinanceiroPage() {
       },
       telefone:
         p.compra?.fornecedor?.whatsapp || p.compra?.fornecedor?.telefone || null,
+      referenciaId: p.id,
     });
   };
 
@@ -796,6 +800,7 @@ function FinanceiroPage() {
           onOpenChange={(v) => !v && setRecibo(null)}
           data={recibo.data}
           telefone={recibo.telefone}
+          referenciaId={recibo.referenciaId}
         />
       )}
     </div>

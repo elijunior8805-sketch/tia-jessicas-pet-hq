@@ -555,6 +555,9 @@ export type Database = {
           telefone: string | null
           updated_at: string
           whatsapp: string | null
+          whatsapp_assinatura: string
+          whatsapp_template_pagar: string
+          whatsapp_template_receber: string
         }
         Insert: {
           cnpj?: string | null
@@ -568,6 +571,9 @@ export type Database = {
           telefone?: string | null
           updated_at?: string
           whatsapp?: string | null
+          whatsapp_assinatura?: string
+          whatsapp_template_pagar?: string
+          whatsapp_template_receber?: string
         }
         Update: {
           cnpj?: string | null
@@ -581,6 +587,9 @@ export type Database = {
           telefone?: string | null
           updated_at?: string
           whatsapp?: string | null
+          whatsapp_assinatura?: string
+          whatsapp_template_pagar?: string
+          whatsapp_template_receber?: string
         }
         Relationships: []
       }
@@ -1006,6 +1015,54 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
+        }
+        Relationships: []
+      }
+      recibos_enviados: {
+        Row: {
+          contraparte: string | null
+          created_at: string
+          enviado_em: string
+          enviado_por: string | null
+          id: string
+          mensagem: string | null
+          numero_recibo: string
+          referencia_id: string
+          signed_url: string | null
+          storage_path: string | null
+          telefone: string | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          contraparte?: string | null
+          created_at?: string
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string | null
+          numero_recibo: string
+          referencia_id: string
+          signed_url?: string | null
+          storage_path?: string | null
+          telefone?: string | null
+          tipo: string
+          valor: number
+        }
+        Update: {
+          contraparte?: string | null
+          created_at?: string
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string | null
+          numero_recibo?: string
+          referencia_id?: string
+          signed_url?: string | null
+          storage_path?: string | null
+          telefone?: string | null
+          tipo?: string
+          valor?: number
         }
         Relationships: []
       }
