@@ -20,17 +20,29 @@ function ClientesPage() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ["clientes", q],
     queryFn: async () => {
+      const term = q.trim();
       let query = supabase
         .from("clientes")
-        .select("id, nome, telefone, whatsapp, bairro, cidade, vip, pets(id, nome, raca)")
+        .select("id, nome, cpf, telefone, whatsapp, bairro, cidade, vip, ativo, pets(id, nome, raca, foto_url)")
         .order("nome");
-      if (q.trim()) {
-        const like = `%${q.trim()}%`;
-        query = query.or(`nome.ilike.${like},telefone.ilike.${like},whatsapp.ilike.${like},bairro.ilike.${like}`);
+      if (term) {
+        const like = `%${term}%`;
+        query = query.or(
+          `nome.ilike.${like},cpf.ilike.${like},telefone.ilike.${like},whatsapp.ilike.${like},bairro.ilike.${like}`,
+        );
       }
-      const { data, error } = await query.limit(100);
+      const { data, error } = await query.limit(200);
       if (error) throw error;
-      return data;
+      if (!term) return data;
+      // Match extra: pet name (client-side filter includes rows already fetched OR fetch by pet name separately)
+      const termLower = term.toLowerCase();
+      const byPet = (data ?? []).filter((c: any) =>
+        (c.pets ?? []).some((p: any) => String(p.nome).toLowerCase().includes(termLower)),
+      );
+      // Merge base results + pet matches (dedup)
+      const map = new Map<string, any>();
+      [...(data ?? []), ...byPet].forEach((c) => map.set(c.id, c));
+      return Array.from(map.values());
     },
   });
 
