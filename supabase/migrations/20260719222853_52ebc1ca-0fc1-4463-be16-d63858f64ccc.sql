@@ -1,0 +1,1 @@
+ALTER VIEW public.mensagens_threads SET (security_invoker = true);

@@ -13,6 +13,7 @@ import {
   Building2,
   BarChart3,
   MessageSquare,
+  Inbox,
   HandCoins,
   Settings,
   PawPrint,
@@ -57,6 +58,7 @@ const groups = [
   {
     label: "Sistema",
     items: [
+      { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],
