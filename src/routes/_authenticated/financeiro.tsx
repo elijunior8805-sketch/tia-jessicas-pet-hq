@@ -50,6 +50,8 @@ import {
 } from "lucide-react";
 import { ReciboDialog } from "@/components/recibo-dialog";
 import type { ReciboData } from "@/lib/recibo-pdf";
+import { generateFinanceiroPDF } from "@/lib/financeiro-pdf";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
 import {
   format,
