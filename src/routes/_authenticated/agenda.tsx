@@ -638,7 +638,7 @@ function AgendamentoRow({
   const [editServicosOpen, setEditServicosOpen] = useState(false);
   const [reagendarOpen, setReagendarOpen] = useState(false);
   const [novaData, setNovaData] = useState<string>(row.data ?? "");
-  const [novaHora, setNovaHora] = useState<string>(row.hora ? String(row.hora).slice(0, 5) : "");
+  const [novaHora, setNovaHora] = useState<string>(normalizarHora(row.hora));
   const [cancelarOpen, setCancelarOpen] = useState(false);
   const [motivoCancel, setMotivoCancel] = useState("");
 
@@ -915,7 +915,7 @@ function AgendamentoRow({
                   <DropdownMenuItem
                     onClick={() => {
                       setNovaData(row.data ?? "");
-                      setNovaHora(row.hora ? String(row.hora).slice(0, 5) : "");
+                      setNovaHora(normalizarHora(row.hora));
                       setReagendarOpen(true);
                     }}
                   >
@@ -1031,7 +1031,7 @@ function AgendamentoRow({
             </div>
             <div>
               <Label>Nova hora</Label>
-              <Input type="time" value={novaHora} onChange={(e) => setNovaHora(e.target.value)} />
+              <TimeField value={novaHora} onChange={setNovaHora} />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
