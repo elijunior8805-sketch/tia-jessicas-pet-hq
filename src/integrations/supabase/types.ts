@@ -640,11 +640,13 @@ export type Database = {
           forma_pagamento: Database["public"]["Enums"]["pagamento_forma"]
           fornecedor_id: string
           id: string
+          is_teste: boolean
           numero_documento: string | null
           observacoes: string | null
           parcelas: number
           primeiro_vencimento: string | null
           recebido: boolean
+          responsavel_id: string | null
           updated_at: string
           valor_total: number
         }
@@ -659,11 +661,13 @@ export type Database = {
           forma_pagamento?: Database["public"]["Enums"]["pagamento_forma"]
           fornecedor_id: string
           id?: string
+          is_teste?: boolean
           numero_documento?: string | null
           observacoes?: string | null
           parcelas?: number
           primeiro_vencimento?: string | null
           recebido?: boolean
+          responsavel_id?: string | null
           updated_at?: string
           valor_total: number
         }
@@ -678,11 +682,13 @@ export type Database = {
           forma_pagamento?: Database["public"]["Enums"]["pagamento_forma"]
           fornecedor_id?: string
           id?: string
+          is_teste?: boolean
           numero_documento?: string | null
           observacoes?: string | null
           parcelas?: number
           primeiro_vencimento?: string | null
           recebido?: boolean
+          responsavel_id?: string | null
           updated_at?: string
           valor_total?: number
         }
@@ -719,6 +725,7 @@ export type Database = {
           desconto: number | null
           forma_pagamento: Database["public"]["Enums"]["pagamento_forma"] | null
           id: string
+          is_teste: boolean
           juros: number | null
           multa: number | null
           numero: number
@@ -740,6 +747,7 @@ export type Database = {
             | Database["public"]["Enums"]["pagamento_forma"]
             | null
           id?: string
+          is_teste?: boolean
           juros?: number | null
           multa?: number | null
           numero: number
@@ -761,6 +769,7 @@ export type Database = {
             | Database["public"]["Enums"]["pagamento_forma"]
             | null
           id?: string
+          is_teste?: boolean
           juros?: number | null
           multa?: number | null
           numero?: number
@@ -999,12 +1008,16 @@ export type Database = {
       pagamentos: {
         Row: {
           atendimento_id: string | null
-          cliente_id: string
+          categoria_receita: string | null
+          cliente_id: string | null
           created_at: string
           data_pagamento: string | null
+          descricao: string | null
           forma: Database["public"]["Enums"]["pagamento_forma"]
           id: string
+          is_teste: boolean
           observacoes: string | null
+          responsavel_id: string | null
           status: Database["public"]["Enums"]["pagamento_status"]
           updated_at: string
           valor_pago: number
@@ -1013,12 +1026,16 @@ export type Database = {
         }
         Insert: {
           atendimento_id?: string | null
-          cliente_id: string
+          categoria_receita?: string | null
+          cliente_id?: string | null
           created_at?: string
           data_pagamento?: string | null
+          descricao?: string | null
           forma?: Database["public"]["Enums"]["pagamento_forma"]
           id?: string
+          is_teste?: boolean
           observacoes?: string | null
+          responsavel_id?: string | null
           status?: Database["public"]["Enums"]["pagamento_status"]
           updated_at?: string
           valor_pago?: number
@@ -1027,12 +1044,16 @@ export type Database = {
         }
         Update: {
           atendimento_id?: string | null
-          cliente_id?: string
+          categoria_receita?: string | null
+          cliente_id?: string | null
           created_at?: string
           data_pagamento?: string | null
+          descricao?: string | null
           forma?: Database["public"]["Enums"]["pagamento_forma"]
           id?: string
+          is_teste?: boolean
           observacoes?: string | null
+          responsavel_id?: string | null
           status?: Database["public"]["Enums"]["pagamento_status"]
           updated_at?: string
           valor_pago?: number
@@ -1724,6 +1745,7 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: never; Returns: boolean }
+      limpar_dados_teste_financeiro: { Args: never; Returns: Json }
     }
     Enums: {
       agendamento_status:
@@ -1784,7 +1806,13 @@ export type Database = {
         | "servico_interrompido"
         | "acidente"
         | "outro"
-      pagamento_forma: "pix" | "credito" | "debito" | "dinheiro" | "pendente"
+      pagamento_forma:
+        | "pix"
+        | "credito"
+        | "debito"
+        | "dinheiro"
+        | "pendente"
+        | "outras"
       pagamento_status:
         | "pago"
         | "parcial"
@@ -1983,7 +2011,14 @@ export const Constants = {
         "acidente",
         "outro",
       ],
-      pagamento_forma: ["pix", "credito", "debito", "dinheiro", "pendente"],
+      pagamento_forma: [
+        "pix",
+        "credito",
+        "debito",
+        "dinheiro",
+        "pendente",
+        "outras",
+      ],
       pagamento_status: [
         "pago",
         "parcial",
