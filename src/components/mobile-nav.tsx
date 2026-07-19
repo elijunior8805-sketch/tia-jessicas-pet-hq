@@ -14,6 +14,8 @@ import {
   Building2,
   BarChart3,
   MessageSquare,
+  Inbox,
+  HandCoins,
   Settings,
   PawPrint,
   type LucideIcon,
