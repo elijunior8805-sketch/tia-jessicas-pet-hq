@@ -140,29 +140,40 @@ function DashboardPage() {
 
       {/* Filtro segmentado */}
       <div className="mb-5">
-        <div className="inline-flex items-center rounded-full bg-muted/60 p-1 border border-border/50">
-          {periodos.map(([k, l]) => (
-            <button
-              key={k}
-              onClick={() => setPeriod(k)}
-              className={`px-4 h-8 rounded-full text-xs sm:text-sm font-medium transition ${
-                period === k
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {l}
-            </button>
-          ))}
+        <div
+          role="tablist"
+          aria-label="Período"
+          className="grid grid-cols-4 sm:inline-flex sm:w-auto items-center rounded-full bg-muted/60 p-1 border border-border/50"
+        >
+          {periodos.map(([k, longLabel, shortLabel]) => {
+            const active = period === k;
+            return (
+              <button
+                key={k}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setPeriod(k)}
+                className={`h-9 px-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium transition text-center leading-none ${
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="sm:hidden">{shortLabel}</span>
+                <span className="hidden sm:inline">{longLabel}</span>
+              </button>
+            );
+          })}
         </div>
         {period === "personalizado" && (
-          <div className="flex items-center gap-2 mt-2">
-            <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 w-auto" />
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 w-full sm:w-auto" />
             <span className="text-muted-foreground text-sm">até</span>
-            <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 w-auto" />
+            <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 w-full sm:w-auto" />
           </div>
         )}
       </div>
+
 
       {/* KPI Cards — 1/2/3 colunas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
