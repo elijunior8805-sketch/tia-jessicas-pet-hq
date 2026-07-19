@@ -178,7 +178,7 @@ function AtendimentoDetalhe() {
     mutationFn: async (patch: Record<string, any>) => {
       const { error } = await supabase
         .from("atendimentos")
-        .update(patch)
+        .update(patch as any)
         .eq("id", atendId);
       if (error) throw error;
     },
@@ -239,7 +239,7 @@ function AtendimentoDetalhe() {
 
       // Atualiza pet
       if (atendimento.pet_id) {
-        await supabase.from("pets").update(petPatch).eq("id", atendimento.pet_id);
+        await supabase.from("pets").update(petPatch as any).eq("id", atendimento.pet_id);
       }
     },
     onSuccess: () => {
@@ -891,8 +891,8 @@ function NovaOcorrenciaDialog({
         atendimento_id: atendimento.id,
         cliente_id: atendimento.cliente_id,
         pet_id: atendimento.pet_id,
-        tipo,
-        descricao: descricao || null,
+        tipo: tipo as any,
+        descricao: descricao || "",
         fotos,
         tutor_informado: tutorInformado,
       });
