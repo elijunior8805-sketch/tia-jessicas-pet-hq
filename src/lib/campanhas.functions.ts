@@ -75,7 +75,7 @@ type PetJoined = {
   id: string;
   nome: string;
   nascimento: string | null;
-  porte_id: string | null;
+  porte: string | null;
   ativo: boolean | null;
   cliente_id: string | null;
   clientes:
@@ -98,14 +98,14 @@ async function buscarCandidatos(
   let q = supabase
     .from("pets")
     .select(
-      `id, nome, nascimento, porte_id, ativo, cliente_id,
+      `id, nome, nascimento, porte, ativo, cliente_id,
        clientes:cliente_id ( id, nome, cidade, telefone, whatsapp, ativo )`
     )
     .limit(5000);
 
   if (filtros.apenas_ativos !== false) q = q.eq("ativo", true);
-  if (filtros.porte_ids && filtros.porte_ids.length > 0) {
-    q = q.in("porte_id", filtros.porte_ids);
+  if (filtros.portes && filtros.portes.length > 0) {
+    q = q.in("porte", filtros.portes);
   }
 
   const { data, error } = await q;
