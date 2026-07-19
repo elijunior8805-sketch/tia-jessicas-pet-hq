@@ -159,8 +159,11 @@ function ResultadoFotoCard({
       )}
 
       {principal && (
-        <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-primary/95 text-primary-foreground text-[10px] font-semibold px-2 py-1 uppercase tracking-wider shadow-md">
-          <Star className="h-3 w-3 fill-current" /> Principal
+        <span className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-gold to-primary text-primary-foreground font-semibold uppercase tracking-wider shadow-md ${
+          hero ? "text-[11px] px-3 py-1.5" : "text-[10px] px-2 py-1"
+        }`}>
+          <Star className={`fill-current ${hero ? "h-3.5 w-3.5" : "h-3 w-3"}`} />
+          {hero ? "Foto principal" : "Principal"}
         </span>
       )}
 
@@ -185,21 +188,21 @@ function ResultadoFotoCard({
       )}
 
       {/* Actions overlay: always visible on mobile, hover on desktop */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent p-2 flex gap-2">
+      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex gap-2 ${hero ? "p-3 sm:p-4" : "p-2"}`}>
         <Button
           type="button" size="sm" variant="secondary"
-          className="flex-1 h-9 text-xs backdrop-blur bg-white/95 hover:bg-white text-foreground"
+          className={`flex-1 backdrop-blur bg-white/95 hover:bg-white text-foreground ${hero ? "h-11 text-sm font-semibold" : "h-9 text-xs"}`}
           onClick={(e) => { e.stopPropagation(); onDownload(); }}
         >
-          <Download className="h-3.5 w-3.5 mr-1" /> Baixar
+          <Download className={`mr-1.5 ${hero ? "h-4 w-4" : "h-3.5 w-3.5"}`} /> Baixar
         </Button>
         {onShare && (
           <Button
             type="button" size="sm"
-            className="flex-1 h-9 text-xs bg-[#25D366] hover:bg-[#20b858] text-white"
+            className={`flex-1 bg-[#25D366] hover:bg-[#20b858] text-white ${hero ? "h-11 text-sm font-semibold" : "h-9 text-xs"}`}
             onClick={(e) => { e.stopPropagation(); onShare(); }}
           >
-            <MessageCircle className="h-3.5 w-3.5 mr-1" /> Enviar
+            <MessageCircle className={`mr-1.5 ${hero ? "h-4 w-4" : "h-3.5 w-3.5"}`} /> Enviar
           </Button>
         )}
       </div>
