@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import {
   ArrowLeft, AlertTriangle, Camera, Upload, Trash2, Star,
-  CheckCircle2, FileText, PawPrint, Sparkles,
+  CheckCircle2, FileText, PawPrint, Sparkles, MessageCircle,
 } from "lucide-react";
 import {
   brl, sumItens, itemFromServico, isBanho, isTosa,
