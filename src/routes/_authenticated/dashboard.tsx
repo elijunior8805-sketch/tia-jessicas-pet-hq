@@ -160,7 +160,7 @@ function DashboardPage() {
           strokeWidth={1}
         />
 
-        <div className="relative p-6 sm:p-8 lg:p-10">
+        <div className="relative p-5 sm:p-8 lg:p-10">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.24em] text-[oklch(0.85_0.10_82)] font-semibold">
@@ -180,7 +180,7 @@ function DashboardPage() {
                   {firstName(profile)}
                 </span>
               </h1>
-              <p className="text-sm sm:text-base text-white/75 mt-2 capitalize">
+              <p className="text-sm sm:text-base text-white/75 mt-2 first-letter:uppercase">
                 {format(hoje, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </p>
               <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-3.5 py-1.5 border border-white/15">
