@@ -409,6 +409,7 @@ function ServicoFormDialog({
   const [categoria, setCategoria] = useState("");
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("0");
+  const [precoAPartir, setPrecoAPartir] = useState(false);
   const [duracao, setDuracao] = useState("");
   const [ativo, setAtivo] = useState(true);
 
@@ -419,6 +420,7 @@ function ServicoFormDialog({
       setCategoria(initial?.categoria ?? "");
       setDescricao(initial?.descricao ?? "");
       setValor(String(initial?.valor ?? 0));
+      setPrecoAPartir(initial?.preco_a_partir ?? false);
       setDuracao(initial?.duracao_min ? String(initial.duracao_min) : "");
       setAtivo(initial?.ativo ?? true);
     }
@@ -435,6 +437,7 @@ function ServicoFormDialog({
       categoria: categoria.trim() || null,
       descricao: descricao.trim() || null,
       valor: Number(valor) || 0,
+      preco_a_partir: precoAPartir,
       duracao_min: duracao ? Number(duracao) : 0,
       ativo,
       is_combo: initial?.is_combo ?? isCombo,
