@@ -133,6 +133,32 @@ export function RelatoriosAgendamentos() {
     }));
   };
 
+  // Amostra determinística para o preview ao vivo
+  const brlFmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const amostra: Record<KpiId, string> = {
+    faturamento: `• Faturamento: ${brlFmt(2480)}`,
+    atendimentos: `• Atendimentos: 12`,
+    ticket: `• Ticket médio: ${brlFmt(206.67)}`,
+    clientes: `• Clientes atendidos: 10`,
+    leva_traz: `• Leva e traz: ${brlFmt(180)}`,
+    a_receber: `• A receber: ${brlFmt(1350)}`,
+    atraso: `• Valor em atraso: ${brlFmt(420)}`,
+  };
+  const previewDestNome = form.destinatarios[0]?.nome?.trim() || "Jéssica";
+  const previewDia = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toLocaleDateString("pt-BR");
+  })();
+  const previewTitulo = form.titulo_mensagem.trim() || `Spa da Tia Jéssica — Relatório diário (${previewDia})`;
+  const previewRodape = form.rodape_mensagem.trim() || "Detalhes completos no painel. 🐾";
+  const previewLinhas = form.kpis.map((k) => amostra[k]).filter(Boolean).join("\n");
+  const previewMensagem =
+    `*${previewTitulo}*\n\n` +
+    `Olá, ${previewDestNome}! Segue o resumo do dia:\n\n` +
+    `${previewLinhas || "• (selecione ao menos um KPI)"}\n\n` +
+    `${previewRodape}`;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -247,6 +273,25 @@ export function RelatoriosAgendamentos() {
                 <div className="flex items-center gap-2 border-t pt-3">
                   <Switch checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: v })} />
                   <Label>Ativo</Label>
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <Label>Prévia ao vivo da mensagem</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Atualiza conforme você marca KPIs, título, rodapé e primeiro destinatário. Valores são amostras.
+                  </p>
+                  <div className="rounded-lg bg-[#0b141a] p-3">
+                    <div className="ml-auto max-w-full rounded-lg bg-[#005c4b] text-white px-3 py-2 shadow text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+                      {previewMensagem.split(/(\*[^*\n]+\*)/g).map((part, i) =>
+                        part.startsWith("*") && part.endsWith("*") && part.length > 2 ? (
+                          <strong key={i}>{part.slice(1, -1)}</strong>
+                        ) : (
+                          <span key={i}>{part}</span>
+                        )
+                      )}
+                    </div>
+                    <div className="text-[10px] text-white/50 text-right mt-1">amostra • WhatsApp</div>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
