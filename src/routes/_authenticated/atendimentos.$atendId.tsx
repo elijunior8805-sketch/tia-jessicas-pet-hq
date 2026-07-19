@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowLeft, AlertTriangle, Camera, Upload, Trash2, Star, Plus,
+  ArrowLeft, AlertTriangle, Camera, Upload, Trash2, Star,
   CheckCircle2, FileText, PawPrint, Sparkles,
 } from "lucide-react";
 import {
