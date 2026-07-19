@@ -123,6 +123,7 @@ function CobrancasPage() {
 
   const [selecionada, setSelecionada] = useState<CobrancaDTO | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const composer = useWhatsAppComposer();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
