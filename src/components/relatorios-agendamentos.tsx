@@ -99,9 +99,14 @@ export function RelatoriosAgendamentos() {
 
   const editar = (a: AgendamentoDTO) => {
     setForm({
-      id: a.id, nome: a.nome, hora_envio: a.hora_envio.slice(0, 5),
+      id: a.id,
+      nome: a.nome,
+      hora_envio: a.hora_envio.slice(0, 5),
       destinatarios: a.destinatarios.length ? a.destinatarios : [{ nome: "", whatsapp: "" }],
       ativo: a.ativo,
+      kpis: (a.kpis && a.kpis.length ? a.kpis : ["faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber"]) as KpiId[],
+      titulo_mensagem: a.titulo_mensagem ?? "",
+      rodape_mensagem: a.rodape_mensagem ?? "",
     });
     setAberto(true);
   };
