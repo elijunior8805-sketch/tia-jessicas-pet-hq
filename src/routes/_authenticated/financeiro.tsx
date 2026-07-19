@@ -347,6 +347,7 @@ function FinanceiroPage() {
         empresa: empresaInfo,
       },
       telefone: p.cliente?.whatsapp || p.cliente?.telefone || null,
+      referenciaId: p.id,
     });
   };
 
