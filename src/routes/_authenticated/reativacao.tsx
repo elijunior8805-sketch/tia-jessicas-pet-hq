@@ -121,7 +121,7 @@ function ReativacaoPage() {
       }
       setGerandoIA(null);
     } else {
-      mensagem = montarMensagemWhatsApp("reativacao_cliente", {
+      mensagem = renderTemplate("reativacao_cliente", {
         tutor: row.cliente_nome.split(" ")[0],
         pet: row.pet_nome,
       });
