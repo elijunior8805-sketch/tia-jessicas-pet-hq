@@ -949,15 +949,22 @@ function AgendamentoRow({
             <Button
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
               onClick={() => {
-                const phone = waPhone(row.clientes?.whatsapp);
-                if (!phone) {
+                const raw = row.clientes?.whatsapp;
+                if (!raw) {
                   toast.error("Cliente sem WhatsApp cadastrado");
                   return;
                 }
-                const url = `https://wa.me/${phone}?text=${encodeURIComponent(previewText)}`;
-                window.open(url, "_blank", "noopener,noreferrer");
+                openWhatsAppComposerGlobal({
+                  tipo: "confirmacao_agendamento",
+                  destinatario: row.clientes?.nome ?? "",
+                  telefone: raw,
+                  mensagem: previewText,
+                  motivo: `Agenda — ${row.status}`,
+                  cliente_id: row.cliente_id ?? null,
+                });
                 setPreviewOpen(false);
               }}
+
             >
               <Send className="h-4 w-4" /> Enviar no WhatsApp
             </Button>
