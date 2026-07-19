@@ -58,6 +58,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
+import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
 export const Route = createFileRoute("/_authenticated/cobrancas")({
   component: CobrancasPage,
