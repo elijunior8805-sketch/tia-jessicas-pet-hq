@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader, EmptyState } from "@/components/page-shell";
@@ -115,6 +115,10 @@ function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
 
 export const Route = createFileRoute("/_authenticated/agenda")({
   component: AgendaPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    cliente: typeof search.cliente === "string" ? search.cliente : undefined,
+    pet: typeof search.pet === "string" ? search.pet : undefined,
+  }),
 });
 
 type Status =
@@ -159,9 +163,23 @@ const brl = (v: number | null | undefined) =>
   v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function AgendaPage() {
+  const search = Route.useSearch();
+  const navigateSelf = useNavigate({ from: Route.fullPath });
   const [date, setDate] = useState(todayISO());
   const [statusFilter, setStatusFilter] = useState<"todos" | Status>("todos");
   const [openNew, setOpenNew] = useState(false);
+  const [prefill, setPrefill] = useState<{ cliente?: string; pet?: string }>({});
+
+  // Abrir dialog automaticamente quando vier ?cliente=&pet= na URL
+  useEffect(() => {
+    if (search.cliente || search.pet) {
+      setPrefill({ cliente: search.cliente, pet: search.pet });
+      setOpenNew(true);
+      // limpa a query string para não reabrir ao fechar o diálogo
+      navigateSelf({ search: {}, replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.cliente, search.pet]);
   const qc = useQueryClient();
   const { data: profile } = useMyProfile();
   const signer = { name: displayName(profile), initials: initials(profile) };
@@ -440,7 +458,13 @@ function AgendaPage() {
         </aside>
       </div>
 
-      <NovoAgendamentoDialog open={openNew} onOpenChange={setOpenNew} defaultDate={date} />
+      <NovoAgendamentoDialog
+        open={openNew}
+        onOpenChange={(v) => { setOpenNew(v); if (!v) setPrefill({}); }}
+        defaultDate={date}
+        defaultClienteId={prefill.cliente}
+        defaultPetId={prefill.pet}
+      />
     </PageShell>
   );
 }
@@ -675,9 +699,10 @@ const novoSchema = z.object({
 });
 
 function NovoAgendamentoDialog({
-  open, onOpenChange, defaultDate,
+  open, onOpenChange, defaultDate, defaultClienteId, defaultPetId,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void; defaultDate: string;
+  defaultClienteId?: string; defaultPetId?: string;
 }) {
   const qc = useQueryClient();
   const [clienteId, setClienteId] = useState<string>("");
@@ -694,14 +719,14 @@ function NovoAgendamentoDialog({
 
   // reset ao abrir
   useMemoReset(open, () => {
-    setClienteId(""); setPetId(""); setServicoId("");
+    setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? ""); setServicoId("");
     setData(defaultDate); setHora("09:00");
     setDuracao(""); setValor(""); setTaxa("0");
     setStatus("agendado"); setObs(""); setClienteSearch("");
   });
 
   const { data: clientes } = useQuery({
-    queryKey: ["clientes-select", clienteSearch],
+    queryKey: ["clientes-select", clienteSearch, defaultClienteId ?? ""],
     enabled: open,
     queryFn: async () => {
       let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(30);
@@ -710,7 +735,17 @@ function NovoAgendamentoDialog({
         q = q.or(`nome.ilike.${like},whatsapp.ilike.${like},telefone.ilike.${like}`);
       }
       const { data } = await q;
-      return data ?? [];
+      let rows = data ?? [];
+      // Garante que o cliente pré-selecionado apareça na lista
+      if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
+        const { data: extra } = await supabase
+          .from("clientes")
+          .select("id, nome, whatsapp, vip")
+          .eq("id", defaultClienteId)
+          .maybeSingle();
+        if (extra) rows = [extra, ...rows];
+      }
+      return rows;
     },
   });
 

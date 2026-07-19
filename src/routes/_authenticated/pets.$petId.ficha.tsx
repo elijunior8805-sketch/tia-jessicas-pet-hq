@@ -5,7 +5,7 @@ import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, PawPrint, ArrowLeft, Ruler, Cake, Syringe, Heart, ClipboardList, Pencil } from "lucide-react";
+import { AlertTriangle, PawPrint, ArrowLeft, Ruler, Cake, Syringe, Heart, ClipboardList, Pencil, CalendarPlus } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/ficha")({
@@ -72,6 +72,12 @@ function FichaOperacional() {
         description={`Ficha operacional · ${pet.clientes?.nome ?? ""}`}
         actions={
           <>
+            <Link
+              to="/agenda"
+              search={{ cliente: pet.cliente_id, pet: pet.id }}
+            >
+              <Button className="gap-2"><CalendarPlus className="h-4 w-4"/> Novo agendamento</Button>
+            </Link>
             <Link to="/pets/$petId/editar" params={{ petId }}>
               <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar pet</Button>
             </Link>
