@@ -574,7 +574,47 @@ function AgendamentoRow({
   };
 
   const meta = statusMeta(row.status);
-  const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
+
+  // Combina serviços da tabela N:N (preferida) ou cai no `servicos` (retrocompat)
+  const itensServicos: Array<{ nome: string; valor_unit: number; duracao_min: number | null }> = useMemo(() => {
+    const arr = Array.isArray(row.agendamento_servicos) ? row.agendamento_servicos : [];
+    if (arr.length > 0) {
+      return [...arr]
+        .sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        .map((it: any) => ({
+          nome: it.nome,
+          valor_unit: Number(it.valor_unit ?? 0),
+          duracao_min: it.duracao_min ?? null,
+        }));
+    }
+    if (row.servicos) {
+      return [{
+        nome: row.servicos.nome,
+        valor_unit: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
+        duracao_min: row.servicos.duracao_min ?? row.duracao_min ?? null,
+      }];
+    }
+    return [];
+  }, [row]);
+
+  const totalItens = itensServicos.length;
+  const valorServicos = itensServicos.reduce((s, it) => s + it.valor_unit, 0);
+  // Se há itens na N:N usa a soma, senão respeita valor_previsto salvo
+  const valorPrevisto = totalItens > 1 || (Array.isArray(row.agendamento_servicos) && row.agendamento_servicos.length > 0)
+    ? valorServicos
+    : Number(row.valor_previsto ?? valorServicos);
+  const total = valorPrevisto + Number(row.taxa_leva_traz ?? 0);
+  const duracaoTotal = itensServicos.reduce((s, it) => s + Number(it.duracao_min ?? 0), 0)
+    || Number(row.duracao_min ?? row.servicos?.duracao_min ?? 0);
+
+  // Label combinado: "Banho + Tosa +1"
+  const servicosLabel = (() => {
+    if (totalItens === 0) return "Serviço";
+    const nomes = itensServicos.map((it) => it.nome);
+    if (nomes.length === 1) return nomes[0];
+    if (nomes.length === 2) return `${nomes[0]} + ${nomes[1]}`;
+    return `${nomes[0]} + ${nomes[1]} +${nomes.length - 2}`;
+  })();
 
   return (
     <Card className="p-4 hover:shadow-elegant transition">
@@ -585,7 +625,7 @@ function AgendamentoRow({
           </div>
           <div className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground flex items-center justify-center gap-1">
             <Clock className="h-3 w-3" />
-            {row.duracao_min ?? row.servicos?.duracao_min ?? "—"} min
+            {duracaoTotal || "—"} min
           </div>
         </div>
 
@@ -595,21 +635,17 @@ function AgendamentoRow({
               {meta.label}
             </span>
             {row.clientes?.vip && <Badge className="badge-gold text-[10px]">VIP</Badge>}
-            {(() => {
-              const extras = Array.isArray(row.agendamento_servicos) ? row.agendamento_servicos.length : 0;
-              const nomePrincipal = row.servicos?.nome ?? (extras > 0 ? row.agendamento_servicos[0]?.nome : "Serviço");
-              const totalItens = Math.max(extras, row.servicos ? 1 : 0);
-              return (
-                <>
-                  <span className="font-display font-semibold text-primary truncate">
-                    {nomePrincipal ?? "Serviço"}
-                  </span>
-                  {totalItens > 1 && (
-                    <Badge variant="secondary" className="text-[10px]">+{totalItens - 1} serviço{totalItens - 1 > 1 ? "s" : ""}</Badge>
-                  )}
-                </>
-              );
-            })()}
+            <span
+              className="font-display font-semibold text-primary truncate"
+              title={itensServicos.map((it) => it.nome).join(" + ")}
+            >
+              {servicosLabel}
+            </span>
+            {totalItens > 1 && (
+              <Badge variant="secondary" className="text-[10px]">
+                {totalItens} serviços
+              </Badge>
+            )}
           </div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1 min-w-0">
@@ -631,6 +667,19 @@ function AgendamentoRow({
               </span>
             )}
           </div>
+          {totalItens > 1 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {itensServicos.map((it, i) => (
+                <span
+                  key={i}
+                  className="text-[11px] px-2 py-0.5 rounded-full bg-primary/5 border border-primary/15 text-primary/90"
+                  title={it.duracao_min ? `${it.duracao_min} min · ${brl(it.valor_unit)}` : brl(it.valor_unit)}
+                >
+                  {it.nome}
+                </span>
+              ))}
+            </div>
+          )}
           {row.observacoes && (
             <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{row.observacoes}</p>
           )}
@@ -639,6 +688,11 @@ function AgendamentoRow({
         <div className="text-right shrink-0 flex flex-col items-end gap-2">
           <div>
             <div className="font-display text-lg font-semibold text-primary">{brl(total)}</div>
+            {totalItens > 1 && (
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {brl(valorServicos)} em serviços
+              </div>
+            )}
             {Number(row.taxa_leva_traz ?? 0) > 0 && (
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 inclui leva-e-traz {brl(row.taxa_leva_traz)}
