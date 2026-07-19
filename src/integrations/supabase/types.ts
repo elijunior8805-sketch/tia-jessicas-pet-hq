@@ -1372,6 +1372,7 @@ export type Database = {
           id: string
           is_combo: boolean
           nome: string
+          preco_a_partir: boolean
           updated_at: string
           valor: number
         }
@@ -1384,6 +1385,7 @@ export type Database = {
           id?: string
           is_combo?: boolean
           nome: string
+          preco_a_partir?: boolean
           updated_at?: string
           valor?: number
         }
@@ -1396,6 +1398,7 @@ export type Database = {
           id?: string
           is_combo?: boolean
           nome?: string
+          preco_a_partir?: boolean
           updated_at?: string
           valor?: number
         }
