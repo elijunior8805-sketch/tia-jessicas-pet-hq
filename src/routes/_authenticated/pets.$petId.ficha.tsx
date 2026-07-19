@@ -192,3 +192,13 @@ function Info({ icon: Icon, label, value }: { icon: React.ComponentType<{ classN
     </div>
   );
 }
+
+function PetAvatar({ path, nome }: { path: string | null | undefined; nome: string }) {
+  const { data: url } = useSignedUrl(path ?? null);
+  if (url) return <img src={url} alt={nome} className="h-14 w-14 rounded-full object-cover border" />;
+  return (
+    <div className="h-14 w-14 rounded-full bg-primary/10 grid place-items-center">
+      <PawPrint className="h-7 w-7 text-primary"/>
+    </div>
+  );
+}
