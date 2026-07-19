@@ -163,6 +163,10 @@ function AgendaPage() {
   const [statusFilter, setStatusFilter] = useState<"todos" | Status>("todos");
   const [openNew, setOpenNew] = useState(false);
   const qc = useQueryClient();
+  const { data: profile } = useMyProfile();
+  const signer = { name: displayName(profile), initials: initials(profile) };
+
+
 
   const { data: agendamentos, isLoading } = useQuery({
     queryKey: ["agendamentos", date, statusFilter],
