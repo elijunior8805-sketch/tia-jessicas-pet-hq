@@ -72,6 +72,12 @@ function FichaOperacional() {
         description={`Ficha operacional · ${pet.clientes?.nome ?? ""}`}
         actions={
           <>
+            <Link
+              to="/agenda"
+              search={{ cliente: pet.cliente_id, pet: pet.id }}
+            >
+              <Button className="gap-2"><CalendarPlus className="h-4 w-4"/> Novo agendamento</Button>
+            </Link>
             <Link to="/pets/$petId/editar" params={{ petId }}>
               <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar pet</Button>
             </Link>
