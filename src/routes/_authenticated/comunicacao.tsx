@@ -156,6 +156,8 @@ function ComunicacaoPage() {
     }
   }
 
+  const composer = useWhatsAppComposer();
+
   function enviar() {
     if (!clienteSel?.whatsapp) {
       toast.error("Este cliente não possui WhatsApp");
@@ -165,8 +167,16 @@ function ComunicacaoPage() {
       toast.error("Escreva ou gere uma mensagem");
       return;
     }
-    openWa(clienteSel.whatsapp, mensagem);
+    composer.open({
+      tipo,
+      destinatario: clienteSel.nome,
+      telefone: clienteSel.whatsapp,
+      mensagem,
+      motivo: `Comunicação — ${tipo}`,
+      cliente_id: clienteSel.id,
+    });
   }
+
 
   // ---- sugestões inteligentes ----
   const hoje = new Date();
