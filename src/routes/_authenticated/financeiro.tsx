@@ -39,7 +39,10 @@ import {
   Clock,
   CheckCircle2,
   Plus,
+  FileText,
 } from "lucide-react";
+import { ReciboDialog } from "@/components/recibo-dialog";
+import type { ReciboData } from "@/lib/recibo-pdf";
 import { toast } from "sonner";
 import {
   format,
