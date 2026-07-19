@@ -2,7 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-export type LembreteTipo = "lembrete_24h" | "pos_atendimento" | "aniversario_pet";
+export type LembreteTipo =
+  | "lembrete_24h"
+  | "pos_atendimento"
+  | "aniversario_pet"
+  | "aniversario_tutor"
+  | "petversario"
+  | "data_especial";
 export type LembreteStatus = "pendente" | "enviado" | "falhou" | "cancelado";
 
 export type LembreteRow = {
@@ -38,6 +44,11 @@ export type LembreteConfig = {
   aniversario_pet_ativo: boolean;
   aniversario_hora: string;
   aniversario_template: string;
+  aniversario_tutor_ativo: boolean;
+  aniversario_tutor_template: string;
+  petversario_ativo: boolean;
+  petversario_template: string;
+  datas_especiais_ativo: boolean;
   updated_at: string;
 };
 
