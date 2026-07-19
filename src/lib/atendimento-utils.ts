@@ -111,6 +111,5 @@ export const FORMAS_PAGAMENTO = [
   { value: "pix", label: "PIX" },
   { value: "debito", label: "Cartão de débito" },
   { value: "credito", label: "Cartão de crédito" },
-  { value: "transferencia", label: "Transferência" },
   { value: "pendente", label: "Pendente" },
 ] as const;
