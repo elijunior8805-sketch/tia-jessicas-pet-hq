@@ -90,6 +90,7 @@ export type Database = {
       atendimentos: {
         Row: {
           agendamento_id: string | null
+          alergia_observada: string | null
           check_in_foto: string | null
           check_in_obs: string | null
           cliente_id: string
@@ -97,24 +98,43 @@ export type Database = {
           created_at: string
           data_fim: string | null
           data_inicio: string
+          desconto: number
+          desconto_motivo: string | null
+          encerrado_em: string | null
+          encerrado_por: string | null
+          etapa_atual: number
+          etapas_status: Json
           finalizado: boolean
+          foto_principal_depois: string | null
           fotos_antes: Json | null
           fotos_depois: Json | null
           id: string
           observacoes: string | null
+          observacoes_checkin: string | null
+          observacoes_internas: string | null
+          pagamento_forma: string | null
+          pagamento_status: string | null
+          pdf_path: string | null
           pet_id: string
+          precisou_pausa: boolean
           profissional_id: string | null
           proxima_visita: string | null
+          reaberto_motivo: string | null
           recomendacoes: string | null
           servicos_executados: Json
+          servicos_extras: Json
           servicos_planejados: Json
+          servicos_solicitados: Json
           taxa_leva_traz: number
           updated_at: string
+          usou_focinheira: boolean
           valor_executado: number
+          valor_pago: number
           valor_planejado: number
         }
         Insert: {
           agendamento_id?: string | null
+          alergia_observada?: string | null
           check_in_foto?: string | null
           check_in_obs?: string | null
           cliente_id: string
@@ -122,24 +142,43 @@ export type Database = {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string
+          desconto?: number
+          desconto_motivo?: string | null
+          encerrado_em?: string | null
+          encerrado_por?: string | null
+          etapa_atual?: number
+          etapas_status?: Json
           finalizado?: boolean
+          foto_principal_depois?: string | null
           fotos_antes?: Json | null
           fotos_depois?: Json | null
           id?: string
           observacoes?: string | null
+          observacoes_checkin?: string | null
+          observacoes_internas?: string | null
+          pagamento_forma?: string | null
+          pagamento_status?: string | null
+          pdf_path?: string | null
           pet_id: string
+          precisou_pausa?: boolean
           profissional_id?: string | null
           proxima_visita?: string | null
+          reaberto_motivo?: string | null
           recomendacoes?: string | null
           servicos_executados?: Json
+          servicos_extras?: Json
           servicos_planejados?: Json
+          servicos_solicitados?: Json
           taxa_leva_traz?: number
           updated_at?: string
+          usou_focinheira?: boolean
           valor_executado?: number
+          valor_pago?: number
           valor_planejado?: number
         }
         Update: {
           agendamento_id?: string | null
+          alergia_observada?: string | null
           check_in_foto?: string | null
           check_in_obs?: string | null
           cliente_id?: string
@@ -147,20 +186,38 @@ export type Database = {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string
+          desconto?: number
+          desconto_motivo?: string | null
+          encerrado_em?: string | null
+          encerrado_por?: string | null
+          etapa_atual?: number
+          etapas_status?: Json
           finalizado?: boolean
+          foto_principal_depois?: string | null
           fotos_antes?: Json | null
           fotos_depois?: Json | null
           id?: string
           observacoes?: string | null
+          observacoes_checkin?: string | null
+          observacoes_internas?: string | null
+          pagamento_forma?: string | null
+          pagamento_status?: string | null
+          pdf_path?: string | null
           pet_id?: string
+          precisou_pausa?: boolean
           profissional_id?: string | null
           proxima_visita?: string | null
+          reaberto_motivo?: string | null
           recomendacoes?: string | null
           servicos_executados?: Json
+          servicos_extras?: Json
           servicos_planejados?: Json
+          servicos_solicitados?: Json
           taxa_leva_traz?: number
           updated_at?: string
+          usou_focinheira?: boolean
           valor_executado?: number
+          valor_pago?: number
           valor_planejado?: number
         }
         Relationships: [

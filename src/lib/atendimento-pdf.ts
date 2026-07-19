@@ -7,6 +7,7 @@ type AtendPDFData = {
   ocorrencias?: any[];
   empresa?: { nome?: string | null; cnpj?: string | null; telefone?: string | null; endereco?: string | null } | null;
   operador?: string | null;
+  returnBlob?: boolean;
 };
 
 // Deep-forest, off-white, gold palette (RGB)
@@ -291,6 +292,9 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   }
 
   const fileName = `atendimento-${(pet.nome ?? "pet").toString().replace(/\s+/g, "_")}-${proto}.pdf`;
+  if (arguments[0]?.returnBlob) {
+    return doc.output("blob") as unknown as Blob;
+  }
   doc.save(fileName);
   return fileName;
 }
