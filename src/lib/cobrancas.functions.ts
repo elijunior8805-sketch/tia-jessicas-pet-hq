@@ -88,7 +88,7 @@ export const listarCobrancas = createServerFn({ method: "POST" })
       .order("vencimento", { ascending: true })
       .limit(data.limit);
 
-    if (data.status && data.status.length > 0) q = q.in("status", data.status);
+    if (data.status && data.status.length > 0) q = q.in("status", data.status as any);
     if (data.vencimentoDe) q = q.gte("vencimento", data.vencimentoDe);
     if (data.vencimentoAte) q = q.lte("vencimento", data.vencimentoAte);
     if (data.valorMin != null) q = q.gte("saldo", data.valorMin);
