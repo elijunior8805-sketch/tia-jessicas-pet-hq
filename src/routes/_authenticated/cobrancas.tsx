@@ -1091,14 +1091,7 @@ function TemplateEditor({
 // Fila do Dia — cobranças priorizadas por score
 // ===================================================================
 function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
-  const fn = useServerFn(
-    // resolve at call time to avoid import cycles
-    (require as any) ? (undefined as any) : (undefined as any),
-  );
-  return <FilaDoDiaTabInner onSelect={onSelect} />;
-}
 
-function FilaDoDiaTabInner({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
   // Lazy import server fn to avoid re-declaring at top; use dynamic require via ESM import at module scope
   // (server fns are already static-imported in the file we live in)
   // We import here through window.__cobrancasFns fallback — but simpler: rely on the static import below.
