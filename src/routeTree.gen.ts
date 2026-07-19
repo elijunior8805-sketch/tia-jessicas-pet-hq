@@ -19,6 +19,7 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedReativacaoRouteImport } from './routes/_authenticated/reativacao'
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
 import { Route as AuthenticatedLevaTrazRouteImport } from './routes/_authenticated/leva-traz'
+import { Route as AuthenticatedLembretesRouteImport } from './routes/_authenticated/lembretes'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -90,6 +91,11 @@ const AuthenticatedPagamentosAbertosRoute =
 const AuthenticatedLevaTrazRoute = AuthenticatedLevaTrazRouteImport.update({
   id: '/leva-traz',
   path: '/leva-traz',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLembretesRoute = AuthenticatedLembretesRouteImport.update({
+  id: '/lembretes',
+  path: '/lembretes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/lembretes': typeof AuthenticatedLembretesRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/reativacao': typeof AuthenticatedReativacaoRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/lembretes': typeof AuthenticatedLembretesRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/reativacao': typeof AuthenticatedReativacaoRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/lembretes': typeof AuthenticatedLembretesRoute
   '/_authenticated/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/_authenticated/reativacao': typeof AuthenticatedReativacaoRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/fornecedores'
     | '/inbox'
+    | '/lembretes'
     | '/leva-traz'
     | '/pagamentos-abertos'
     | '/reativacao'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/fornecedores'
     | '/inbox'
+    | '/lembretes'
     | '/leva-traz'
     | '/pagamentos-abertos'
     | '/reativacao'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/fornecedores'
     | '/_authenticated/inbox'
+    | '/_authenticated/lembretes'
     | '/_authenticated/leva-traz'
     | '/_authenticated/pagamentos-abertos'
     | '/_authenticated/reativacao'
@@ -500,6 +512,13 @@ declare module '@tanstack/react-router' {
       path: '/leva-traz'
       fullPath: '/leva-traz'
       preLoaderRoute: typeof AuthenticatedLevaTrazRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/lembretes': {
+      id: '/_authenticated/lembretes'
+      path: '/lembretes'
+      fullPath: '/lembretes'
+      preLoaderRoute: typeof AuthenticatedLembretesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/inbox': {
@@ -684,6 +703,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedLembretesRoute: typeof AuthenticatedLembretesRoute
   AuthenticatedLevaTrazRoute: typeof AuthenticatedLevaTrazRoute
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
   AuthenticatedReativacaoRoute: typeof AuthenticatedReativacaoRoute
@@ -710,6 +730,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedLembretesRoute: AuthenticatedLembretesRoute,
   AuthenticatedLevaTrazRoute: AuthenticatedLevaTrazRoute,
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,
   AuthenticatedReativacaoRoute: AuthenticatedReativacaoRoute,
