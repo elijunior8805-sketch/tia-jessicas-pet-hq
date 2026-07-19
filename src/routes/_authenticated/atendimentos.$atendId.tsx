@@ -1301,6 +1301,11 @@ function AtendimentoDetalhe() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </PageShell>
   );
 }
