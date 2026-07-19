@@ -650,7 +650,7 @@ function AtendimentoDetalhe() {
 
   // ---- Relatório ----
 
-  const buildPDF = (returnBlob = false): Blob | string => {
+  const buildPDF = async (returnBlob = false, permitirSemFotos = false) => {
     const executados: ServicoItem[] = [...solicitados, ...extras];
     const enriched = {
       ...atendimento,
@@ -667,31 +667,86 @@ function AtendimentoDetalhe() {
       empresa: empresa ?? null,
       operador: myProfile?.nome ?? null,
       returnBlob,
-    }) as any;
+      fotosAntesPaths: fotosAntes.map((f) => f.path).filter(Boolean) as string[],
+      fotosDepoisPaths: fotosDepois.map((f) => f.path).filter(Boolean) as string[],
+      permitirSemFotos,
+    });
+  };
+
+  const runBuild = async (
+    returnBlob: boolean,
+    onOk: (res: { fileName: string; blob?: Blob; fotosFalhas: string[] }) => void | Promise<void>,
+  ) => {
+    const toastId = toast.loading("Gerando relatório e carregando fotos…");
+    try {
+      const res = await buildPDF(returnBlob, false);
+      toast.dismiss(toastId);
+      if (res.fotosFalhas.length) {
+        toast.warning(`${res.fotosFalhas.length} foto(s) não puderam ser carregadas. O relatório foi gerado sem elas.`);
+      }
+      await onOk(res);
+    } catch (e: any) {
+      toast.dismiss(toastId);
+      if (e?.code === "FOTOS_INCOMPLETAS") {
+        const ok = window.confirm(
+          "Não foi possível carregar uma ou mais fotos do atendimento.\n\n" +
+          "Verifique as imagens antes de gerar o relatório.\n\n" +
+          "Deseja gerar o PDF mesmo assim, sem as fotos faltantes?"
+        );
+        if (!ok) return;
+        const t2 = toast.loading("Gerando relatório sem fotos faltantes…");
+        try {
+          const res = await buildPDF(returnBlob, true);
+          toast.dismiss(t2);
+          await onOk(res);
+        } catch (err: any) {
+          toast.dismiss(t2);
+          toast.error("Erro ao gerar PDF: " + (err?.message ?? "desconhecido"));
+        }
+        return;
+      }
+      toast.error("Erro ao gerar PDF: " + (e?.message ?? "desconhecido"));
+    }
   };
 
   const visualizarRelatorio = () => {
-    const blob = buildPDF(true) as Blob;
-    const url = URL.createObjectURL(blob);
-    setPdfPreview(url);
+    runBuild(true, ({ blob }) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      setPdfPreview(url);
+    });
   };
 
-  const baixarRelatorio = () => { buildPDF(false); };
+  const baixarRelatorio = () => {
+    runBuild(true, ({ blob, fileName }) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName; document.body.appendChild(a);
+      a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    });
+  };
 
   const imprimirRelatorio = () => {
-    const blob = buildPDF(true) as Blob;
-    const url = URL.createObjectURL(blob);
-    const w = window.open(url, "_blank");
-    if (w) { setTimeout(() => { try { w.print(); } catch {} }, 500); }
+    runBuild(true, ({ blob }) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, "_blank");
+      if (w) { setTimeout(() => { try { w.print(); } catch {} }, 500); }
+    });
   };
 
   const confirmarRelatorio = async () => {
-    const blob = buildPDF(true) as Blob;
-    const path = `atendimentos/${atendId}/relatorio/relatorio-${Date.now()}.pdf`;
-    const { error } = await supabase.storage.from("spa-fotos")
-      .upload(path, blob, { upsert: true, contentType: "application/pdf" });
-    if (error) { toast.error("Erro ao salvar PDF"); return; }
-    await confirmarEtapa(6, { pdf_path: path });
+    await runBuild(true, async ({ blob }) => {
+      if (!blob) return;
+      const path = `atendimentos/${atendId}/relatorio/relatorio-${Date.now()}.pdf`;
+      const { error } = await supabase.storage.from("spa-fotos")
+        .upload(path, blob, { upsert: true, contentType: "application/pdf" });
+      if (error) { toast.error("Erro ao salvar PDF"); return; }
+      await confirmarEtapa(6, { pdf_path: path });
+      toast.success("Relatório gerado e anexado ao atendimento.");
+    });
   };
 
   // ---- Reabrir (admin) ----
