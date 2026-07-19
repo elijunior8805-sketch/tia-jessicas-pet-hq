@@ -928,6 +928,74 @@ function AgendamentoRow({
         onOpenChange={setEditServicosOpen}
         agendamento={row}
       />
+
+      <Dialog open={reagendarOpen} onOpenChange={setReagendarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reagendar</DialogTitle>
+            <DialogDescription>
+              {row.pets?.nome ? `${row.pets.nome} · ` : ""}{row.clientes?.nome ?? ""} — escolha a nova data e horário.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Nova data</Label>
+              <Input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
+            </div>
+            <div>
+              <Label>Nova hora</Label>
+              <Input type="time" value={novaHora} onChange={(e) => setNovaHora(e.target.value)} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            O status volta para <strong>Agendado</strong> após reagendar. Envie uma nova confirmação pelo WhatsApp em seguida.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReagendarOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => reagendarMut.mutate()}
+              disabled={reagendarMut.isPending || !novaData || !novaHora}
+            >
+              {reagendarMut.isPending ? "Salvando…" : "Confirmar reagendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelarOpen} onOpenChange={setCancelarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar agendamento</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja cancelar o agendamento de{" "}
+              <strong>{row.pets?.nome ?? "pet"}</strong> às{" "}
+              <strong>{row.hora ? String(row.hora).slice(0, 5) : "—"}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Motivo (opcional)</Label>
+            <Textarea
+              rows={3}
+              value={motivoCancel}
+              onChange={(e) => setMotivoCancel(e.target.value)}
+              placeholder="Ex.: cliente pediu para remarcar por motivo pessoal"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              O motivo é anexado às observações do agendamento para histórico.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelarOpen(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelarMut.mutate()}
+              disabled={cancelarMut.isPending}
+            >
+              {cancelarMut.isPending ? "Cancelando…" : "Cancelar agendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
