@@ -17,9 +17,12 @@ import {
   salvarConfigCobranca,
   salvarTemplateCobranca,
   renderTemplate,
+  filaDoDia as FILA_FN,
+  funilCobrancas as FUNIL_FN,
   type CobrancaDTO,
   type CobrancaStatus,
 } from "@/lib/cobrancas.functions";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -175,7 +178,24 @@ function CobrancasPage() {
         />
       </div>
 
+      <Tabs defaultValue="fila" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="fila">Fila do Dia</TabsTrigger>
+          <TabsTrigger value="todas">Todas</TabsTrigger>
+          <TabsTrigger value="funil">Funil de recuperação</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="fila">
+          <FilaDoDiaTab onSelect={setSelecionada} />
+        </TabsContent>
+
+        <TabsContent value="funil">
+          <FunilTab />
+        </TabsContent>
+
+        <TabsContent value="todas">
       <Card>
+
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[220px]">
@@ -296,6 +316,10 @@ function CobrancasPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
+
+
 
       {selecionada && (
         <CobrancaDialog
@@ -1065,3 +1089,171 @@ function TemplateEditor({
     </Dialog>
   );
 }
+
+// ===================================================================
+// Fila do Dia — cobranças priorizadas por score
+// ===================================================================
+function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
+
+  // Lazy import server fn to avoid re-declaring at top; use dynamic require via ESM import at module scope
+  // (server fns are already static-imported in the file we live in)
+  // We import here through window.__cobrancasFns fallback — but simpler: rely on the static import below.
+  const filaFn = useServerFn(FILA_FN);
+  const q = useQuery({
+    queryKey: ["cobrancas", "fila"],
+    queryFn: () => filaFn(),
+    refetchInterval: 60_000,
+  });
+
+  const items = q.data ?? [];
+  const grupos = items.reduce<Record<string, typeof items>>((acc, it) => {
+    (acc[it.gatilho_label] ??= [] as any).push(it);
+    return acc;
+  }, {});
+
+  if (q.isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+  if (items.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <Inbox className="mx-auto h-6 w-6 mb-2" />
+          Nada para cobrar hoje. Bom trabalho!
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(grupos).map(([label, arr]) => (
+        <Card key={label}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span>{label}</span>
+              <Badge variant="outline">{arr.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 px-3">Prioridade</th>
+                    <th className="py-2 px-3">Cliente / Pet</th>
+                    <th className="py-2 px-3">Saldo</th>
+                    <th className="py-2 px-3">Atraso</th>
+                    <th className="py-2 px-3">Tentativas</th>
+                    <th className="py-2 px-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {arr.map((c) => (
+                    <tr
+                      key={c.id}
+                      className="border-t hover:bg-muted/40 cursor-pointer"
+                      onClick={() => onSelect(c)}
+                    >
+                      <td className="py-2 px-3">
+                        <Badge className="bg-gold/20 text-foreground border-gold/40">
+                          {c.score}
+                        </Badge>
+                      </td>
+                      <td className="py-2 px-3">
+                        <div className="font-medium">{c.cliente_nome}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {c.pet_nome ?? "—"}
+                        </div>
+                      </td>
+                      <td className="py-2 px-3 font-medium">{brl(c.saldo)}</td>
+                      <td className="py-2 px-3">
+                        {c.dias_atraso > 0 ? (
+                          <span className="text-rose-700 font-medium">{c.dias_atraso}d</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-muted-foreground">{c.tentativas}x</td>
+                      <td className="py-2 px-3 text-right">
+                        <Button size="sm" variant="outline">Abrir</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ===================================================================
+// Funil de recuperação — mês corrente
+// ===================================================================
+function FunilTab() {
+  const funilFn = useServerFn(FUNIL_FN);
+  const q = useQuery({ queryKey: ["cobrancas", "funil"], queryFn: () => funilFn() });
+
+  if (q.isLoading || !q.data) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const d = q.data;
+  const etapas = [
+    { label: "Criadas no mês", value: d.criadas, valor: d.valor_criado, taxa: 1 },
+    { label: "Enviadas", value: d.enviadas, taxa: d.taxa_envio },
+    { label: "Responderam", value: d.responderam, taxa: d.taxa_resposta },
+    { label: "Prometeram pagar", value: d.prometeram },
+    { label: "Pagaram", value: d.pagaram, valor: d.valor_recuperado, taxa: d.taxa_pagamento },
+  ];
+  const max = Math.max(1, ...etapas.map((e) => e.value));
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Funil de recuperação — mês corrente</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {etapas.map((e) => (
+            <div key={e.label}>
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="text-muted-foreground">{e.label}</span>
+                <span className="font-medium">
+                  {e.value}
+                  {e.valor != null ? ` • ${brl(e.valor)}` : ""}
+                  {e.taxa != null && e.label !== "Criadas no mês"
+                    ? ` • ${Math.round(e.taxa * 100)}%`
+                    : ""}
+                </span>
+              </div>
+              <div className="h-2 mt-1 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary"
+                  style={{ width: `${(e.value / max) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+

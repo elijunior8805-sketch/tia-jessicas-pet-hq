@@ -39,6 +39,29 @@ export const Route = createFileRoute("/api/public/hooks/regua-cobranca")({
           .eq("status", "a_vencer")
           .lt("vencimento", iso);
 
+        // 1b) Promessas vencidas voltam para "vencido" e registram evento.
+        const { data: promessasVencidas } = await admin
+          .from("cobrancas")
+          .select("id, promessa_data")
+          .eq("status", "promessa")
+          .lt("promessa_data", iso);
+
+        for (const p of promessasVencidas ?? []) {
+          await admin.from("cobrancas").update({ status: "vencido" }).eq("id", p.id);
+          await admin.from("cobrancas_eventos").insert({
+            cobranca_id: p.id,
+            tipo: "mudanca_status",
+            canal: "sistema",
+            payload: {
+              status: "vencido",
+              motivo: "promessa_vencida",
+              promessa_data: p.promessa_data,
+            },
+          });
+        }
+
+
+
         // 2) Config
         const { data: cfg } = await admin
           .from("cobrancas_config")

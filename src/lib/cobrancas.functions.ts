@@ -812,3 +812,216 @@ export const registrarRespostaCliente = createServerFn({ method: "POST" })
     return { ok: true, intencao, promessaData: null };
   });
 
+
+// ============= Fila do Dia (priorização inteligente) =============
+export type FilaGatilho =
+  | "promessa_vencida"
+  | "d_menos_3"
+  | "d_menos_1"
+  | "d_zero"
+  | "d_mais_3"
+  | "d_mais_7"
+  | "d_mais_15"
+  | "atraso_longo"
+  | "sem_retorno";
+
+export type FilaItem = CobrancaDTO & {
+  gatilho: FilaGatilho;
+  gatilho_label: string;
+  score: number;
+  promessa_data: string | null;
+};
+
+const GATILHO_LABEL: Record<FilaGatilho, string> = {
+  promessa_vencida: "Promessa vencida",
+  d_menos_3: "Lembrete D-3",
+  d_menos_1: "Lembrete D-1",
+  d_zero: "Vence hoje",
+  d_mais_3: "1ª cobrança (D+3)",
+  d_mais_7: "2ª cobrança (D+7)",
+  d_mais_15: "Última régua (D+15)",
+  atraso_longo: "Atraso > 15 dias",
+  sem_retorno: "Sem retorno",
+};
+
+function classificarGatilho(
+  dias: number,
+  status: CobrancaStatus,
+  promessaData: string | null,
+  hojeIso: string,
+): FilaGatilho | null {
+  if (status === "pago" || status === "pausada" || status === "negociado") return null;
+  if (status === "promessa" && promessaData && promessaData < hojeIso) return "promessa_vencida";
+  if (status === "sem_retorno") return "sem_retorno";
+  if (dias === -3) return "d_menos_3";
+  if (dias === -1) return "d_menos_1";
+  if (dias === 0) return "d_zero";
+  if (dias === 3) return "d_mais_3";
+  if (dias >= 6 && dias <= 8) return "d_mais_7";
+  if (dias >= 13 && dias <= 16) return "d_mais_15";
+  if (dias > 15) return "atraso_longo";
+  return null;
+}
+
+/** Score = saldo × log(1+dias) × penalidade por tentativas (satura em 5). */
+function calcularScore(saldo: number, dias: number, tentativas: number, gatilho: FilaGatilho): number {
+  const diasEfetivos = Math.max(1, dias);
+  const base = saldo * Math.log(1 + diasEfetivos);
+  const penalidade = 1 / (1 + Math.min(tentativas, 5) * 0.15);
+  const boost =
+    gatilho === "promessa_vencida" ? 1.6 :
+    gatilho === "atraso_longo" ? 1.3 :
+    gatilho === "d_mais_7" || gatilho === "d_mais_15" ? 1.1 :
+    1;
+  return Math.round(base * penalidade * boost);
+}
+
+export const filaDoDia = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const hoje = new Date();
+    const iso = hoje.toISOString().slice(0, 10);
+
+    const { data: rows, error } = await supabase
+      .from("cobrancas")
+      .select(
+        `id, pagamento_id, cliente_id, atendimento_id, valor_original, valor_pago, saldo,
+         vencimento, status, promessa_data, tentativas, ultima_cobranca_em, pausada, pausada_motivo,
+         clientes:cliente_id ( nome, whatsapp ),
+         atendimentos:atendimento_id ( data_inicio, pets:pet_id ( nome ) )`,
+      )
+      .eq("pausada", false)
+      .not("status", "eq", "pago")
+      .gt("saldo", 0)
+      .limit(500);
+
+    if (error) throw new Error(error.message);
+
+    const itens: FilaItem[] = [];
+    for (const r of rows ?? []) {
+      const dias = diasAtraso((r as any).vencimento);
+      // permite dias negativos (D-1, D-3)
+      const v = new Date((r as any).vencimento + "T00:00:00Z").getTime();
+      const h = new Date(iso + "T00:00:00Z").getTime();
+      const diasReal = Math.floor((h - v) / 86400000);
+      const gatilho = classificarGatilho(
+        diasReal,
+        (r as any).status,
+        (r as any).promessa_data ?? null,
+        iso,
+      );
+      if (!gatilho) continue;
+
+      const saldo = Number((r as any).saldo ?? 0);
+      const tentativas = (r as any).tentativas ?? 0;
+      const score = calcularScore(saldo, diasReal, tentativas, gatilho);
+
+      itens.push({
+        id: (r as any).id,
+        pagamento_id: (r as any).pagamento_id,
+        cliente_id: (r as any).cliente_id,
+        cliente_nome: (r as any).clientes?.nome ?? "—",
+        cliente_whatsapp: (r as any).clientes?.whatsapp ?? null,
+        atendimento_id: (r as any).atendimento_id,
+        pet_nome: (r as any).atendimentos?.pets?.nome ?? null,
+        data_atendimento: (r as any).atendimentos?.data_inicio ?? null,
+        valor_original: Number((r as any).valor_original ?? 0),
+        valor_pago: Number((r as any).valor_pago ?? 0),
+        saldo,
+        vencimento: (r as any).vencimento,
+        dias_atraso: dias,
+        status: (r as any).status as CobrancaStatus,
+        promessa_data: (r as any).promessa_data ?? null,
+        tentativas,
+        ultima_cobranca_em: (r as any).ultima_cobranca_em,
+        pausada: !!(r as any).pausada,
+        pausada_motivo: (r as any).pausada_motivo,
+        gatilho,
+        gatilho_label: GATILHO_LABEL[gatilho],
+        score,
+      });
+    }
+
+    itens.sort((a, b) => b.score - a.score);
+    return itens;
+  });
+
+// ============= Funil de recuperação (mês corrente) =============
+export type FunilCobrancas = {
+  criadas: number;
+  enviadas: number;
+  responderam: number;
+  prometeram: number;
+  pagaram: number;
+  valor_criado: number;
+  valor_recuperado: number;
+  taxa_envio: number;
+  taxa_resposta: number;
+  taxa_pagamento: number;
+};
+
+export const funilCobrancas = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const hoje = new Date();
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString();
+
+    const { data: cobs, error } = await supabase
+      .from("cobrancas")
+      .select("id, status, valor_original, tentativas, created_at, updated_at")
+      .gte("created_at", inicioMes);
+    if (error) throw new Error(error.message);
+
+    const { data: eventos } = await supabase
+      .from("cobrancas_eventos")
+      .select("cobranca_id, tipo, created_at")
+      .gte("created_at", inicioMes);
+
+    const cobIds = new Set((cobs ?? []).map((c: any) => c.id));
+    const respondeu = new Set<string>();
+    const prometeu = new Set<string>();
+    for (const e of eventos ?? []) {
+      if (!cobIds.has((e as any).cobranca_id)) continue;
+      const t = (e as any).tipo as string;
+      if (t === "resposta_cliente") respondeu.add((e as any).cobranca_id);
+      if (t === "promessa") prometeu.add((e as any).cobranca_id);
+    }
+
+    let criadas = 0;
+    let enviadas = 0;
+    let pagaram = 0;
+    let valor_criado = 0;
+    let valor_recuperado = 0;
+
+    for (const c of cobs ?? []) {
+      criadas += 1;
+      valor_criado += Number((c as any).valor_original ?? 0);
+      if (((c as any).tentativas ?? 0) > 0 || (c as any).status !== "a_vencer") {
+        // "enviada" cobre todo estado operacional pós-envio
+        if (((c as any).tentativas ?? 0) > 0) enviadas += 1;
+      }
+      if ((c as any).status === "pago") {
+        pagaram += 1;
+        valor_recuperado += Number((c as any).valor_original ?? 0);
+      }
+    }
+
+    const responderam = respondeu.size;
+    const prometeram = prometeu.size;
+
+    const kpis: FunilCobrancas = {
+      criadas,
+      enviadas,
+      responderam,
+      prometeram,
+      pagaram,
+      valor_criado,
+      valor_recuperado,
+      taxa_envio: criadas > 0 ? enviadas / criadas : 0,
+      taxa_resposta: enviadas > 0 ? responderam / enviadas : 0,
+      taxa_pagamento: enviadas > 0 ? pagaram / enviadas : 0,
+    };
+    return kpis;
+  });
