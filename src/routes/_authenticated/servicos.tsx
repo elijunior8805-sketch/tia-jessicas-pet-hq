@@ -34,6 +34,23 @@ type Servico = {
   duracao_min: number;
   ativo: boolean;
   is_combo: boolean;
+  preco_a_partir: boolean;
+};
+
+const CATEGORIAS_SERVICO = [
+  "Banhos",
+  "Hidratação",
+  "Tosas",
+  "Acabamentos",
+  "Cuidados com a pelagem",
+] as const;
+
+const ORDEM_CATEGORIA: Record<string, number> = {
+  "Banhos": 1,
+  "Hidratação": 2,
+  "Tosas": 3,
+  "Acabamentos": 4,
+  "Cuidados com a pelagem": 5,
 };
 type Preco = { id: string; servico_id: string; porte_id: string; valor: number };
 type ComboItem = { id: string; combo_id: string; servico_id: string; quantidade: number };
