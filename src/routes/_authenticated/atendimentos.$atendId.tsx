@@ -342,6 +342,26 @@ function AtendimentoDetalhe() {
     return items.filter(([n]) => !isEtapaConfirmada(atendimento, n)).map(([, l]) => l);
   }, [atendimento]);
 
+  const excluirMut = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("excluir_atendimento", { _atendimento_id: atendId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Atendimento excluído. Agendamento, histórico e financeiro atualizados.");
+      qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
+      qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["pets"] });
+      setExcluirOpen(false);
+      navigate({ to: "/agenda" });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao excluir atendimento"),
+  });
+
+
   if (isLoading) {
     return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
   }
