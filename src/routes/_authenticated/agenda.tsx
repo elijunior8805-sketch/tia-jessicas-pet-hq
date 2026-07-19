@@ -703,6 +703,18 @@ function AgendamentoRow({
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {podeEditarServicos && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => setEditServicosOpen(true)}
+                title="Editar serviços deste agendamento"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Serviços
+              </Button>
+            )}
             {["agendado","confirmado","aguardando","em_atendimento"].includes(row.status) && (
               <Button
                 size="sm"
