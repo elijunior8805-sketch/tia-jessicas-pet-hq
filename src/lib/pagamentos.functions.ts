@@ -159,3 +159,140 @@ export const registrarContatoCobranca = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+// ============ Cobrança em lote ============
+
+const LoteSchema = z.object({
+  pagamentoIds: z.array(z.string().uuid()).min(1).max(50),
+  observacao: z.string().max(300).optional().nullable(),
+});
+
+export type CobrancaLoteItem = {
+  pagamentoId: string;
+  cliente_nome: string;
+  cliente_whatsapp: string | null;
+  pet_nome: string | null;
+  saldo: number;
+  vencimento: string | null;
+  dias_atraso: number;
+  mensagem: string;
+  wa_url: string | null;
+  registrado: boolean;
+  motivo?: string;
+};
+
+const brl = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => LoteSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const nowIso = new Date().toISOString();
+
+    // Ler todas as parcelas selecionadas em uma única query
+    const { data: rows, error } = await supabase
+      .from("pagamentos")
+      .select(
+        "id, status, observacoes, valor_total, valor_pago, vencimento, cliente_id, atendimento_id, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(pets:pet_id(nome))"
+      )
+      .in("id", data.pagamentoIds);
+    if (error) {
+      console.error("[pagamentos] lote read erro:", error.message);
+      throw new Error("Falha ao carregar parcelas selecionadas");
+    }
+
+    const hoje = new Date();
+    hoje.setUTCHours(0, 0, 0, 0);
+    const hojeMs = hoje.getTime();
+
+    const resultados: CobrancaLoteItem[] = [];
+    let totalOk = 0;
+    let totalFalha = 0;
+
+    for (const pid of data.pagamentoIds) {
+      const r: any = (rows ?? []).find((x: any) => x.id === pid);
+      if (!r) {
+        resultados.push({
+          pagamentoId: pid,
+          cliente_nome: "—", cliente_whatsapp: null, pet_nome: null,
+          saldo: 0, vencimento: null, dias_atraso: 0,
+          mensagem: "", wa_url: null,
+          registrado: false, motivo: "Parcela não encontrada",
+        });
+        totalFalha++;
+        continue;
+      }
+      if (r.status === "pago" || r.status === "cancelado") {
+        resultados.push({
+          pagamentoId: pid,
+          cliente_nome: r.clientes?.nome ?? "—",
+          cliente_whatsapp: r.clientes?.whatsapp ?? null,
+          pet_nome: r.atendimentos?.pets?.nome ?? null,
+          saldo: 0, vencimento: r.vencimento, dias_atraso: 0,
+          mensagem: "", wa_url: null,
+          registrado: false, motivo: `Status: ${r.status}`,
+        });
+        totalFalha++;
+        continue;
+      }
+
+      const valorTotal = Number(r.valor_total ?? 0);
+      const valorPago = Number(r.valor_pago ?? 0);
+      const saldo = Math.max(0, valorTotal - valorPago);
+      let diasAtraso = 0;
+      if (r.vencimento) {
+        const venc = new Date(r.vencimento + "T00:00:00Z").getTime();
+        diasAtraso = Math.floor((hojeMs - venc) / 86400000);
+      }
+
+      const clienteNome = (r.clientes?.nome ?? "Cliente") as string;
+      const petNome = (r.atendimentos?.pets?.nome ?? null) as string | null;
+      const whatsapp = (r.clientes?.whatsapp ?? null) as string | null;
+
+      const vencTxt = r.vencimento
+        ? ` com vencimento em ${new Date(r.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}`
+        : "";
+      const atrasoTxt = diasAtraso > 0 ? ` (em atraso há ${diasAtraso} dia(s))` : "";
+      const petTxt = petNome ? ` referente ao atendimento do ${petNome}` : "";
+      const mensagem =
+        `Olá, ${clienteNome}! Passando para lembrar do pagamento de ${brl(saldo)}${petTxt}${vencTxt}${atrasoTxt}. ` +
+        `Se já efetuou, por favor desconsidere. Obrigada! 🐾`;
+
+      const fone = (whatsapp ?? "").replace(/\D/g, "");
+      const wa_url = fone
+        ? `https://wa.me/55${fone}?text=${encodeURIComponent(mensagem)}`
+        : null;
+
+      const marca = `[Cobrança lote whatsapp por ${userId} em ${nowIso}${data.observacao ? ` — ${data.observacao}` : ""}]`;
+      const novasObs = r.observacoes ? `${r.observacoes}\n${marca}` : marca;
+
+      const { error: updErr } = await supabase
+        .from("pagamentos")
+        .update({ observacoes: novasObs })
+        .eq("id", pid)
+        .in("status", ["pendente", "parcial", "atrasado"]); // guarda concorrência
+
+      if (updErr) {
+        console.error("[pagamentos] lote update erro:", pid, updErr.message);
+        resultados.push({
+          pagamentoId: pid, cliente_nome: clienteNome, cliente_whatsapp: whatsapp,
+          pet_nome: petNome, saldo, vencimento: r.vencimento, dias_atraso: diasAtraso,
+          mensagem, wa_url,
+          registrado: false, motivo: "Falha ao registrar",
+        });
+        totalFalha++;
+        continue;
+      }
+
+      resultados.push({
+        pagamentoId: pid, cliente_nome: clienteNome, cliente_whatsapp: whatsapp,
+        pet_nome: petNome, saldo, vencimento: r.vencimento, dias_atraso: diasAtraso,
+        mensagem, wa_url, registrado: true,
+      });
+      totalOk++;
+    }
+
+    return { resultados, totalOk, totalFalha };
+  });

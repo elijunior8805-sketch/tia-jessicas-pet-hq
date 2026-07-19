@@ -5,18 +5,25 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   listarPagamentosAbertos,
   registrarContatoCobranca,
+  registrarContatoCobrancaLote,
   type PagamentoAbertoDTO,
+  type CobrancaLoteItem,
 } from "@/lib/pagamentos.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, Calendar, MessageCircle, Search, TrendingDown, Wallet } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/pagamentos-abertos")({
   component: PagamentosAbertosPage,
@@ -37,9 +44,13 @@ function statusBadge(status: string, diasAtraso: number) {
 function PagamentosAbertosPage() {
   const listar = useServerFn(listarPagamentosAbertos);
   const registrar = useServerFn(registrarContatoCobranca);
+  const registrarLote = useServerFn(registrarContatoCobrancaLote);
   const qc = useQueryClient();
   const [busca, setBusca] = useState("");
   const [somenteAtrasados, setSomenteAtrasados] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [loteAberto, setLoteAberto] = useState(false);
+  const [loteResultado, setLoteResultado] = useState<CobrancaLoteItem[] | null>(null);
 
   const query = useQuery({
     queryKey: ["pagamentos-abertos", { somenteAtrasados }],
@@ -56,8 +67,20 @@ function PagamentosAbertosPage() {
     onError: (e: any) => toast.error(e?.message ?? "Falha ao registrar"),
   });
 
+  const loteMut = useMutation({
+    mutationFn: (ids: string[]) => registrarLote({ data: { pagamentoIds: ids } }),
+    onSuccess: (r) => {
+      setLoteResultado(r.resultados);
+      toast.success(`${r.totalOk} cobrança(s) registrada(s)${r.totalFalha ? `, ${r.totalFalha} falha(s)` : ""}`);
+      setSelecionados(new Set());
+      qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha na cobrança em lote"),
+  });
+
   const itens = query.data?.itens ?? [];
   const resumo = query.data?.resumo;
+
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -107,7 +130,19 @@ function PagamentosAbertosPage() {
             <AlertCircle className="w-4 h-4 mr-2" />
             {somenteAtrasados ? "Mostrando atrasados" : "Somente atrasados"}
           </Button>
+          <Button
+            disabled={selecionados.size === 0 || loteMut.isPending}
+            onClick={() => {
+              setLoteAberto(true);
+              setLoteResultado(null);
+              loteMut.mutate(Array.from(selecionados));
+            }}
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Cobrar selecionados ({selecionados.size})
+          </Button>
         </div>
+
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -152,6 +187,21 @@ function PagamentosAbertosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          filtrados.length > 0 &&
+                          filtrados.every((p) => selecionados.has(p.id))
+                        }
+                        onCheckedChange={(v) => {
+                          const next = new Set(selecionados);
+                          if (v) filtrados.forEach((p) => next.add(p.id));
+                          else filtrados.forEach((p) => next.delete(p.id));
+                          setSelecionados(next);
+                        }}
+                        aria-label="Selecionar todos"
+                      />
+                    </TableHead>
                     <TableHead>Cliente / Pet</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Status</TableHead>
@@ -163,11 +213,24 @@ function PagamentosAbertosPage() {
                   {filtrados.map((p) => (
                     <TableRow key={p.id} className={p.dias_atraso > 0 ? "bg-destructive/5" : ""}>
                       <TableCell>
+                        <Checkbox
+                          checked={selecionados.has(p.id)}
+                          onCheckedChange={(v) => {
+                            const next = new Set(selecionados);
+                            if (v) next.add(p.id);
+                            else next.delete(p.id);
+                            setSelecionados(next);
+                          }}
+                          aria-label={`Selecionar ${p.cliente_nome}`}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <div className="font-medium">{p.cliente_nome}</div>
                         {p.pet_nome && (
                           <div className="text-xs text-muted-foreground">🐾 {p.pet_nome}</div>
                         )}
                       </TableCell>
+
                       <TableCell>
                         {p.vencimento
                           ? new Date(p.vencimento + "T00:00:00").toLocaleDateString("pt-BR")
@@ -201,9 +264,79 @@ function PagamentosAbertosPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={loteAberto} onOpenChange={setLoteAberto}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Cobrança em lote</DialogTitle>
+            <DialogDescription>
+              {loteMut.isPending
+                ? "Registrando cobranças no servidor…"
+                : loteResultado
+                  ? `${loteResultado.filter((r) => r.registrado).length} registrada(s) · abra o WhatsApp para cada cliente.`
+                  : "Aguarde…"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {(loteResultado ?? []).map((r) => (
+              <div
+                key={r.pagamentoId}
+                className={`flex items-center gap-3 rounded-md border p-3 ${
+                  r.registrado ? "bg-card" : "bg-destructive/5 border-destructive/30"
+                }`}
+              >
+                {r.registrado ? (
+                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-destructive shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{r.cliente_nome}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {r.pet_nome ? `${r.pet_nome} · ` : ""}
+                    {brl(r.saldo)}
+                    {r.dias_atraso > 0 ? ` · atraso ${r.dias_atraso}d` : ""}
+                    {r.motivo ? ` · ${r.motivo}` : ""}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!r.wa_url || !r.registrado}
+                  onClick={() => r.wa_url && window.open(r.wa_url, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" /> WhatsApp
+                </Button>
+              </div>
+            ))}
+            {loteMut.isPending && (
+              <div className="text-center text-muted-foreground py-6">Processando…</div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              disabled={!loteResultado || loteResultado.every((r) => !r.wa_url || !r.registrado)}
+              onClick={() => {
+                let i = 0;
+                (loteResultado ?? [])
+                  .filter((r) => r.registrado && r.wa_url)
+                  .forEach((r) => {
+                    setTimeout(() => window.open(r.wa_url!, "_blank", "noopener,noreferrer"), i * 400);
+                    i++;
+                  });
+              }}
+            >
+              Abrir todos os WhatsApp
+            </Button>
+            <Button onClick={() => setLoteAberto(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function KpiCard({
   icon, label, value, sub, destaque,
