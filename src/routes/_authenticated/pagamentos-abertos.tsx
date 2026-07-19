@@ -23,6 +23,10 @@ import {
 } from "@/components/ui/dialog";
 import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
+import { renderTemplate } from "@/lib/whatsapp-templates";
+
+
 
 
 export const Route = createFileRoute("/_authenticated/pagamentos-abertos")({
