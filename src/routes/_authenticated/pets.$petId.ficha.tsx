@@ -103,10 +103,10 @@ function FichaOperacional() {
           </div>
           <dl className="space-y-2 text-sm">
             {pet.sexo && <Info icon={Heart} label="Sexo" value={pet.sexo}/>}
-            {pet.data_nascimento && <Info icon={Cake} label="Nascimento" value={new Date(pet.data_nascimento).toLocaleDateString("pt-BR")}/>}
+            {pet.nascimento && <Info icon={Cake} label="Nascimento" value={new Date(pet.nascimento).toLocaleDateString("pt-BR")}/>}
             {pet.peso && <Info icon={Ruler} label="Peso" value={`${pet.peso} kg`}/>}
-            {pet.pelagem && <Info icon={PawPrint} label="Pelagem" value={pet.pelagem}/>}
-            {pet.vacinacao && <Info icon={Syringe} label="Vacinação" value={pet.vacinacao}/>}
+            {pet.cor && <Info icon={PawPrint} label="Cor / pelagem" value={pet.cor}/>}
+            {(pet as any).cuidados_saude && <Info icon={Syringe} label="Cuidados de saúde" value={(pet as any).cuidados_saude}/>}
           </dl>
           {pet.temperamento && (
             <div className="mt-3 pt-3 border-t">
