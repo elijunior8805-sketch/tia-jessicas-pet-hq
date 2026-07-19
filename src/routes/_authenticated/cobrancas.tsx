@@ -175,7 +175,24 @@ function CobrancasPage() {
         />
       </div>
 
+      <Tabs defaultValue="fila" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="fila">Fila do Dia</TabsTrigger>
+          <TabsTrigger value="todas">Todas</TabsTrigger>
+          <TabsTrigger value="funil">Funil de recuperação</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="fila">
+          <FilaDoDiaTab onSelect={setSelecionada} />
+        </TabsContent>
+
+        <TabsContent value="funil">
+          <FunilTab />
+        </TabsContent>
+
+        <TabsContent value="todas">
       <Card>
+
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[220px]">
