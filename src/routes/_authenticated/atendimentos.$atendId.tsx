@@ -931,37 +931,59 @@ function AtendimentoDetalhe() {
             <ConfirmadaFooter st={st(4)} />
           </Card>
 
-          {/* 5. Fotos depois */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-display text-xl flex items-center gap-2">
-                <Camera className="h-5 w-5 text-muted-foreground" /> Fotos do pet finalizado
-              </h2>
+          {/* 5. Fotos depois — destaque premium */}
+          <Card className="p-6 border-primary/30 bg-gradient-to-br from-primary/[0.03] to-transparent shadow-elegant">
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+              <div className="min-w-0">
+                <h2 className="font-display text-2xl flex items-center gap-2">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                  Pet pronto — Resultado
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Fotos do {pet?.nome ?? "pet"} lindo depois do banho. Compartilhe pelo WhatsApp ou baixe direto no celular.
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <EtapaBadge st={st(5)} />
-                {!readOnly && <UploadButton onFile={(f) => addFoto("depois", f)} label="Adicionar" />}
+                {!readOnly && <UploadButton onFile={(f) => addFoto("depois", f)} label="Nova foto" />}
               </div>
             </div>
             {fotosDepois.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic text-center py-8">Nenhuma foto ainda.</p>
+              <div className="rounded-xl border-2 border-dashed border-primary/20 py-12 text-center">
+                <Camera className="h-10 w-10 text-primary/40 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground italic">Nenhuma foto do resultado ainda.</p>
+                <p className="text-xs text-muted-foreground mt-1">Capriche na foto do pet lindo!</p>
+              </div>
             ) : (
               <>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {fotosDepois.map((f, i) => (
-                    <Thumb key={i} path={f.path} disabled={readOnly}
-                      starred={!!f.principal}
-                      onClick={() => setZoomFoto(f.path)}
+                    <ResultadoFotoCard
+                      key={i}
+                      path={f.path}
+                      principal={!!f.principal}
+                      disabled={readOnly}
+                      filename={`${(pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-")}-pronto-${i + 1}.jpg`}
+                      onZoom={() => setZoomFoto(f.path)}
                       onStar={() => setPrincipal(i)}
-                      onRemove={() => removeFoto("depois", i)} />
+                      onRemove={() => removeFoto("depois", i)}
+                      onDownload={() => baixarFoto(
+                        f.path,
+                        `${(pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-")}-pronto-${i + 1}.jpg`,
+                      )}
+                      onShare={() => compartilharFotoWhats(
+                        f.path, cliente?.whatsapp, pet?.nome ?? "seu pet", cliente?.nome ?? "",
+                      )}
+                    />
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Clique na estrela para marcar a foto principal do resultado.
+                <p className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+                  <Star className="h-3 w-3" /> Clique na estrela para marcar a foto principal do resultado.
                 </p>
               </>
             )}
             {!readOnly && !isEtapaConfirmada(atendimento, 5) && (
-              <Button className="mt-4 w-full uppercase" onClick={() => confirmarEtapa(5)}>
+              <Button className="mt-5 w-full h-11 uppercase" onClick={() => confirmarEtapa(5)}>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Salvar e confirmar fotos do resultado
               </Button>
