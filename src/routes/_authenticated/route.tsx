@@ -42,9 +42,9 @@ function AuthenticatedLayout() {
         <SidebarInset className="flex flex-col min-w-0 flex-1">
           <header className="h-14 border-b border-border bg-card/60 backdrop-blur flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
             <div className="flex items-center gap-2 min-w-0">
-              <SidebarTrigger className="hidden md:inline-flex" />
-              <span className="font-display text-lg font-semibold text-primary truncate">
-                Spa de Pet Tia Jéssica
+              <SidebarTrigger />
+              <span className="font-display text-base sm:text-lg font-semibold text-primary truncate">
+                Spa de Pet
               </span>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
