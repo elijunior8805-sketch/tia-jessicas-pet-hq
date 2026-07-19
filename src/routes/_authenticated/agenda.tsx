@@ -448,10 +448,14 @@ function AgendaPage() {
 function AgendamentoRow({
   row,
   onChangeStatus,
+  onIniciar,
+  iniciando,
   signer,
 }: {
   row: any;
   onChangeStatus: (s: Status) => void;
+  onIniciar: () => void;
+  iniciando: boolean;
   signer: { name: string; initials: string };
 }) {
   const previewStorageKey = `wa-preview:finalizado:${row.id}`;
