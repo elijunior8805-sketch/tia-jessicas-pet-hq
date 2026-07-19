@@ -17,6 +17,7 @@ import {
   Inbox,
   HandCoins,
   HeartHandshake,
+  BellRing,
   Settings,
   PawPrint,
   type LucideIcon,
