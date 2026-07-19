@@ -11,6 +11,7 @@ import {
   alterarStatusCobranca,
   pausarCobranca,
   marcarPagamento,
+  registrarRespostaCliente,
   sugerirMensagemCobranca,
   obterConfigCobranca,
   salvarConfigCobranca,
