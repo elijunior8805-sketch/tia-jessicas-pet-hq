@@ -404,8 +404,7 @@ function AgendamentoRow({
                 className="gap-1 border-success/40 text-success hover:bg-success/10"
                 onClick={() => {
                   if (row.status === "finalizado") {
-                    setPreviewText(waMessage(row, signer));
-                    setPreviewOpen(true);
+                    openFinalizadoPreview();
                   } else {
                     openWhatsApp(row, signer);
                   }
