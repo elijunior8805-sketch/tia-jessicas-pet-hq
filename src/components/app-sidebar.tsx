@@ -47,6 +47,7 @@ const groups = [
     items: [
       { title: "Financeiro", url: "/financeiro", icon: Wallet },
       { title: "Pagamentos em aberto", url: "/pagamentos-abertos", icon: Receipt },
+      { title: "Cobranças", url: "/cobrancas", icon: HandCoins },
       { title: "Estoque", url: "/estoque", icon: Package },
       { title: "Compras", url: "/compras", icon: ShoppingCart },
       { title: "Fornecedores", url: "/fornecedores", icon: Building2 },
