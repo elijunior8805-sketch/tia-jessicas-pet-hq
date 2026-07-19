@@ -32,6 +32,7 @@ import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authent
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
 import { Route as ApiPublicHooksRelatoriosDiariosRouteImport } from './routes/api/public/hooks/relatorios-diarios'
+import { Route as ApiPublicHooksReguaCobrancaRouteImport } from './routes/api/public/hooks/regua-cobranca'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
 import { Route as AuthenticatedPetsPetIdEditarRouteImport } from './routes/_authenticated/pets.$petId.editar'
 import { Route as AuthenticatedClientesIdEditarRouteImport } from './routes/_authenticated/clientes.$id.editar'
@@ -159,6 +160,12 @@ const ApiPublicHooksRelatoriosDiariosRoute =
     path: '/api/public/hooks/relatorios-diarios',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksReguaCobrancaRoute =
+  ApiPublicHooksReguaCobrancaRouteImport.update({
+    id: '/api/public/hooks/regua-cobranca',
+    path: '/api/public/hooks/regua-cobranca',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedPetsPetIdFichaRoute =
   AuthenticatedPetsPetIdFichaRouteImport.update({
     id: '/pets/$petId/ficha',
@@ -203,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRoutesByTo {
@@ -230,6 +238,7 @@ export interface FileRoutesByTo {
   '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRoutesById {
@@ -259,6 +268,7 @@ export interface FileRoutesById {
   '/_authenticated/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/_authenticated/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRouteTypes {
@@ -288,6 +298,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
+    | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
+    | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
   id:
     | '__root__'
@@ -343,6 +355,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes/$id/editar'
     | '/_authenticated/pets/$petId/editar'
     | '/_authenticated/pets/$petId/ficha'
+    | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
   fileRoutesById: FileRoutesById
 }
@@ -351,6 +364,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicHooksReguaCobrancaRoute: typeof ApiPublicHooksReguaCobrancaRoute
   ApiPublicHooksRelatoriosDiariosRoute: typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 
@@ -517,6 +531,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksRelatoriosDiariosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/regua-cobranca': {
+      id: '/api/public/hooks/regua-cobranca'
+      path: '/api/public/hooks/regua-cobranca'
+      fullPath: '/api/public/hooks/regua-cobranca'
+      preLoaderRoute: typeof ApiPublicHooksReguaCobrancaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/pets/$petId/ficha': {
       id: '/_authenticated/pets/$petId/ficha'
       path: '/pets/$petId/ficha'
@@ -609,6 +630,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicHooksReguaCobrancaRoute: ApiPublicHooksReguaCobrancaRoute,
   ApiPublicHooksRelatoriosDiariosRoute: ApiPublicHooksRelatoriosDiariosRoute,
 }
 export const routeTree = rootRouteImport
