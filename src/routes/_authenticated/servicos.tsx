@@ -384,7 +384,7 @@ function ServicoFormDialog({
       categoria: categoria.trim() || null,
       descricao: descricao.trim() || null,
       valor: Number(valor) || 0,
-      duracao_min: duracao ? Number(duracao) : null,
+      duracao_min: duracao ? Number(duracao) : 0,
       ativo,
       is_combo: initial?.is_combo ?? isCombo,
     });
