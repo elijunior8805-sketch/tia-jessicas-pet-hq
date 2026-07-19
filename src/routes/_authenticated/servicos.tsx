@@ -31,7 +31,7 @@ type Servico = {
   categoria: string | null;
   descricao: string | null;
   valor: number;
-  duracao_min: number | null;
+  duracao_min: number;
   ativo: boolean;
   is_combo: boolean;
 };
