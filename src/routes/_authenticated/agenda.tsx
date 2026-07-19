@@ -699,9 +699,10 @@ const novoSchema = z.object({
 });
 
 function NovoAgendamentoDialog({
-  open, onOpenChange, defaultDate,
+  open, onOpenChange, defaultDate, defaultClienteId, defaultPetId,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void; defaultDate: string;
+  defaultClienteId?: string; defaultPetId?: string;
 }) {
   const qc = useQueryClient();
   const [clienteId, setClienteId] = useState<string>("");
@@ -718,7 +719,7 @@ function NovoAgendamentoDialog({
 
   // reset ao abrir
   useMemoReset(open, () => {
-    setClienteId(""); setPetId(""); setServicoId("");
+    setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? ""); setServicoId("");
     setData(defaultDate); setHora("09:00");
     setDuracao(""); setValor(""); setTaxa("0");
     setStatus("agendado"); setObs(""); setClienteSearch("");
