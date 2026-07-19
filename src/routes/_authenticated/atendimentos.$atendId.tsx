@@ -570,18 +570,28 @@ function AtendimentoDetalhe() {
               <p className="mt-2 text-sm text-muted-foreground">{subtitleParts.join(" · ")}</p>
             )}
           </div>
-          {encerrado && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {encerrado && (
               <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Encerrado
               </span>
-              {isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => setReabrirOpen(true)}>
-                  <Lock className="h-3.5 w-3.5 mr-1" /> Reabrir
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+            {isAdmin && encerrado && (
+              <Button size="sm" variant="outline" onClick={() => setReabrirOpen(true)}>
+                <Lock className="h-3.5 w-3.5 mr-1" /> Reabrir
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => setExcluirOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
+              </Button>
+            )}
+          </div>
         </div>
 
         {alertas.length > 0 && (
