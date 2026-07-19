@@ -345,7 +345,7 @@ export function openWhatsAppComposerGlobal(payload: WhatsAppComposerPayload) {
   if (__waComposerListeners.size === 0) {
     // Fallback: abre wa.me diretamente se nenhum host montado
     const tel = normalizarTelefoneBR(payload.telefone);
-    if (!tel.valido) {
+    if (!tel.ok) {
       toast.error("Telefone inválido");
       return;
     }
