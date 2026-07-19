@@ -197,7 +197,54 @@ export function RelatoriosAgendamentos() {
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="space-y-2 border-t pt-3">
+                  <Label>KPIs na mensagem</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Escolha quais indicadores aparecem no resumo enviado por WhatsApp.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {KPIS_DISPONIVEIS.map((k) => {
+                      const on = form.kpis.includes(k.id);
+                      return (
+                        <label
+                          key={k.id}
+                          className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/50"
+                        >
+                          <Checkbox checked={on} onCheckedChange={() => toggleKpi(k.id)} />
+                          <span className="text-sm">{k.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {form.kpis.length} selecionado(s)
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <div>
+                    <Label>Título da mensagem (opcional)</Label>
+                    <Input
+                      maxLength={120}
+                      value={form.titulo_mensagem}
+                      onChange={(e) => setForm({ ...form, titulo_mensagem: e.target.value })}
+                      placeholder="Ex.: Spa da Tia Jéssica — Resumo do dia"
+                    />
+                  </div>
+                  <div>
+                    <Label>Rodapé (opcional)</Label>
+                    <Textarea
+                      maxLength={300}
+                      rows={2}
+                      value={form.rodape_mensagem}
+                      onChange={(e) => setForm({ ...form, rodape_mensagem: e.target.value })}
+                      placeholder="Ex.: Qualquer dúvida, estou à disposição. 🐾"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 border-t pt-3">
                   <Switch checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: v })} />
                   <Label>Ativo</Label>
                 </div>
