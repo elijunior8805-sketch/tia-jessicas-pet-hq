@@ -234,32 +234,32 @@ function DashboardPage() {
       />
 
       {/* ============ KPI CARDS PREMIUM ============ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 mb-6">
         {kpis.map((k) => (
           <Card
             key={k.label}
-            className="group relative overflow-hidden p-5 rounded-2xl border-border/60 bg-card shadow-[0_1px_2px_oklch(0.25_0.05_155/0.05),0_4px_16px_-8px_oklch(0.30_0.08_155/0.10)] hover:shadow-[0_8px_28px_-12px_oklch(0.30_0.08_155/0.22)] hover:-translate-y-0.5 transition-all duration-300"
+            className="group relative overflow-hidden p-4 sm:p-5 rounded-2xl border-border/60 bg-card shadow-[0_1px_2px_oklch(0.25_0.05_155/0.05),0_4px_16px_-8px_oklch(0.30_0.08_155/0.10)] hover:shadow-[0_8px_28px_-12px_oklch(0.30_0.08_155/0.22)] hover:-translate-y-0.5 transition-all duration-300"
           >
             {/* Faixa lateral colorida */}
             <span
               className="absolute left-0 top-0 bottom-0 w-[3px]"
               style={{ background: `linear-gradient(180deg, ${k.tone.chip}, ${k.tone.bar})` }}
             />
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-muted-foreground truncate">
                   {k.label}
                 </p>
-                <div className="font-display text-[1.75rem] sm:text-3xl font-semibold text-primary leading-tight mt-2 tabular-nums truncate">
+                <div className="font-display text-2xl sm:text-3xl font-semibold text-primary leading-[1.1] mt-1.5 sm:mt-2 tabular-nums truncate">
                   {k.value}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">{k.hint}</p>
+                <p className="text-[11px] leading-snug text-muted-foreground mt-1 sm:mt-1.5 line-clamp-2">{k.hint}</p>
               </div>
               <div
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-transform group-hover:scale-110"
+                className="grid h-9 w-9 sm:h-10 sm:w-10 shrink-0 place-items-center rounded-xl transition-transform group-hover:scale-110"
                 style={{ backgroundColor: k.tone.soft, color: k.tone.chip }}
               >
-                <k.icon className="h-[18px] w-[18px]" strokeWidth={2} />
+                <k.icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2} />
               </div>
             </div>
           </Card>
