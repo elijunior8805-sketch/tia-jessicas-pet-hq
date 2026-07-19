@@ -103,7 +103,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       const dia = String(r.encerrado_em ?? r.data_fim ?? "").slice(0, 10);
       if (!dia) continue;
       const cur = serieMap.get(dia) ?? { faturamento: 0, atendimentos: 0 };
-      cur.faturamento += Number(r.valor_executado ?? 0);
+      cur.faturamento += valorRow(r);
       cur.atendimentos += 1;
       serieMap.set(dia, cur);
     }
@@ -117,7 +117,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       const k = r.cliente_id ?? "—";
       const nome = r.clientes?.nome ?? "—";
       const cur = rankMap.get(k) ?? { nome, total: 0, qtd: 0 };
-      cur.total += Number(r.valor_executado ?? 0);
+      cur.total += valorRow(r);
       cur.qtd += 1;
       rankMap.set(k, cur);
     }
