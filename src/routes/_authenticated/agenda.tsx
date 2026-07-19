@@ -24,6 +24,7 @@ import {
   ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
 } from "lucide-react";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
+import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
 
 // ---------- WhatsApp helpers ----------
