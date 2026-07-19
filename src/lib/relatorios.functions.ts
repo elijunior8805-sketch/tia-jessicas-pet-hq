@@ -36,19 +36,20 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
     const deIso = `${data.de}T00:00:00.000Z`;
     const ateIso = `${data.ate}T23:59:59.999Z`;
 
-    // Atendimentos finalizados no período
+    // Atendimentos no período (por data_inicio) — inclui em andamento e finalizados,
+    // para que os relatórios reflitam a realidade do dia mesmo sem encerramento.
     const { data: atendRows, error: atErr } = await supabase
       .from("atendimentos")
       .select(
         sel(
-          "id, cliente_id, data_fim, valor_planejado, valor_executado, taxa_leva_traz, desconto, encerrado_em, servicos_executados, clientes:cliente_id(nome)"
+          "id, cliente_id, data_inicio, data_fim, valor_planejado, valor_executado, taxa_leva_traz, desconto, encerrado_em, finalizado, servicos_executados, servicos_planejados, clientes:cliente_id(nome)"
         )
       )
-      .gte("encerrado_em", deIso)
-      .lte("encerrado_em", ateIso)
-      .not("encerrado_em", "is", null)
+      .gte("data_inicio", deIso)
+      .lte("data_inicio", ateIso)
       .returns<any[]>();
     if (atErr) throw new Error("Falha ao carregar atendimentos");
+
 
     // Pagamentos em aberto na data corrente (snapshot)
     const { data: pagRows, error: pgErr } = await supabase
