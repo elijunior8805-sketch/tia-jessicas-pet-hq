@@ -254,11 +254,11 @@ export async function gerarExecucoesInterno(supabase: any) {
     const rodape = (a.rodape_mensagem?.trim()) || "Detalhes completos no painel. 🐾";
 
     for (const d of (a.destinatarios ?? []) as Array<{ nome: string; whatsapp: string }>) {
-      const linhas = kpisSel.map(linhaKpi).filter((s): s is string => !!s).join("\n");
+      const blocoKpis = kpisSel.map(linhaKpi).filter((s): s is string => !!s).join("\n");
       const mensagem =
         `*${titulo}*\n\n` +
         `Olá, ${d.nome}! Segue o resumo do dia:\n\n` +
-        `${linhas}\n\n` +
+        `${blocoKpis}\n\n` +
         `${rodape}`;
 
       const fone = d.whatsapp.replace(/\D/g, "");
