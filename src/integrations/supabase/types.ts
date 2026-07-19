@@ -123,6 +123,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agendamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "agendamentos_pet_id_fkey"
             columns: ["pet_id"]
             isOneToOne: false
@@ -285,6 +292,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
           },
           {
             foreignKeyName: "atendimentos_pet_id_fkey"
@@ -511,6 +525,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
           },
           {
             foreignKeyName: "cobrancas_pagamento_id_fkey"
@@ -893,6 +914,96 @@ export type Database = {
         }
         Relationships: []
       }
+      mensagens: {
+        Row: {
+          atendimento_id: string | null
+          autor_email: string | null
+          autor_id: string | null
+          canal: string
+          cliente_id: string
+          cobranca_id: string | null
+          corpo: string
+          created_at: string
+          direcao: string
+          id: string
+          lida_em: string | null
+          metadata: Json
+          pagamento_id: string | null
+          status: string
+          tags: Json
+        }
+        Insert: {
+          atendimento_id?: string | null
+          autor_email?: string | null
+          autor_id?: string | null
+          canal?: string
+          cliente_id: string
+          cobranca_id?: string | null
+          corpo: string
+          created_at?: string
+          direcao: string
+          id?: string
+          lida_em?: string | null
+          metadata?: Json
+          pagamento_id?: string | null
+          status?: string
+          tags?: Json
+        }
+        Update: {
+          atendimento_id?: string | null
+          autor_email?: string | null
+          autor_id?: string | null
+          canal?: string
+          cliente_id?: string
+          cobranca_id?: string | null
+          corpo?: string
+          created_at?: string
+          direcao?: string
+          id?: string
+          lida_em?: string | null
+          metadata?: Json
+          pagamento_id?: string | null
+          status?: string
+          tags?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "mensagens_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimentos_estoque: {
         Row: {
           compra_id: string | null
@@ -997,6 +1108,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ocorrencias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "ocorrencias_pet_id_fkey"
             columns: ["pet_id"]
             isOneToOne: false
@@ -1074,6 +1192,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
           },
         ]
       }
@@ -1160,6 +1285,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pets_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
           },
         ]
       }
@@ -1688,6 +1820,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "whatsapp_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "whatsapp_contatos_cobranca_id_fkey"
             columns: ["cobranca_id"]
             isOneToOne: false
@@ -1705,7 +1844,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mensagens_threads: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_telefone: string | null
+          nao_lidas: number | null
+          total_mensagens: number | null
+          ultima_direcao: string | null
+          ultima_em: string | null
+          ultima_mensagem: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_telefone?: string | null
+          nao_lidas?: never
+          total_mensagens?: never
+          ultima_direcao?: never
+          ultima_em?: never
+          ultima_mensagem?: never
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_telefone?: string | null
+          nao_lidas?: never
+          total_mensagens?: never
+          ultima_direcao?: never
+          ultima_em?: never
+          ultima_mensagem?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       excluir_atendimento: {
