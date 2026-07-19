@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
-  ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2,
+  ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
 } from "lucide-react";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 
