@@ -1398,7 +1398,7 @@ function NovoAgendamentoDialog({
           </div>
           <div>
             <Label>Hora *</Label>
-            <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+            <TimeField value={hora} onChange={setHora} />
           </div>
 
           <div>
