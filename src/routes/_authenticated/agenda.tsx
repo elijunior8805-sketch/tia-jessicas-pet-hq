@@ -345,26 +345,47 @@ function AgendamentoRow({
               </div>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1">
-                Status <MoreHorizontal className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2">
+            {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-success/40 text-success hover:bg-success/10"
+                onClick={() => openWhatsApp(row)}
+                title={
+                  row.status === "agendado"
+                    ? "Enviar confirmação por WhatsApp"
+                    : row.status === "confirmado"
+                    ? "Enviar lembrete por WhatsApp"
+                    : "Enviar mensagem de aguardando"
+                }
+              >
+                <Send className="h-3.5 w-3.5" />
+                {row.status === "agendado" ? "Confirmar" : row.status === "confirmado" ? "Lembrar" : "Cobrar"}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {STATUS.map((s) => (
-                <DropdownMenuItem
-                  key={s.value}
-                  disabled={row.status === s.value}
-                  onClick={() => onChangeStatus(s.value)}
-                >
-                  {s.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  Status <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {STATUS.map((s) => (
+                  <DropdownMenuItem
+                    key={s.value}
+                    disabled={row.status === s.value}
+                    onClick={() => onChangeStatus(s.value)}
+                  >
+                    {s.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
         </div>
       </div>
     </Card>
