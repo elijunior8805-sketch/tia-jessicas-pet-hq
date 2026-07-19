@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import {
   ArrowLeft, AlertTriangle, Camera, Upload, Trash2, Star,
-  CheckCircle2, FileText, PawPrint, Sparkles,
+  CheckCircle2, FileText, PawPrint, Sparkles, MessageCircle,
 } from "lucide-react";
 import {
   brl, sumItens, itemFromServico, isBanho, isTosa,
@@ -695,6 +695,46 @@ function AtendimentoDetalhe() {
                     <FileText className="h-4 w-4" /> Ver relatório
                   </Button>
                 )}
+
+                {encerrado && (atendimento as any).pdf_path && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    onClick={async () => {
+                      const fone = (cliente?.whatsapp ?? "").replace(/\D/g, "");
+                      if (!fone) {
+                        toast.error("Cliente não tem WhatsApp cadastrado");
+                        return;
+                      }
+                      const { data, error } = await supabase.storage
+                        .from("spa-fotos")
+                        .createSignedUrl((atendimento as any).pdf_path, 60 * 60 * 24 * 7);
+                      if (error || !data?.signedUrl) {
+                        toast.error("Não foi possível gerar o link do relatório");
+                        return;
+                      }
+                      const iniciais = (myProfile?.nome ?? "")
+                        .split(" ").filter(Boolean).slice(0, 2)
+                        .map((s) => s[0]?.toUpperCase()).join("");
+                      const assinatura = myProfile?.nome
+                        ? `\n\nAtenciosamente,\n${myProfile.nome}${iniciais ? ` (${iniciais})` : ""}`
+                        : "";
+                      const msg =
+                        `Olá, ${cliente?.nome ?? ""}! 🐾\n\n` +
+                        `O atendimento do ${pet?.nome ?? "seu pet"} foi encerrado. ` +
+                        `Segue o relatório completo em PDF:\n\n${data.signedUrl}\n\n` +
+                        `O link fica ativo por 7 dias.${assinatura}`;
+                      const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
+                      window.open(
+                        `https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`,
+                        "_blank",
+                      );
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4" /> Enviar PDF por WhatsApp
+                  </Button>
+                )}
+
               </div>
             </Card>
           </div>
