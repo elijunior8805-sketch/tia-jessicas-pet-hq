@@ -1,0 +1,1 @@
+ALTER TABLE public.servicos ADD COLUMN IF NOT EXISTS preco_a_partir boolean NOT NULL DEFAULT false;
