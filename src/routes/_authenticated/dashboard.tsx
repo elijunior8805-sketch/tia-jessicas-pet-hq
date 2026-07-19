@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
@@ -139,40 +139,15 @@ function DashboardPage() {
       </div>
 
       {/* Filtro segmentado */}
-      <div className="mb-5">
-        <div
-          role="tablist"
-          aria-label="Período"
-          className="grid grid-cols-4 sm:inline-flex sm:w-auto items-center rounded-full bg-muted/60 p-1 border border-border/50"
-        >
-          {periodos.map(([k, longLabel, shortLabel]) => {
-            const active = period === k;
-            return (
-              <button
-                key={k}
-                role="tab"
-                aria-selected={active}
-                onClick={() => setPeriod(k)}
-                className={`h-9 px-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium transition text-center leading-none ${
-                  active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="sm:hidden">{shortLabel}</span>
-                <span className="hidden sm:inline">{longLabel}</span>
-              </button>
-            );
-          })}
-        </div>
-        {period === "personalizado" && (
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 w-full sm:w-auto" />
-            <span className="text-muted-foreground text-sm">até</span>
-            <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 w-full sm:w-auto" />
-          </div>
-        )}
-      </div>
+      <PeriodTabs
+        period={period}
+        onChange={setPeriod}
+        periodos={periodos}
+        customFrom={customFrom}
+        customTo={customTo}
+        setCustomFrom={setCustomFrom}
+        setCustomTo={setCustomTo}
+      />
 
 
       {/* KPI Cards — 1/2/3 colunas */}
