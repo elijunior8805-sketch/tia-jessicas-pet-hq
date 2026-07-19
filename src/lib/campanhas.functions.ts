@@ -10,7 +10,7 @@ export type CampanhaStatus =
   | "cancelada";
 
 export type CampanhaFiltros = {
-  porte_ids?: string[];
+  portes?: string[];
   cidade?: string;
   min_dias_ultimo_atend?: number | null;
   max_dias_ultimo_atend?: number | null;
