@@ -63,7 +63,7 @@ function ClientesPage() {
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nome, telefone, WhatsApp ou bairro…"
+          placeholder="Buscar por nome, CPF, telefone, WhatsApp, bairro ou nome do pet…"
           className="pl-9"
         />
       </div>
