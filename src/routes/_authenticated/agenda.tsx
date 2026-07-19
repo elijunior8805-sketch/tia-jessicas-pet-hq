@@ -374,6 +374,8 @@ function AgendaPage() {
                   key={a.id}
                   row={a}
                   onChangeStatus={(status) => updateStatus.mutate({ id: a.id, status })}
+                  onIniciar={() => iniciarAtendimentoMut.mutate(a)}
+                  iniciando={iniciarAtendimentoMut.isPending}
                   signer={signer}
                 />
               ))}
