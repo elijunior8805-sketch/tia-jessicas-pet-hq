@@ -52,6 +52,14 @@ function NovoClientePage() {
     observacoes: "", indicacao: "", vip: false,
     pet_nome: "", pet_raca: "", pet_porte: "", pet_sexo: "",
   });
+  const [petFoto, setPetFoto] = useState<File | null>(null);
+  const [petFotoPreview, setPetFotoPreview] = useState<string | null>(null);
+
+  function onPickFoto(file: File | null) {
+    setPetFoto(file);
+    if (petFotoPreview) URL.revokeObjectURL(petFotoPreview);
+    setPetFotoPreview(file ? URL.createObjectURL(file) : null);
+  }
 
   const { data: racas } = useQuery({
     queryKey: ["racas-ativas"],
