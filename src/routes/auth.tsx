@@ -51,10 +51,10 @@ function friendlyAuthError(err: AuthErrorLike): string {
 }
 
 // Retry com backoff exponencial; NÃO tenta de novo em 429 (usa cooldown UI).
-async function withRetry<T>(
-  fn: () => Promise<{ data: T; error: AuthErrorLike | null }>,
+async function withRetry<T extends { error: AuthErrorLike | null }>(
+  fn: () => Promise<T>,
   { retries = 2, baseMs = 400 }: { retries?: number; baseMs?: number } = {},
-): Promise<{ data: T; error: AuthErrorLike | null }> {
+): Promise<T> {
   let attempt = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -67,6 +67,7 @@ async function withRetry<T>(
     attempt++;
   }
 }
+
 
 // ---------- Component ----------
 
