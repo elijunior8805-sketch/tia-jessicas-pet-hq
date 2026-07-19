@@ -789,6 +789,15 @@ function FinanceiroPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {recibo && (
+        <ReciboDialog
+          open={!!recibo}
+          onOpenChange={(v) => !v && setRecibo(null)}
+          data={recibo.data}
+          telefone={recibo.telefone}
+        />
+      )}
     </div>
   );
 }
