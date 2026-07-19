@@ -304,14 +304,22 @@ function AgendaPage() {
         .select("id").eq("agendamento_id", row.id).maybeSingle();
       if (existing?.id) return existing.id as string;
 
-      const servicoSolicitado = row.servicos ? [{
-        servico_id: row.servicos.id,
-        nome: row.servicos.nome,
+      const itens = Array.isArray(row.agendamento_servicos) && row.agendamento_servicos.length > 0
+        ? [...row.agendamento_servicos].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        : (row.servicos ? [{
+            servico_id: row.servicos.id,
+            nome: row.servicos.nome,
+            valor_unit: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
+            duracao_min: row.servicos.duracao_min ?? null,
+          }] : []);
+      const servicoSolicitado = itens.map((it: any) => ({
+        servico_id: it.servico_id,
+        nome: it.nome,
         categoria: null,
         quantidade: 1,
-        valor_unit: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
-        valor_total: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
-      }] : [];
+        valor_unit: Number(it.valor_unit ?? 0),
+        valor_total: Number(it.valor_unit ?? 0),
+      }));
 
       const { data: novo, error } = await supabase.from("atendimentos").insert({
         agendamento_id: row.id,
