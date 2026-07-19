@@ -264,9 +264,79 @@ function PagamentosAbertosPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={loteAberto} onOpenChange={setLoteAberto}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Cobrança em lote</DialogTitle>
+            <DialogDescription>
+              {loteMut.isPending
+                ? "Registrando cobranças no servidor…"
+                : loteResultado
+                  ? `${loteResultado.filter((r) => r.registrado).length} registrada(s) · abra o WhatsApp para cada cliente.`
+                  : "Aguarde…"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {(loteResultado ?? []).map((r) => (
+              <div
+                key={r.pagamentoId}
+                className={`flex items-center gap-3 rounded-md border p-3 ${
+                  r.registrado ? "bg-card" : "bg-destructive/5 border-destructive/30"
+                }`}
+              >
+                {r.registrado ? (
+                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-destructive shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{r.cliente_nome}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {r.pet_nome ? `${r.pet_nome} · ` : ""}
+                    {brl(r.saldo)}
+                    {r.dias_atraso > 0 ? ` · atraso ${r.dias_atraso}d` : ""}
+                    {r.motivo ? ` · ${r.motivo}` : ""}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!r.wa_url || !r.registrado}
+                  onClick={() => r.wa_url && window.open(r.wa_url, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" /> WhatsApp
+                </Button>
+              </div>
+            ))}
+            {loteMut.isPending && (
+              <div className="text-center text-muted-foreground py-6">Processando…</div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              disabled={!loteResultado || loteResultado.every((r) => !r.wa_url || !r.registrado)}
+              onClick={() => {
+                let i = 0;
+                (loteResultado ?? [])
+                  .filter((r) => r.registrado && r.wa_url)
+                  .forEach((r) => {
+                    setTimeout(() => window.open(r.wa_url!, "_blank", "noopener,noreferrer"), i * 400);
+                    i++;
+                  });
+              }}
+            >
+              Abrir todos os WhatsApp
+            </Button>
+            <Button onClick={() => setLoteAberto(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function KpiCard({
   icon, label, value, sub, destaque,
