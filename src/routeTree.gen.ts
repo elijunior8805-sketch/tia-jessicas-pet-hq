@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReciboCodigoRouteImport } from './routes/recibo.$codigo'
 import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticated/servicos'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as AuthenticatedReativacaoRouteImport } from './routes/_authenticated/reativacao'
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
 import { Route as AuthenticatedLevaTrazRouteImport } from './routes/_authenticated/leva-traz'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
@@ -72,6 +73,11 @@ const AuthenticatedServicosRoute = AuthenticatedServicosRouteImport.update({
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReativacaoRoute = AuthenticatedReativacaoRouteImport.update({
+  id: '/reativacao',
+  path: '/reativacao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPagamentosAbertosRoute =
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AuthenticatedInboxRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
+  '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/inbox': typeof AuthenticatedInboxRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
+  '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
+  '/_authenticated/reativacao': typeof AuthenticatedReativacaoRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
@@ -316,6 +325,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/leva-traz'
     | '/pagamentos-abertos'
+    | '/reativacao'
     | '/relatorios'
     | '/servicos'
     | '/recibo/$codigo'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/leva-traz'
     | '/pagamentos-abertos'
+    | '/reativacao'
     | '/relatorios'
     | '/servicos'
     | '/recibo/$codigo'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/_authenticated/inbox'
     | '/_authenticated/leva-traz'
     | '/_authenticated/pagamentos-abertos'
+    | '/_authenticated/reativacao'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
     | '/recibo/$codigo'
@@ -454,6 +466,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reativacao': {
+      id: '/_authenticated/reativacao'
+      path: '/reativacao'
+      fullPath: '/reativacao'
+      preLoaderRoute: typeof AuthenticatedReativacaoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/pagamentos-abertos': {
@@ -647,6 +666,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedLevaTrazRoute: typeof AuthenticatedLevaTrazRoute
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
+  AuthenticatedReativacaoRoute: typeof AuthenticatedReativacaoRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
   AuthenticatedAtendimentosAtendIdRoute: typeof AuthenticatedAtendimentosAtendIdRoute
@@ -672,6 +692,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedLevaTrazRoute: AuthenticatedLevaTrazRoute,
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,
+  AuthenticatedReativacaoRoute: AuthenticatedReativacaoRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
   AuthenticatedAtendimentosAtendIdRoute: AuthenticatedAtendimentosAtendIdRoute,
