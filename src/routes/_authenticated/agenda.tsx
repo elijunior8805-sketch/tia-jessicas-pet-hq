@@ -829,6 +829,12 @@ function AgendamentoRow({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditarServicosDialog
+        open={editServicosOpen}
+        onOpenChange={setEditServicosOpen}
+        agendamento={row}
+      />
     </Card>
   );
 }
