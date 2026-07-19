@@ -307,12 +307,35 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           <Textarea
             value={mensagem}
             onChange={(e) => setMensagem(e.target.value)}
-            rows={7}
+            rows={6}
             className="text-sm font-normal resize-none"
           />
           <p className="text-[11px] text-muted-foreground">
-            Modelo carregado das Configurações. Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}.
+            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}.
           </p>
+
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-widest text-emerald-800">
+                Prévia enviada
+              </div>
+              <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-800">
+                Como o cliente vai ver
+              </Badge>
+            </div>
+            <div className="rounded-md bg-white border p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
+              {mensagemFinal || <span className="text-muted-foreground italic">Mensagem vazia</span>}
+              {"\n\n"}
+              <span className="text-primary underline break-all">
+                {signedUrl ?? "[link do comprovante será anexado no envio]"}
+              </span>
+            </div>
+            {variaveisRestantes.length > 0 && (
+              <p className="text-[11px] text-amber-700">
+                Atenção: variáveis não substituídas — {variaveisRestantes.join(", ")}
+              </p>
+            )}
+          </div>
         </div>
 
           {!numero && (
@@ -322,6 +345,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           )}
           </div>
         </div>
+
 
 
 
