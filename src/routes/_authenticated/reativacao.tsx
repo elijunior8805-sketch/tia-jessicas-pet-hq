@@ -38,7 +38,7 @@ import {
   useWhatsAppComposer,
   openWhatsAppComposerGlobal,
 } from "@/components/whatsapp-composer";
-import { montarMensagemWhatsApp } from "@/lib/whatsapp-templates";
+import { renderTemplate } from "@/lib/whatsapp-templates";
 import { normalizarTelefoneBR } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/_authenticated/reativacao")({
