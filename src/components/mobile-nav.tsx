@@ -18,6 +18,7 @@ import {
   HandCoins,
   HeartHandshake,
   BellRing,
+  Megaphone,
   Settings,
   PawPrint,
   type LucideIcon,
