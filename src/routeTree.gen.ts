@@ -31,6 +31,7 @@ import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authent
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
+import { Route as AuthenticatedClientesIdEditarRouteImport } from './routes/_authenticated/clientes.$id.editar'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -150,6 +151,12 @@ const AuthenticatedPetsPetIdFichaRoute =
     path: '/pets/$petId/ficha',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClientesIdEditarRoute =
+  AuthenticatedClientesIdEditarRouteImport.update({
+    id: '/editar',
+    path: '/editar',
+    getParentRoute: () => AuthenticatedClientesIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -168,10 +175,11 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
   '/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
+  '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
 export interface FileRoutesByTo {
@@ -191,10 +199,11 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
   '/atendimentos': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
+  '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
 export interface FileRoutesById {
@@ -216,10 +225,11 @@ export interface FileRoutesById {
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
   '/_authenticated/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/_authenticated/clientes/novo': typeof AuthenticatedClientesNovoRoute
   '/_authenticated/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
+  '/_authenticated/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
 export interface FileRouteTypes {
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/clientes/novo'
     | '/atendimentos/'
     | '/clientes/'
+    | '/clientes/$id/editar'
     | '/pets/$petId/ficha'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/clientes/novo'
     | '/atendimentos'
     | '/clientes'
+    | '/clientes/$id/editar'
     | '/pets/$petId/ficha'
   id:
     | '__root__'
@@ -292,6 +304,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes/novo'
     | '/_authenticated/atendimentos/'
     | '/_authenticated/clientes/'
+    | '/_authenticated/clientes/$id/editar'
     | '/_authenticated/pets/$petId/ficha'
   fileRoutesById: FileRoutesById
 }
@@ -458,8 +471,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPetsPetIdFichaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clientes/$id/editar': {
+      id: '/_authenticated/clientes/$id/editar'
+      path: '/editar'
+      fullPath: '/clientes/$id/editar'
+      preLoaderRoute: typeof AuthenticatedClientesIdEditarRouteImport
+      parentRoute: typeof AuthenticatedClientesIdRoute
+    }
   }
 }
+
+interface AuthenticatedClientesIdRouteChildren {
+  AuthenticatedClientesIdEditarRoute: typeof AuthenticatedClientesIdEditarRoute
+}
+
+const AuthenticatedClientesIdRouteChildren: AuthenticatedClientesIdRouteChildren =
+  {
+    AuthenticatedClientesIdEditarRoute: AuthenticatedClientesIdEditarRoute,
+  }
+
+const AuthenticatedClientesIdRouteWithChildren =
+  AuthenticatedClientesIdRoute._addFileChildren(
+    AuthenticatedClientesIdRouteChildren,
+  )
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
@@ -475,7 +509,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
   AuthenticatedAtendimentosAtendIdRoute: typeof AuthenticatedAtendimentosAtendIdRoute
-  AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
+  AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRouteWithChildren
   AuthenticatedClientesNovoRoute: typeof AuthenticatedClientesNovoRoute
   AuthenticatedAtendimentosIndexRoute: typeof AuthenticatedAtendimentosIndexRoute
   AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
@@ -496,7 +530,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
   AuthenticatedAtendimentosAtendIdRoute: AuthenticatedAtendimentosAtendIdRoute,
-  AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
+  AuthenticatedClientesIdRoute: AuthenticatedClientesIdRouteWithChildren,
   AuthenticatedClientesNovoRoute: AuthenticatedClientesNovoRoute,
   AuthenticatedAtendimentosIndexRoute: AuthenticatedAtendimentosIndexRoute,
   AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,
