@@ -317,14 +317,14 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
               <div className="text-muted-foreground">
                 {format(new Date(envioAnterior.enviado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </div>
-              {envioAnterior.signed_url && (
+              {envioAnterior.codigo_publico && (
                 <a
-                  href={envioAnterior.signed_url}
+                  href={`/recibo/${envioAnterior.codigo_publico}`}
                   target="_blank"
                   rel="noreferrer"
                   className="underline text-primary"
                 >
-                  Abrir link enviado
+                  Abrir página do recibo
                 </a>
               )}
             </div>
