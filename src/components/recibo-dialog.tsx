@@ -119,6 +119,13 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     };
   }, [open, data]);
 
+  const mensagemFinal = useMemo(() => applyVars(mensagem, vars), [mensagem, vars]);
+  const variaveisRestantes = useMemo(() => {
+    const m = mensagemFinal.match(/\{(\w+)\}/g);
+    return m ? Array.from(new Set(m)) : [];
+  }, [mensagemFinal]);
+
+
 
   const baixar = () => {
     generateReciboPDF(data);
