@@ -1293,7 +1293,7 @@ function EditarServicosDialog({
       const { error: errUp } = await supabase.from("agendamentos").update({
         servico_id: principal.servico_id,
         valor_previsto: totalValor,
-        duracao_min: totalDuracao > 0 ? totalDuracao : null,
+        duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
         taxa_leva_traz: Number(taxa || 0),
       }).eq("id", agendamento.id);
       if (errUp) throw errUp;
