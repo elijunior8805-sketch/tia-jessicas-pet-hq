@@ -260,6 +260,7 @@ function AtendimentoDetalhe() {
   const [motivoReabrir, setMotivoReabrir] = useState("");
   const [reabrirOpen, setReabrirOpen] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<string | null>(null);
+  const [excluirOpen, setExcluirOpen] = useState(false);
 
   useEffect(() => {
     if (!atendimento) return;
@@ -340,6 +341,26 @@ function AtendimentoDetalhe() {
     ] as const;
     return items.filter(([n]) => !isEtapaConfirmada(atendimento, n)).map(([, l]) => l);
   }, [atendimento]);
+
+  const excluirMut = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("excluir_atendimento", { _atendimento_id: atendId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Atendimento excluído. Agendamento, histórico e financeiro atualizados.");
+      qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
+      qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["pets"] });
+      setExcluirOpen(false);
+      navigate({ to: "/agenda" });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao excluir atendimento"),
+  });
+
 
   if (isLoading) {
     return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
@@ -549,18 +570,28 @@ function AtendimentoDetalhe() {
               <p className="mt-2 text-sm text-muted-foreground">{subtitleParts.join(" · ")}</p>
             )}
           </div>
-          {encerrado && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {encerrado && (
               <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Encerrado
               </span>
-              {isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => setReabrirOpen(true)}>
-                  <Lock className="h-3.5 w-3.5 mr-1" /> Reabrir
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+            {isAdmin && encerrado && (
+              <Button size="sm" variant="outline" onClick={() => setReabrirOpen(true)}>
+                <Lock className="h-3.5 w-3.5 mr-1" /> Reabrir
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => setExcluirOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
+              </Button>
+            )}
+          </div>
         </div>
 
         {alertas.length > 0 && (
@@ -1034,6 +1065,33 @@ function AtendimentoDetalhe() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setReabrirOpen(false)}>Cancelar</Button>
             <Button onClick={reabrir}>Confirmar reabertura</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excluir dialog */}
+      <Dialog open={excluirOpen} onOpenChange={setExcluirOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir atendimento</DialogTitle>
+            <DialogDescription>
+              Esta ação é permanente. Ao excluir este atendimento:
+              <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
+                <li>Os pagamentos vinculados serão <strong>removidos</strong>.</li>
+                <li>O agendamento vinculado voltará para <strong>Agendado</strong>.</li>
+                <li>O histórico do pet (último banho, última tosa, próxima visita) será <strong>recalculado</strong> a partir dos atendimentos restantes.</li>
+              </ul>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirOpen(false)} disabled={excluirMut.isPending}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => excluirMut.mutate()}
+              disabled={excluirMut.isPending}
+            >
+              {excluirMut.isPending ? "Excluindo…" : "Confirmar exclusão"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
