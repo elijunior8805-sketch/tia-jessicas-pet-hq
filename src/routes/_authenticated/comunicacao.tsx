@@ -451,8 +451,8 @@ function ComunicacaoPage() {
                         {r.created_at && format(new Date(r.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                       </div>
                     </div>
-                    {r.pdf_url && (
-                      <a href={r.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline shrink-0">
+                    {r.signed_url && (
+                      <a href={r.signed_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline shrink-0">
                         Ver PDF
                       </a>
                     )}
