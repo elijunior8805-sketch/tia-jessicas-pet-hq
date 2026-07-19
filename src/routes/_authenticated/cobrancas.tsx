@@ -305,6 +305,12 @@ function CobrancasPage() {
       )}
 
       {showConfig && <ConfigDialog onClose={() => setShowConfig(false)} />}
+      {showConfig && null}
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </div>
   );
 }
