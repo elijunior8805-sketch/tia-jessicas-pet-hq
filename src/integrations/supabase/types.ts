@@ -949,6 +949,173 @@ export type Database = {
         }
         Relationships: []
       }
+      lembretes_config: {
+        Row: {
+          aniversario_hora: string
+          aniversario_pet_ativo: boolean
+          aniversario_template: string
+          created_at: string
+          id: string
+          lembrete_24h_ativo: boolean
+          lembrete_24h_hora: string
+          lembrete_24h_template: string
+          pos_atendimento_ativo: boolean
+          pos_atendimento_horas: number
+          pos_atendimento_template: string
+          updated_at: string
+        }
+        Insert: {
+          aniversario_hora?: string
+          aniversario_pet_ativo?: boolean
+          aniversario_template?: string
+          created_at?: string
+          id?: string
+          lembrete_24h_ativo?: boolean
+          lembrete_24h_hora?: string
+          lembrete_24h_template?: string
+          pos_atendimento_ativo?: boolean
+          pos_atendimento_horas?: number
+          pos_atendimento_template?: string
+          updated_at?: string
+        }
+        Update: {
+          aniversario_hora?: string
+          aniversario_pet_ativo?: boolean
+          aniversario_template?: string
+          created_at?: string
+          id?: string
+          lembrete_24h_ativo?: boolean
+          lembrete_24h_hora?: string
+          lembrete_24h_template?: string
+          pos_atendimento_ativo?: boolean
+          pos_atendimento_horas?: number
+          pos_atendimento_template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lembretes_fila: {
+        Row: {
+          agendamento_id: string | null
+          atendimento_id: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          enviado_em: string | null
+          enviado_por: string | null
+          erro: string | null
+          id: string
+          idempotency_key: string
+          max_tentativas: number
+          mensagem: string
+          pet_id: string | null
+          pet_nome: string | null
+          proximo_envio: string
+          status: string
+          telefone: string | null
+          tentativas: number
+          tipo: string
+          ultima_tentativa: string | null
+          updated_at: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          enviado_por?: string | null
+          erro?: string | null
+          id?: string
+          idempotency_key: string
+          max_tentativas?: number
+          mensagem: string
+          pet_id?: string | null
+          pet_nome?: string | null
+          proximo_envio?: string
+          status?: string
+          telefone?: string | null
+          tentativas?: number
+          tipo: string
+          ultima_tentativa?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          enviado_por?: string | null
+          erro?: string | null
+          id?: string
+          idempotency_key?: string
+          max_tentativas?: number
+          mensagem?: string
+          pet_id?: string | null
+          pet_nome?: string | null
+          proximo_envio?: string
+          status?: string
+          telefone?: string | null
+          tentativas?: number
+          tipo?: string
+          ultima_tentativa?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lembretes_fila_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
+      }
       mensagens: {
         Row: {
           atendimento_id: string | null
@@ -1975,6 +2142,39 @@ export type Database = {
       }
     }
     Functions: {
+      claim_lembretes_pendentes: {
+        Args: { _limit?: number }
+        Returns: {
+          agendamento_id: string | null
+          atendimento_id: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          enviado_em: string | null
+          enviado_por: string | null
+          erro: string | null
+          id: string
+          idempotency_key: string
+          max_tentativas: number
+          mensagem: string
+          pet_id: string | null
+          pet_nome: string | null
+          proximo_envio: string
+          status: string
+          telefone: string | null
+          tentativas: number
+          tipo: string
+          ultima_tentativa: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lembretes_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      enfileirar_lembretes: { Args: never; Returns: Json }
       excluir_atendimento: {
         Args: { _atendimento_id: string }
         Returns: undefined
@@ -2013,6 +2213,16 @@ export type Database = {
       }
       is_staff: { Args: never; Returns: boolean }
       limpar_dados_teste_financeiro: { Args: never; Returns: Json }
+      render_lembrete: {
+        Args: {
+          _data: string
+          _hora: string
+          _pet: string
+          _template: string
+          _tutor: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       agendamento_status:
