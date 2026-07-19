@@ -314,6 +314,8 @@ function AgendamentoRow({
   onChangeStatus: (s: Status) => void;
   signer: { name: string; initials: string };
 }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewText, setPreviewText] = useState("");
 
   const meta = statusMeta(row.status);
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
@@ -381,7 +383,14 @@ function AgendamentoRow({
                 variant="outline"
                 size="sm"
                 className="gap-1 border-success/40 text-success hover:bg-success/10"
-                onClick={() => openWhatsApp(row, signer)}
+                onClick={() => {
+                  if (row.status === "finalizado") {
+                    setPreviewText(waMessage(row, signer));
+                    setPreviewOpen(true);
+                  } else {
+                    openWhatsApp(row, signer);
+                  }
+                }}
                 title={
                   row.status === "agendado"
                     ? "Enviar confirmação por WhatsApp"
@@ -427,6 +436,51 @@ function AgendamentoRow({
 
         </div>
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Prévia do aviso de encerramento</DialogTitle>
+            <DialogDescription>
+              Revise e ajuste a mensagem antes de abrir o WhatsApp de {row.clientes?.nome ?? "—"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-[#e5ddd5] p-3">
+            <div className="ml-auto max-w-[85%] rounded-lg bg-[#dcf8c6] px-3 py-2 shadow-sm">
+              <Textarea
+                value={previewText}
+                onChange={(e) => setPreviewText(e.target.value)}
+                rows={10}
+                className="min-h-[180px] resize-none border-0 bg-transparent p-0 text-sm text-foreground shadow-none focus-visible:ring-0 whitespace-pre-wrap"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Cancelar</Button>
+            <Button
+              variant="outline"
+              onClick={() => setPreviewText(waMessage(row, signer))}
+            >
+              Restaurar padrão
+            </Button>
+            <Button
+              className="gap-2 bg-success text-success-foreground hover:bg-success/90"
+              onClick={() => {
+                const phone = waPhone(row.clientes?.whatsapp);
+                if (!phone) {
+                  toast.error("Cliente sem WhatsApp cadastrado");
+                  return;
+                }
+                const url = `https://wa.me/${phone}?text=${encodeURIComponent(previewText)}`;
+                window.open(url, "_blank", "noopener,noreferrer");
+                setPreviewOpen(false);
+              }}
+            >
+              <Send className="h-4 w-4" /> Enviar no WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
