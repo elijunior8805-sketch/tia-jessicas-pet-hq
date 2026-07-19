@@ -369,10 +369,10 @@ function DashboardPage() {
                     <Link
                       key={a.id}
                       to="/agenda"
-                      className="group flex gap-3 items-center rounded-xl p-2.5 -mx-2.5 hover:bg-[oklch(0.97_0.02_150)] transition-colors"
+                      className="group flex gap-2.5 sm:gap-3 items-center rounded-xl p-2 sm:p-2.5 -mx-2 sm:-mx-2.5 hover:bg-[oklch(0.97_0.02_150)] transition-colors"
                     >
-                      <div className="flex flex-col items-center justify-center w-14 shrink-0 rounded-lg py-1.5 bg-[oklch(0.96_0.02_155)] border border-[oklch(0.90_0.02_155)]">
-                        <div className="flex items-center gap-1 font-display text-[15px] font-semibold text-primary leading-none tabular-nums">
+                      <div className="flex flex-col items-center justify-center w-[52px] sm:w-14 shrink-0 rounded-lg py-1.5 bg-[oklch(0.96_0.02_155)] border border-[oklch(0.90_0.02_155)]">
+                        <div className="flex items-center gap-1 font-display text-sm sm:text-[15px] font-semibold text-primary leading-none tabular-nums">
                           <Clock className="h-3 w-3 text-[oklch(0.55_0.10_82)]" strokeWidth={2.2} />
                           {a.hora_inicio?.slice(0, 5)}
                         </div>
@@ -380,17 +380,17 @@ function DashboardPage() {
                           {isToday(dt) ? "Hoje" : format(dt, "dd MMM", { locale: ptBR })}
                         </div>
                       </div>
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.94_0.04_150)] to-[oklch(0.88_0.05_150)] text-[oklch(0.32_0.06_155)] font-display font-semibold text-sm border border-[oklch(0.85_0.04_150)]">
+                      <div className="hidden sm:grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.94_0.04_150)] to-[oklch(0.88_0.05_150)] text-[oklch(0.32_0.06_155)] font-display font-semibold text-sm border border-[oklch(0.85_0.04_150)]">
                         {initial}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-foreground truncate">
+                        <div className="text-sm font-semibold text-foreground truncate leading-tight">
                           {a.pets?.nome ?? "Pet"}
                           <span className="text-muted-foreground font-normal"> · {a.servicos?.nome ?? "serviço"}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">{a.clientes?.nome}</div>
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">{a.clientes?.nome}</div>
                       </div>
-                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full shrink-0 ${st.className}`}>
+                      <span className={`text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full shrink-0 whitespace-nowrap ${st.className}`}>
                         {st.label}
                       </span>
                     </Link>
