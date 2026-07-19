@@ -32,7 +32,6 @@ type Item = { title: string; url: string; icon: LucideIcon };
 const primary: Item[] = [
   { title: "Painel", url: "/dashboard", icon: LayoutDashboard },
   { title: "Agenda", url: "/agenda", icon: Calendar },
-  { title: "Atender", url: "/atendimentos", icon: ClipboardList },
   { title: "Clientes", url: "/clientes", icon: Users },
 ];
 
@@ -42,7 +41,6 @@ const groups: { label: string; items: Item[] }[] = [
     items: [
       { title: "Painel", url: "/dashboard", icon: LayoutDashboard },
       { title: "Agenda", url: "/agenda", icon: Calendar },
-      { title: "Atendimentos", url: "/atendimentos", icon: ClipboardList },
       { title: "Clientes e Pets", url: "/clientes", icon: Users },
       { title: "Serviços", url: "/servicos", icon: Scissors },
       { title: "Leva e Traz", url: "/leva-traz", icon: Truck },
