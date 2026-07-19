@@ -191,23 +191,24 @@ export const listarLinhasExport = createServerFn({ method: "POST" })
       .from("atendimentos")
       .select(
         sel(
-          "encerrado_em, data_fim, valor_planejado, valor_executado, desconto, taxa_leva_traz, pagamento_status, servicos_executados, clientes:cliente_id(nome), pets:pet_id(nome)"
+          "data_inicio, encerrado_em, data_fim, valor_planejado, valor_executado, desconto, taxa_leva_traz, pagamento_status, servicos_executados, servicos_planejados, clientes:cliente_id(nome), pets:pet_id(nome)"
         )
       )
-      .gte("encerrado_em", deIso)
-      .lte("encerrado_em", ateIso)
-      .not("encerrado_em", "is", null)
-      .order("encerrado_em", { ascending: true })
+      .gte("data_inicio", deIso)
+      .lte("data_inicio", ateIso)
+      .order("data_inicio", { ascending: true })
       .limit(5000)
       .returns<any[]>();
     if (error) throw new Error("Falha ao carregar linhas");
 
     const linhas: LinhaExport[] = (rows ?? []).map((r) => {
-      const servicos = Array.isArray(r.servicos_executados)
-        ? r.servicos_executados.map((s: any) => s?.nome).filter(Boolean).join(" + ")
-        : "";
+      const execArr = Array.isArray(r.servicos_executados) ? r.servicos_executados : [];
+      const arr = execArr.length > 0
+        ? execArr
+        : (Array.isArray(r.servicos_planejados) ? r.servicos_planejados : []);
+      const servicos = arr.map((s: any) => s?.nome).filter(Boolean).join(" + ");
       return {
-        data: String(r.encerrado_em ?? r.data_fim ?? "").slice(0, 10),
+        data: String(r.encerrado_em ?? r.data_fim ?? r.data_inicio ?? "").slice(0, 10),
         cliente: r.clientes?.nome ?? "",
         pet: r.pets?.nome ?? "",
         servicos,
@@ -220,3 +221,4 @@ export const listarLinhasExport = createServerFn({ method: "POST" })
     });
     return { linhas };
   });
+
