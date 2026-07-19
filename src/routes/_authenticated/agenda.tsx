@@ -726,7 +726,7 @@ function NovoAgendamentoDialog({
   });
 
   const { data: clientes } = useQuery({
-    queryKey: ["clientes-select", clienteSearch],
+    queryKey: ["clientes-select", clienteSearch, defaultClienteId ?? ""],
     enabled: open,
     queryFn: async () => {
       let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(30);
@@ -735,7 +735,17 @@ function NovoAgendamentoDialog({
         q = q.or(`nome.ilike.${like},whatsapp.ilike.${like},telefone.ilike.${like}`);
       }
       const { data } = await q;
-      return data ?? [];
+      let rows = data ?? [];
+      // Garante que o cliente pré-selecionado apareça na lista
+      if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
+        const { data: extra } = await supabase
+          .from("clientes")
+          .select("id, nome, whatsapp, vip")
+          .eq("id", defaultClienteId)
+          .maybeSingle();
+        if (extra) rows = [extra, ...rows];
+      }
+      return rows;
     },
   });
 
