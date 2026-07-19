@@ -330,6 +330,7 @@ export type Database = {
           created_at: string
           email: string | null
           estado: string | null
+          foto_url: string | null
           id: string
           indicacao: string | null
           nascimento: string | null
@@ -352,6 +353,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           estado?: string | null
+          foto_url?: string | null
           id?: string
           indicacao?: string | null
           nascimento?: string | null
@@ -374,6 +376,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           estado?: string | null
+          foto_url?: string | null
           id?: string
           indicacao?: string | null
           nascimento?: string | null
@@ -972,6 +975,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string | null
           id: string
@@ -980,6 +984,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           id: string
@@ -988,6 +993,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           id?: string

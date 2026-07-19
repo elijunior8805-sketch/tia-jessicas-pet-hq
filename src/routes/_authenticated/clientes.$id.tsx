@@ -149,10 +149,15 @@ function ClienteDetalhe() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Contato */}
         <Card className="p-5 lg:col-span-1">
-          <div className="flex items-center gap-2 mb-3">
-            <h2 className="font-display font-semibold text-primary">Contato</h2>
-            {data.vip && <Badge className="badge-gold text-xs"><Star className="h-3 w-3 mr-0.5"/>VIP</Badge>}
-            {data.ativo === false && <Badge variant="secondary" className="text-xs">Arquivado</Badge>}
+          <div className="flex items-center gap-3 mb-3">
+            <ClienteAvatar path={(data as any).foto_url} nome={data.nome} />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display font-semibold text-primary truncate">Contato</h2>
+              <div className="flex items-center gap-1 flex-wrap">
+                {data.vip && <Badge className="badge-gold text-xs"><Star className="h-3 w-3 mr-0.5"/>VIP</Badge>}
+                {data.ativo === false && <Badge variant="secondary" className="text-xs">Arquivado</Badge>}
+              </div>
+            </div>
           </div>
           <div className="space-y-2 text-sm">
             {data.cpf && <Row label="CPF" value={data.cpf}/>}
@@ -303,6 +308,17 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-2">
       <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
       <span className="text-sm text-right">{value}</span>
+    </div>
+  );
+}
+
+function ClienteAvatar({ path, nome }: { path?: string | null; nome: string }) {
+  const { data: url } = useSignedUrl(path ?? null);
+  if (url) return <img src={url} alt={nome} className="h-14 w-14 rounded-full object-cover border" />;
+  const initials = nome.split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("");
+  return (
+    <div className="h-14 w-14 rounded-full bg-primary/10 grid place-items-center text-primary font-semibold">
+      {initials || "?"}
     </div>
   );
 }

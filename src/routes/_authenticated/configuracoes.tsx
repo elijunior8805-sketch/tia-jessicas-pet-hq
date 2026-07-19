@@ -10,11 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { User, Lock, Eye, EyeOff, MessageCircle, History } from "lucide-react";
+import { User, Lock, Eye, EyeOff, MessageCircle, History, Building2 } from "lucide-react";
 import { z } from "zod";
 import { useMyProfile } from "@/hooks/use-my-profile";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { FotoPicker } from "@/components/foto-picker";
+import { uploadFoto, removeFoto } from "@/lib/foto-upload";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: ConfiguracoesPage,
@@ -26,6 +28,8 @@ function ConfiguracoesPage() {
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
 
   const { data: profile, isLoading } = useMyProfile();
 
@@ -50,15 +54,31 @@ function ConfiguracoesPage() {
       setSaving(false);
       return;
     }
-    const { error } = await supabase
-      .from("profiles")
-      .update({ nome: nome.trim(), telefone: telefone.trim() || null })
-      .eq("id", u.user.id);
+    const patch: any = { nome: nome.trim(), telefone: telefone.trim() || null };
+    if (avatarFile) {
+      try {
+        const path = await uploadFoto("avatars", u.user.id, avatarFile);
+        patch.avatar_url = path;
+        if (profile?.avatar_url && profile.avatar_url !== path) {
+          removeFoto(profile.avatar_url).catch(() => {});
+        }
+      } catch (e: any) {
+        setSaving(false);
+        toast.error("Falha ao enviar foto", { description: e?.message });
+        return;
+      }
+    } else if (avatarRemoved && profile?.avatar_url) {
+      patch.avatar_url = null;
+      removeFoto(profile.avatar_url).catch(() => {});
+    }
+    const { error } = await supabase.from("profiles").update(patch).eq("id", u.user.id);
     setSaving(false);
     if (error) {
       toast.error("Não foi possível salvar", { description: error.message });
       return;
     }
+    setAvatarFile(null);
+    setAvatarRemoved(false);
     toast.success("Perfil atualizado");
     qc.invalidateQueries({ queryKey: ["me-profile"] });
   }
@@ -79,6 +99,17 @@ function ConfiguracoesPage() {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          <div className="flex justify-center pb-2">
+            <FotoPicker
+              currentPath={profile?.avatar_url ?? null}
+              onFileChange={setAvatarFile}
+              onRemoveExisting={() => setAvatarRemoved(true)}
+              placeholderIcon={User}
+              size="md"
+              label="Sua foto"
+            />
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="nome">Nome de exibição</Label>
             <Input
@@ -116,6 +147,7 @@ function ConfiguracoesPage() {
         </form>
       </Card>
 
+      <EmpresaCard />
       <WhatsAppTemplatesCard />
       <RecibosEnviadosCard />
       <ChangePasswordCard authEmail={profile?.authEmail ?? ""} />
@@ -505,4 +537,150 @@ function RecibosEnviadosCard() {
     </Card>
   );
 }
+
+function EmpresaCard() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["empresa-config-dados"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("empresa_config")
+        .select("id, nome_fantasia, razao_social, cnpj, telefone, whatsapp, email, endereco, logo_url")
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const [form, setForm] = useState({
+    nome_fantasia: "", razao_social: "", cnpj: "",
+    telefone: "", whatsapp: "", email: "", endereco: "",
+  });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setForm({
+        nome_fantasia: data.nome_fantasia ?? "",
+        razao_social: data.razao_social ?? "",
+        cnpj: data.cnpj ?? "",
+        telefone: data.telefone ?? "",
+        whatsapp: data.whatsapp ?? "",
+        email: data.email ?? "",
+        endereco: data.endereco ?? "",
+      });
+    }
+  }, [data]);
+
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const patch: any = {
+        nome_fantasia: form.nome_fantasia.trim() || null,
+        razao_social: form.razao_social.trim() || null,
+        cnpj: form.cnpj.trim() || null,
+        telefone: form.telefone.trim() || null,
+        whatsapp: form.whatsapp.trim() || null,
+        email: form.email.trim() || null,
+        endereco: form.endereco.trim() || null,
+      };
+      if (logoFile) {
+        const path = await uploadFoto(
+          "empresa",
+          data?.id ?? "logo",
+          logoFile,
+        );
+        patch.logo_url = path;
+        if (data?.logo_url && data.logo_url !== path) removeFoto(data.logo_url).catch(() => {});
+      } else if (logoRemoved && data?.logo_url) {
+        patch.logo_url = null;
+        removeFoto(data.logo_url).catch(() => {});
+      }
+      if (data?.id) {
+        const { error } = await supabase.from("empresa_config").update(patch).eq("id", data.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("empresa_config").insert(patch);
+        if (error) throw error;
+      }
+      setLogoFile(null);
+      setLogoRemoved(false);
+      toast.success("Dados da empresa salvos");
+      qc.invalidateQueries({ queryKey: ["empresa-config-dados"] });
+      qc.invalidateQueries({ queryKey: ["empresa-config-whatsapp"] });
+    } catch (err: any) {
+      toast.error("Não foi possível salvar", { description: err?.message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="p-6 rounded-2xl border-border/60 max-w-2xl mt-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-primary">
+          <Building2 className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="font-display text-xl font-semibold text-primary">Dados da empresa</h2>
+          <p className="text-sm text-muted-foreground">Aparecem em recibos, PDFs e mensagens.</p>
+        </div>
+      </div>
+
+      <form onSubmit={salvar} className="space-y-4">
+        <div className="flex justify-center pb-2">
+          <FotoPicker
+            currentPath={data?.logo_url ?? null}
+            onFileChange={setLogoFile}
+            onRemoveExisting={() => setLogoRemoved(true)}
+            placeholderIcon={Building2}
+            size="lg"
+            shape="rounded"
+            label="Logotipo"
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label>Nome fantasia</Label>
+            <Input value={form.nome_fantasia} onChange={(e) => setForm((s) => ({ ...s, nome_fantasia: e.target.value }))} disabled={isLoading} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Razão social</Label>
+            <Input value={form.razao_social} onChange={(e) => setForm((s) => ({ ...s, razao_social: e.target.value }))} disabled={isLoading} />
+          </div>
+          <div className="grid gap-2">
+            <Label>CNPJ</Label>
+            <Input value={form.cnpj} onChange={(e) => setForm((s) => ({ ...s, cnpj: e.target.value }))} disabled={isLoading} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Telefone</Label>
+            <Input value={form.telefone} onChange={(e) => setForm((s) => ({ ...s, telefone: e.target.value }))} disabled={isLoading} />
+          </div>
+          <div className="grid gap-2">
+            <Label>WhatsApp</Label>
+            <Input value={form.whatsapp} onChange={(e) => setForm((s) => ({ ...s, whatsapp: e.target.value }))} disabled={isLoading} />
+          </div>
+          <div className="grid gap-2">
+            <Label>E-mail</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} disabled={isLoading} />
+          </div>
+          <div className="grid gap-2 sm:col-span-2">
+            <Label>Endereço</Label>
+            <Textarea rows={2} value={form.endereco} onChange={(e) => setForm((s) => ({ ...s, endereco: e.target.value }))} disabled={isLoading} />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button type="submit" disabled={saving || isLoading}>
+            {saving ? "Salvando…" : "Salvar dados"}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 

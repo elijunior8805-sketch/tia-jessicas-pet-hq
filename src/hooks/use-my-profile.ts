@@ -6,6 +6,7 @@ export type MyProfile = {
   nome: string | null;
   email: string | null;
   telefone: string | null;
+  avatar_url: string | null;
   authEmail: string | null;
 };
 
@@ -18,7 +19,7 @@ export function useMyProfile() {
       if (!u.user) return null;
       const { data } = await supabase
         .from("profiles")
-        .select("id,nome,email,telefone")
+        .select("id,nome,email,telefone,avatar_url")
         .eq("id", u.user.id)
         .maybeSingle();
       return {
@@ -26,6 +27,7 @@ export function useMyProfile() {
         nome: data?.nome ?? null,
         email: data?.email ?? null,
         telefone: data?.telefone ?? null,
+        avatar_url: (data as any)?.avatar_url ?? null,
         authEmail: u.user.email ?? null,
       };
     },
