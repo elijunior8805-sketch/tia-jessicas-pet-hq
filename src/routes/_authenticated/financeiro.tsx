@@ -1090,6 +1090,50 @@ function FinanceiroPage() {
 
   const periodoLabel = `${format(parseISO(inicio), "dd MMM", { locale: ptBR })} — ${format(parseISO(fim), "dd MMM yyyy", { locale: ptBR })}`;
 
+  const exportarPDF = () => {
+    try {
+      const entradas = receitasFiltradas.map((p) => ({
+        data: p.data_pagamento,
+        vencimento: p.vencimento,
+        cliente: p.cliente?.nome || p.descricao || "—",
+        descricao:
+          p.descricao ||
+          p.observacoes ||
+          (p.atendimento?.pet?.nome ? `Atendimento · ${p.atendimento.pet.nome}` : "Recebimento"),
+        forma: FORMA_META[p.forma]?.label ?? p.forma,
+        status: p.status,
+        valor: Number(p.valor_total || 0),
+        valor_pago: Number(p.valor_pago || 0),
+      }));
+      const saidas = despesasFiltradas.map((p) => ({
+        data: p.data_pagamento,
+        vencimento: p.vencimento,
+        fornecedor: p.compra?.fornecedor?.nome || "—",
+        descricao:
+          p.compra?.descricao ||
+          p.compra?.numero_documento ||
+          `Parcela ${p.numero}/${p.total_parcelas}`,
+        categoria: p.compra?.categoria?.nome ?? null,
+        forma: p.forma_pagamento ? (FORMA_META[p.forma_pagamento]?.label ?? p.forma_pagamento) : "—",
+        status: p.status,
+        valor: Number(p.valor || 0),
+        valor_pago: Number(p.valor_pago || 0),
+      }));
+      generateFinanceiroPDF({
+        empresa: empresaInfo,
+        periodo: { de: inicio, ate: fim },
+        filtrosAtivos: filtrosAtivos.map((f) => f.label),
+        kpis: kpis,
+        porForma: porForma.map((r) => ({ label: r.label, valor: r.valor, qtd: r.qtd, pct: r.pct })),
+        entradas,
+        saidas,
+      });
+      toast.success("Relatório PDF gerado");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao gerar PDF");
+    }
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6 bg-[hsl(var(--background))] min-h-screen">
       {/* Header */}
