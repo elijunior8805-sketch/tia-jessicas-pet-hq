@@ -474,6 +474,12 @@ function ComunicacaoPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </PageShell>
   );
 }
