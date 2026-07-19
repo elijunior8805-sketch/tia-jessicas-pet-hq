@@ -153,7 +153,7 @@ export function RelatoriosAgendamentos() {
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="w-4 h-4 mr-1" />Novo</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{form.id ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
                 <DialogDescription>
