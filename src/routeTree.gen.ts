@@ -27,10 +27,13 @@ import { Route as AuthenticatedComprasRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes.index'
 import { Route as AuthenticatedAtendimentosIndexRouteImport } from './routes/_authenticated/atendimentos.index'
+import { Route as AuthenticatedPetsNovoRouteImport } from './routes/_authenticated/pets.novo'
 import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authenticated/clientes.novo'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
+import { Route as AuthenticatedPetsPetIdEditarRouteImport } from './routes/_authenticated/pets.$petId.editar'
+import { Route as AuthenticatedClientesIdEditarRouteImport } from './routes/_authenticated/clientes.$id.editar'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -127,6 +130,11 @@ const AuthenticatedAtendimentosIndexRoute =
     path: '/atendimentos/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPetsNovoRoute = AuthenticatedPetsNovoRouteImport.update({
+  id: '/pets/novo',
+  path: '/pets/novo',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedClientesNovoRoute =
   AuthenticatedClientesNovoRouteImport.update({
     id: '/clientes/novo',
@@ -150,6 +158,18 @@ const AuthenticatedPetsPetIdFichaRoute =
     path: '/pets/$petId/ficha',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPetsPetIdEditarRoute =
+  AuthenticatedPetsPetIdEditarRouteImport.update({
+    id: '/pets/$petId/editar',
+    path: '/pets/$petId/editar',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClientesIdEditarRoute =
+  AuthenticatedClientesIdEditarRouteImport.update({
+    id: '/editar',
+    path: '/editar',
+    getParentRoute: () => AuthenticatedClientesIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -168,10 +188,13 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
+  '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
+  '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
 export interface FileRoutesByTo {
@@ -191,10 +214,13 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/atendimentos': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
+  '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
+  '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
 export interface FileRoutesById {
@@ -216,10 +242,13 @@ export interface FileRoutesById {
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
   '/_authenticated/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/_authenticated/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/_authenticated/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/_authenticated/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
+  '/_authenticated/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
+  '/_authenticated/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
 export interface FileRouteTypes {
@@ -243,8 +272,11 @@ export interface FileRouteTypes {
     | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/pets/novo'
     | '/atendimentos/'
     | '/clientes/'
+    | '/clientes/$id/editar'
+    | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -266,8 +298,11 @@ export interface FileRouteTypes {
     | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/pets/novo'
     | '/atendimentos'
     | '/clientes'
+    | '/clientes/$id/editar'
+    | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
   id:
     | '__root__'
@@ -290,8 +325,11 @@ export interface FileRouteTypes {
     | '/_authenticated/atendimentos/$atendId'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/novo'
+    | '/_authenticated/pets/novo'
     | '/_authenticated/atendimentos/'
     | '/_authenticated/clientes/'
+    | '/_authenticated/clientes/$id/editar'
+    | '/_authenticated/pets/$petId/editar'
     | '/_authenticated/pets/$petId/ficha'
   fileRoutesById: FileRoutesById
 }
@@ -430,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAtendimentosIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pets/novo': {
+      id: '/_authenticated/pets/novo'
+      path: '/pets/novo'
+      fullPath: '/pets/novo'
+      preLoaderRoute: typeof AuthenticatedPetsNovoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/clientes/novo': {
       id: '/_authenticated/clientes/novo'
       path: '/clientes/novo'
@@ -458,8 +503,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPetsPetIdFichaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pets/$petId/editar': {
+      id: '/_authenticated/pets/$petId/editar'
+      path: '/pets/$petId/editar'
+      fullPath: '/pets/$petId/editar'
+      preLoaderRoute: typeof AuthenticatedPetsPetIdEditarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/clientes/$id/editar': {
+      id: '/_authenticated/clientes/$id/editar'
+      path: '/editar'
+      fullPath: '/clientes/$id/editar'
+      preLoaderRoute: typeof AuthenticatedClientesIdEditarRouteImport
+      parentRoute: typeof AuthenticatedClientesIdRoute
+    }
   }
 }
+
+interface AuthenticatedClientesIdRouteChildren {
+  AuthenticatedClientesIdEditarRoute: typeof AuthenticatedClientesIdEditarRoute
+}
+
+const AuthenticatedClientesIdRouteChildren: AuthenticatedClientesIdRouteChildren =
+  {
+    AuthenticatedClientesIdEditarRoute: AuthenticatedClientesIdEditarRoute,
+  }
+
+const AuthenticatedClientesIdRouteWithChildren =
+  AuthenticatedClientesIdRoute._addFileChildren(
+    AuthenticatedClientesIdRouteChildren,
+  )
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
@@ -475,10 +548,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
   AuthenticatedAtendimentosAtendIdRoute: typeof AuthenticatedAtendimentosAtendIdRoute
-  AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
+  AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRouteWithChildren
   AuthenticatedClientesNovoRoute: typeof AuthenticatedClientesNovoRoute
+  AuthenticatedPetsNovoRoute: typeof AuthenticatedPetsNovoRoute
   AuthenticatedAtendimentosIndexRoute: typeof AuthenticatedAtendimentosIndexRoute
   AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
+  AuthenticatedPetsPetIdEditarRoute: typeof AuthenticatedPetsPetIdEditarRoute
   AuthenticatedPetsPetIdFichaRoute: typeof AuthenticatedPetsPetIdFichaRoute
 }
 
@@ -496,10 +571,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
   AuthenticatedAtendimentosAtendIdRoute: AuthenticatedAtendimentosAtendIdRoute,
-  AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
+  AuthenticatedClientesIdRoute: AuthenticatedClientesIdRouteWithChildren,
   AuthenticatedClientesNovoRoute: AuthenticatedClientesNovoRoute,
+  AuthenticatedPetsNovoRoute: AuthenticatedPetsNovoRoute,
   AuthenticatedAtendimentosIndexRoute: AuthenticatedAtendimentosIndexRoute,
   AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,
+  AuthenticatedPetsPetIdEditarRoute: AuthenticatedPetsPetIdEditarRoute,
   AuthenticatedPetsPetIdFichaRoute: AuthenticatedPetsPetIdFichaRoute,
 }
 
