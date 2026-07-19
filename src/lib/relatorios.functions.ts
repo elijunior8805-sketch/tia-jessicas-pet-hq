@@ -76,7 +76,13 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .returns<any[]>();
 
     const rows = atendRows ?? [];
-    const faturamento = rows.reduce((s, r) => s + Number(r.valor_executado ?? 0), 0);
+    // Ticket usa valor executado; se ausente/zero, cai para o valor planejado.
+    const valorRow = (r: any) => {
+      const exec = Number(r.valor_executado ?? 0);
+      const plan = Number(r.valor_planejado ?? 0);
+      return exec > 0 ? exec : plan;
+    };
+    const faturamento = rows.reduce((s, r) => s + valorRow(r), 0);
     const faturamentoPlan = rows.reduce((s, r) => s + Number(r.valor_planejado ?? 0), 0);
     const taxaLevaTraz = rows.reduce((s, r) => s + Number(r.taxa_leva_traz ?? 0), 0);
     const descontos = rows.reduce((s, r) => s + Number(r.desconto ?? 0), 0);
