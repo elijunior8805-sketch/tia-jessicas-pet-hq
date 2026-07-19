@@ -46,6 +46,8 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [storagePath, setStoragePath] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [confirmado, setConfirmado] = useState(false);
 
   const isReceita = data.tipo === "receita";
   const numeroRaw = digits(telefone || "");
