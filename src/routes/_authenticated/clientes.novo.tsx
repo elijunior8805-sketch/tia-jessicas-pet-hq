@@ -15,6 +15,9 @@ import {
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { uploadPetFoto } from "@/lib/pet-foto-upload";
+import { uploadFoto } from "@/lib/foto-upload";
+import { FotoPicker } from "@/components/foto-picker";
+import { User } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/clientes/novo")({
   component: NovoClientePage,
@@ -26,6 +29,7 @@ function NovoClientePage() {
   const [incluirPet, setIncluirPet] = useState(true);
   const [pet, setPet] = useState<PetFormState>(emptyPetForm);
   const [petFoto, setPetFoto] = useState<File | null>(null);
+  const [clienteFoto, setClienteFoto] = useState<File | null>(null);
   const dirtyRef = useRef(false);
 
   useEffect(() => { dirtyRef.current = true; }, [cliente, pet, incluirPet, petFoto]);
@@ -50,6 +54,15 @@ function NovoClientePage() {
         .select("id")
         .single();
       if (error) throw error;
+
+      if (clienteFoto && novo?.id) {
+        try {
+          const path = await uploadFoto("clientes", novo.id, clienteFoto);
+          await supabase.from("clientes").update({ foto_url: path } as any).eq("id", novo.id);
+        } catch (e: any) {
+          toast.error("Cliente salvo, mas a foto falhou: " + (e?.message ?? ""));
+        }
+      }
 
       if (incluirPet && pet.nome.trim()) {
         const { data: novoPet, error: petErr } = await supabase
@@ -101,10 +114,22 @@ function NovoClientePage() {
         onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}
         className="space-y-6"
       >
-        <ClienteFormFields
-          value={cliente}
-          onChange={(patch) => setCliente((s) => ({ ...s, ...patch }))}
-        />
+        <Card className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-6 items-start">
+            <FotoPicker
+              onFileChange={setClienteFoto}
+              placeholderIcon={User}
+              size="md"
+              label="Foto do tutor"
+            />
+            <div className="flex-1 w-full">
+              <ClienteFormFields
+                value={cliente}
+                onChange={(patch) => setCliente((s) => ({ ...s, ...patch }))}
+              />
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-4 sm:p-6 border-primary/20 bg-primary/5">
           <div className="flex items-center justify-between gap-3 mb-4">
