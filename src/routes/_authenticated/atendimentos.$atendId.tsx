@@ -279,7 +279,7 @@ function AtendimentoDetalhe() {
         servicos_executados: executados,
         valor_executado: valorExec,
         pdf_path: pdf_path ?? atendimento.pdf_path,
-      }).eq("id", atendId);
+      } as never).eq("id", atendId);
       if (error) throw error;
 
       // agendamento → finalizado
