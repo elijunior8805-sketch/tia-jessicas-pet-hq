@@ -1074,7 +1074,10 @@ export type Database = {
           destinatarios: Json
           hora_envio: string
           id: string
+          kpis: Json
           nome: string
+          rodape_mensagem: string | null
+          titulo_mensagem: string | null
           ultima_execucao: string | null
           updated_at: string
         }
@@ -1085,7 +1088,10 @@ export type Database = {
           destinatarios?: Json
           hora_envio?: string
           id?: string
+          kpis?: Json
           nome: string
+          rodape_mensagem?: string | null
+          titulo_mensagem?: string | null
           ultima_execucao?: string | null
           updated_at?: string
         }
@@ -1096,7 +1102,10 @@ export type Database = {
           destinatarios?: Json
           hora_envio?: string
           id?: string
+          kpis?: Json
           nome?: string
+          rodape_mensagem?: string | null
+          titulo_mensagem?: string | null
           ultima_execucao?: string | null
           updated_at?: string
         }
