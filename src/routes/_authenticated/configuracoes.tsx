@@ -280,3 +280,229 @@ function ChangePasswordCard({ authEmail }: { authEmail: string }) {
   );
 }
 
+const DEFAULT_TEMPLATES = {
+  receber:
+    'Olá, {contraparte}! 🐾\n\nSegue o recibo de pagamento nº {numero} no valor de *{valor}* referente a "{descricao}".\n\nObrigada pela confiança! ✨\n{assinatura}',
+  pagar:
+    'Olá, {contraparte}!\n\nSegue o comprovante nº {numero} referente a "{descricao}" no valor de *{valor}*, pago em {data}.\n\nObrigada!\n{assinatura}',
+};
+
+const VAR_HINTS = [
+  { k: "{contraparte}", d: "Nome do cliente/fornecedor" },
+  { k: "{valor}", d: "Valor formatado em reais" },
+  { k: "{numero}", d: "Nº do recibo/comprovante" },
+  { k: "{descricao}", d: "Descrição do documento" },
+  { k: "{data}", d: "Data de hoje" },
+  { k: "{forma}", d: "Forma de pagamento" },
+  { k: "{assinatura}", d: "Assinatura configurada abaixo" },
+];
+
+function WhatsAppTemplatesCard() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["empresa-config-whatsapp"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("empresa_config")
+        .select("id, whatsapp_template_receber, whatsapp_template_pagar, whatsapp_assinatura")
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const [receber, setReceber] = useState("");
+  const [pagar, setPagar] = useState("");
+  const [assinatura, setAssinatura] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setReceber(data.whatsapp_template_receber ?? DEFAULT_TEMPLATES.receber);
+      setPagar(data.whatsapp_template_pagar ?? DEFAULT_TEMPLATES.pagar);
+      setAssinatura(data.whatsapp_assinatura ?? "");
+    }
+  }, [data]);
+
+  async function salvar() {
+    if (!data?.id) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("empresa_config")
+      .update({
+        whatsapp_template_receber: receber,
+        whatsapp_template_pagar: pagar,
+        whatsapp_assinatura: assinatura,
+      })
+      .eq("id", data.id);
+    setSaving(false);
+    if (error) {
+      toast.error("Não foi possível salvar", { description: error.message });
+      return;
+    }
+    toast.success("Modelos de WhatsApp salvos");
+    qc.invalidateQueries({ queryKey: ["empresa-config-whatsapp"] });
+  }
+
+  function restaurar(tipo: "receber" | "pagar") {
+    if (tipo === "receber") setReceber(DEFAULT_TEMPLATES.receber);
+    else setPagar(DEFAULT_TEMPLATES.pagar);
+  }
+
+  return (
+    <Card className="p-6 rounded-2xl border-border/60 max-w-2xl mt-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-primary">
+          <MessageCircle className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="font-display text-xl font-semibold text-primary">Mensagens do WhatsApp</h2>
+          <p className="text-sm text-muted-foreground">
+            Modelo enviado ao emitir recibo (Receber) ou comprovante (Pagar). Use as variáveis abaixo.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-muted/30 p-3 mb-5">
+        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+          Variáveis disponíveis
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {VAR_HINTS.map((v) => (
+            <Badge key={v.k} variant="outline" className="font-mono text-[11px]" title={v.d}>
+              {v.k}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="tpl-receber">Modelo para Receber (recibo)</Label>
+            <Button type="button" size="sm" variant="ghost" onClick={() => restaurar("receber")}>
+              Restaurar padrão
+            </Button>
+          </div>
+          <Textarea
+            id="tpl-receber"
+            value={receber}
+            onChange={(e) => setReceber(e.target.value)}
+            rows={7}
+            disabled={isLoading}
+            className="font-mono text-xs"
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="tpl-pagar">Modelo para Pagar (comprovante)</Label>
+            <Button type="button" size="sm" variant="ghost" onClick={() => restaurar("pagar")}>
+              Restaurar padrão
+            </Button>
+          </div>
+          <Textarea
+            id="tpl-pagar"
+            value={pagar}
+            onChange={(e) => setPagar(e.target.value)}
+            rows={7}
+            disabled={isLoading}
+            className="font-mono text-xs"
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="assinatura">Assinatura padrão</Label>
+          <Textarea
+            id="assinatura"
+            value={assinatura}
+            onChange={(e) => setAssinatura(e.target.value)}
+            rows={3}
+            disabled={isLoading}
+            placeholder="Ex.: Spa de Pet Tia Jéssica · (11) 90000-0000"
+          />
+          <p className="text-xs text-muted-foreground">
+            Substitui a variável <code className="font-mono">{"{assinatura}"}</code> nas mensagens.
+          </p>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button onClick={salvar} disabled={saving || isLoading}>
+            {saving ? "Salvando…" : "Salvar modelos"}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function RecibosEnviadosCard() {
+  const { data: envios = [], isLoading } = useQuery({
+    queryKey: ["recibos-enviados-recentes"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("recibos_enviados")
+        .select("id, tipo, numero_recibo, contraparte, valor, enviado_em, signed_url, telefone")
+        .order("enviado_em", { ascending: false })
+        .limit(20);
+      return data ?? [];
+    },
+  });
+
+  return (
+    <Card className="p-6 rounded-2xl border-border/60 max-w-2xl mt-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-primary">
+          <History className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="font-display text-xl font-semibold text-primary">Auditoria de envios</h2>
+          <p className="text-sm text-muted-foreground">
+            Últimos 20 recibos enviados por WhatsApp, com data/hora e link para reabrir.
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Carregando…</p>
+      ) : envios.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum recibo enviado ainda.</p>
+      ) : (
+        <ul className="divide-y divide-border/60">
+          {envios.map((e) => (
+            <li key={e.id} className="py-3 flex items-start justify-between gap-3 text-sm">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {e.tipo === "receita" ? "Recibo" : "Comprovante"}
+                  </Badge>
+                  <span className="font-mono text-xs text-muted-foreground">{e.numero_recibo}</span>
+                </div>
+                <div className="font-medium truncate">{e.contraparte || "—"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {format(new Date(e.enviado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  {e.telefone ? ` · ${e.telefone}` : ""}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="font-mono text-sm">
+                  {Number(e.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </div>
+                {e.signed_url && (
+                  <a
+                    href={e.signed_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs underline text-primary"
+                  >
+                    Abrir PDF
+                  </a>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
