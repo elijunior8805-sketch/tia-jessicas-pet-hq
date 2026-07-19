@@ -1089,6 +1089,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      excluir_atendimento: {
+        Args: { _atendimento_id: string }
+        Returns: undefined
+      }
       gerar_parcelas_compra: {
         Args: { _compra_id: string }
         Returns: undefined
