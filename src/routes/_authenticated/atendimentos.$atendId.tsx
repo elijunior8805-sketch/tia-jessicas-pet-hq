@@ -319,6 +319,7 @@ function AtendimentoDetalhe() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { data: myProfile } = useMyProfile();
+  const composer = useWhatsAppComposer();
 
   const { data: isAdmin } = useQuery({
     queryKey: ["is-admin", myProfile?.id],
