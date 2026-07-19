@@ -132,24 +132,30 @@ async function compartilharFotoWhats(path: string, whatsapp: string | null | und
 }
 
 function ResultadoFotoCard({
-  path, principal, disabled, onZoom, onStar, onRemove, onDownload, onShare, filename,
+  path, principal, disabled, hero, onZoom, onStar, onRemove, onDownload, onShare, filename,
 }: {
-  path: string; principal?: boolean; disabled?: boolean; filename: string;
+  path: string; principal?: boolean; disabled?: boolean; hero?: boolean; filename: string;
   onZoom: () => void; onStar?: () => void; onRemove?: () => void;
   onDownload: () => void; onShare?: () => void;
 }) {
   const { data: url } = useSignedUrl(path);
   return (
-    <div className={`group relative overflow-hidden rounded-xl border bg-muted ${principal ? "ring-2 ring-primary shadow-elegant" : ""}`}>
+    <div className={`group relative overflow-hidden bg-muted ${
+      hero
+        ? "rounded-2xl border-2 border-primary/40 ring-1 ring-gold/40 shadow-premium"
+        : `rounded-xl border ${principal ? "ring-2 ring-primary shadow-elegant" : ""}`
+    }`}>
       {url ? (
         <img
           src={url}
           alt={filename}
           onClick={onZoom}
-          className="aspect-square w-full object-cover cursor-zoom-in transition group-hover:scale-[1.02]"
+          className={`w-full object-cover cursor-zoom-in transition group-hover:scale-[1.02] ${
+            hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"
+          }`}
         />
       ) : (
-        <div className="aspect-square w-full bg-muted animate-pulse" />
+        <div className={`w-full bg-muted animate-pulse ${hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"}`} />
       )}
 
       {principal && (
