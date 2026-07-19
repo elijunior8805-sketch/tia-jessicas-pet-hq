@@ -320,6 +320,16 @@ export function useWhatsAppComposer() {
     open: boolean;
     payload: WhatsAppComposerPayload | null;
   }>({ open: false, payload: null });
+
+  useEffect(() => {
+    const handler = (payload: WhatsAppComposerPayload) =>
+      setState({ open: true, payload });
+    __waComposerListeners.add(handler);
+    return () => {
+      __waComposerListeners.delete(handler);
+    };
+  }, []);
+
   return {
     state,
     open: (payload: WhatsAppComposerPayload) =>
@@ -328,3 +338,20 @@ export function useWhatsAppComposer() {
     setOpen: (v: boolean) => setState((s) => ({ ...s, open: v })),
   };
 }
+
+// Barramento global — permite abrir o composer de funções top-level (fora de componentes).
+const __waComposerListeners = new Set<(p: WhatsAppComposerPayload) => void>();
+export function openWhatsAppComposerGlobal(payload: WhatsAppComposerPayload) {
+  if (__waComposerListeners.size === 0) {
+    // Fallback: abre wa.me diretamente se nenhum host montado
+    const tel = normalizarTelefoneBR(payload.telefone);
+    if (!tel.valido) {
+      toast.error("Telefone inválido");
+      return;
+    }
+    window.open(montarWaUrl(tel.e164, payload.mensagem), "_blank", "noopener,noreferrer");
+    return;
+  }
+  __waComposerListeners.forEach((fn) => fn(payload));
+}
+
