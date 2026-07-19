@@ -198,7 +198,7 @@ function AtendimentoDetalhe() {
 
   const confirmarEtapa = useMutation({
     mutationFn: async ({ num, extra }: { num: number; extra?: Record<string, any> }) => {
-      const map = { ...(atendimento?.etapas_status ?? {}) } as Record<string, EtapaStatus>;
+      const map = { ...((atendimento?.etapas_status as Record<string, EtapaStatus>) ?? {}) };
       map[String(num)] = {
         status: "concluida",
         confirmado_em: new Date().toISOString(),
