@@ -519,7 +519,124 @@ function CobrancaDialog({
           </TabsContent>
 
           <TabsContent value="acoes" className="space-y-4">
+            <Card className="border-primary/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Inbox className="h-4 w-4 text-primary" />
+                  Registrar resposta recebida do cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  rows={3}
+                  placeholder="Cole aqui a mensagem que o cliente enviou pelo WhatsApp…"
+                  value={respostaTexto}
+                  onChange={(e) => setRespostaTexto(e.target.value)}
+                />
+                <div className="grid md:grid-cols-3 gap-2">
+                  <div>
+                    <Label className="text-xs">Interpretar como</Label>
+                    <Select
+                      value={respostaIntencao}
+                      onValueChange={(v: any) => setRespostaIntencao(v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Detectar automaticamente</SelectItem>
+                        <SelectItem value="pagou">Pagou</SelectItem>
+                        <SelectItem value="promessa">Prometeu pagar</SelectItem>
+                        <SelectItem value="negociar">Quer negociar</SelectItem>
+                        <SelectItem value="contestou">Contestou a cobrança</SelectItem>
+                        <SelectItem value="sem_intencao">Só respondeu</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Data da promessa (opcional)</Label>
+                    <Input
+                      type="date"
+                      value={respostaData}
+                      onChange={(e) => setRespostaData(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Valor pago (opcional)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder={cobranca.saldo.toFixed(2)}
+                      value={respostaValor}
+                      onChange={(e) => setRespostaValor(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    disabled={salvandoResp || respostaTexto.trim().length === 0}
+                    onClick={async () => {
+                      setSalvandoResp(true);
+                      try {
+                        const r = await registrarResposta({
+                          data: {
+                            cobrancaId: cobranca.id,
+                            texto: respostaTexto.trim(),
+                            intencao: respostaIntencao,
+                            promessaData: respostaData || null,
+                            valorPago: respostaValor
+                              ? Number(respostaValor)
+                              : null,
+                            canal: "whatsapp",
+                          },
+                        });
+                        const label =
+                          {
+                            pagou: "pagamento",
+                            promessa: `promessa${
+                              r.promessaData
+                                ? " para " +
+                                  new Date(r.promessaData + "T00:00:00").toLocaleDateString(
+                                    "pt-BR",
+                                  )
+                                : ""
+                            }`,
+                            negociar: "negociação",
+                            contestou: "contestação (pausada para revisão)",
+                            sem_intencao: "resposta",
+                          }[r.intencao] ?? "resposta";
+                        toast.success(`Resposta registrada: ${label}`);
+                        setRespostaTexto("");
+                        setRespostaData("");
+                        setRespostaValor("");
+                        setRespostaIntencao("auto");
+                        invalidar();
+                        qHist.refetch();
+                      } catch (e: any) {
+                        toast.error(e?.message ?? "Falha ao registrar");
+                      } finally {
+                        setSalvandoResp(false);
+                      }
+                    }}
+                  >
+                    {salvandoResp ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Inbox className="h-4 w-4 mr-1" />
+                    )}
+                    Analisar e registrar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O sistema detecta intenção (pagamento, promessa, negociação, contestação),
+                  atualiza o status e a promessa de pagamento, e grava tudo no histórico.
+                </p>
+              </CardContent>
+            </Card>
+
             <div className="grid md:grid-cols-2 gap-3">
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">Promessa de pagamento</CardTitle>
