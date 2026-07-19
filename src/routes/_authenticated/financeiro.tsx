@@ -1146,6 +1146,9 @@ function FinanceiroPage() {
           <p className="text-sm text-muted-foreground lowercase">{periodoLabel}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={exportarPDF} className="gap-2">
+            <Download className="h-4 w-4" /> Exportar PDF
+          </Button>
           <TesteToolbar onChange={refreshAll} />
           <LancamentoManualDialog onCreated={refreshAll} />
         </div>
