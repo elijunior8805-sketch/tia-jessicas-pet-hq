@@ -8,13 +8,17 @@ import {
   listarExecucoes,
   marcarExecucaoEnviada,
   gerarExecucoesAgora,
+  KPIS_DISPONIVEIS,
   type AgendamentoDTO,
+  type KpiId,
 } from "@/lib/relatorios-agendamentos.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -28,7 +32,15 @@ type Destinatario = { nome: string; whatsapp: string };
 
 const empty = (): {
   id?: string; nome: string; hora_envio: string; destinatarios: Destinatario[]; ativo: boolean;
-} => ({ nome: "", hora_envio: "08:00", destinatarios: [{ nome: "", whatsapp: "" }], ativo: true });
+  kpis: KpiId[]; titulo_mensagem: string; rodape_mensagem: string;
+} => ({
+  nome: "", hora_envio: "08:00",
+  destinatarios: [{ nome: "", whatsapp: "" }],
+  ativo: true,
+  kpis: ["faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber"],
+  titulo_mensagem: "",
+  rodape_mensagem: "",
+});
 
 export function RelatoriosAgendamentos() {
   const qc = useQueryClient();
@@ -87,9 +99,14 @@ export function RelatoriosAgendamentos() {
 
   const editar = (a: AgendamentoDTO) => {
     setForm({
-      id: a.id, nome: a.nome, hora_envio: a.hora_envio.slice(0, 5),
+      id: a.id,
+      nome: a.nome,
+      hora_envio: a.hora_envio.slice(0, 5),
       destinatarios: a.destinatarios.length ? a.destinatarios : [{ nome: "", whatsapp: "" }],
       ativo: a.ativo,
+      kpis: (a.kpis && a.kpis.length ? a.kpis : ["faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber"]) as KpiId[],
+      titulo_mensagem: a.titulo_mensagem ?? "",
+      rodape_mensagem: a.rodape_mensagem ?? "",
     });
     setAberto(true);
   };
@@ -100,7 +117,20 @@ export function RelatoriosAgendamentos() {
       .map((d) => ({ nome: d.nome.trim(), whatsapp: d.whatsapp.replace(/\D/g, "") }))
       .filter((d) => d.nome && d.whatsapp);
     if (!dests.length) return toast.error("Adicione ao menos um destinatário");
-    mSalvar.mutate({ ...form, destinatarios: dests });
+    if (!form.kpis.length) return toast.error("Selecione ao menos um KPI");
+    mSalvar.mutate({
+      ...form,
+      destinatarios: dests,
+      titulo_mensagem: form.titulo_mensagem.trim() || null,
+      rodape_mensagem: form.rodape_mensagem.trim() || null,
+    } as any);
+  };
+
+  const toggleKpi = (id: KpiId) => {
+    setForm((f) => ({
+      ...f,
+      kpis: f.kpis.includes(id) ? f.kpis.filter((k) => k !== id) : [...f.kpis, id],
+    }));
   };
 
   return (
@@ -123,7 +153,7 @@ export function RelatoriosAgendamentos() {
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="w-4 h-4 mr-1" />Novo</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{form.id ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
                 <DialogDescription>
@@ -167,7 +197,54 @@ export function RelatoriosAgendamentos() {
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="space-y-2 border-t pt-3">
+                  <Label>KPIs na mensagem</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Escolha quais indicadores aparecem no resumo enviado por WhatsApp.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {KPIS_DISPONIVEIS.map((k) => {
+                      const on = form.kpis.includes(k.id);
+                      return (
+                        <label
+                          key={k.id}
+                          className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/50"
+                        >
+                          <Checkbox checked={on} onCheckedChange={() => toggleKpi(k.id)} />
+                          <span className="text-sm">{k.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {form.kpis.length} selecionado(s)
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <div>
+                    <Label>Título da mensagem (opcional)</Label>
+                    <Input
+                      maxLength={120}
+                      value={form.titulo_mensagem}
+                      onChange={(e) => setForm({ ...form, titulo_mensagem: e.target.value })}
+                      placeholder="Ex.: Spa da Tia Jéssica — Resumo do dia"
+                    />
+                  </div>
+                  <div>
+                    <Label>Rodapé (opcional)</Label>
+                    <Textarea
+                      maxLength={300}
+                      rows={2}
+                      value={form.rodape_mensagem}
+                      onChange={(e) => setForm({ ...form, rodape_mensagem: e.target.value })}
+                      placeholder="Ex.: Qualquer dúvida, estou à disposição. 🐾"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 border-t pt-3">
                   <Switch checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: v })} />
                   <Label>Ativo</Label>
                 </div>
@@ -201,7 +278,7 @@ export function RelatoriosAgendamentos() {
                     <Badge variant="outline">{a.hora_envio.slice(0, 5)}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {a.destinatarios.length} destinatário(s)
+                    {a.destinatarios.length} destinatário(s) · {(a.kpis?.length ?? 0)} KPI(s)
                     {a.ultima_execucao ? ` · última execução ${new Date(a.ultima_execucao + "T12:00:00").toLocaleDateString("pt-BR")}` : ""}
                   </div>
                 </div>

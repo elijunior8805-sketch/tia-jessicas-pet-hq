@@ -7,12 +7,31 @@ const DestinatarioSchema = z.object({
   whatsapp: z.string().trim().regex(/^\+?\d{10,15}$/, "WhatsApp inválido"),
 });
 
+export const KPIS_DISPONIVEIS = [
+  { id: "faturamento", label: "Faturamento" },
+  { id: "atendimentos", label: "Atendimentos (quantidade)" },
+  { id: "ticket", label: "Ticket médio" },
+  { id: "clientes", label: "Clientes atendidos" },
+  { id: "leva_traz", label: "Leva e traz (taxas)" },
+  { id: "a_receber", label: "A receber" },
+  { id: "atraso", label: "Valor em atraso" },
+] as const;
+
+const KpiIdSchema = z.enum([
+  "faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber", "atraso",
+]);
+
+export type KpiId = z.infer<typeof KpiIdSchema>;
+
 const AgendamentoSchema = z.object({
   id: z.string().uuid().optional(),
   nome: z.string().trim().min(1).max(80),
   hora_envio: z.string().regex(/^\d{2}:\d{2}$/),
   destinatarios: z.array(DestinatarioSchema).min(1).max(20),
   ativo: z.boolean().default(true),
+  kpis: z.array(KpiIdSchema).min(1).max(10),
+  titulo_mensagem: z.string().trim().max(120).optional().nullable(),
+  rodape_mensagem: z.string().trim().max(300).optional().nullable(),
 });
 
 export type AgendamentoDTO = {
@@ -22,6 +41,9 @@ export type AgendamentoDTO = {
   destinatarios: Array<{ nome: string; whatsapp: string }>;
   ativo: boolean;
   ultima_execucao: string | null;
+  kpis: KpiId[];
+  titulo_mensagem: string | null;
+  rodape_mensagem: string | null;
 };
 
 export type ExecucaoDTO = {
@@ -45,7 +67,7 @@ export const listarAgendamentos = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("relatorios_agendamentos")
-      .select(sel("id, nome, hora_envio, destinatarios, ativo, ultima_execucao"))
+      .select(sel("id, nome, hora_envio, destinatarios, ativo, ultima_execucao, kpis, titulo_mensagem, rodape_mensagem"))
       .order("created_at", { ascending: false })
       .returns<AgendamentoDTO[]>();
     if (error) throw new Error("Falha ao carregar agendamentos");
@@ -62,6 +84,9 @@ export const salvarAgendamento = createServerFn({ method: "POST" })
       hora_envio: data.hora_envio,
       destinatarios: data.destinatarios,
       ativo: data.ativo,
+      kpis: data.kpis,
+      titulo_mensagem: data.titulo_mensagem ?? null,
+      rodape_mensagem: data.rodape_mensagem ?? null,
       criado_por: userId,
     };
     if (data.id) {
@@ -162,7 +187,7 @@ export async function gerarExecucoesInterno(supabase: any) {
   // Agendamentos ativos que ainda não rodaram hoje
   const { data: agends, error } = await supabase
     .from("relatorios_agendamentos")
-    .select("id, nome, hora_envio, destinatarios, ultima_execucao, ativo")
+    .select("id, nome, hora_envio, destinatarios, ultima_execucao, ativo, kpis, titulo_mensagem, rodape_mensagem")
     .eq("ativo", true);
   if (error) throw new Error(error.message);
 
@@ -207,17 +232,34 @@ export async function gerarExecucoesInterno(supabase: any) {
       n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const diaFmt = new Date(`${dia}T12:00:00Z`).toLocaleDateString("pt-BR");
 
+    const kpisSel: string[] = Array.isArray(a.kpis) && a.kpis.length
+      ? a.kpis
+      : ["faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber"];
+
+    const linhaKpi = (id: string): string | null => {
+      switch (id) {
+        case "faturamento": return `• Faturamento: ${brl(faturamento)}`;
+        case "atendimentos": return `• Atendimentos: ${qtd}`;
+        case "ticket": return `• Ticket médio: ${brl(ticket)}`;
+        case "clientes": return `• Clientes atendidos: ${clientes}`;
+        case "leva_traz": return `• Leva e traz: ${brl(taxaLT)}`;
+        case "a_receber": return `• A receber: ${brl(aReceber)}`;
+        case "atraso": return `• Valor em atraso: ${brl(atraso)}`;
+        default: return null;
+      }
+    };
+
+    const titulo = (a.titulo_mensagem?.trim())
+      || `Spa da Tia Jéssica — Relatório diário (${diaFmt})`;
+    const rodape = (a.rodape_mensagem?.trim()) || "Detalhes completos no painel. 🐾";
+
     for (const d of (a.destinatarios ?? []) as Array<{ nome: string; whatsapp: string }>) {
+      const blocoKpis = kpisSel.map(linhaKpi).filter((s): s is string => !!s).join("\n");
       const mensagem =
-        `*Spa da Tia Jéssica — Relatório diário (${diaFmt})*\n\n` +
+        `*${titulo}*\n\n` +
         `Olá, ${d.nome}! Segue o resumo do dia:\n\n` +
-        `• Faturamento: ${brl(faturamento)}\n` +
-        `• Atendimentos: ${qtd}\n` +
-        `• Ticket médio: ${brl(ticket)}\n` +
-        `• Clientes atendidos: ${clientes}\n` +
-        `• Leva e traz: ${brl(taxaLT)}\n` +
-        `• A receber: ${brl(aReceber)}${atraso > 0 ? ` (atraso ${brl(atraso)})` : ""}\n\n` +
-        `Detalhes completos no painel. 🐾`;
+        `${blocoKpis}\n\n` +
+        `${rodape}`;
 
       const fone = d.whatsapp.replace(/\D/g, "");
       const wa_url = `https://wa.me/${fone.startsWith("55") ? fone : `55${fone}`}?text=${encodeURIComponent(mensagem)}`;
