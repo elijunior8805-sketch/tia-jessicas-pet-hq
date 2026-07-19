@@ -80,7 +80,7 @@ function ServicosPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("servicos")
-        .select("id, nome, categoria, descricao, valor, duracao_min, ativo, is_combo")
+        .select("id, nome, categoria, descricao, valor, duracao_min, ativo, is_combo, preco_a_partir")
         .order("nome");
       if (error) throw error;
       return data as Servico[];
