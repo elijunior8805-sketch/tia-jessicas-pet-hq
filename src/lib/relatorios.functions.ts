@@ -36,19 +36,20 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
     const deIso = `${data.de}T00:00:00.000Z`;
     const ateIso = `${data.ate}T23:59:59.999Z`;
 
-    // Atendimentos finalizados no período
+    // Atendimentos no período (por data_inicio) — inclui em andamento e finalizados,
+    // para que os relatórios reflitam a realidade do dia mesmo sem encerramento.
     const { data: atendRows, error: atErr } = await supabase
       .from("atendimentos")
       .select(
         sel(
-          "id, cliente_id, data_fim, valor_planejado, valor_executado, taxa_leva_traz, desconto, encerrado_em, servicos_executados, clientes:cliente_id(nome)"
+          "id, cliente_id, data_inicio, data_fim, valor_planejado, valor_executado, taxa_leva_traz, desconto, encerrado_em, finalizado, servicos_executados, servicos_planejados, clientes:cliente_id(nome)"
         )
       )
-      .gte("encerrado_em", deIso)
-      .lte("encerrado_em", ateIso)
-      .not("encerrado_em", "is", null)
+      .gte("data_inicio", deIso)
+      .lte("data_inicio", ateIso)
       .returns<any[]>();
     if (atErr) throw new Error("Falha ao carregar atendimentos");
+
 
     // Pagamentos em aberto na data corrente (snapshot)
     const { data: pagRows, error: pgErr } = await supabase
@@ -97,10 +98,10 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .filter((p) => p.vencimento && p.vencimento < hoje)
       .reduce((s, p) => s + Math.max(0, Number(p.valor_total ?? 0) - Number(p.valor_pago ?? 0)), 0);
 
-    // Série diária
+    // Série diária (usa encerrado_em, senão data_inicio)
     const serieMap = new Map<string, { faturamento: number; atendimentos: number }>();
     for (const r of rows) {
-      const dia = String(r.encerrado_em ?? r.data_fim ?? "").slice(0, 10);
+      const dia = String(r.encerrado_em ?? r.data_fim ?? r.data_inicio ?? "").slice(0, 10);
       if (!dia) continue;
       const cur = serieMap.get(dia) ?? { faturamento: 0, atendimentos: 0 };
       cur.faturamento += valorRow(r);
@@ -125,15 +126,18 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
 
-    // Serviços mais executados
+    // Serviços — considera executados; se vazio, cai para planejados
     const svcMap = new Map<string, { qtd: number; total: number }>();
     for (const r of rows) {
-      const arr = Array.isArray(r.servicos_executados) ? r.servicos_executados : [];
+      const execArr = Array.isArray(r.servicos_executados) ? r.servicos_executados : [];
+      const arr = execArr.length > 0
+        ? execArr
+        : (Array.isArray(r.servicos_planejados) ? r.servicos_planejados : []);
       for (const s of arr) {
         const nome = String(s?.nome ?? "—").trim() || "—";
         const cur = svcMap.get(nome) ?? { qtd: 0, total: 0 };
         cur.qtd += Number(s?.quantidade ?? 1);
-        cur.total += Number(s?.preco ?? s?.valor ?? 0);
+        cur.total += Number(s?.valor_total ?? s?.preco ?? s?.valor ?? s?.valor_unit ?? 0);
         svcMap.set(nome, cur);
       }
     }
@@ -142,12 +146,14 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .sort((a, b) => b.qtd - a.qtd)
       .slice(0, 10);
 
+    const finalizadosCount = rows.filter((r) => r.encerrado_em || r.finalizado).length;
+    const totalAtend = rows.length || 1;
     const indicadores: IndicadoresDTO = {
       periodo: { de: data.de, ate: data.ate },
       faturamento,
       faturamento_planejado: faturamentoPlan,
-      ticket_medio: rows.length ? faturamento / rows.length : 0,
-      atendimentos_finalizados: rows.length,
+      ticket_medio: rows.length ? faturamento / totalAtend : 0,
+      atendimentos_finalizados: finalizadosCount,
       atendimentos_cancelados: (agRows ?? []).length,
       clientes_atendidos: clientesSet.size,
       novos_clientes: (novosCli as any)?.length ?? 0,
@@ -156,6 +162,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       taxa_leva_traz_total: taxaLevaTraz,
       descontos_total: descontos,
     };
+
 
     return { indicadores, serie, rankingClientes, servicos };
   });
@@ -184,23 +191,24 @@ export const listarLinhasExport = createServerFn({ method: "POST" })
       .from("atendimentos")
       .select(
         sel(
-          "encerrado_em, data_fim, valor_planejado, valor_executado, desconto, taxa_leva_traz, pagamento_status, servicos_executados, clientes:cliente_id(nome), pets:pet_id(nome)"
+          "data_inicio, encerrado_em, data_fim, valor_planejado, valor_executado, desconto, taxa_leva_traz, pagamento_status, servicos_executados, servicos_planejados, clientes:cliente_id(nome), pets:pet_id(nome)"
         )
       )
-      .gte("encerrado_em", deIso)
-      .lte("encerrado_em", ateIso)
-      .not("encerrado_em", "is", null)
-      .order("encerrado_em", { ascending: true })
+      .gte("data_inicio", deIso)
+      .lte("data_inicio", ateIso)
+      .order("data_inicio", { ascending: true })
       .limit(5000)
       .returns<any[]>();
     if (error) throw new Error("Falha ao carregar linhas");
 
     const linhas: LinhaExport[] = (rows ?? []).map((r) => {
-      const servicos = Array.isArray(r.servicos_executados)
-        ? r.servicos_executados.map((s: any) => s?.nome).filter(Boolean).join(" + ")
-        : "";
+      const execArr = Array.isArray(r.servicos_executados) ? r.servicos_executados : [];
+      const arr = execArr.length > 0
+        ? execArr
+        : (Array.isArray(r.servicos_planejados) ? r.servicos_planejados : []);
+      const servicos = arr.map((s: any) => s?.nome).filter(Boolean).join(" + ");
       return {
-        data: String(r.encerrado_em ?? r.data_fim ?? "").slice(0, 10),
+        data: String(r.encerrado_em ?? r.data_fim ?? r.data_inicio ?? "").slice(0, 10),
         cliente: r.clientes?.nome ?? "",
         pet: r.pets?.nome ?? "",
         servicos,
@@ -213,3 +221,4 @@ export const listarLinhasExport = createServerFn({ method: "POST" })
     });
     return { linhas };
   });
+
