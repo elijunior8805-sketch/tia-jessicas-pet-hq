@@ -98,10 +98,10 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .filter((p) => p.vencimento && p.vencimento < hoje)
       .reduce((s, p) => s + Math.max(0, Number(p.valor_total ?? 0) - Number(p.valor_pago ?? 0)), 0);
 
-    // Série diária
+    // Série diária (usa encerrado_em, senão data_inicio)
     const serieMap = new Map<string, { faturamento: number; atendimentos: number }>();
     for (const r of rows) {
-      const dia = String(r.encerrado_em ?? r.data_fim ?? "").slice(0, 10);
+      const dia = String(r.encerrado_em ?? r.data_fim ?? r.data_inicio ?? "").slice(0, 10);
       if (!dia) continue;
       const cur = serieMap.get(dia) ?? { faturamento: 0, atendimentos: 0 };
       cur.faturamento += valorRow(r);
@@ -126,15 +126,18 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
 
-    // Serviços mais executados
+    // Serviços — considera executados; se vazio, cai para planejados
     const svcMap = new Map<string, { qtd: number; total: number }>();
     for (const r of rows) {
-      const arr = Array.isArray(r.servicos_executados) ? r.servicos_executados : [];
+      const execArr = Array.isArray(r.servicos_executados) ? r.servicos_executados : [];
+      const arr = execArr.length > 0
+        ? execArr
+        : (Array.isArray(r.servicos_planejados) ? r.servicos_planejados : []);
       for (const s of arr) {
         const nome = String(s?.nome ?? "—").trim() || "—";
         const cur = svcMap.get(nome) ?? { qtd: 0, total: 0 };
         cur.qtd += Number(s?.quantidade ?? 1);
-        cur.total += Number(s?.preco ?? s?.valor ?? 0);
+        cur.total += Number(s?.valor_total ?? s?.preco ?? s?.valor ?? s?.valor_unit ?? 0);
         svcMap.set(nome, cur);
       }
     }
@@ -143,12 +146,14 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .sort((a, b) => b.qtd - a.qtd)
       .slice(0, 10);
 
+    const finalizadosCount = rows.filter((r) => r.encerrado_em || r.finalizado).length;
+    const totalAtend = rows.length || 1;
     const indicadores: IndicadoresDTO = {
       periodo: { de: data.de, ate: data.ate },
       faturamento,
       faturamento_planejado: faturamentoPlan,
-      ticket_medio: rows.length ? faturamento / rows.length : 0,
-      atendimentos_finalizados: rows.length,
+      ticket_medio: rows.length ? faturamento / totalAtend : 0,
+      atendimentos_finalizados: finalizadosCount,
       atendimentos_cancelados: (agRows ?? []).length,
       clientes_atendidos: clientesSet.size,
       novos_clientes: (novosCli as any)?.length ?? 0,
@@ -157,6 +162,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       taxa_leva_traz_total: taxaLevaTraz,
       descontos_total: descontos,
     };
+
 
     return { indicadores, serie, rankingClientes, servicos };
   });
