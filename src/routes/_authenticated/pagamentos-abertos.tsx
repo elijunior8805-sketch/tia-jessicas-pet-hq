@@ -44,9 +44,13 @@ function statusBadge(status: string, diasAtraso: number) {
 function PagamentosAbertosPage() {
   const listar = useServerFn(listarPagamentosAbertos);
   const registrar = useServerFn(registrarContatoCobranca);
+  const registrarLote = useServerFn(registrarContatoCobrancaLote);
   const qc = useQueryClient();
   const [busca, setBusca] = useState("");
   const [somenteAtrasados, setSomenteAtrasados] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [loteAberto, setLoteAberto] = useState(false);
+  const [loteResultado, setLoteResultado] = useState<CobrancaLoteItem[] | null>(null);
 
   const query = useQuery({
     queryKey: ["pagamentos-abertos", { somenteAtrasados }],
@@ -63,8 +67,20 @@ function PagamentosAbertosPage() {
     onError: (e: any) => toast.error(e?.message ?? "Falha ao registrar"),
   });
 
+  const loteMut = useMutation({
+    mutationFn: (ids: string[]) => registrarLote({ data: { pagamentoIds: ids } }),
+    onSuccess: (r) => {
+      setLoteResultado(r.resultados);
+      toast.success(`${r.totalOk} cobrança(s) registrada(s)${r.totalFalha ? `, ${r.totalFalha} falha(s)` : ""}`);
+      setSelecionados(new Set());
+      qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha na cobrança em lote"),
+  });
+
   const itens = query.data?.itens ?? [];
   const resumo = query.data?.resumo;
+
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
