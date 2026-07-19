@@ -61,8 +61,8 @@ function FichaOperacional() {
     alertas.push(`Temperamento: ${pet.temperamento}`);
   }
   if (pet.alergias) alertas.push(`Alergias: ${pet.alergias}`);
-  if (pet.condicoes_saude) alertas.push(`Saúde: ${pet.condicoes_saude}`);
-  if (pet.observacoes_manejo) alertas.push(`Manejo: ${pet.observacoes_manejo}`);
+  if ((pet as any).cuidados_saude) alertas.push(`Saúde: ${(pet as any).cuidados_saude}`);
+  if ((pet as any).observacoes) alertas.push(`Observações: ${(pet as any).observacoes}`);
 
   return (
     <PageShell>
