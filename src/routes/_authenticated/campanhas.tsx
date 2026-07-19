@@ -308,8 +308,6 @@ function CampanhasPage() {
           }
         }}
       />
-        payload={composer.state.payload}
-      />
     </div>
   );
 }
