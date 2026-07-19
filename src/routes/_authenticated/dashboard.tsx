@@ -12,6 +12,7 @@ import {
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, eachDayOfInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useMyProfile, firstName } from "@/hooks/use-my-profile";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
