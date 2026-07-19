@@ -104,10 +104,10 @@ function DashboardPage() {
 
   const hoje = new Date();
   const periodos = [
-    ["hoje", "Hoje"],
-    ["semana", "Semana"],
-    ["mes", "Mês"],
-    ["personalizado", "Personalizado"],
+    ["hoje", "Hoje", "Hoje"],
+    ["semana", "Semana", "Sem."],
+    ["mes", "Mês", "Mês"],
+    ["personalizado", "Personalizado", "Custom"],
   ] as const;
 
   return (
