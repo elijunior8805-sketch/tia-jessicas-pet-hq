@@ -766,14 +766,24 @@ function AgendamentoRow({
 
 // ---------- Novo agendamento ----------
 
+type ItemServico = {
+  servico_id: string;
+  nome: string;
+  valor_unit: number;
+  duracao_min: number | null;
+};
+
 const novoSchema = z.object({
   cliente_id: z.string().uuid("Selecione um cliente"),
   pet_id: z.string().uuid("Selecione um pet"),
-  servico_id: z.string().uuid("Selecione um serviço"),
+  itens: z.array(z.object({
+    servico_id: z.string().uuid(),
+    nome: z.string(),
+    valor_unit: z.number().nonnegative(),
+    duracao_min: z.number().int().positive().nullable(),
+  })).min(1, "Adicione ao menos um serviço"),
   data: z.string().min(1, "Informe a data"),
   hora: z.string().min(1, "Informe a hora"),
-  duracao_min: z.number().int().positive().nullable(),
-  valor_previsto: z.number().nonnegative(),
   taxa_leva_traz: z.number().nonnegative(),
   status: z.enum(["agendado","confirmado","aguardando","em_atendimento","finalizado","cancelado","nao_compareceu"]),
   observacoes: z.string().max(1000).optional().or(z.literal("")),
@@ -788,11 +798,10 @@ function NovoAgendamentoDialog({
   const qc = useQueryClient();
   const [clienteId, setClienteId] = useState<string>("");
   const [petId, setPetId] = useState<string>("");
-  const [servicoId, setServicoId] = useState<string>("");
+  const [itens, setItens] = useState<ItemServico[]>([]);
+  const [servicoAdd, setServicoAdd] = useState<string>("");
   const [data, setData] = useState(defaultDate);
   const [hora, setHora] = useState("09:00");
-  const [duracao, setDuracao] = useState<string>("");
-  const [valor, setValor] = useState<string>("");
   const [taxa, setTaxa] = useState<string>("0");
   const [status, setStatus] = useState<Status>("agendado");
   const [obs, setObs] = useState("");
@@ -800,9 +809,10 @@ function NovoAgendamentoDialog({
 
   // reset ao abrir
   useMemoReset(open, () => {
-    setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? ""); setServicoId("");
+    setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
+    setItens([]); setServicoAdd("");
     setData(defaultDate); setHora("09:00");
-    setDuracao(""); setValor(""); setTaxa("0");
+    setTaxa("0");
     setStatus("agendado"); setObs(""); setClienteSearch("");
   });
 
@@ -817,7 +827,6 @@ function NovoAgendamentoDialog({
       }
       const { data } = await q;
       let rows = data ?? [];
-      // Garante que o cliente pré-selecionado apareça na lista
       if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
         const { data: extra } = await supabase
           .from("clientes")
@@ -857,14 +866,40 @@ function NovoAgendamentoDialog({
     },
   });
 
-  // Ao escolher serviço, preencher valor/duração se vazios
-  function onSelectServico(id: string) {
-    setServicoId(id);
-    const s = servicos?.find((x) => x.id === id);
-    if (s) {
-      if (!valor) setValor(String(s.valor ?? ""));
-      if (!duracao) setDuracao(String(s.duracao_min ?? ""));
+  // Totais calculados
+  const totalValor = useMemo(
+    () => itens.reduce((s, it) => s + Number(it.valor_unit ?? 0), 0),
+    [itens],
+  );
+  const totalDuracao = useMemo(
+    () => itens.reduce((s, it) => s + Number(it.duracao_min ?? 0), 0),
+    [itens],
+  );
+
+  function adicionarServico(id: string) {
+    if (!id) return;
+    if (itens.some((it) => it.servico_id === id)) {
+      toast.info("Este serviço já foi adicionado");
+      setServicoAdd("");
+      return;
     }
+    const s = servicos?.find((x) => x.id === id);
+    if (!s) return;
+    setItens((prev) => [...prev, {
+      servico_id: s.id,
+      nome: s.nome,
+      valor_unit: Number(s.valor ?? 0),
+      duracao_min: s.duracao_min ?? null,
+    }]);
+    setServicoAdd("");
+  }
+
+  function removerItem(idx: number) {
+    setItens((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function alterarItem(idx: number, patch: Partial<ItemServico>) {
+    setItens((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
   }
 
   const mutation = useMutation({
@@ -872,27 +907,41 @@ function NovoAgendamentoDialog({
       const parsed = novoSchema.parse({
         cliente_id: clienteId,
         pet_id: petId,
-        servico_id: servicoId,
+        itens,
         data, hora,
-        duracao_min: duracao ? Number(duracao) : null,
-        valor_previsto: valor ? Number(valor) : 0,
         taxa_leva_traz: taxa ? Number(taxa) : 0,
         status,
         observacoes: obs,
       });
-      const { error } = await supabase.from("agendamentos").insert({
+
+      // Serviço principal = primeiro item (mantém compat com servico_id)
+      const principal = parsed.itens[0];
+
+      const { data: novo, error } = await supabase.from("agendamentos").insert({
         cliente_id: parsed.cliente_id,
         pet_id: parsed.pet_id,
-        servico_id: parsed.servico_id,
+        servico_id: principal.servico_id,
         data: parsed.data,
         hora: parsed.hora,
-        duracao_min: parsed.duracao_min ?? undefined,
-        valor_previsto: parsed.valor_previsto,
+        duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
+        valor_previsto: totalValor,
         taxa_leva_traz: parsed.taxa_leva_traz,
         status: parsed.status,
         observacoes: parsed.observacoes || null,
-      });
+      }).select("id").single();
       if (error) throw error;
+
+      // Insere todos os itens (inclusive o principal) para simetria
+      const rowsItens = parsed.itens.map((it, i) => ({
+        agendamento_id: novo.id,
+        servico_id: it.servico_id,
+        nome: it.nome,
+        valor_unit: it.valor_unit,
+        duracao_min: it.duracao_min,
+        ordem: i,
+      }));
+      const { error: errItens } = await supabase.from("agendamento_servicos").insert(rowsItens);
+      if (errItens) throw errItens;
     },
     onSuccess: () => {
       toast.success("Agendamento criado");
@@ -906,13 +955,15 @@ function NovoAgendamentoDialog({
     },
   });
 
+  const servicosDisponiveis = (servicos ?? []).filter((s) => !itens.some((it) => it.servico_id === s.id));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display">Novo agendamento</DialogTitle>
           <DialogDescription>
-            Vincule cliente, pet e serviço. O valor e a duração podem ser ajustados.
+            Adicione um ou mais serviços — o valor e a duração totais são calculados automaticamente.
           </DialogDescription>
         </DialogHeader>
 
@@ -956,19 +1007,66 @@ function NovoAgendamentoDialog({
             )}
           </div>
 
-          <div className="sm:col-span-2">
-            <Label>Serviço *</Label>
-            <Select value={servicoId || undefined} onValueChange={onSelectServico}>
-              <SelectTrigger><SelectValue placeholder="Selecionar serviço" /></SelectTrigger>
-              <SelectContent>
-                {(servicos ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.nome} {s.valor != null ? `· ${brl(Number(s.valor))}` : ""}
-                    {s.duracao_min ? ` · ${s.duracao_min}min` : ""}
-                  </SelectItem>
+          <div className="sm:col-span-2 space-y-2">
+            <Label>Serviços * <span className="text-muted-foreground text-xs">(um ou mais)</span></Label>
+            <div className="flex gap-2">
+              <Select value={servicoAdd || undefined} onValueChange={adicionarServico}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder={servicosDisponiveis.length ? "Adicionar serviço…" : "Todos os serviços já adicionados"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicosDisponiveis.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.nome} {s.valor != null ? `· ${brl(Number(s.valor))}` : ""}
+                      {s.duracao_min ? ` · ${s.duracao_min}min` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {itens.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">Nenhum serviço adicionado ainda.</p>
+            ) : (
+              <div className="space-y-2 rounded-md border border-border/60 p-2 bg-muted/20">
+                {itens.map((it, idx) => (
+                  <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_90px_80px_auto] gap-2 items-center">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{it.nome}</div>
+                      {idx === 0 && <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</div>}
+                    </div>
+                    <Input
+                      type="number" min={0} step="0.01"
+                      value={it.valor_unit}
+                      onChange={(e) => alterarItem(idx, { valor_unit: Number(e.target.value || 0) })}
+                      aria-label="Valor"
+                    />
+                    <Input
+                      type="number" min={0}
+                      value={it.duracao_min ?? ""}
+                      onChange={(e) => alterarItem(idx, { duracao_min: e.target.value ? Number(e.target.value) : null })}
+                      placeholder="min"
+                      aria-label="Duração"
+                    />
+                    <Button
+                      type="button" variant="ghost" size="sm"
+                      onClick={() => removerItem(idx)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Remover
+                    </Button>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+                <div className="flex flex-wrap justify-end gap-4 pt-2 border-t border-border/60 text-sm">
+                  <span className="text-muted-foreground">
+                    Duração total: <strong className="text-foreground">{totalDuracao} min</strong>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Valor total: <strong className="text-primary">{brl(totalValor)}</strong>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -978,15 +1076,6 @@ function NovoAgendamentoDialog({
           <div>
             <Label>Hora *</Label>
             <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
-          </div>
-
-          <div>
-            <Label>Duração (min)</Label>
-            <Input type="number" min={0} value={duracao} onChange={(e) => setDuracao(e.target.value)} />
-          </div>
-          <div>
-            <Label>Valor previsto (R$)</Label>
-            <Input type="number" min={0} step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
           </div>
 
           <div>
@@ -1013,8 +1102,8 @@ function NovoAgendamentoDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? "Salvando…" : "Criar agendamento"}
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || itens.length === 0}>
+            {mutation.isPending ? "Salvando…" : `Criar agendamento${itens.length > 1 ? ` (${itens.length} serviços)` : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>
