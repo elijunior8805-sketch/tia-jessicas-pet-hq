@@ -407,19 +407,19 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           >
             <Download className="h-4 w-4 mr-1" /> Baixar PDF
           </Button>
-          {signedUrl && (
+          {publicUrl && (
             <Button variant="ghost" asChild className="w-full sm:w-auto">
-              <a href={signedUrl} target="_blank" rel="noreferrer">
+              <a href={publicUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4 mr-1" /> Abrir link
               </a>
             </Button>
           )}
           <Button
             onClick={enviarWhats}
-            disabled={!numero || uploading || !confirmado}
+            disabled={!numero || enviando || !confirmado}
             className="w-full sm:w-auto"
           >
-            {uploading ? (
+            {enviando ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (
               <MessageCircle className="h-4 w-4 mr-1" />
