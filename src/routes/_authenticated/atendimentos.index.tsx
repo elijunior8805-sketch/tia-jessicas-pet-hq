@@ -12,6 +12,7 @@ import {
   AlertTriangle, Sparkles, ListChecks,
 } from "lucide-react";
 import { brl, itemFromServico } from "@/lib/atendimento-utils";
+import { useSignedUrl } from "@/lib/use-signed-url";
 
 export const Route = createFileRoute("/_authenticated/atendimentos/")({
   component: AtendimentosPainel,
