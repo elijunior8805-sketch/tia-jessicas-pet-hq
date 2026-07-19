@@ -140,10 +140,16 @@ function AtendimentoDetalhe() {
     queryFn: async () => {
       const { data } = await supabase
         .from("empresa_config")
-        .select("nome, cnpj, telefone, endereco")
+        .select("nome_fantasia, cnpj, telefone, endereco")
         .limit(1)
         .maybeSingle();
-      return data;
+      if (!data) return null;
+      return {
+        nome: (data as any).nome_fantasia as string | null,
+        cnpj: (data as any).cnpj as string | null,
+        telefone: (data as any).telefone as string | null,
+        endereco: (data as any).endereco as string | null,
+      };
     },
   });
 
