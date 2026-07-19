@@ -308,12 +308,14 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           </p>
         </div>
 
-        {!numero && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-            Sem WhatsApp/telefone cadastrado para envio automático.
-          </p>
+          {!numero && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              Sem WhatsApp/telefone cadastrado para envio automático.
+            </p>
+          )}
           </div>
         </div>
+
 
 
 
