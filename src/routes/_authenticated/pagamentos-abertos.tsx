@@ -352,9 +352,17 @@ function PagamentosAbertosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+        onSent={() => qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] })}
+      />
     </div>
   );
 }
+
 
 
 function KpiCard({
