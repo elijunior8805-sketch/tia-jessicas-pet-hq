@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { Download, TrendingUp, Users, Wallet, AlertCircle, Sparkles, PawPrint, CircleDollarSign } from "lucide-react";
 import { toast } from "sonner";
+import { RelatoriosAgendamentos } from "@/components/relatorios-agendamentos";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
@@ -255,6 +256,8 @@ function RelatoriosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <RelatoriosAgendamentos />
     </div>
   );
 }

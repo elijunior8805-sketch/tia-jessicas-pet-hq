@@ -31,6 +31,7 @@ import { Route as AuthenticatedPetsNovoRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authenticated/clientes.novo'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
+import { Route as ApiPublicHooksRelatoriosDiariosRouteImport } from './routes/api/public/hooks/relatorios-diarios'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
 import { Route as AuthenticatedPetsPetIdEditarRouteImport } from './routes/_authenticated/pets.$petId.editar'
 import { Route as AuthenticatedClientesIdEditarRouteImport } from './routes/_authenticated/clientes.$id.editar'
@@ -152,6 +153,12 @@ const AuthenticatedAtendimentosAtendIdRoute =
     path: '/atendimentos/$atendId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicHooksRelatoriosDiariosRoute =
+  ApiPublicHooksRelatoriosDiariosRouteImport.update({
+    id: '/api/public/hooks/relatorios-diarios',
+    path: '/api/public/hooks/relatorios-diarios',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedPetsPetIdFichaRoute =
   AuthenticatedPetsPetIdFichaRouteImport.update({
     id: '/pets/$petId/ficha',
@@ -196,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -222,6 +230,7 @@ export interface FileRoutesByTo {
   '/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -250,6 +259,7 @@ export interface FileRoutesById {
   '/_authenticated/clientes/$id/editar': typeof AuthenticatedClientesIdEditarRoute
   '/_authenticated/pets/$petId/editar': typeof AuthenticatedPetsPetIdEditarRoute
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
+  '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
+    | '/api/public/hooks/relatorios-diarios'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/clientes/$id/editar'
     | '/pets/$petId/editar'
     | '/pets/$petId/ficha'
+    | '/api/public/hooks/relatorios-diarios'
   id:
     | '__root__'
     | '/'
@@ -331,6 +343,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes/$id/editar'
     | '/_authenticated/pets/$petId/editar'
     | '/_authenticated/pets/$petId/ficha'
+    | '/api/public/hooks/relatorios-diarios'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -338,6 +351,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicHooksRelatoriosDiariosRoute: typeof ApiPublicHooksRelatoriosDiariosRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -496,6 +510,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAtendimentosAtendIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/relatorios-diarios': {
+      id: '/api/public/hooks/relatorios-diarios'
+      path: '/api/public/hooks/relatorios-diarios'
+      fullPath: '/api/public/hooks/relatorios-diarios'
+      preLoaderRoute: typeof ApiPublicHooksRelatoriosDiariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/pets/$petId/ficha': {
       id: '/_authenticated/pets/$petId/ficha'
       path: '/pets/$petId/ficha'
@@ -588,6 +609,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicHooksRelatoriosDiariosRoute: ApiPublicHooksRelatoriosDiariosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
