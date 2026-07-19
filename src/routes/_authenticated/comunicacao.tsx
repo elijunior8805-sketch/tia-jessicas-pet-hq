@@ -33,6 +33,7 @@ import {
 import { format, differenceInDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { sugerirMensagemWhatsApp } from "@/lib/comunicacao.functions";
+import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
   component: ComunicacaoPage,
