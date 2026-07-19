@@ -467,7 +467,7 @@ function AgendamentoRow({
             <div className="ml-auto max-w-[85%] rounded-lg bg-[#dcf8c6] px-3 py-2 shadow-sm">
               <Textarea
                 value={previewText}
-                onChange={(e) => setPreviewText(e.target.value)}
+                onChange={(e) => updatePreviewText(e.target.value)}
                 rows={10}
                 className="min-h-[180px] resize-none border-0 bg-transparent p-0 text-sm text-foreground shadow-none focus-visible:ring-0 whitespace-pre-wrap"
               />
