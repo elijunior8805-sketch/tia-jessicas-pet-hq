@@ -186,7 +186,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     }
     const link = await gerarLinkCompartilhavel();
     if (!link) return;
-    const texto = `${mensagem}\n\n${link.url}`;
+    const texto = `${mensagemFinal}\n\n${link.url}`;
     await registrarEnvio(link.url, link.path);
     window.open(
       `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`,
