@@ -98,6 +98,8 @@ type Parc = {
 type ReciboState = {
   data: ReciboData;
   telefone: string | null;
+  referenciaId: string;
+
 };
 
 const brl = (v: number) =>
