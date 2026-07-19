@@ -7,12 +7,31 @@ const DestinatarioSchema = z.object({
   whatsapp: z.string().trim().regex(/^\+?\d{10,15}$/, "WhatsApp inválido"),
 });
 
+export const KPIS_DISPONIVEIS = [
+  { id: "faturamento", label: "Faturamento" },
+  { id: "atendimentos", label: "Atendimentos (quantidade)" },
+  { id: "ticket", label: "Ticket médio" },
+  { id: "clientes", label: "Clientes atendidos" },
+  { id: "leva_traz", label: "Leva e traz (taxas)" },
+  { id: "a_receber", label: "A receber" },
+  { id: "atraso", label: "Valor em atraso" },
+] as const;
+
+const KpiIdSchema = z.enum([
+  "faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber", "atraso",
+]);
+
+export type KpiId = z.infer<typeof KpiIdSchema>;
+
 const AgendamentoSchema = z.object({
   id: z.string().uuid().optional(),
   nome: z.string().trim().min(1).max(80),
   hora_envio: z.string().regex(/^\d{2}:\d{2}$/),
   destinatarios: z.array(DestinatarioSchema).min(1).max(20),
   ativo: z.boolean().default(true),
+  kpis: z.array(KpiIdSchema).min(1).max(10),
+  titulo_mensagem: z.string().trim().max(120).optional().nullable(),
+  rodape_mensagem: z.string().trim().max(300).optional().nullable(),
 });
 
 export type AgendamentoDTO = {
@@ -22,6 +41,9 @@ export type AgendamentoDTO = {
   destinatarios: Array<{ nome: string; whatsapp: string }>;
   ativo: boolean;
   ultima_execucao: string | null;
+  kpis: KpiId[];
+  titulo_mensagem: string | null;
+  rodape_mensagem: string | null;
 };
 
 export type ExecucaoDTO = {
