@@ -217,88 +217,176 @@ function AgendaPage() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar"),
   });
 
+  const [busca, setBusca] = useState("");
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return agendamentos ?? [];
+    return (agendamentos ?? []).filter((a: any) => {
+      const bag = [
+        a.clientes?.nome, a.pets?.nome, a.servicos?.nome,
+        a.clientes?.whatsapp, a.pets?.raca, a.pets?.porte,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return bag.includes(q);
+    });
+  }, [agendamentos, busca]);
+
+  const proximo = useMemo(() => {
+    const pend = (agendamentos ?? []).filter((a: any) =>
+      !["finalizado","cancelado","nao_compareceu"].includes(a.status),
+    );
+    return pend[0];
+  }, [agendamentos]);
+
   return (
     <PageShell>
-      <PageHeader
-        title="Agenda"
-        description="Fluxo do dia — do agendamento à finalização."
-        actions={
-          <Button onClick={() => setOpenNew(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Novo agendamento
-          </Button>
-        }
-      />
-
-      {/* Barra de data */}
-      <Card className="p-3 mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setDate(shiftDate(date, -1))} aria-label="Dia anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="relative">
-            <CalendarIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="pl-9 w-[180px]" />
-          </div>
-          <Button variant="outline" size="icon" onClick={() => setDate(shiftDate(date, 1))} aria-label="Próximo dia">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" onClick={() => setDate(todayISO())}>Hoje</Button>
-
-          <div className="ml-auto text-sm text-muted-foreground">
-            <span className="capitalize">{fmtDateLong(date)}</span>
-            <span className="mx-2">·</span>
-            <span>{agendamentos?.length ?? 0} agendamento(s)</span>
-            <span className="mx-2">·</span>
-            <span className="text-primary font-medium">Previsto: {brl(totalPrevisto)}</span>
-          </div>
+      {/* Topo: busca + Novo Agendamento */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+        <div className="relative">
+          <Input
+            placeholder="Buscar cliente, pet, serviço…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="h-12 rounded-full bg-card border-border/60 pl-11 shadow-sm"
+          />
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         </div>
-      </Card>
-
-      {/* Filtros por status */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button
-          onClick={() => setStatusFilter("todos")}
-          className={`px-3 py-1.5 rounded-full text-xs border transition ${
-            statusFilter === "todos" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-accent"
-          }`}
+        <Button
+          onClick={() => setOpenNew(true)}
+          className="h-12 rounded-full gap-2 px-6 bg-primary text-primary-foreground hover:bg-primary/90 shadow-elegant"
         >
-          Todos {agendamentos ? `(${agendamentos.length})` : ""}
-        </button>
-        {STATUS.map((s) => (
-          <button
-            key={s.value}
-            onClick={() => setStatusFilter(s.value)}
-            className={`px-3 py-1.5 rounded-full text-xs border transition ${
-              statusFilter === s.value ? "ring-2 ring-primary/40 " : "hover:bg-accent "
-            }${s.tone}`}
-          >
-            {s.label} {counts[s.value] ? `(${counts[s.value]})` : ""}
-          </button>
-        ))}
+          <Plus className="h-4 w-4" /> Novo Agendamento
+        </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Carregando…</div>
-      ) : !agendamentos || agendamentos.length === 0 ? (
-        <EmptyState
-          icon={CalendarIcon}
-          title="Nenhum agendamento neste dia"
-          description="Clique em Novo agendamento para começar."
-          action={<Button onClick={() => setOpenNew(true)} className="gap-2"><Plus className="h-4 w-4"/>Novo agendamento</Button>}
-        />
-      ) : (
-        <div className="grid gap-3">
-          {agendamentos.map((a: any) => (
-            <AgendamentoRow
-              key={a.id}
-              row={a}
-              onChangeStatus={(status) => updateStatus.mutate({ id: a.id, status })}
-              signer={signer}
-            />
+      <PageHeader
+        title="Agenda"
+        description={fmtDateLong(date)}
+      />
 
-          ))}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+        {/* Coluna principal */}
+        <div className="min-w-0">
+          {/* Barra de data */}
+          <Card className="p-3 mb-4 rounded-2xl border-border/60 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setDate(shiftDate(date, -1))} aria-label="Dia anterior">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="relative">
+                <CalendarIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="pl-9 w-[180px]" />
+              </div>
+              <Button variant="outline" size="icon" onClick={() => setDate(shiftDate(date, 1))} aria-label="Próximo dia">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" onClick={() => setDate(todayISO())}>Hoje</Button>
+            </div>
+          </Card>
+
+          {/* Filtros por status */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button
+              onClick={() => setStatusFilter("todos")}
+              className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                statusFilter === "todos" ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"
+              }`}
+            >
+              Todos {agendamentos ? `(${agendamentos.length})` : ""}
+            </button>
+            {STATUS.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => setStatusFilter(s.value)}
+                className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                  statusFilter === s.value ? "ring-2 ring-primary/40 " : "hover:bg-accent "
+                }${s.tone}`}
+              >
+                {s.label} {counts[s.value] ? `(${counts[s.value]})` : ""}
+              </button>
+            ))}
+          </div>
+
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground">Carregando…</div>
+          ) : !filtrados || filtrados.length === 0 ? (
+            <EmptyState
+              icon={CalendarIcon}
+              title={busca ? "Nenhum resultado para a busca" : "Nenhum agendamento neste dia"}
+              description={busca ? "Tente outro termo ou limpe a busca." : "Clique em Novo Agendamento para começar."}
+              action={<Button onClick={() => setOpenNew(true)} className="gap-2 rounded-full"><Plus className="h-4 w-4"/>Novo Agendamento</Button>}
+            />
+          ) : (
+            <div className="grid gap-3">
+              {filtrados.map((a: any) => (
+                <AgendamentoRow
+                  key={a.id}
+                  row={a}
+                  onChangeStatus={(status) => updateStatus.mutate({ id: a.id, status })}
+                  signer={signer}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Sidebar resumo do dia */}
+        <aside className="lg:sticky lg:top-4 space-y-4">
+          <Card className="p-5 rounded-2xl border-border/60 shadow-sm bg-card">
+            <div className="flex items-center gap-2 mb-4">
+              <CalendarIcon className="h-4 w-4 text-primary" />
+              <h3 className="font-display text-lg font-semibold text-primary">Resumo do dia</h3>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between items-baseline">
+                <span className="text-muted-foreground">Agendamentos</span>
+                <span className="font-semibold">{agendamentos?.length ?? 0}</span>
+              </div>
+              <div className="flex justify-between items-baseline pb-3 border-b border-border/60">
+                <span className="text-muted-foreground">Faturamento previsto</span>
+                <span className="font-display text-primary font-semibold">{brl(totalPrevisto)}</span>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                {STATUS.filter((s) => counts[s.value]).map((s) => (
+                  <div key={s.value} className="flex items-center justify-between">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border ${s.tone}`}>
+                      {s.label}
+                    </span>
+                    <span className="text-sm font-medium tabular-nums">{counts[s.value]}</span>
+                  </div>
+                ))}
+                {Object.keys(counts).length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">Sem agendamentos ainda.</p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {proximo && (
+            <Card className="p-5 rounded-2xl border-border/60 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4 text-primary" />
+                <h3 className="font-display text-base font-semibold text-primary">Próximo atendimento</h3>
+              </div>
+              <div className="font-display text-3xl font-semibold text-primary leading-none">
+                {proximo.hora ? String(proximo.hora).slice(0, 5) : "—"}
+              </div>
+              <div className="mt-2 text-sm">
+                <div className="font-medium truncate">{proximo.pets?.nome ?? "—"}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {proximo.clientes?.nome ?? "—"}
+                </div>
+                <div className="text-xs text-muted-foreground truncate mt-1">
+                  {proximo.servicos?.nome ?? "—"}
+                </div>
+              </div>
+            </Card>
+          )}
+        </aside>
+      </div>
 
       <NovoAgendamentoDialog open={openNew} onOpenChange={setOpenNew} defaultDate={date} />
     </PageShell>
