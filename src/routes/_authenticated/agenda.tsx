@@ -163,9 +163,20 @@ const brl = (v: number | null | undefined) =>
   v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function AgendaPage() {
+  const search = Route.useSearch();
+  const navigateSelf = useNavigate({ from: Route.fullPath });
   const [date, setDate] = useState(todayISO());
   const [statusFilter, setStatusFilter] = useState<"todos" | Status>("todos");
   const [openNew, setOpenNew] = useState(false);
+  const [prefill, setPrefill] = useState<{ cliente?: string; pet?: string }>({});
+
+  // Abrir dialog automaticamente quando vier ?cliente=&pet= na URL
+  useMemo(() => {
+    if (search.cliente || search.pet) {
+      setPrefill({ cliente: search.cliente, pet: search.pet });
+      setOpenNew(true);
+    }
+  }, [search.cliente, search.pet]);
   const qc = useQueryClient();
   const { data: profile } = useMyProfile();
   const signer = { name: displayName(profile), initials: initials(profile) };
