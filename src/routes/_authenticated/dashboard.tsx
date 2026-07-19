@@ -42,15 +42,8 @@ function DashboardPage() {
     return { from: customFrom, to: customTo };
   }, [period, customFrom, customTo]);
 
-  const { data: profile } = useQuery({
-    queryKey: ["me-profile"],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return null;
-      const { data } = await supabase.from("profiles").select("nome").eq("id", u.user.id).maybeSingle();
-      return data;
-    },
-  });
+  const { data: profile } = useMyProfile();
+
 
   const { data } = useQuery({
     queryKey: ["dashboard-metrics", from, to],
