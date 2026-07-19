@@ -256,6 +256,8 @@ function RelatoriosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <RelatoriosAgendamentos />
     </div>
   );
 }
