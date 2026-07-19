@@ -260,6 +260,26 @@ function AtendimentoDetalhe() {
     },
     onSuccess: () => {
       toast.success("Atendimento finalizado");
+      // Gera o PDF final com os dados mais recentes em memória
+      try {
+        const executados = (atendimento?.servicos_executados ?? []) as ServicoItem[];
+        const valor_executado = sumItens(executados);
+        const enriched = {
+          ...atendimento,
+          finalizado: true,
+          data_fim: new Date().toISOString(),
+          valor_executado,
+        };
+        generateAtendimentoPDF({
+          atendimento: enriched,
+          ocorrencias,
+          empresa: empresa ?? null,
+          operador: myProfile?.nome ?? null,
+        });
+        toast.success("PDF do atendimento gerado");
+      } catch (err: any) {
+        toast.error(`Não foi possível gerar o PDF: ${err?.message ?? "erro"}`);
+      }
       qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
       qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
       qc.invalidateQueries({ queryKey: ["agenda"] });
