@@ -84,6 +84,9 @@ export const salvarAgendamento = createServerFn({ method: "POST" })
       hora_envio: data.hora_envio,
       destinatarios: data.destinatarios,
       ativo: data.ativo,
+      kpis: data.kpis,
+      titulo_mensagem: data.titulo_mensagem ?? null,
+      rodape_mensagem: data.rodape_mensagem ?? null,
       criado_por: userId,
     };
     if (data.id) {
