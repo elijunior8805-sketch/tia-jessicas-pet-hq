@@ -312,7 +312,10 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
             Sem WhatsApp/telefone cadastrado para envio automático.
           </p>
-        )}
+          </div>
+        </div>
+
+
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={baixar} className="w-full sm:w-auto">
