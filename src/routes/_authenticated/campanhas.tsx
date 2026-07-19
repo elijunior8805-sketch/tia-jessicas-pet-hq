@@ -279,6 +279,7 @@ function CampanhasPage() {
             toast.error(`${dest.cliente_nome ?? "Cliente"} sem telefone válido`);
             return;
           }
+          setPendingDestId(dest.id);
           openWhatsAppComposerGlobal({
             tipo: "personalizada",
             destinatario: dest.cliente_nome ?? "Cliente",
@@ -293,6 +294,20 @@ function CampanhasPage() {
       <WhatsAppComposer
         open={composer.state.open}
         onOpenChange={(v) => (v ? null : composer.close())}
+        payload={composer.state.payload}
+        onSent={async () => {
+          if (pendingDestId) {
+            try {
+              await marcarFn({ data: { destinatario_id: pendingDestId } });
+              lista.refetch();
+              kpis.refetch();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Erro ao marcar como enviado");
+            }
+            setPendingDestId(null);
+          }
+        }}
+      />
         payload={composer.state.payload}
       />
     </div>
