@@ -77,7 +77,7 @@ function DashboardPage() {
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const lucro = faturamento - despesas;
       const atendCount = atendimentos.length;
-      const bilhete = atendCount > 0 ? atendimentos.reduce((s, a) => s + Number(a.valor_total ?? 0), 0) / atendCount : 0;
+      const bilhete = atendCount > 0 ? atendimentos.reduce((s, a) => s + Number(a.valor_executado ?? 0), 0) / atendCount : 0;
 
       // Série de receita por dia
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
