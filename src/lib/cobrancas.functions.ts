@@ -625,3 +625,190 @@ export function renderTemplate(
     return String(v);
   });
 }
+
+// ============= Registrar resposta recebida do cliente =============
+export type RespostaIntencao =
+  | "pagou"
+  | "promessa"
+  | "negociar"
+  | "contestou"
+  | "sem_intencao";
+
+const RespostaSchema = z.object({
+  cobrancaId: z.string().uuid(),
+  texto: z.string().min(1).max(2000),
+  intencao: z
+    .enum(["pagou", "promessa", "negociar", "contestou", "sem_intencao", "auto"])
+    .default("auto"),
+  promessaData: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  valorPago: z.number().positive().optional().nullable(),
+  canal: z.enum(["whatsapp", "outro"]).default("whatsapp"),
+});
+
+function detectarIntencao(texto: string): {
+  intencao: RespostaIntencao;
+  promessaData: string | null;
+} {
+  const t = texto.toLowerCase();
+  const pagou =
+    /\b(paguei|pago|quitei|transferi|pix\s*enviado|comprovante|acabei\s*de\s*pagar|ja\s*paguei|já\s*paguei)\b/.test(
+      t,
+    );
+  const negociar = /\b(parcel|negoci|desconto|dividir|abater|abatimento)\b/.test(t);
+  const contestou =
+    /\b(nao\s*reconhec|não\s*reconhec|nao\s*devo|não\s*devo|indevid|cobrança\s*errada|errado|engano)\b/.test(
+      t,
+    );
+
+  // Detecta data de promessa (dd/mm, dd/mm/aaaa, "amanhã", "sexta")
+  let promessa: string | null = null;
+  const m = t.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+  if (m) {
+    const d = String(m[1]).padStart(2, "0");
+    const mo = String(m[2]).padStart(2, "0");
+    const y = m[3] ? (m[3].length === 2 ? `20${m[3]}` : m[3]) : String(new Date().getFullYear());
+    const cand = `${y}-${mo}-${d}`;
+    if (!isNaN(new Date(cand).getTime())) promessa = cand;
+  } else if (/\bamanh[ãa]\b/.test(t)) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    promessa = d.toISOString().slice(0, 10);
+  } else if (/\bhoje\b/.test(t)) {
+    promessa = new Date().toISOString().slice(0, 10);
+  }
+
+  const promete =
+    !!promessa ||
+    /\b(prometo|pago\s*(amanh|dia|at[eé])|at[eé]\s*(sexta|amanh|segunda|ter[cç]a|quarta|quinta|s[aá]bado|domingo)|semana\s*que\s*vem|proxima\s*semana|próxima\s*semana|dia\s*\d{1,2})\b/.test(
+      t,
+    );
+
+  if (pagou) return { intencao: "pagou", promessaData: promessa };
+  if (contestou) return { intencao: "contestou", promessaData: promessa };
+  if (negociar) return { intencao: "negociar", promessaData: promessa };
+  if (promete) return { intencao: "promessa", promessaData: promessa };
+  return { intencao: "sem_intencao", promessaData: promessa };
+}
+
+export const registrarRespostaCliente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => RespostaSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, claims } = context;
+
+    const { data: cob, error: eSel } = await supabase
+      .from("cobrancas")
+      .select("id, pagamento_id, valor_original, valor_pago, saldo, status")
+      .eq("id", data.cobrancaId)
+      .maybeSingle();
+    if (eSel || !cob) throw new Error("Cobrança não encontrada");
+
+    // Determina intenção (manual ou heurística)
+    const auto = data.intencao === "auto";
+    const detectada = detectarIntencao(data.texto);
+    const intencao: RespostaIntencao = auto
+      ? detectada.intencao
+      : (data.intencao as RespostaIntencao);
+    const promessaData = data.promessaData ?? detectada.promessaData;
+
+    // 1) Log da resposta recebida (histórico)
+    await logEvento(
+      supabase,
+      data.cobrancaId,
+      "resposta_cliente",
+      {
+        texto: data.texto,
+        intencao,
+        auto,
+        promessa_data: promessaData ?? null,
+        valor_pago: data.valorPago ?? null,
+      },
+      data.canal,
+      claims?.email ?? null,
+    );
+
+    // 2) Efeitos colaterais conforme intenção
+    if (intencao === "pagou") {
+      const total = Number(cob.valor_original ?? 0);
+      const pagoAntes = Number(cob.valor_pago ?? 0);
+      const integral = data.valorPago == null || data.valorPago >= Number(cob.saldo ?? 0);
+      const pagoDepois = integral ? total : Math.min(total, pagoAntes + (data.valorPago ?? 0));
+      const { error: eUpdPag } = await supabase
+        .from("pagamentos")
+        .update({
+          valor_pago: pagoDepois,
+          status: pagoDepois >= total ? "pago" : "parcial",
+          data_pagamento:
+            pagoDepois >= total ? new Date().toISOString().slice(0, 10) : null,
+        })
+        .eq("id", cob.pagamento_id);
+      if (eUpdPag) throw new Error(eUpdPag.message);
+      await logEvento(
+        supabase,
+        data.cobrancaId,
+        "pagamento",
+        {
+          valor: pagoDepois - pagoAntes,
+          integral,
+          total_pago: pagoDepois,
+          origem: "resposta_cliente",
+        },
+        undefined,
+        claims?.email ?? null,
+      );
+      return { ok: true, intencao, promessaData: null };
+    }
+
+    if (intencao === "promessa") {
+      const alvo =
+        promessaData ??
+        (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 3);
+          return d.toISOString().slice(0, 10);
+        })();
+      const { error } = await supabase
+        .from("cobrancas")
+        .update({ promessa_data: alvo, status: "promessa" })
+        .eq("id", data.cobrancaId);
+      if (error) throw new Error(error.message);
+      return { ok: true, intencao, promessaData: alvo };
+    }
+
+    if (intencao === "negociar") {
+      const { error } = await supabase
+        .from("cobrancas")
+        .update({ status: "negociado" })
+        .eq("id", data.cobrancaId);
+      if (error) throw new Error(error.message);
+      return { ok: true, intencao, promessaData: null };
+    }
+
+    if (intencao === "contestou") {
+      // Pausa cordialmente para revisão humana
+      const { error } = await supabase
+        .from("cobrancas")
+        .update({
+          status: "pausada",
+          pausada: true,
+          pausada_motivo: "Cliente contestou — revisar",
+        })
+        .eq("id", data.cobrancaId);
+      if (error) throw new Error(error.message);
+      return { ok: true, intencao, promessaData: null };
+    }
+
+    // sem_intencao → apenas marca que respondeu
+    if (cob.status !== "pago") {
+      await supabase
+        .from("cobrancas")
+        .update({ status: "respondeu" })
+        .eq("id", data.cobrancaId);
+    }
+    return { ok: true, intencao, promessaData: null };
+  });
+
