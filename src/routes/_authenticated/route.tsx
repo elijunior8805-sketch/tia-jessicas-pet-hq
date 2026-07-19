@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { MobileNav } from "@/components/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
@@ -37,7 +38,7 @@ function AuthenticatedLayout() {
         <SidebarInset className="flex flex-col min-w-0 flex-1">
           <header className="h-14 border-b border-border bg-card/60 backdrop-blur flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
             <div className="flex items-center gap-2 min-w-0">
-              <SidebarTrigger />
+              <SidebarTrigger className="hidden md:inline-flex" />
               <span className="font-display text-lg font-semibold text-primary truncate">
                 Spa de Pet Tia Jéssica
               </span>
@@ -50,6 +51,7 @@ function AuthenticatedLayout() {
           <main className="flex-1 min-w-0">
             <Outlet />
           </main>
+          <MobileNav />
         </SidebarInset>
       </div>
     </SidebarProvider>
