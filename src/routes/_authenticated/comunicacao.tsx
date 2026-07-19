@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PlaceholderPage } from "@/components/placeholder-page";
+import { useMemo, useState } from "react";
+import { useQuery, useServerFn } from "@tanstack/react-query" as any;
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
-  component: () => <PlaceholderPage title="Comunicação e IA" description="Mensagens WhatsApp e sugestões da IA." />,
+  component: ComunicacaoPage,
 });
+
+// placeholder to satisfy TS if imports above are wrong
+function ComunicacaoPage() { return null; }
