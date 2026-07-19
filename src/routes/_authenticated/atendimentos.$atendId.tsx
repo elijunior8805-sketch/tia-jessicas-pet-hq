@@ -155,7 +155,7 @@ function AtendimentoDetalhe() {
       const { data, error } = await supabase.from("atendimentos").select(`
         *,
         clientes(id, nome, whatsapp, vip),
-        pets(id, nome, especie, porte, raca, foto_url, alergias, temperamento, necessita_focinheira, cuidados_saude, observacoes),
+        pets(id, nome, porte, raca, foto_url, alergias, temperamento, necessita_focinheira, cuidados_saude, observacoes),
         agendamentos(id, data, hora)
       `).eq("id", atendId).maybeSingle();
       if (error) throw error;
