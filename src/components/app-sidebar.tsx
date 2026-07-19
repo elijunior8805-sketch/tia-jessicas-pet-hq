@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Inbox,
   HandCoins,
+  HeartHandshake,
   Settings,
   PawPrint,
 } from "lucide-react";
