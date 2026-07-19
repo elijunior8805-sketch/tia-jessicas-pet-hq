@@ -148,8 +148,8 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
       ? executados.map((it) => [
           it.nome,
           String(it.quantidade ?? 1),
-          brl(Number(it.valor_unitario ?? 0)),
-          brl(Number(it.valor_unitario ?? 0) * Number(it.quantidade ?? 1)),
+          brl(Number(it.valor_unit ?? 0)),
+          brl(Number(it.valor_unit ?? 0) * Number(it.quantidade ?? 1)),
         ])
       : [["Nenhum servico executado", "", "", ""]],
     theme: "grid",
