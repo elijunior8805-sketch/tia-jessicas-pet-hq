@@ -117,7 +117,20 @@ export function RelatoriosAgendamentos() {
       .map((d) => ({ nome: d.nome.trim(), whatsapp: d.whatsapp.replace(/\D/g, "") }))
       .filter((d) => d.nome && d.whatsapp);
     if (!dests.length) return toast.error("Adicione ao menos um destinatário");
-    mSalvar.mutate({ ...form, destinatarios: dests });
+    if (!form.kpis.length) return toast.error("Selecione ao menos um KPI");
+    mSalvar.mutate({
+      ...form,
+      destinatarios: dests,
+      titulo_mensagem: form.titulo_mensagem.trim() || null,
+      rodape_mensagem: form.rodape_mensagem.trim() || null,
+    } as any);
+  };
+
+  const toggleKpi = (id: KpiId) => {
+    setForm((f) => ({
+      ...f,
+      kpis: f.kpis.includes(id) ? f.kpis.filter((k) => k !== id) : [...f.kpis, id],
+    }));
   };
 
   return (
