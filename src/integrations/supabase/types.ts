@@ -1681,6 +1681,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_staff: { Args: never; Returns: boolean }
     }
     Enums: {
       agendamento_status:
