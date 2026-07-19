@@ -1256,5 +1256,4 @@ function FunilTab() {
   );
 }
 
-// Server fn refs (declared here to avoid circular import at top)
-import { filaDoDia as FILA_FN, funilCobrancas as FUNIL_FN } from "@/lib/cobrancas.functions";
+
