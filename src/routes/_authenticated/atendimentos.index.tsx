@@ -12,6 +12,7 @@ import {
   AlertTriangle, Sparkles, ListChecks,
 } from "lucide-react";
 import { brl, itemFromServico } from "@/lib/atendimento-utils";
+import { useSignedUrl } from "@/lib/use-signed-url";
 
 export const Route = createFileRoute("/_authenticated/atendimentos/")({
   component: AtendimentosPainel,
@@ -239,15 +240,17 @@ function AlertChips({ pet }: { pet: any }) {
   );
 }
 
+function PetThumb({ path }: { path: string | null | undefined }) {
+  const { data: url } = useSignedUrl(path);
+  if (!url) return <PawPrint className="h-5 w-5 text-primary" />;
+  return <img src={url} alt="" className="h-full w-full object-cover" />;
+}
+
 function CardHeader({ pet, cliente }: { pet: any; cliente: any }) {
   return (
     <div className="flex items-start gap-3 min-w-0">
       <div className="h-11 w-11 rounded-full bg-primary/10 grid place-items-center shrink-0 overflow-hidden">
-        {pet?.foto_url ? (
-          <img src={pet.foto_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <PawPrint className="h-5 w-5 text-primary" />
-        )}
+        <PetThumb path={pet?.foto_url} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
