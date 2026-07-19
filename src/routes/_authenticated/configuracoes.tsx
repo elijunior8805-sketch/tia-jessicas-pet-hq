@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
+import { useMyProfile } from "@/hooks/use-my-profile";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: ConfiguracoesPage,
@@ -22,19 +23,7 @@ function ConfiguracoesPage() {
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const { data: profile, isLoading } = useQuery({
-    queryKey: ["me-profile"],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select("nome,email,telefone")
-        .eq("id", u.user.id)
-        .maybeSingle();
-      return { ...data, authEmail: u.user.email };
-    },
-  });
+  const { data: profile, isLoading } = useMyProfile();
 
   useEffect(() => {
     if (profile) {
@@ -43,6 +32,7 @@ function ConfiguracoesPage() {
       setEmail(profile.email ?? profile.authEmail ?? "");
     }
   }, [profile]);
+
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

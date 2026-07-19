@@ -12,6 +12,7 @@ import {
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, eachDayOfInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useMyProfile, firstName } from "@/hooks/use-my-profile";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -41,15 +42,8 @@ function DashboardPage() {
     return { from: customFrom, to: customTo };
   }, [period, customFrom, customTo]);
 
-  const { data: profile } = useQuery({
-    queryKey: ["me-profile"],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return null;
-      const { data } = await supabase.from("profiles").select("nome").eq("id", u.user.id).maybeSingle();
-      return data;
-    },
-  });
+  const { data: profile } = useMyProfile();
+
 
   const { data } = useQuery({
     queryKey: ["dashboard-metrics", from, to],
@@ -128,7 +122,7 @@ function DashboardPage() {
       {/* Saudação */}
       <div className="mb-6">
         <h1 className="font-display text-4xl sm:text-5xl font-semibold text-primary tracking-tight">
-          {greeting()}, {profile?.nome?.split(" ")[0] || "seja bem-vinda"}
+          {greeting()}, {firstName(profile)}
         </h1>
         <p className="text-muted-foreground mt-2 capitalize">
           {format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}

@@ -8,6 +8,8 @@ import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
+
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -22,6 +24,8 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { data: profile } = useMyProfile();
+  const name = displayName(profile);
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
@@ -43,11 +47,20 @@ function AuthenticatedLayout() {
                 Spa de Pet Tia Jéssica
               </span>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-border/60">
+                <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {initials(profile)}
+                </div>
+                <div className="text-sm font-medium text-foreground truncate max-w-[160px]">{name}</div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
+            </div>
           </header>
+
           <main className="flex-1 min-w-0">
             <Outlet />
           </main>
