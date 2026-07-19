@@ -1184,15 +1184,22 @@ function AtendimentoDetalhe() {
                 <Button variant="outline" size="sm"
                   disabled={readOnly || !(atendimento as any).pdf_path}
                   onClick={async () => {
-                    const fone = (cliente?.whatsapp ?? "").replace(/\D/g, "");
-                    if (!fone) { toast.error("Cliente sem WhatsApp"); return; }
+                    if (!cliente?.whatsapp) { toast.error("Cliente sem WhatsApp"); return; }
                     const { data } = await supabase.storage.from("spa-fotos")
                       .createSignedUrl((atendimento as any).pdf_path, 60 * 60 * 24 * 7);
                     if (!data?.signedUrl) { toast.error("Erro ao gerar link"); return; }
                     const msg = `Olá, ${cliente?.nome ?? ""}! O relatório do atendimento de ${pet?.nome ?? "seu pet"} está pronto:\n\n${data.signedUrl}`;
-                    const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
-                    window.open(`https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`, "_blank");
+                    openWhatsAppComposerGlobal({
+                      tipo: "agradecimento",
+                      destinatario: cliente?.nome ?? "",
+                      telefone: cliente.whatsapp,
+                      mensagem: msg,
+                      motivo: "Envio do relatório de atendimento",
+                      cliente_id: cliente?.id ?? null,
+                      atendimento_id: (atendimento as any).id ?? null,
+                    });
                   }}>
+
                   <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
                 </Button>
               </div>
