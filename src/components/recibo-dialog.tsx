@@ -191,7 +191,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isReceita ? "Recibo emitido" : "Comprovante emitido"}
@@ -201,24 +201,72 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
-          <div>
-            <span className="text-muted-foreground">
-              {isReceita ? "Cliente:" : "Fornecedor:"}
-            </span>{" "}
-            <span className="font-medium">{data.contraparte}</span>
-          </div>
-          <div className="line-clamp-2">
-            <span className="text-muted-foreground">Descrição:</span>{" "}
-            {data.descricao || "—"}
-          </div>
-          {data.forma && (
-            <div>
-              <span className="text-muted-foreground">Forma:</span>{" "}
-              <span className="capitalize">{data.forma.replace(/_/g, " ")}</span>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-3">
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+              <div>
+                <span className="text-muted-foreground">
+                  {isReceita ? "Cliente:" : "Fornecedor:"}
+                </span>{" "}
+                <span className="font-medium">{data.contraparte}</span>
+              </div>
+              <div className="line-clamp-2">
+                <span className="text-muted-foreground">Descrição:</span>{" "}
+                {data.descricao || "—"}
+              </div>
+              {data.forma && (
+                <div>
+                  <span className="text-muted-foreground">Forma:</span>{" "}
+                  <span className="capitalize">{data.forma.replace(/_/g, " ")}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  <Eye className="h-3.5 w-3.5" /> Prévia do documento
+                </div>
+                {previewUrl && (
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-primary underline"
+                  >
+                    Abrir em nova aba
+                  </a>
+                )}
+              </div>
+              {previewUrl ? (
+                <iframe
+                  key={previewUrl}
+                  src={previewUrl}
+                  title="Prévia do recibo"
+                  className="w-full h-[420px] bg-white"
+                />
+              ) : (
+                <div className="h-[420px] flex items-center justify-center text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Gerando prévia…
+                </div>
+              )}
+            </div>
+
+            <label className="flex items-start gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3 cursor-pointer">
+              <Checkbox
+                checked={confirmado}
+                onCheckedChange={(v) => setConfirmado(v === true)}
+                className="mt-0.5"
+              />
+              <span className="text-xs leading-relaxed">
+                <span className="font-semibold text-primary">Confirmo que revisei a prévia</span>
+                {" "}e que o documento nº <span className="font-mono">{data.numero}</span> está correto e atualizado.
+              </span>
+            </label>
+          </div>
+
+          <div className="space-y-3">
+
 
         {envioAnterior && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs flex items-start gap-2">
