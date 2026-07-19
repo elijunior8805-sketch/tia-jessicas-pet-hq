@@ -232,6 +232,12 @@ function LembretesPage() {
     const tipoWa =
       row.tipo === "aniversario_pet"
         ? "aniversario_pet"
+        : row.tipo === "aniversario_tutor"
+        ? "parabens_cliente"
+        : row.tipo === "petversario"
+        ? "aniversario_pet"
+        : row.tipo === "data_especial"
+        ? "personalizada"
         : row.tipo === "pos_atendimento"
         ? "solicitacao_avaliacao"
         : "lembrete_atendimento";
