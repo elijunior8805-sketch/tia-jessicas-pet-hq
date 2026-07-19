@@ -187,7 +187,7 @@ export async function gerarExecucoesInterno(supabase: any) {
   // Agendamentos ativos que ainda não rodaram hoje
   const { data: agends, error } = await supabase
     .from("relatorios_agendamentos")
-    .select("id, nome, hora_envio, destinatarios, ultima_execucao, ativo")
+    .select("id, nome, hora_envio, destinatarios, ultima_execucao, ativo, kpis, titulo_mensagem, rodape_mensagem")
     .eq("ativo", true);
   if (error) throw new Error(error.message);
 
