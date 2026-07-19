@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { supabase } from "@/integrations/supabase/client";
 import { brl, sumItens, type ServicoItem } from "./atendimento-utils";
 
 type AtendPDFData = {
@@ -8,9 +9,20 @@ type AtendPDFData = {
   empresa?: { nome?: string | null; cnpj?: string | null; telefone?: string | null; endereco?: string | null } | null;
   operador?: string | null;
   returnBlob?: boolean;
+  /** Bucket paths para as fotos antes/depois. Se ausentes, o gerador lê de atendimento.fotos_antes/fotos_depois. */
+  fotosAntesPaths?: string[];
+  fotosDepoisPaths?: string[];
+  /** Se true, gera o PDF mesmo sem fotos ou com falha no download. */
+  permitirSemFotos?: boolean;
 };
 
-// Deep-forest, off-white, gold palette (RGB)
+export type PDFResult = {
+  fileName: string;
+  blob?: Blob;
+  fotosIncluidas: { antes: number; depois: number };
+  fotosFalhas: string[];
+};
+
 const C = {
   forest: [26, 61, 45] as [number, number, number],
   gold: [176, 141, 87] as [number, number, number],
@@ -22,23 +34,73 @@ const C = {
 
 function fmtDateTime(iso?: string | null) {
   if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-  } catch {
-    return "—";
-  }
+  try { return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }); } catch { return "—"; }
 }
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
   try {
     const [y, m, d] = String(iso).slice(0, 10).split("-");
     return `${d}/${m}/${y}`;
-  } catch {
-    return "—";
-  }
+  } catch { return "—"; }
 }
 
-export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa, operador }: AtendPDFData) {
+type LoadedImage = { dataUrl: string; w: number; h: number; path: string };
+
+/**
+ * Carrega imagem privada do bucket como dataURL, corrigindo orientação (EXIF)
+ * via createImageBitmap quando disponível. Redimensiona para no máx. 1400px.
+ */
+async function loadImageAsDataURL(path: string): Promise<LoadedImage> {
+  const { data, error } = await supabase.storage
+    .from("spa-fotos")
+    .createSignedUrl(path, 60 * 5);
+  if (error || !data?.signedUrl) throw new Error(`URL falhou: ${path}`);
+  const res = await fetch(data.signedUrl);
+  if (!res.ok) throw new Error(`Download falhou: ${path}`);
+  const blob = await res.blob();
+
+  // Preferir createImageBitmap para respeitar EXIF (orientação de fotos de celular)
+  let width = 0;
+  let height = 0;
+  let source: CanvasImageSource | null = null;
+  try {
+    const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" as ImageOrientation });
+    width = bmp.width; height = bmp.height; source = bmp;
+  } catch {
+    // Fallback via <img> (não corrige EXIF, mas funciona para PNG/WEBP/JPG normais)
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("img load"));
+        el.src = url;
+      });
+      width = img.naturalWidth; height = img.naturalHeight; source = img;
+    } finally {
+      // não revoga aqui — usamos o source logo abaixo
+    }
+  }
+  if (!source || !width || !height) throw new Error("Imagem inválida");
+
+  const MAX = 1400;
+  const scale = Math.min(1, MAX / Math.max(width, height));
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D indisponível");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(source, 0, 0, w, h);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return { dataUrl, w, h, path };
+}
+
+export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFResult> {
+  const { atendimento, ocorrencias = [], empresa, operador, returnBlob, permitirSemFotos } = opts;
+
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -53,7 +115,41 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   const total = valorExec + taxa;
   const comportamentos = (atendimento?.comportamentos ?? []) as string[];
 
-  // Header band
+  // ---- Fotos: descobrir caminhos ----
+  const antesPaths: string[] =
+    opts.fotosAntesPaths
+    ?? ((atendimento?.fotos_antes ?? []) as any[])
+        .map((f: any) => (typeof f === "string" ? f : f?.path))
+        .filter(Boolean);
+  const depoisPaths: string[] =
+    opts.fotosDepoisPaths
+    ?? ((atendimento?.fotos_depois ?? []) as any[])
+        .map((f: any) => (typeof f === "string" ? f : f?.path))
+        .filter(Boolean);
+
+  // ---- Fotos: baixar antes de desenhar qualquer coisa ----
+  const [antesRes, depoisRes] = await Promise.all([
+    Promise.allSettled(antesPaths.map(loadImageAsDataURL)),
+    Promise.allSettled(depoisPaths.map(loadImageAsDataURL)),
+  ]);
+  const antesOk = antesRes.filter((r): r is PromiseFulfilledResult<LoadedImage> => r.status === "fulfilled").map(r => r.value);
+  const depoisOk = depoisRes.filter((r): r is PromiseFulfilledResult<LoadedImage> => r.status === "fulfilled").map(r => r.value);
+  const falhas: string[] = [];
+  antesRes.forEach((r, i) => { if (r.status === "rejected") falhas.push(antesPaths[i]); });
+  depoisRes.forEach((r, i) => { if (r.status === "rejected") falhas.push(depoisPaths[i]); });
+
+  if (!permitirSemFotos) {
+    const semAntes = antesOk.length === 0;
+    const semDepois = depoisOk.length === 0;
+    if (semAntes || semDepois || falhas.length) {
+      const err = new Error("Não foi possível carregar uma das fotos. Verifique as imagens antes de gerar o relatório.");
+      (err as any).code = "FOTOS_INCOMPLETAS";
+      (err as any).detalhe = { falhas, antesOk: antesOk.length, depoisOk: depoisOk.length };
+      throw err;
+    }
+  }
+
+  // ============ HEADER ============
   doc.setFillColor(...C.forest);
   doc.rect(0, 0, W, 90, "F");
   doc.setFillColor(...C.gold);
@@ -70,7 +166,6 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   doc.setFontSize(9);
   doc.text("Relatorio de Atendimento", M, 76);
 
-  // Right side: protocol
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   const proto = String(atendimento?.id ?? "").slice(0, 8).toUpperCase();
@@ -82,34 +177,27 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   let y = 120;
   doc.setTextColor(...C.ink);
 
-  // Cliente & Pet
+  // ============ CLIENTE / PET ============
   const boxW = (W - M * 2 - 12) / 2;
   const boxTop = y;
   const boxH = 110;
-
   const drawBox = (x: number, title: string, lines: [string, string][]) => {
     doc.setDrawColor(...C.line);
     doc.setFillColor(...C.cream);
     doc.roundedRect(x, boxTop, boxW, boxH, 6, 6, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...C.gold);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.gold);
     doc.text(title.toUpperCase(), x + 12, boxTop + 18);
-    doc.setTextColor(...C.ink);
-    doc.setFontSize(10);
+    doc.setTextColor(...C.ink); doc.setFontSize(10);
     let ly = boxTop + 36;
     lines.forEach(([k, v]) => {
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...C.mute);
+      doc.setFont("helvetica", "normal"); doc.setTextColor(...C.mute);
       doc.text(k, x + 12, ly);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...C.ink);
+      doc.setFont("helvetica", "bold"); doc.setTextColor(...C.ink);
       const value = doc.splitTextToSize(v || "—", boxW - 90);
       doc.text(value, x + 82, ly);
       ly += 16;
     });
   };
-
   drawBox(M, "Tutor", [
     ["Nome", cliente.nome ?? "—"],
     ["WhatsApp", cliente.whatsapp ?? "—"],
@@ -124,24 +212,16 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   ]);
   y = boxTop + boxH + 20;
 
-  // Timeline
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...C.forest);
+  // ============ TIMELINE ============
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...C.forest);
   doc.text("LINHA DO TEMPO", M, y);
-  doc.setDrawColor(...C.gold);
-  doc.line(M, y + 4, M + 90, y + 4);
+  doc.setDrawColor(...C.gold); doc.line(M, y + 4, M + 90, y + 4);
   y += 18;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...C.ink);
+  doc.text(`Check-in: ${fmtDateTime(atendimento?.data_inicio)}`, M, y); y += 14;
+  doc.text(`Check-out: ${fmtDateTime(atendimento?.data_fim)}`, M, y); y += 20;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(...C.ink);
-  const t1 = `Check-in: ${fmtDateTime(atendimento?.data_inicio)}`;
-  const t2 = `Check-out: ${fmtDateTime(atendimento?.data_fim)}`;
-  doc.text(t1, M, y); y += 14;
-  doc.text(t2, M, y); y += 20;
-
-  // Serviços executados (tabela)
+  // ============ SERVIÇOS ============
   autoTable(doc, {
     startY: y,
     head: [["Servico", "Qtd", "Valor unit.", "Subtotal"]],
@@ -165,7 +245,7 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   });
   y = (doc as any).lastAutoTable.finalY + 10;
 
-  // Totais
+  // ============ TOTAIS ============
   const totRows: [string, string][] = [
     ["Servicos executados", brl(valorExec)],
     ["Taxa leva-e-traz", brl(taxa)],
@@ -190,42 +270,28 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   y += 4;
   doc.setTextColor(...C.ink);
 
-  // Planejado vs executado (resumo compacto)
   if (planejados.length) {
     const planTotal = sumItens(planejados);
     const diff = valorExec - planTotal;
-    doc.setFontSize(9);
-    doc.setTextColor(...C.mute);
+    doc.setFontSize(9); doc.setTextColor(...C.mute);
     doc.text(
       `Planejado: ${brl(planTotal)}   Executado: ${brl(valorExec)}   Diferenca: ${diff >= 0 ? "+" : ""}${brl(diff)}`,
-      M,
-      y
+      M, y,
     );
     y += 16;
   }
 
   const ensureSpace = (needed: number) => {
-    if (y + needed > H - 60) {
-      doc.addPage();
-      y = 60;
-    }
+    if (y + needed > H - 60) { doc.addPage(); y = 60; }
   };
-
-  // Registro operacional
   const section = (title: string) => {
     ensureSpace(30);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...C.forest);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...C.forest);
     doc.text(title.toUpperCase(), M, y);
-    doc.setDrawColor(...C.gold);
-    doc.line(M, y + 4, M + doc.getTextWidth(title) + 4, y + 4);
+    doc.setDrawColor(...C.gold); doc.line(M, y + 4, M + doc.getTextWidth(title) + 4, y + 4);
     y += 16;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...C.ink);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...C.ink);
   };
-
   const paragraph = (text?: string | null) => {
     const t = (text ?? "").trim() || "—";
     const lines = doc.splitTextToSize(t, W - M * 2);
@@ -234,26 +300,12 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
     y += lines.length * 14 + 6;
   };
 
-  section("Observacoes de check-in");
-  paragraph(atendimento?.observacoes_checkin);
+  section("Observacoes de check-in"); paragraph(atendimento?.observacoes_checkin);
+  if (comportamentos.length) { section("Comportamento observado"); paragraph(comportamentos.join(", ")); }
+  section("Observacoes internas"); paragraph(atendimento?.observacoes_internas);
+  section("Recomendacoes ao tutor"); paragraph(atendimento?.recomendacoes);
+  if (atendimento?.proxima_visita) { section("Proxima visita sugerida"); paragraph(fmtDate(atendimento.proxima_visita)); }
 
-  if (comportamentos.length) {
-    section("Comportamento observado");
-    paragraph(comportamentos.join(", "));
-  }
-
-  section("Observacoes internas");
-  paragraph(atendimento?.observacoes_internas);
-
-  section("Recomendacoes ao tutor");
-  paragraph(atendimento?.recomendacoes);
-
-  if (atendimento?.proxima_visita) {
-    section("Proxima visita sugerida");
-    paragraph(fmtDate(atendimento.proxima_visita));
-  }
-
-  // Ocorrências
   if (ocorrencias.length) {
     section("Ocorrencias registradas");
     autoTable(doc, {
@@ -274,27 +326,122 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
     y = (doc as any).lastAutoTable.finalY + 10;
   }
 
-  // Rodapé em todas as páginas
+  // ============ RESULTADO DO ATENDIMENTO (ANTES x DEPOIS) ============
+  if (antesOk.length || depoisOk.length) {
+    // Página exclusiva para dar destaque
+    doc.addPage();
+    y = 60;
+
+    // Faixa título
+    doc.setFillColor(...C.forest);
+    doc.rect(0, 0, W, 60, "F");
+    doc.setFillColor(...C.gold);
+    doc.rect(0, 60, W, 2, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text("Resultado do atendimento", M, 38);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    const subtituloParts = [pet?.nome, fmtDate(atendimento?.data_fim ?? atendimento?.data_inicio)].filter(Boolean).join("  ·  ");
+    if (subtituloParts) doc.text(subtituloParts, W - M, 38, { align: "right" });
+    doc.setTextColor(...C.ink);
+
+    y = 90;
+
+    const drawPair = (antes: LoadedImage | null, depois: LoadedImage | null) => {
+      const gap = 16;
+      const availW = W - M * 2 - gap;
+      const cellW = availW / 2;
+      const cellH = 260;
+
+      if (y + cellH + 40 > H - 60) { doc.addPage(); y = 60; }
+
+      const drawCell = (label: string, img: LoadedImage | null, x: number) => {
+        // Moldura
+        doc.setDrawColor(...C.line);
+        doc.setFillColor(...C.cream);
+        doc.roundedRect(x, y, cellW, cellH + 30, 8, 8, "FD");
+
+        // Etiqueta
+        doc.setFillColor(...C.forest);
+        doc.roundedRect(x + 10, y + 10, 74, 20, 4, 4, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+        doc.text(label.toUpperCase(), x + 47, y + 24, { align: "center" });
+        doc.setTextColor(...C.ink);
+
+        // Imagem contida (fit) — sem esticar
+        const areaX = x + 10;
+        const areaY = y + 40;
+        const areaW = cellW - 20;
+        const areaH = cellH - 20;
+        if (img) {
+          const r = Math.min(areaW / img.w, areaH / img.h);
+          const iw = img.w * r;
+          const ih = img.h * r;
+          const ix = areaX + (areaW - iw) / 2;
+          const iy = areaY + (areaH - ih) / 2;
+          try {
+            doc.addImage(img.dataUrl, "JPEG", ix, iy, iw, ih, undefined, "FAST");
+          } catch {
+            doc.setTextColor(...C.mute); doc.setFontSize(9);
+            doc.text("Falha ao renderizar", areaX + areaW / 2, areaY + areaH / 2, { align: "center" });
+            doc.setTextColor(...C.ink);
+          }
+        } else {
+          doc.setTextColor(...C.mute); doc.setFont("helvetica", "italic"); doc.setFontSize(10);
+          doc.text("Sem foto disponível", areaX + areaW / 2, areaY + areaH / 2, { align: "center" });
+          doc.setFont("helvetica", "normal"); doc.setTextColor(...C.ink);
+        }
+
+        // Rodapé com pet + data
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.mute);
+        const meta = [pet?.nome, fmtDate(atendimento?.data_fim ?? atendimento?.data_inicio)].filter(Boolean).join(" · ");
+        if (meta) doc.text(meta, x + cellW / 2, y + cellH + 22, { align: "center" });
+        doc.setTextColor(...C.ink);
+      };
+
+      drawCell("Antes", antes, M);
+      drawCell("Depois", depois, M + cellW + gap);
+      y += cellH + 30 + 20;
+    };
+
+    const maxPairs = Math.max(antesOk.length, depoisOk.length);
+    for (let i = 0; i < maxPairs; i++) {
+      drawPair(antesOk[i] ?? null, depoisOk[i] ?? null);
+    }
+
+    if (falhas.length) {
+      ensureSpace(30);
+      doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(...C.mute);
+      doc.text(`${falhas.length} foto(s) não puderam ser carregadas e foram omitidas.`, M, y);
+      y += 14; doc.setTextColor(...C.ink); doc.setFont("helvetica", "normal");
+    }
+  }
+
+  // ============ FOOTER ============
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setDrawColor(...C.line);
     doc.line(M, H - 40, W - M, H - 40);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...C.mute);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.mute);
     doc.text(
       `${empresa?.nome ?? "Spa de Pet Tia Jessica"} · Documento gerado em ${fmtDateTime(new Date().toISOString())}`,
-      M,
-      H - 24
+      M, H - 24,
     );
     doc.text(`Pagina ${i} de ${pageCount}`, W - M, H - 24, { align: "right" });
   }
 
-  const fileName = `atendimento-${(pet.nome ?? "pet").toString().replace(/\s+/g, "_")}-${proto}.pdf`;
-  if (arguments[0]?.returnBlob) {
-    return doc.output("blob") as unknown as Blob;
+  const fileName = `relatorio-${(pet.nome ?? "pet").toString().replace(/\s+/g, "_")}-${proto}.pdf`;
+  const result: PDFResult = {
+    fileName,
+    fotosIncluidas: { antes: antesOk.length, depois: depoisOk.length },
+    fotosFalhas: falhas,
+  };
+  if (returnBlob) {
+    result.blob = doc.output("blob") as unknown as Blob;
+  } else {
+    doc.save(fileName);
   }
-  doc.save(fileName);
-  return fileName;
+  return result;
 }
