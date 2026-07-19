@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Inbox,
   HandCoins,
+  HeartHandshake,
   Settings,
   PawPrint,
   type LucideIcon,
