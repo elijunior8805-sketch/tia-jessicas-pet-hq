@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Camera, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/clientes/novo")({
   component: NovoClientePage,
@@ -52,6 +52,14 @@ function NovoClientePage() {
     observacoes: "", indicacao: "", vip: false,
     pet_nome: "", pet_raca: "", pet_porte: "", pet_sexo: "",
   });
+  const [petFoto, setPetFoto] = useState<File | null>(null);
+  const [petFotoPreview, setPetFotoPreview] = useState<string | null>(null);
+
+  function onPickFoto(file: File | null) {
+    setPetFoto(file);
+    if (petFotoPreview) URL.revokeObjectURL(petFotoPreview);
+    setPetFotoPreview(file ? URL.createObjectURL(file) : null);
+  }
 
   const { data: racas } = useQuery({
     queryKey: ["racas-ativas"],
@@ -87,14 +95,27 @@ function NovoClientePage() {
       if (error) throw error;
 
       if (parsed.pet_nome && parsed.pet_nome.trim()) {
-        const { error: petErr } = await supabase.from("pets").insert({
+        const { data: pet, error: petErr } = await supabase.from("pets").insert({
           cliente_id: cliente.id,
           nome: parsed.pet_nome.trim(),
           raca: clean(parsed.pet_raca),
           porte: clean(parsed.pet_porte),
           sexo: clean(parsed.pet_sexo),
-        });
+        }).select("id").single();
         if (petErr) throw petErr;
+
+        if (petFoto && pet?.id) {
+          const ext = (petFoto.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `pets/${pet.id}-${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from("spa-fotos")
+            .upload(path, petFoto, { upsert: true, contentType: petFoto.type || "image/jpeg" });
+          if (upErr) {
+            toast.error("Cliente e pet salvos, mas a foto falhou: " + upErr.message);
+          } else {
+            await supabase.from("pets").update({ foto_url: path }).eq("id", pet.id);
+          }
+        }
       }
 
       return cliente.id as string;
@@ -221,38 +242,74 @@ function NovoClientePage() {
         <Card className="p-4 sm:p-6 border-primary/20 bg-primary/5">
           <h2 className="font-display text-lg font-semibold mb-1">Primeiro pet (opcional)</h2>
           <p className="text-xs text-muted-foreground mb-4">Preencha o nome do pet para já cadastrá-lo junto. Você pode adicionar mais pets depois.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="sm:col-span-2">
-              <Label>Nome do pet</Label>
-              <Input {...field("pet_nome")} />
+
+          <div className="flex flex-col sm:flex-row gap-6">
+            {/* Foto do pet */}
+            <div className="flex flex-col items-center gap-2 shrink-0">
+              <label
+                htmlFor="pet-foto"
+                className="relative h-28 w-28 rounded-full border-2 border-dashed border-primary/40 bg-card overflow-hidden cursor-pointer flex items-center justify-center hover:border-primary/70 transition"
+              >
+                {petFotoPreview ? (
+                  <img src={petFotoPreview} alt="Foto do pet" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                    <Camera className="h-6 w-6" />
+                    <span className="text-[10px] uppercase tracking-wider">Foto</span>
+                  </div>
+                )}
+                <input
+                  id="pet-foto"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onPickFoto(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {petFotoPreview && (
+                <button
+                  type="button"
+                  onClick={() => onPickFoto(null)}
+                  className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"
+                >
+                  <X className="h-3 w-3" /> remover
+                </button>
+              )}
             </div>
-            <div>
-              <Label>Raça</Label>
-              <Select value={v.pet_raca || undefined} onValueChange={(val) => setV((s) => ({ ...s, pet_raca: val }))}>
-                <SelectTrigger><SelectValue placeholder="Selecionar…" /></SelectTrigger>
-                <SelectContent>
-                  {racas?.map((r) => <SelectItem key={r.nome} value={r.nome}>{r.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Porte</Label>
-              <Select value={v.pet_porte || undefined} onValueChange={(val) => setV((s) => ({ ...s, pet_porte: val }))}>
-                <SelectTrigger><SelectValue placeholder="Selecionar…" /></SelectTrigger>
-                <SelectContent>
-                  {portes?.map((p) => <SelectItem key={p.nome} value={p.nome}>{p.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Sexo</Label>
-              <Select value={v.pet_sexo || undefined} onValueChange={(val) => setV((s) => ({ ...s, pet_sexo: val }))}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="macho">Macho</SelectItem>
-                  <SelectItem value="femea">Fêmea</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="grid flex-1 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="sm:col-span-2">
+                <Label>Nome do pet</Label>
+                <Input {...field("pet_nome")} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Raça</Label>
+                <Select value={v.pet_raca || undefined} onValueChange={(val) => setV((s) => ({ ...s, pet_raca: val }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar…" /></SelectTrigger>
+                  <SelectContent>
+                    {racas?.map((r) => <SelectItem key={r.nome} value={r.nome}>{r.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Porte</Label>
+                <Select value={v.pet_porte || undefined} onValueChange={(val) => setV((s) => ({ ...s, pet_porte: val }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar…" /></SelectTrigger>
+                  <SelectContent>
+                    {portes?.map((p) => <SelectItem key={p.nome} value={p.nome}>{p.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Sexo</Label>
+                <Select value={v.pet_sexo || undefined} onValueChange={(val) => setV((s) => ({ ...s, pet_sexo: val }))}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="macho">Macho</SelectItem>
+                    <SelectItem value="femea">Fêmea</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </Card>

@@ -265,7 +265,7 @@ function AgendaPage() {
       />
 
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
         {/* Coluna principal */}
         <div className="min-w-0">
           {/* Barra de data */}
@@ -332,7 +332,7 @@ function AgendaPage() {
         </div>
 
         {/* Sidebar resumo do dia */}
-        <aside className="lg:sticky lg:top-4 space-y-4">
+        <aside className="md:sticky md:top-4 space-y-4">
           <Card className="p-5 rounded-2xl border-border/60 shadow-sm bg-card">
             <div className="flex items-center gap-2 mb-4">
               <CalendarIcon className="h-4 w-4 text-primary" />
