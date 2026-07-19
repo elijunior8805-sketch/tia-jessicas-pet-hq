@@ -99,12 +99,11 @@ function FichaOperacional() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-5 lg:col-span-1">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 grid place-items-center">
-              <PawPrint className="h-7 w-7 text-primary"/>
-            </div>
+            <PetAvatar path={pet.foto_url} nome={pet.nome}/>
             <div>
               <div className="font-display text-xl font-semibold text-primary">{pet.nome}</div>
               <div className="text-xs text-muted-foreground">{[pet.raca, pet.porte].filter(Boolean).join(" · ")}</div>
+              {pet.necessita_focinheira && <div className="mt-1 text-xs text-warning-foreground bg-warning/20 rounded px-1.5 py-0.5 inline-block">⚠ Focinheira obrigatória</div>}
             </div>
           </div>
           <dl className="space-y-2 text-sm">
