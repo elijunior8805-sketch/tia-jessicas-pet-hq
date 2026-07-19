@@ -292,6 +292,9 @@ export function generateAtendimentoPDF({ atendimento, ocorrencias = [], empresa,
   }
 
   const fileName = `atendimento-${(pet.nome ?? "pet").toString().replace(/\s+/g, "_")}-${proto}.pdf`;
+  if (arguments[0]?.returnBlob) {
+    return doc.output("blob") as unknown as Blob;
+  }
   doc.save(fileName);
   return fileName;
 }
