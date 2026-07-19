@@ -130,11 +130,25 @@ export type Database = {
             referencedColumns: ["cliente_id"]
           },
           {
+            foreignKeyName: "agendamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "agendamentos_pet_id_fkey"
             columns: ["pet_id"]
             isOneToOne: false
             referencedRelation: "pets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
           },
           {
             foreignKeyName: "agendamentos_servico_id_fkey"
@@ -301,11 +315,25 @@ export type Database = {
             referencedColumns: ["cliente_id"]
           },
           {
+            foreignKeyName: "atendimentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "atendimentos_pet_id_fkey"
             columns: ["pet_id"]
             isOneToOne: false
             referencedRelation: "pets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
           },
         ]
       }
@@ -531,6 +559,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -989,6 +1024,13 @@ export type Database = {
             referencedColumns: ["cliente_id"]
           },
           {
+            foreignKeyName: "mensagens_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "mensagens_cobranca_id_fkey"
             columns: ["cobranca_id"]
             isOneToOne: false
@@ -1115,11 +1157,25 @@ export type Database = {
             referencedColumns: ["cliente_id"]
           },
           {
+            foreignKeyName: "ocorrencias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "ocorrencias_pet_id_fkey"
             columns: ["pet_id"]
             isOneToOne: false
             referencedRelation: "pets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ocorrencias_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
           },
         ]
       }
@@ -1198,6 +1254,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "pagamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
             referencedColumns: ["cliente_id"]
           },
         ]
@@ -1291,6 +1354,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "pets_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
             referencedColumns: ["cliente_id"]
           },
         ]
@@ -1827,6 +1897,13 @@ export type Database = {
             referencedColumns: ["cliente_id"]
           },
           {
+            foreignKeyName: "whatsapp_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "whatsapp_contatos_cobranca_id_fkey"
             columns: ["cobranca_id"]
             isOneToOne: false
@@ -1874,6 +1951,25 @@ export type Database = {
           ultima_direcao?: never
           ultima_em?: never
           ultima_mensagem?: never
+        }
+        Relationships: []
+      }
+      pets_reativacao: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_telefone: string | null
+          cliente_whatsapp: string | null
+          dias_inativo: number | null
+          faixa: string | null
+          pet_foto: string | null
+          pet_id: string | null
+          pet_nome: string | null
+          retornou_apos_contato: boolean | null
+          ticket_medio: number | null
+          total_atendimentos: number | null
+          ultimo_atendimento_em: string | null
+          ultimo_contato_reativacao_em: string | null
         }
         Relationships: []
       }
