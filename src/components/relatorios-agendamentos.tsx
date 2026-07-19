@@ -8,7 +8,9 @@ import {
   listarExecucoes,
   marcarExecucaoEnviada,
   gerarExecucoesAgora,
+  KPIS_DISPONIVEIS,
   type AgendamentoDTO,
+  type KpiId,
 } from "@/lib/relatorios-agendamentos.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
