@@ -99,6 +99,17 @@ function ConfiguracoesPage() {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          <div className="flex justify-center pb-2">
+            <FotoPicker
+              currentPath={profile?.avatar_url ?? null}
+              onFileChange={setAvatarFile}
+              onRemoveExisting={() => setAvatarRemoved(true)}
+              placeholderIcon={User}
+              size="md"
+              label="Sua foto"
+            />
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="nome">Nome de exibição</Label>
             <Input
@@ -136,6 +147,7 @@ function ConfiguracoesPage() {
         </form>
       </Card>
 
+      <EmpresaCard />
       <WhatsAppTemplatesCard />
       <RecibosEnviadosCard />
       <ChangePasswordCard authEmail={profile?.authEmail ?? ""} />
