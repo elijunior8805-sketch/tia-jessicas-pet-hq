@@ -133,6 +133,32 @@ export function RelatoriosAgendamentos() {
     }));
   };
 
+  // Amostra determinística para o preview ao vivo
+  const brlFmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const amostra: Record<KpiId, string> = {
+    faturamento: `• Faturamento: ${brlFmt(2480)}`,
+    atendimentos: `• Atendimentos: 12`,
+    ticket: `• Ticket médio: ${brlFmt(206.67)}`,
+    clientes: `• Clientes atendidos: 10`,
+    leva_traz: `• Leva e traz: ${brlFmt(180)}`,
+    a_receber: `• A receber: ${brlFmt(1350)}`,
+    atraso: `• Valor em atraso: ${brlFmt(420)}`,
+  };
+  const previewDestNome = form.destinatarios[0]?.nome?.trim() || "Jéssica";
+  const previewDia = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toLocaleDateString("pt-BR");
+  })();
+  const previewTitulo = form.titulo_mensagem.trim() || `Spa da Tia Jéssica — Relatório diário (${previewDia})`;
+  const previewRodape = form.rodape_mensagem.trim() || "Detalhes completos no painel. 🐾";
+  const previewLinhas = form.kpis.map((k) => amostra[k]).filter(Boolean).join("\n");
+  const previewMensagem =
+    `*${previewTitulo}*\n\n` +
+    `Olá, ${previewDestNome}! Segue o resumo do dia:\n\n` +
+    `${previewLinhas || "• (selecione ao menos um KPI)"}\n\n` +
+    `${previewRodape}`;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
