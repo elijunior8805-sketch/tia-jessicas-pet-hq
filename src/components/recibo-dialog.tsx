@@ -159,7 +159,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       contraparte: data.contraparte,
       telefone: telefone || null,
       valor: data.valor,
-      mensagem,
+      mensagem: mensagemFinal,
       signed_url: url,
       storage_path: path,
       enviado_por: u.user.id,
