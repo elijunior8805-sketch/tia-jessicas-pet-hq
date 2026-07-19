@@ -554,6 +554,9 @@ function AgendamentoRow({
   const previewStorageKey = `wa-preview:finalizado:${row.id}`;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState("");
+  const [editServicosOpen, setEditServicosOpen] = useState(false);
+
+  const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
 
   const openFinalizadoPreview = () => {
     let saved: string | null = null;
