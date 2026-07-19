@@ -67,7 +67,7 @@ export const listarAgendamentos = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("relatorios_agendamentos")
-      .select(sel("id, nome, hora_envio, destinatarios, ativo, ultima_execucao"))
+      .select(sel("id, nome, hora_envio, destinatarios, ativo, ultima_execucao, kpis, titulo_mensagem, rodape_mensagem"))
       .order("created_at", { ascending: false })
       .returns<AgendamentoDTO[]>();
     if (error) throw new Error("Falha ao carregar agendamentos");
