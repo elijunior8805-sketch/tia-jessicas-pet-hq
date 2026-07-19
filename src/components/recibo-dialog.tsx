@@ -345,7 +345,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             className="text-sm font-normal resize-none"
           />
           <p className="text-[11px] text-muted-foreground">
-            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}.
+            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}, {"{link}"}.
           </p>
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
@@ -359,11 +359,20 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             </div>
             <div className="rounded-md bg-white border p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
               {mensagemFinal || <span className="text-muted-foreground italic">Mensagem vazia</span>}
-              {"\n\n"}
-              <span className="text-primary underline break-all">
-                {signedUrl ?? "[link do comprovante será anexado no envio]"}
-              </span>
             </div>
+            {publicUrl && (
+              <p className="text-[11px] text-emerald-800">
+                Link seguro do recibo:{" "}
+                <a
+                  href={publicUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline break-all"
+                >
+                  {publicUrl}
+                </a>
+              </p>
+            )}
             {variaveisRestantes.length > 0 && (
               <p className="text-[11px] text-amber-700">
                 Atenção: variáveis não substituídas — {variaveisRestantes.join(", ")}
