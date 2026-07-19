@@ -278,7 +278,7 @@ export function RelatoriosAgendamentos() {
                     <Badge variant="outline">{a.hora_envio.slice(0, 5)}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {a.destinatarios.length} destinatário(s)
+                    {a.destinatarios.length} destinatário(s) · {(a.kpis?.length ?? 0)} KPI(s)
                     {a.ultima_execucao ? ` · última execução ${new Date(a.ultima_execucao + "T12:00:00").toLocaleDateString("pt-BR")}` : ""}
                   </div>
                 </div>
