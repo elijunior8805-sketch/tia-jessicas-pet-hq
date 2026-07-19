@@ -267,28 +267,59 @@ function ServicosList({
       </Card>
     );
 
+  // Agrupar por categoria (somente para serviços; combos ficam em lista única)
+  const grupos = isCombo
+    ? [["Combos", items] as const]
+    : (() => {
+        const map = new Map<string, Servico[]>();
+        for (const s of items) {
+          const cat = s.categoria?.trim() || "Outros";
+          if (!map.has(cat)) map.set(cat, []);
+          map.get(cat)!.push(s);
+        }
+        return Array.from(map.entries()).sort((a, b) => {
+          const oa = ORDEM_CATEGORIA[a[0]] ?? 99;
+          const ob = ORDEM_CATEGORIA[b[0]] ?? 99;
+          if (oa !== ob) return oa - ob;
+          return a[0].localeCompare(b[0], "pt-BR");
+        });
+      })();
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((s) => {
-        const precosServico = precos.filter((p) => p.servico_id === s.id);
-        const itensCombo = isCombo ? (comboItens ?? []).filter((c) => c.combo_id === s.id) : [];
-        return (
-          <Card key={s.id} className="p-4 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-medium text-foreground truncate">{s.nome}</h3>
-                  {!s.ativo && <Badge variant="secondary">Inativo</Badge>}
-                </div>
-                {s.categoria && <p className="text-xs text-muted-foreground mt-0.5">{s.categoria}</p>}
-              </div>
-              <div className="text-right shrink-0">
-                <p className="font-semibold text-primary">{brl(Number(s.valor))}</p>
-                {s.duracao_min ? (
-                  <p className="text-xs text-muted-foreground">{s.duracao_min} min</p>
-                ) : null}
-              </div>
+    <div className="flex flex-col gap-6">
+      {grupos.map(([cat, arr]) => (
+        <section key={cat} className="flex flex-col gap-3">
+          {!isCombo && (
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold tracking-wide text-foreground">{cat}</h2>
+              <span className="text-xs text-muted-foreground">{arr.length}</span>
+              <div className="flex-1 h-px bg-border/60" />
             </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {arr.map((s) => {
+              const precosServico = precos.filter((p) => p.servico_id === s.id);
+              const itensCombo = isCombo ? (comboItens ?? []).filter((c) => c.combo_id === s.id) : [];
+              return (
+                <Card key={s.id} className="p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-medium text-foreground truncate">{s.nome}</h3>
+                        {!s.ativo && <Badge variant="secondary">Inativo</Badge>}
+                      </div>
+                      {s.categoria && <p className="text-xs text-muted-foreground mt-0.5">{s.categoria}</p>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      {s.preco_a_partir && (
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">a partir de</p>
+                      )}
+                      <p className="font-semibold text-primary">{brl(Number(s.valor))}</p>
+                      {s.duracao_min ? (
+                        <p className="text-xs text-muted-foreground">{s.duracao_min} min</p>
+                      ) : null}
+                    </div>
+                  </div>
 
             {s.descricao && <p className="text-sm text-muted-foreground line-clamp-2">{s.descricao}</p>}
 
