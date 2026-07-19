@@ -171,13 +171,73 @@ function AgendaPage() {
   const [prefill, setPrefill] = useState<{ cliente?: string; pet?: string }>({});
 
   // Abrir dialog automaticamente quando vier ?cliente=&pet= na URL
+  // Valida existência e vínculo pet→cliente antes de abrir.
   useEffect(() => {
-    if (search.cliente || search.pet) {
-      setPrefill({ cliente: search.cliente, pet: search.pet });
-      setOpenNew(true);
-      // limpa a query string para não reabrir ao fechar o diálogo
-      navigateSelf({ search: {}, replace: true });
-    }
+    const cli = search.cliente;
+    const pet = search.pet;
+    if (!cli && !pet) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        let clienteOk = true;
+        if (cli) {
+          const { data, error } = await supabase
+            .from("clientes").select("id").eq("id", cli).maybeSingle();
+          if (error) throw error;
+          clienteOk = !!data;
+          if (!clienteOk) {
+            toast.error("Cliente não encontrado", {
+              description: "O link aponta para um cliente que não existe mais.",
+            });
+          }
+        }
+
+        let petOk = true;
+        let petClienteId: string | null = null;
+        if (pet) {
+          const { data, error } = await supabase
+            .from("pets").select("id, cliente_id").eq("id", pet).maybeSingle();
+          if (error) throw error;
+          if (!data) {
+            petOk = false;
+            toast.error("Pet não encontrado", {
+              description: "O link aponta para um pet que não existe mais.",
+            });
+          } else {
+            petClienteId = data.cliente_id;
+            if (cli && clienteOk && petClienteId !== cli) {
+              petOk = false;
+              toast.error("Pet não pertence a este cliente", {
+                description: "O vínculo foi alterado. Selecione novamente.",
+              });
+            }
+          }
+        }
+
+        if (cancelled) return;
+
+        const nextPrefill: { cliente?: string; pet?: string } = {};
+        if (cli && clienteOk) nextPrefill.cliente = cli;
+        if (pet && petOk) nextPrefill.pet = pet;
+        if (!nextPrefill.cliente && petOk && petClienteId) {
+          nextPrefill.cliente = petClienteId;
+        }
+
+        setPrefill(nextPrefill);
+        setOpenNew(true);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "Tente novamente.";
+        toast.error("Não foi possível validar o link", { description: msg });
+      } finally {
+        if (!cancelled) {
+          navigateSelf({ search: {}, replace: true });
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.cliente, search.pet]);
   const qc = useQueryClient();
