@@ -540,7 +540,19 @@ function AgendamentoRow({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {["agendado","confirmado","aguardando","em_atendimento"].includes(row.status) && (
+              <Button
+                size="sm"
+                className="gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={iniciando}
+                onClick={onIniciar}
+                title={row.status === "em_atendimento" ? "Retomar atendimento" : "Iniciar atendimento"}
+              >
+                <Play className="h-3.5 w-3.5" />
+                {row.status === "em_atendimento" ? "Retomar" : "Iniciar atendimento"}
+              </Button>
+            )}
             {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando" || row.status === "finalizado") && (
               <Button
                 variant="outline"
