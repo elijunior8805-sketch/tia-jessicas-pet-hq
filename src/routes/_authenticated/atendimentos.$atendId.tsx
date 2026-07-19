@@ -328,7 +328,7 @@ function AtendimentoDetalhe() {
   if (pet?.cuidados_saude) alertas.push(`Saúde: ${pet.cuidados_saude}`);
 
   const subtitleParts = [
-    pet?.especie, pet?.raca, pet?.porte, cliente?.whatsapp,
+    pet?.raca, pet?.porte, cliente?.whatsapp,
   ].filter(Boolean);
 
   // ---- Handlers ----
