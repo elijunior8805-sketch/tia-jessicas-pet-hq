@@ -800,6 +800,7 @@ function FinanceiroPage() {
           onOpenChange={(v) => !v && setRecibo(null)}
           data={recibo.data}
           telefone={recibo.telefone}
+          referenciaId={recibo.referenciaId}
         />
       )}
     </div>
