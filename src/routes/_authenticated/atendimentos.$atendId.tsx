@@ -1068,6 +1068,33 @@ function AtendimentoDetalhe() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Excluir dialog */}
+      <Dialog open={excluirOpen} onOpenChange={setExcluirOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir atendimento</DialogTitle>
+            <DialogDescription>
+              Esta ação é permanente. Ao excluir este atendimento:
+              <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
+                <li>Os pagamentos vinculados serão <strong>removidos</strong>.</li>
+                <li>O agendamento vinculado voltará para <strong>Agendado</strong>.</li>
+                <li>O histórico do pet (último banho, última tosa, próxima visita) será <strong>recalculado</strong> a partir dos atendimentos restantes.</li>
+              </ul>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirOpen(false)} disabled={excluirMut.isPending}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => excluirMut.mutate()}
+              disabled={excluirMut.isPending}
+            >
+              {excluirMut.isPending ? "Excluindo…" : "Confirmar exclusão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }
