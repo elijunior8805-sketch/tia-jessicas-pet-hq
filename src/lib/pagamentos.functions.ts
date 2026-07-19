@@ -53,7 +53,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
       .select(
         "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(pets:pet_id(nome))"
       )
-      .in("status", statusFiltro as unknown as string[])
+      .in("status", [...statusFiltro])
       .order("vencimento", { ascending: true, nullsFirst: false })
       .limit(data.limit);
 
