@@ -75,6 +75,11 @@ const ConfigSchema = z.object({
   aniversario_pet_ativo: z.boolean(),
   aniversario_hora: z.string(),
   aniversario_template: z.string().min(5).max(2000),
+  aniversario_tutor_ativo: z.boolean(),
+  aniversario_tutor_template: z.string().min(5).max(2000),
+  petversario_ativo: z.boolean(),
+  petversario_template: z.string().min(5).max(2000),
+  datas_especiais_ativo: z.boolean(),
 });
 
 export const salvarLembretesConfig = createServerFn({ method: "POST" })
