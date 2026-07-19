@@ -373,6 +373,151 @@ export type Database = {
         }
         Relationships: []
       }
+      campanhas: {
+        Row: {
+          agendada_para: string | null
+          concluida_em: string | null
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          filtros: Json
+          id: string
+          mensagem: string
+          nome: string
+          status: string
+          total_destinatarios: number
+          total_enviados: number
+          total_falhas: number
+          updated_at: string
+        }
+        Insert: {
+          agendada_para?: string | null
+          concluida_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          filtros?: Json
+          id?: string
+          mensagem: string
+          nome: string
+          status?: string
+          total_destinatarios?: number
+          total_enviados?: number
+          total_falhas?: number
+          updated_at?: string
+        }
+        Update: {
+          agendada_para?: string | null
+          concluida_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          filtros?: Json
+          id?: string
+          mensagem?: string
+          nome?: string
+          status?: string
+          total_destinatarios?: number
+          total_enviados?: number
+          total_falhas?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      campanhas_destinatarios: {
+        Row: {
+          campanha_id: string
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          mensagem_renderizada: string
+          pet_id: string | null
+          pet_nome: string | null
+          status: string
+          telefone: string | null
+          tentativas: number
+          updated_at: string
+        }
+        Insert: {
+          campanha_id: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          mensagem_renderizada: string
+          pet_id?: string | null
+          pet_nome?: string | null
+          status?: string
+          telefone?: string | null
+          tentativas?: number
+          updated_at?: string
+        }
+        Update: {
+          campanha_id?: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          mensagem_renderizada?: string
+          pet_id?: string | null
+          pet_nome?: string | null
+          status?: string
+          telefone?: string | null
+          tentativas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanhas_destinatarios_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanhas_destinatarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanhas_destinatarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "campanhas_destinatarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "campanhas_destinatarios_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanhas_destinatarios_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
+      }
       categorias_financeiras: {
         Row: {
           ativo: boolean
