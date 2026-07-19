@@ -24,11 +24,12 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedComunicacaoRouteImport } from './routes/_authenticated/comunicacao'
 import { Route as AuthenticatedComprasRouteImport } from './routes/_authenticated/compras'
-import { Route as AuthenticatedAtendimentosRouteImport } from './routes/_authenticated/atendimentos'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes.index'
+import { Route as AuthenticatedAtendimentosIndexRouteImport } from './routes/_authenticated/atendimentos.index'
 import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authenticated/clientes.novo'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
+import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -109,12 +110,6 @@ const AuthenticatedComprasRoute = AuthenticatedComprasRouteImport.update({
   path: '/compras',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAtendimentosRoute =
-  AuthenticatedAtendimentosRouteImport.update({
-    id: '/atendimentos',
-    path: '/atendimentos',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -124,6 +119,12 @@ const AuthenticatedClientesIndexRoute =
   AuthenticatedClientesIndexRouteImport.update({
     id: '/clientes/',
     path: '/clientes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAtendimentosIndexRoute =
+  AuthenticatedAtendimentosIndexRouteImport.update({
+    id: '/atendimentos/',
+    path: '/atendimentos/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClientesNovoRoute =
@@ -137,6 +138,12 @@ const AuthenticatedClientesIdRoute = AuthenticatedClientesIdRouteImport.update({
   path: '/clientes/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAtendimentosAtendIdRoute =
+  AuthenticatedAtendimentosAtendIdRouteImport.update({
+    id: '/atendimentos/$atendId',
+    path: '/atendimentos/$atendId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPetsPetIdFichaRoute =
   AuthenticatedPetsPetIdFichaRouteImport.update({
     id: '/pets/$petId/ficha',
@@ -149,7 +156,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agenda': typeof AuthenticatedAgendaRoute
-  '/atendimentos': typeof AuthenticatedAtendimentosRoute
   '/compras': typeof AuthenticatedComprasRoute
   '/comunicacao': typeof AuthenticatedComunicacaoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
@@ -161,8 +167,10 @@ export interface FileRoutesByFullPath {
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
+  '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
@@ -171,7 +179,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agenda': typeof AuthenticatedAgendaRoute
-  '/atendimentos': typeof AuthenticatedAtendimentosRoute
   '/compras': typeof AuthenticatedComprasRoute
   '/comunicacao': typeof AuthenticatedComunicacaoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
@@ -183,8 +190,10 @@ export interface FileRoutesByTo {
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
+  '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/atendimentos': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
@@ -195,7 +204,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
-  '/_authenticated/atendimentos': typeof AuthenticatedAtendimentosRoute
   '/_authenticated/compras': typeof AuthenticatedComprasRoute
   '/_authenticated/comunicacao': typeof AuthenticatedComunicacaoRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
@@ -207,8 +215,10 @@ export interface FileRoutesById {
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
+  '/_authenticated/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/_authenticated/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
 }
@@ -219,7 +229,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agenda'
-    | '/atendimentos'
     | '/compras'
     | '/comunicacao'
     | '/configuracoes'
@@ -231,8 +240,10 @@ export interface FileRouteTypes {
     | '/pagamentos-abertos'
     | '/relatorios'
     | '/servicos'
+    | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/atendimentos/'
     | '/clientes/'
     | '/pets/$petId/ficha'
   fileRoutesByTo: FileRoutesByTo
@@ -241,7 +252,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agenda'
-    | '/atendimentos'
     | '/compras'
     | '/comunicacao'
     | '/configuracoes'
@@ -253,8 +263,10 @@ export interface FileRouteTypes {
     | '/pagamentos-abertos'
     | '/relatorios'
     | '/servicos'
+    | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/atendimentos'
     | '/clientes'
     | '/pets/$petId/ficha'
   id:
@@ -264,7 +276,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/agenda'
-    | '/_authenticated/atendimentos'
     | '/_authenticated/compras'
     | '/_authenticated/comunicacao'
     | '/_authenticated/configuracoes'
@@ -276,8 +287,10 @@ export interface FileRouteTypes {
     | '/_authenticated/pagamentos-abertos'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
+    | '/_authenticated/atendimentos/$atendId'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/novo'
+    | '/_authenticated/atendimentos/'
     | '/_authenticated/clientes/'
     | '/_authenticated/pets/$petId/ficha'
   fileRoutesById: FileRoutesById
@@ -396,13 +409,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedComprasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/atendimentos': {
-      id: '/_authenticated/atendimentos'
-      path: '/atendimentos'
-      fullPath: '/atendimentos'
-      preLoaderRoute: typeof AuthenticatedAtendimentosRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/agenda': {
       id: '/_authenticated/agenda'
       path: '/agenda'
@@ -415,6 +421,13 @@ declare module '@tanstack/react-router' {
       path: '/clientes'
       fullPath: '/clientes/'
       preLoaderRoute: typeof AuthenticatedClientesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/atendimentos/': {
+      id: '/_authenticated/atendimentos/'
+      path: '/atendimentos'
+      fullPath: '/atendimentos/'
+      preLoaderRoute: typeof AuthenticatedAtendimentosIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/clientes/novo': {
@@ -431,6 +444,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientesIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/atendimentos/$atendId': {
+      id: '/_authenticated/atendimentos/$atendId'
+      path: '/atendimentos/$atendId'
+      fullPath: '/atendimentos/$atendId'
+      preLoaderRoute: typeof AuthenticatedAtendimentosAtendIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/pets/$petId/ficha': {
       id: '/_authenticated/pets/$petId/ficha'
       path: '/pets/$petId/ficha'
@@ -443,7 +463,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
-  AuthenticatedAtendimentosRoute: typeof AuthenticatedAtendimentosRoute
   AuthenticatedComprasRoute: typeof AuthenticatedComprasRoute
   AuthenticatedComunicacaoRoute: typeof AuthenticatedComunicacaoRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
@@ -455,15 +474,16 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
+  AuthenticatedAtendimentosAtendIdRoute: typeof AuthenticatedAtendimentosAtendIdRoute
   AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
   AuthenticatedClientesNovoRoute: typeof AuthenticatedClientesNovoRoute
+  AuthenticatedAtendimentosIndexRoute: typeof AuthenticatedAtendimentosIndexRoute
   AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
   AuthenticatedPetsPetIdFichaRoute: typeof AuthenticatedPetsPetIdFichaRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
-  AuthenticatedAtendimentosRoute: AuthenticatedAtendimentosRoute,
   AuthenticatedComprasRoute: AuthenticatedComprasRoute,
   AuthenticatedComunicacaoRoute: AuthenticatedComunicacaoRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
@@ -475,8 +495,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
+  AuthenticatedAtendimentosAtendIdRoute: AuthenticatedAtendimentosAtendIdRoute,
   AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
   AuthenticatedClientesNovoRoute: AuthenticatedClientesNovoRoute,
+  AuthenticatedAtendimentosIndexRoute: AuthenticatedAtendimentosIndexRoute,
   AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,
   AuthenticatedPetsPetIdFichaRoute: AuthenticatedPetsPetIdFichaRoute,
 }
