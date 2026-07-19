@@ -72,7 +72,8 @@ type Pag = {
   status: string;
   vencimento: string | null;
   data_pagamento: string | null;
-  cliente: { nome: string } | null;
+  observacoes: string | null;
+  cliente: { nome: string; telefone: string | null; whatsapp: string | null } | null;
 };
 
 type Parc = {
@@ -85,12 +86,18 @@ type Parc = {
   data_pagamento: string | null;
   status: string;
   forma_pagamento: string | null;
+  observacoes: string | null;
   compra: {
     descricao: string | null;
     numero_documento: string | null;
-    fornecedor: { nome: string } | null;
+    fornecedor: { nome: string; telefone: string | null; whatsapp: string | null } | null;
     categoria: { nome: string } | null;
   } | null;
+};
+
+type ReciboState = {
+  data: ReciboData;
+  telefone: string | null;
 };
 
 const brl = (v: number) =>
