@@ -301,7 +301,7 @@ function LancamentoManualDialog({ onCreated }: { onCreated: () => void }) {
             centro_custo_id: centroCustoId !== "none" ? centroCustoId : null,
             data_compra: data,
             valor_total: v,
-            forma_pagamento: forma,
+            forma_pagamento: forma as any,
             parcelas: 1,
             primeiro_vencimento: vencimento,
           })
@@ -316,7 +316,7 @@ function LancamentoManualDialog({ onCreated }: { onCreated: () => void }) {
               valor_pago: v,
               data_pagamento: data,
               status: "pago",
-              forma_pagamento: forma,
+              forma_pagamento: forma as any,
             })
             .eq("compra_id", compra.id);
         }
