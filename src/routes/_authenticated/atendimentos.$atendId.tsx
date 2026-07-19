@@ -211,7 +211,7 @@ function AtendimentoDetalhe() {
         etapa_atual: nextEtapa,
         ...(extra ?? {}),
       };
-      const { error } = await supabase.from("atendimentos").update(patch).eq("id", atendId);
+      const { error } = await supabase.from("atendimentos").update(patch as never).eq("id", atendId);
       if (error) throw error;
     },
     onSuccess: () => {
