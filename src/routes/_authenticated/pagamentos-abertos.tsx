@@ -55,6 +55,8 @@ function PagamentosAbertosPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [loteAberto, setLoteAberto] = useState(false);
   const [loteResultado, setLoteResultado] = useState<CobrancaLoteItem[] | null>(null);
+  const composer = useWhatsAppComposer();
+
 
   const query = useQuery({
     queryKey: ["pagamentos-abertos", { somenteAtrasados }],
