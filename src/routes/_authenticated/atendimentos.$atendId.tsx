@@ -28,6 +28,7 @@ import {
 } from "@/lib/atendimento-utils";
 import { generateAtendimentoPDF } from "@/lib/atendimento-pdf";
 import { useMyProfile } from "@/hooks/use-my-profile";
+import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
 export const Route = createFileRoute("/_authenticated/atendimentos/$atendId")({
   component: AtendimentoDetalhe,
