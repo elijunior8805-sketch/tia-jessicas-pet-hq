@@ -39,7 +39,10 @@ import {
   Clock,
   CheckCircle2,
   Plus,
+  FileText,
 } from "lucide-react";
+import { ReciboDialog } from "@/components/recibo-dialog";
+import type { ReciboData } from "@/lib/recibo-pdf";
 import { toast } from "sonner";
 import {
   format,
@@ -69,7 +72,8 @@ type Pag = {
   status: string;
   vencimento: string | null;
   data_pagamento: string | null;
-  cliente: { nome: string } | null;
+  observacoes: string | null;
+  cliente: { nome: string; telefone: string | null; whatsapp: string | null } | null;
 };
 
 type Parc = {
@@ -82,12 +86,18 @@ type Parc = {
   data_pagamento: string | null;
   status: string;
   forma_pagamento: string | null;
+  observacoes: string | null;
   compra: {
     descricao: string | null;
     numero_documento: string | null;
-    fornecedor: { nome: string } | null;
+    fornecedor: { nome: string; telefone: string | null; whatsapp: string | null } | null;
     categoria: { nome: string } | null;
   } | null;
+};
+
+type ReciboState = {
+  data: ReciboData;
+  telefone: string | null;
 };
 
 const brl = (v: number) =>
@@ -296,12 +306,78 @@ function FinanceiroPage() {
     setFim(format(endOfMonth(base), "yyyy-MM-dd"));
   };
 
+  const [recibo, setRecibo] = useState<ReciboState | null>(null);
+
+  const { data: empresa } = useQuery({
+    queryKey: ["empresa-config-fin"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("empresa_config")
+        .select("nome_fantasia, cnpj, telefone, endereco")
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const empresaInfo = {
+    nome: empresa?.nome_fantasia ?? "Spa de Pet Tia Jéssica",
+    cnpj: empresa?.cnpj ?? null,
+    telefone: empresa?.telefone ?? null,
+    endereco: empresa?.endereco ?? null,
+  };
+
+  const abrirReciboReceita = (p: Pag) => {
+    const numero = `RC-${format(new Date(), "yyyyMMdd")}-${p.id.slice(0, 6)}`;
+    setRecibo({
+      data: {
+        tipo: "receita",
+        numero,
+        data: p.data_pagamento || format(new Date(), "yyyy-MM-dd"),
+        contraparte: p.cliente?.nome || "Cliente",
+        descricao:
+          p.observacoes ||
+          `Pagamento de serviços do spa · vencimento ${
+            p.vencimento ? format(parseISO(p.vencimento), "dd/MM/yyyy") : "—"
+          }`,
+        valor: Number(p.valor_total),
+        forma: p.forma,
+        empresa: empresaInfo,
+      },
+      telefone: p.cliente?.whatsapp || p.cliente?.telefone || null,
+    });
+  };
+
+  const abrirReciboDespesa = (p: Parc) => {
+    const numero = `CP-${format(new Date(), "yyyyMMdd")}-${p.id.slice(0, 6)}`;
+    setRecibo({
+      data: {
+        tipo: "despesa",
+        numero,
+        data: p.data_pagamento || format(new Date(), "yyyy-MM-dd"),
+        contraparte: p.compra?.fornecedor?.nome || "Fornecedor",
+        descricao:
+          p.compra?.descricao ||
+          p.compra?.numero_documento ||
+          `Parcela ${p.numero}/${p.total_parcelas}`,
+        valor: Number(p.valor),
+        forma: p.forma_pagamento || null,
+        categoria: p.compra?.categoria?.nome || null,
+        empresa: empresaInfo,
+      },
+      telefone:
+        p.compra?.fornecedor?.whatsapp || p.compra?.fornecedor?.telefone || null,
+    });
+  };
+
   const { data: pagamentos = [] } = useQuery<Pag[]>({
     queryKey: ["fin-pag", inicio, fim],
     queryFn: async () => {
       const { data } = await supabase
         .from("pagamentos")
-        .select("id, valor_total, valor_pago, forma, status, vencimento, data_pagamento, cliente:clientes(nome)")
+        .select(
+          "id, valor_total, valor_pago, forma, status, vencimento, data_pagamento, observacoes, cliente:clientes(nome, telefone, whatsapp)",
+        )
         .or(
           `and(data_pagamento.gte.${inicio},data_pagamento.lte.${fim}),and(vencimento.gte.${inicio},vencimento.lte.${fim})`,
         )
@@ -316,9 +392,9 @@ function FinanceiroPage() {
       const { data } = await supabase
         .from("compras_parcelas")
         .select(
-          `id, numero, total_parcelas, valor, valor_pago, vencimento, data_pagamento, status, forma_pagamento,
+          `id, numero, total_parcelas, valor, valor_pago, vencimento, data_pagamento, status, forma_pagamento, observacoes,
            compra:compras(descricao, numero_documento,
-             fornecedor:fornecedores(nome),
+             fornecedor:fornecedores(nome, telefone, whatsapp),
              categoria:categorias_financeiras(nome))`,
         )
         .or(
@@ -340,10 +416,16 @@ function FinanceiroPage() {
         })
         .eq("id", p.id);
       if (error) throw error;
+      return p;
     },
-    onSuccess: () => {
+    onSuccess: (p) => {
       toast.success("Parcela quitada");
       qc.invalidateQueries({ queryKey: ["fin-parc"] });
+      abrirReciboDespesa({
+        ...p,
+        data_pagamento: format(new Date(), "yyyy-MM-dd"),
+        status: "pago",
+      });
     },
     onError: (e: any) => toast.error(e.message || "Erro"),
   });
@@ -359,10 +441,16 @@ function FinanceiroPage() {
         })
         .eq("id", p.id);
       if (error) throw error;
+      return p;
     },
-    onSuccess: () => {
+    onSuccess: (p) => {
       toast.success("Recebimento registrado");
       qc.invalidateQueries({ queryKey: ["fin-pag"] });
+      abrirReciboReceita({
+        ...p,
+        data_pagamento: format(new Date(), "yyyy-MM-dd"),
+        status: "pago",
+      });
     },
     onError: (e: any) => toast.error(e.message || "Erro"),
   });
@@ -591,15 +679,25 @@ function FinanceiroPage() {
                           {brl(Number(p.valor_total))}
                         </TableCell>
                         <TableCell className="text-right">
-                          {p.status !== "pago" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => marcarPagRecebido.mutate(p)}
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Receber
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-1">
+                            {p.status !== "pago" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => marcarPagRecebido.mutate(p)}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Receber
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => abrirReciboReceita(p)}
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1" /> Recibo
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -662,15 +760,25 @@ function FinanceiroPage() {
                           {brl(Number(p.valor))}
                         </TableCell>
                         <TableCell className="text-right">
-                          {p.status !== "pago" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => marcarParcelaPaga.mutate(p)}
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Pagar
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-1">
+                            {p.status !== "pago" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => marcarParcelaPaga.mutate(p)}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Pagar
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => abrirReciboDespesa(p)}
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1" /> Comprovante
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -681,6 +789,15 @@ function FinanceiroPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {recibo && (
+        <ReciboDialog
+          open={!!recibo}
+          onOpenChange={(v) => !v && setRecibo(null)}
+          data={recibo.data}
+          telefone={recibo.telefone}
+        />
+      )}
     </div>
   );
 }
