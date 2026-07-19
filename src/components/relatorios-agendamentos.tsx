@@ -32,7 +32,15 @@ type Destinatario = { nome: string; whatsapp: string };
 
 const empty = (): {
   id?: string; nome: string; hora_envio: string; destinatarios: Destinatario[]; ativo: boolean;
-} => ({ nome: "", hora_envio: "08:00", destinatarios: [{ nome: "", whatsapp: "" }], ativo: true });
+  kpis: KpiId[]; titulo_mensagem: string; rodape_mensagem: string;
+} => ({
+  nome: "", hora_envio: "08:00",
+  destinatarios: [{ nome: "", whatsapp: "" }],
+  ativo: true,
+  kpis: ["faturamento", "atendimentos", "ticket", "clientes", "leva_traz", "a_receber"],
+  titulo_mensagem: "",
+  rodape_mensagem: "",
+});
 
 export function RelatoriosAgendamentos() {
   const qc = useQueryClient();
