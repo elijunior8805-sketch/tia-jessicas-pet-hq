@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
@@ -8,17 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   ArrowLeft, AlertTriangle, Camera, Upload, Trash2, Star,
   CheckCircle2, FileText, PawPrint, Sparkles, MessageCircle,
+  Download, Printer, Eye, ClipboardList, Lock, Plus, Minus,
 } from "lucide-react";
 import {
   brl, sumItens, itemFromServico, isBanho, isTosa,
-  FORMAS_PAGAMENTO, type ServicoItem, type FotoItem,
+  FORMAS_PAGAMENTO, getEtapaStatus, isEtapaConfirmada,
+  type ServicoItem, type FotoItem, type EtapaStatus,
 } from "@/lib/atendimento-utils";
 import { generateAtendimentoPDF } from "@/lib/atendimento-pdf";
 import { useMyProfile } from "@/hooks/use-my-profile";
@@ -55,13 +61,20 @@ function useSignedUrl(path: string | null | undefined) {
 }
 
 function Thumb({
-  path, onRemove, onStar, starred, disabled,
-}: { path: string; onRemove?: () => void; onStar?: () => void; starred?: boolean; disabled?: boolean }) {
+  path, onRemove, onStar, starred, disabled, onClick,
+}: {
+  path: string; onRemove?: () => void; onStar?: () => void;
+  starred?: boolean; disabled?: boolean; onClick?: () => void;
+}) {
   const { data: url } = useSignedUrl(path);
   return (
     <div className="relative group">
       {url ? (
-        <img src={url} alt="foto" className={`h-24 w-24 rounded-lg object-cover border ${starred ? "ring-2 ring-primary" : ""}`} />
+        <img
+          src={url} alt="foto"
+          onClick={onClick}
+          className={`h-24 w-24 rounded-lg object-cover border cursor-zoom-in ${starred ? "ring-2 ring-primary" : ""}`}
+        />
       ) : (
         <div className="h-24 w-24 rounded-lg bg-muted animate-pulse" />
       )}
@@ -90,29 +103,58 @@ function Thumb({
 }
 
 function UploadButton({
-  onFile, disabled,
-}: { onFile: (f: File) => Promise<void> | void; disabled?: boolean }) {
+  onFile, disabled, label = "Adicionar foto",
+}: { onFile: (f: File) => Promise<void> | void; disabled?: boolean; label?: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <label className="inline-flex">
       <input
-        type="file" accept="image/*" multiple className="hidden"
+        type="file" accept="image/*" multiple capture="environment" className="hidden"
         disabled={disabled || busy}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
           if (files.length === 0) return;
           setBusy(true);
-          try { for (const f of files) await onFile(f); } finally { setBusy(false); }
+          try { for (const f of files) await onFile(f); toast.success("Foto(s) enviada(s)"); }
+          catch (err: any) { toast.error(err.message ?? "Erro ao enviar foto"); }
+          finally { setBusy(false); }
         }}
       />
       <span className={
         "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm cursor-pointer hover:bg-accent transition " +
         (disabled || busy ? "opacity-60 pointer-events-none" : "")
       }>
-        <Upload className="h-4 w-4" /> {busy ? "Enviando…" : "adicionar"}
+        <Upload className="h-4 w-4" /> {busy ? "Enviando…" : label}
       </span>
     </label>
+  );
+}
+
+// ---------- Etapa badge + confirm ----------
+
+function EtapaBadge({ st }: { st: EtapaStatus }) {
+  if (st.status === "concluida") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-success/15 text-success border border-success/30 px-2.5 py-0.5 text-[11px] font-medium">
+        <CheckCircle2 className="h-3 w-3" /> Concluída
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-[11px] font-medium">
+      Pendente
+    </span>
+  );
+}
+
+function ConfirmadaFooter({ st }: { st: EtapaStatus }) {
+  if (st.status !== "concluida") return null;
+  const dt = st.confirmado_em ? new Date(st.confirmado_em).toLocaleString("pt-BR") : "—";
+  return (
+    <p className="mt-3 text-[11px] text-muted-foreground">
+      Confirmada em {dt} por {st.confirmado_por_nome ?? "—"}
+    </p>
   );
 }
 
@@ -156,7 +198,7 @@ function AtendimentoDetalhe() {
         *,
         clientes(id, nome, whatsapp, vip),
         pets(id, nome, porte, raca, foto_url, alergias, temperamento, necessita_focinheira, cuidados_saude, observacoes),
-        agendamentos(id, data, hora)
+        agendamentos(id, data, hora, observacoes)
       `).eq("id", atendId).maybeSingle();
       if (error) throw error;
       return data;
@@ -191,115 +233,46 @@ function AtendimentoDetalhe() {
     onError: (e: any) => toast.error(e.message ?? "Erro ao salvar"),
   });
 
-  const encerrarMut = useMutation({
-    mutationFn: async () => {
-      if (!atendimento) return;
-      const executados = ((atendimento as any).servicos_executados ?? []) as ServicoItem[];
-      const valorExec = sumItens(executados);
-      const taxa = Number((atendimento as any).taxa_leva_traz ?? 0);
-      const desconto = Number((atendimento as any).desconto ?? 0);
-      const total = Math.max(0, valorExec + taxa - desconto);
+  const confirmarEtapa = async (num: number, extraPatch: Record<string, any> = {}) => {
+    const map = { ...((atendimento as any)?.etapas_status ?? {}) };
+    map[String(num)] = {
+      status: "concluida",
+      confirmado_em: new Date().toISOString(),
+      confirmado_por: myProfile?.id ?? null,
+      confirmado_por_nome: myProfile?.nome ?? null,
+    };
+    await patchMut.mutateAsync({ ...extraPatch, etapas_status: map });
+    toast.success("Etapa confirmada");
+  };
 
-      const enriched = {
-        ...atendimento,
-        servicos_executados: executados,
-        valor_executado: valorExec,
-        encerrado_em: new Date().toISOString(),
-        data_fim: (atendimento as any).data_fim ?? new Date().toISOString(),
-      };
-
-      let pdfBlob: Blob | null = null;
-      try {
-        pdfBlob = generateAtendimentoPDF({
-          atendimento: enriched, ocorrencias, empresa: empresa ?? null,
-          operador: myProfile?.nome ?? null, returnBlob: true,
-        }) as Blob;
-      } catch { /* segue */ }
-
-      let pdf_path: string | null = null;
-      if (pdfBlob) {
-        const path = `atendimentos/${atendId}/relatorio/relatorio-${Date.now()}.pdf`;
-        const { error: upErr } = await supabase.storage
-          .from("spa-fotos").upload(path, pdfBlob, { upsert: true, contentType: "application/pdf" });
-        if (!upErr) pdf_path = path;
-      }
-
-      const { error } = await supabase.from("atendimentos").update({
-        finalizado: true,
-        data_fim: new Date().toISOString(),
-        encerrado_em: new Date().toISOString(),
-        encerrado_por: myProfile?.id ?? null,
-        servicos_executados: executados,
-        valor_executado: valorExec,
-        pdf_path: pdf_path ?? (atendimento as any).pdf_path,
-      } as never).eq("id", atendId);
-      if (error) throw error;
-
-      if ((atendimento as any).agendamento_id) {
-        await supabase.from("agendamentos")
-          .update({ status: "finalizado" })
-          .eq("id", (atendimento as any).agendamento_id);
-      }
-
-      const status = (atendimento as any).pagamento_status === "pago" ? "pago" : "pendente";
-      const forma = ((atendimento as any).pagamento_forma ?? "pendente") as any;
-      const valorPago = status === "pago" ? total : Number((atendimento as any).valor_pago ?? 0);
-      const hojeISO = new Date().toISOString().slice(0, 10);
-      const pagPayload = {
-        atendimento_id: atendId,
-        cliente_id: (atendimento as any).cliente_id,
-        valor_total: total,
-        valor_pago: valorPago,
-        forma,
-        status: status as any,
-        vencimento: hojeISO,
-        data_pagamento: status === "pago" ? hojeISO : null,
-      };
-      const { data: existing } = await supabase.from("pagamentos")
-        .select("id").eq("atendimento_id", atendId).maybeSingle();
-      if (existing) await supabase.from("pagamentos").update(pagPayload).eq("id", existing.id);
-      else await supabase.from("pagamentos").insert(pagPayload);
-
-      if ((atendimento as any).pet_id) {
-        const petPatch: Record<string, any> = {
-          proxima_visita: (atendimento as any).proxima_visita ?? null,
-        };
-        if (executados.some(isBanho)) petPatch.ultimo_banho = hojeISO;
-        if (executados.some(isTosa)) petPatch.ultima_tosa = hojeISO;
-        await supabase.from("pets").update(petPatch as any).eq("id", (atendimento as any).pet_id);
-      }
-
-      try {
-        generateAtendimentoPDF({
-          atendimento: enriched, ocorrencias, empresa: empresa ?? null,
-          operador: myProfile?.nome ?? null,
-        });
-      } catch {}
-    },
-    onSuccess: () => {
-      toast.success("Atendimento encerrado");
-      qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
-      qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
-      qc.invalidateQueries({ queryKey: ["agenda"] });
-      navigate({ to: "/atendimentos" });
-    },
-    onError: (e: any) => toast.error(e.message ?? "Erro ao encerrar"),
-  });
-
-  // Local state for fields with typing lag
+  // Local state for inputs
   const [obs, setObs] = useState("");
+  const [obsInt, setObsInt] = useState("");
   const [rec, setRec] = useState("");
   const [prox, setProx] = useState("");
   const [taxa, setTaxa] = useState(0);
   const [desc, setDesc] = useState(0);
+  const [valorPagoInput, setValorPagoInput] = useState(0);
+  const [formaPag, setFormaPag] = useState<string>("");
+  const [focinheira, setFocinheira] = useState(false);
+  const [pausa, setPausa] = useState(false);
+  const [zoomFoto, setZoomFoto] = useState<string | null>(null);
+  const [motivoReabrir, setMotivoReabrir] = useState("");
+  const [reabrirOpen, setReabrirOpen] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!atendimento) return;
     setObs((atendimento as any).observacoes ?? "");
+    setObsInt((atendimento as any).observacoes_internas ?? "");
     setRec((atendimento as any).recomendacoes ?? "");
     setProx((atendimento as any).proxima_visita ?? "");
     setTaxa(Number((atendimento as any).taxa_leva_traz ?? 0));
     setDesc(Number((atendimento as any).desconto ?? 0));
+    setValorPagoInput(Number((atendimento as any).valor_pago ?? 0));
+    setFormaPag((atendimento as any).pagamento_forma ?? "");
+    setFocinheira(!!(atendimento as any).usou_focinheira);
+    setPausa(!!(atendimento as any).precisou_pausa);
   }, [atendimento?.id]);
 
   if (isLoading) {
@@ -314,12 +287,17 @@ function AtendimentoDetalhe() {
   const encerrado = !!(atendimento as any).encerrado_em;
   const readOnly = encerrado && !isAdmin;
 
-  const executados: ServicoItem[] = ((atendimento as any).servicos_executados ?? []) as ServicoItem[];
+  const solicitados: ServicoItem[] = ((atendimento as any).servicos_solicitados ?? (atendimento as any).servicos_planejados ?? []) as ServicoItem[];
+  const extras: ServicoItem[] = ((atendimento as any).servicos_extras ?? []) as ServicoItem[];
   const fotosAntes: FotoItem[] = ((atendimento as any).fotos_antes ?? []) as FotoItem[];
   const fotosDepois: FotoItem[] = ((atendimento as any).fotos_depois ?? []) as FotoItem[];
 
-  const subtotal = sumItens(executados);
+  const valorSolicitados = sumItens(solicitados);
+  const valorExtras = sumItens(extras);
+  const subtotal = valorSolicitados + valorExtras;
   const total = Math.max(0, subtotal + Number(taxa || 0) - Number(desc || 0));
+
+  const st = (n: number) => getEtapaStatus(atendimento, n);
 
   const alertas: string[] = [];
   if (pet?.alergias) alertas.push(`Alergia: ${pet.alergias}`);
@@ -327,13 +305,11 @@ function AtendimentoDetalhe() {
   if (pet?.necessita_focinheira) alertas.push("Precisa de focinheira");
   if (pet?.cuidados_saude) alertas.push(`Saúde: ${pet.cuidados_saude}`);
 
-  const subtitleParts = [
-    pet?.raca, pet?.porte, cliente?.whatsapp,
-  ].filter(Boolean);
+  const subtitleParts = [pet?.raca, pet?.porte, cliente?.whatsapp].filter(Boolean);
 
   // ---- Handlers ----
 
-  const addServico = (id: string) => {
+  const addExtra = (id: string) => {
     if (readOnly) return;
     const s = servicos.find((x: any) => x.id === id);
     if (!s) return;
@@ -341,24 +317,23 @@ function AtendimentoDetalhe() {
     novo.adicionado_por = myProfile?.id ?? null;
     novo.adicionado_por_nome = myProfile?.nome ?? null;
     novo.adicionado_em = new Date().toISOString();
-    patchMut.mutate({ servicos_executados: [...executados, novo] as any });
+    patchMut.mutate({ servicos_extras: [...extras, novo] as any });
   };
 
-  const updateServico = (idx: number, patch: Partial<ServicoItem>) => {
+  const updateExtra = (idx: number, patch: Partial<ServicoItem>) => {
     if (readOnly) return;
-    const next = executados.map((it, i) => {
+    const next = extras.map((it, i) => {
       if (i !== idx) return it;
       const merged = { ...it, ...patch };
       merged.valor_total = Number(merged.quantidade || 0) * Number(merged.valor_unit || 0);
       return merged;
     });
-    patchMut.mutate({ servicos_executados: next as any });
+    patchMut.mutate({ servicos_extras: next as any });
   };
 
-  const removeServico = (idx: number) => {
+  const removeExtra = (idx: number) => {
     if (readOnly) return;
-    const next = executados.filter((_, i) => i !== idx);
-    patchMut.mutate({ servicos_executados: next as any });
+    patchMut.mutate({ servicos_extras: extras.filter((_, i) => i !== idx) as any });
   };
 
   const addFoto = async (tipo: "antes" | "depois", file: File) => {
@@ -372,7 +347,7 @@ function AtendimentoDetalhe() {
     };
     const key = tipo === "antes" ? "fotos_antes" : "fotos_depois";
     const list = tipo === "antes" ? fotosAntes : fotosDepois;
-    patchMut.mutate({ [key]: [...list, novo] as any });
+    await patchMut.mutateAsync({ [key]: [...list, novo] as any });
   };
 
   const removeFoto = async (tipo: "antes" | "depois", idx: number) => {
@@ -395,28 +370,201 @@ function AtendimentoDetalhe() {
     });
   };
 
+  // ---- Pagamento ----
+
+  const confirmarPagamento = async () => {
+    if (!formaPag) { toast.error("Selecione a forma de pagamento"); return; }
+    const pago = ["dinheiro","pix","debito","credito"].includes(formaPag);
+    const parcial = formaPag === "parcial";
+    const valorPago = pago ? total : parcial ? Number(valorPagoInput || 0) : 0;
+    const status = pago ? "pago" : parcial && valorPago > 0 && valorPago < total ? "parcial" : "pendente";
+
+    await patchMut.mutateAsync({
+      pagamento_forma: formaPag,
+      pagamento_status: status,
+      valor_pago: valorPago,
+      taxa_leva_traz: Number(taxa || 0),
+      desconto: Number(desc || 0),
+    });
+
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const pagPayload: any = {
+      atendimento_id: atendId,
+      cliente_id: (atendimento as any).cliente_id,
+      valor_total: total,
+      valor_pago: valorPago,
+      forma: pago ? formaPag : parcial ? "pendente" : "pendente",
+      status: pago ? "pago" : "pendente",
+      vencimento: hojeISO,
+      data_pagamento: pago ? hojeISO : null,
+    };
+    const { data: existing } = await supabase.from("pagamentos")
+      .select("id").eq("atendimento_id", atendId).maybeSingle();
+    if (existing) await supabase.from("pagamentos").update(pagPayload).eq("id", existing.id);
+    else await supabase.from("pagamentos").insert(pagPayload);
+
+    await confirmarEtapa(7);
+  };
+
+  // ---- Relatório ----
+
+  const buildPDF = (returnBlob = false): Blob | string => {
+    const executados: ServicoItem[] = [...solicitados, ...extras];
+    const enriched = {
+      ...atendimento,
+      servicos_executados: executados,
+      valor_executado: subtotal,
+      taxa_leva_traz: Number(taxa || 0),
+      desconto: Number(desc || 0),
+      encerrado_em: (atendimento as any).encerrado_em ?? new Date().toISOString(),
+      data_fim: (atendimento as any).data_fim ?? new Date().toISOString(),
+    };
+    return generateAtendimentoPDF({
+      atendimento: enriched,
+      ocorrencias,
+      empresa: empresa ?? null,
+      operador: myProfile?.nome ?? null,
+      returnBlob,
+    }) as any;
+  };
+
+  const visualizarRelatorio = () => {
+    const blob = buildPDF(true) as Blob;
+    const url = URL.createObjectURL(blob);
+    setPdfPreview(url);
+  };
+
+  const baixarRelatorio = () => { buildPDF(false); };
+
+  const imprimirRelatorio = () => {
+    const blob = buildPDF(true) as Blob;
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (w) { setTimeout(() => { try { w.print(); } catch {} }, 500); }
+  };
+
+  const confirmarRelatorio = async () => {
+    const blob = buildPDF(true) as Blob;
+    const path = `atendimentos/${atendId}/relatorio/relatorio-${Date.now()}.pdf`;
+    const { error } = await supabase.storage.from("spa-fotos")
+      .upload(path, blob, { upsert: true, contentType: "application/pdf" });
+    if (error) { toast.error("Erro ao salvar PDF"); return; }
+    await confirmarEtapa(6, { pdf_path: path });
+  };
+
+  // ---- Encerrar ----
+
+  const encerrarMut = useMutation({
+    mutationFn: async () => {
+      const pendentes: string[] = [];
+      const need = [
+        [1, "Serviço solicitado"], [2, "Serviços extras"], [3, "Fotos antes"],
+        [4, "Informações do atendimento"], [5, "Fotos depois"],
+        [7, "Pagamento"], [6, "Relatório"],
+      ] as const;
+      for (const [n, label] of need) {
+        if (!isEtapaConfirmada(atendimento, n)) pendentes.push(label);
+      }
+      // etapa 2 só é obrigatória confirmar (não precisa ter extras)
+      if (pendentes.length) {
+        throw new Error("Etapas pendentes:\n• " + pendentes.join("\n• "));
+      }
+
+      const executados = [...solicitados, ...extras];
+      const { error } = await supabase.from("atendimentos").update({
+        finalizado: true,
+        data_fim: new Date().toISOString(),
+        encerrado_em: new Date().toISOString(),
+        encerrado_por: myProfile?.id ?? null,
+        servicos_executados: executados as any,
+        valor_executado: subtotal,
+        taxa_leva_traz: Number(taxa || 0),
+        desconto: Number(desc || 0),
+      } as never).eq("id", atendId);
+      if (error) throw error;
+
+      // Atualiza agendamento
+      if ((atendimento as any).agendamento_id) {
+        await supabase.from("agendamentos")
+          .update({ status: "finalizado" })
+          .eq("id", (atendimento as any).agendamento_id);
+      }
+
+      // Atualiza pet
+      const hojeISO = new Date().toISOString().slice(0, 10);
+      if ((atendimento as any).pet_id) {
+        const petPatch: Record<string, any> = {
+          proxima_visita: (atendimento as any).proxima_visita ?? null,
+        };
+        if (executados.some(isBanho)) petPatch.ultimo_banho = hojeISO;
+        if (executados.some(isTosa)) petPatch.ultima_tosa = hojeISO;
+        await supabase.from("pets").update(petPatch as any).eq("id", (atendimento as any).pet_id);
+      }
+
+      await confirmarEtapa(8);
+    },
+    onSuccess: () => {
+      toast.success("Atendimento encerrado com sucesso");
+      qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
+      qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao encerrar"),
+  });
+
+  // ---- Reabrir (admin) ----
+  const reabrir = async () => {
+    if (!motivoReabrir.trim()) { toast.error("Informe o motivo"); return; }
+    await patchMut.mutateAsync({
+      encerrado_em: null,
+      encerrado_por: null,
+      finalizado: false,
+      reaberto_motivo: motivoReabrir,
+    });
+    toast.success("Atendimento reaberto");
+    setReabrirOpen(false);
+  };
+
+  // ---- Pendentes list ----
+  const pendentesFinais = useMemo(() => {
+    const items = [
+      [1, "Serviço solicitado"], [2, "Serviços realizados"], [3, "Fotos antes"],
+      [4, "Informações do atendimento"], [5, "Fotos depois"],
+      [7, "Pagamento"], [6, "Relatório"],
+    ] as const;
+    return items.filter(([n]) => !isEtapaConfirmada(atendimento, n)).map(([, l]) => l);
+  }, [atendimento]);
+
+  const pagStatus = (atendimento as any).pagamento_status;
+
   return (
     <PageShell>
       {/* Header */}
       <div className="mb-6">
-        <Link to="/atendimentos" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+        <Link to="/agenda" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
+          <ArrowLeft className="h-4 w-4" /> Voltar para agenda
         </Link>
         <div className="mt-4 flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="font-display text-4xl md:text-5xl leading-tight tracking-tight">
-              {pet?.nome ?? "—"} <span className="text-muted-foreground font-normal">—</span> {cliente?.nome ?? "—"}
+            <h1 className="font-display text-3xl md:text-4xl leading-tight tracking-tight">
+              {pet?.nome ?? "—"} <span className="text-muted-foreground font-normal">·</span> {cliente?.nome ?? "—"}
             </h1>
             {subtitleParts.length > 0 && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                {subtitleParts.join(" · ")}
-              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{subtitleParts.join(" · ")}</p>
             )}
           </div>
           {encerrado && (
-            <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Encerrado
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Encerrado
+              </span>
+              {isAdmin && (
+                <Button size="sm" variant="outline" onClick={() => setReabrirOpen(true)}>
+                  <Lock className="h-3.5 w-3.5 mr-1" /> Reabrir
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
@@ -424,9 +572,7 @@ function AtendimentoDetalhe() {
           <div className="mt-4 rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 flex flex-wrap items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
             {alertas.map((a, i) => (
-              <span key={i} className="text-xs bg-background/60 border rounded-full px-2 py-1">
-                {a}
-              </span>
+              <span key={i} className="text-xs bg-background/60 border rounded-full px-2 py-1">{a}</span>
             ))}
           </div>
         )}
@@ -436,64 +582,88 @@ function AtendimentoDetalhe() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* ---- Left column ---- */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Fotos antes */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+
+          {/* 1. Serviço Solicitado */}
+          <Card className="p-6 border-l-4 border-l-gold">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <h2 className="font-display text-xl flex items-center gap-2">
-                <Camera className="h-5 w-5 text-muted-foreground" /> Fotos antes
+                <ClipboardList className="h-5 w-5 text-primary" /> Serviço solicitado
               </h2>
-              {!readOnly && <UploadButton onFile={(f) => addFoto("antes", f)} />}
+              <EtapaBadge st={st(1)} />
             </div>
-            {fotosAntes.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic text-center py-8">
-                Nenhuma foto ainda.
+            {solicitados.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                Nenhum serviço vinculado ao agendamento original.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                {fotosAntes.map((f, i) => (
-                  <Thumb key={i} path={f.path} disabled={readOnly}
-                    onRemove={() => removeFoto("antes", i)} />
+              <div className="divide-y">
+                {solicitados.map((it, i) => (
+                  <div key={i} className="py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium">{it.nome}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Quantidade: {it.quantidade} · Registro original do agendamento
+                      </div>
+                    </div>
+                    <div className="font-medium tabular-nums">{brl(it.valor_total)}</div>
+                  </div>
                 ))}
               </div>
             )}
+            {(atendimento as any).agendamentos?.observacoes && (
+              <p className="mt-3 text-sm bg-muted/40 rounded-lg p-3 border">
+                <span className="font-medium">Observações do agendamento:</span>{" "}
+                {(atendimento as any).agendamentos.observacoes}
+              </p>
+            )}
+            {!readOnly && !isEtapaConfirmada(atendimento, 1) && (
+              <Button className="mt-4 w-full uppercase" onClick={() => confirmarEtapa(1)}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Confirmar serviço solicitado
+              </Button>
+            )}
+            <ConfirmadaFooter st={st(1)} />
           </Card>
 
-          {/* Serviços executados */}
+          {/* 2. Serviços extras */}
           <Card className="p-6">
             <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
               <div>
                 <h2 className="font-display text-xl flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-muted-foreground" /> Serviços executados
+                  <Sparkles className="h-5 w-5 text-muted-foreground" /> Serviços extras
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Adicione todos os serviços realizados neste atendimento.
+                  Adicione serviços realizados além do solicitado.
                 </p>
               </div>
-              {!readOnly && (
-                <div className="min-w-[220px]">
-                  <Select value="" onValueChange={addServico}>
-                    <SelectTrigger className="rounded-full">
-                      <SelectValue placeholder="+ serviço" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {servicos.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.nome} — {brl(s.valor)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <EtapaBadge st={st(2)} />
+                {!readOnly && (
+                  <div className="min-w-[220px]">
+                    <Select value="" onValueChange={addExtra}>
+                      <SelectTrigger className="rounded-full">
+                        <SelectValue placeholder="+ adicionar serviço" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {servicos.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.nome} — {brl(s.valor)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {executados.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic text-center py-8">
-                Nenhum serviço adicionado ainda.
+            {extras.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic text-center py-6">
+                Nenhum serviço extra adicionado.
               </p>
             ) : (
               <div className="divide-y">
-                {executados.map((it, i) => (
+                {extras.map((it, i) => (
                   <div key={i} className="py-3 flex items-center gap-3 flex-wrap">
                     <div className="flex-1 min-w-[160px]">
                       <div className="font-medium">{it.nome}</div>
@@ -501,31 +671,32 @@ function AtendimentoDetalhe() {
                         <div className="text-xs text-muted-foreground">{it.categoria}</div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-muted-foreground">Qtd</Label>
-                      <Input
-                        type="number" min={1} step={1}
-                        value={it.quantidade}
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="icon" className="h-8 w-8"
                         disabled={readOnly}
-                        onChange={(e) => updateServico(i, { quantidade: Number(e.target.value || 1) })}
-                        className="w-16 h-9"
-                      />
+                        onClick={() => updateExtra(i, { quantidade: Math.max(1, (it.quantidade || 1) - 1) })}>
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <Input type="number" min={1} step={1} value={it.quantidade}
+                        disabled={readOnly}
+                        onChange={(e) => updateExtra(i, { quantidade: Number(e.target.value || 1) })}
+                        className="w-14 h-8 text-center" />
+                      <Button variant="outline" size="icon" className="h-8 w-8"
+                        disabled={readOnly}
+                        onClick={() => updateExtra(i, { quantidade: (it.quantidade || 1) + 1 })}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
                     </div>
                     <div className="flex items-center gap-2">
                       <Label className="text-xs text-muted-foreground">Valor</Label>
-                      <Input
-                        type="number" min={0} step="0.01"
-                        value={it.valor_unit}
+                      <Input type="number" min={0} step="0.01" value={it.valor_unit}
                         disabled={readOnly}
-                        onChange={(e) => updateServico(i, { valor_unit: Number(e.target.value || 0) })}
-                        className="w-24 h-9"
-                      />
+                        onChange={(e) => updateExtra(i, { valor_unit: Number(e.target.value || 0) })}
+                        className="w-24 h-8" />
                     </div>
-                    <div className="w-24 text-right font-medium tabular-nums">
-                      {brl(it.valor_total)}
-                    </div>
+                    <div className="w-24 text-right font-medium tabular-nums">{brl(it.valor_total)}</div>
                     {!readOnly && (
-                      <Button variant="ghost" size="icon" onClick={() => removeServico(i)}
+                      <Button variant="ghost" size="icon" onClick={() => removeExtra(i)}
                         className="text-muted-foreground hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -534,129 +705,199 @@ function AtendimentoDetalhe() {
                 ))}
               </div>
             )}
+            {!readOnly && !isEtapaConfirmada(atendimento, 2) && (
+              <Button className="mt-4 w-full uppercase" onClick={() => confirmarEtapa(2)}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Salvar e confirmar serviços
+              </Button>
+            )}
+            <ConfirmadaFooter st={st(2)} />
           </Card>
 
-          {/* Fotos depois */}
+          {/* 3. Fotos antes */}
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h2 className="font-display text-xl flex items-center gap-2">
-                <Camera className="h-5 w-5 text-muted-foreground" /> Fotos depois
+                <Camera className="h-5 w-5 text-muted-foreground" /> Fotos antes do atendimento
               </h2>
-              {!readOnly && <UploadButton onFile={(f) => addFoto("depois", f)} />}
+              <div className="flex items-center gap-2">
+                <EtapaBadge st={st(3)} />
+                {!readOnly && <UploadButton onFile={(f) => addFoto("antes", f)} label="Adicionar" />}
+              </div>
+            </div>
+            {fotosAntes.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic text-center py-8">Nenhuma foto ainda.</p>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {fotosAntes.map((f, i) => (
+                  <Thumb key={i} path={f.path} disabled={readOnly}
+                    onClick={() => setZoomFoto(f.path)}
+                    onRemove={() => removeFoto("antes", i)} />
+                ))}
+              </div>
+            )}
+            {!readOnly && !isEtapaConfirmada(atendimento, 3) && (
+              <Button className="mt-4 w-full uppercase" onClick={() => confirmarEtapa(3)}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Salvar e confirmar fotos do antes
+              </Button>
+            )}
+            <ConfirmadaFooter st={st(3)} />
+          </Card>
+
+          {/* 4. Informações do atendimento */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="font-display text-xl">Observações do atendimento</h2>
+              <EtapaBadge st={st(4)} />
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={focinheira} disabled={readOnly}
+                    onCheckedChange={(v) => setFocinheira(!!v)} />
+                  Usou focinheira
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={pausa} disabled={readOnly}
+                    onCheckedChange={(v) => setPausa(!!v)} />
+                  Precisou de pausa
+                </label>
+              </div>
+              <div>
+                <Label htmlFor="obs">Comportamento, particularidades e incidentes</Label>
+                <Textarea id="obs" value={obs} disabled={readOnly}
+                  onChange={(e) => setObs(e.target.value)}
+                  placeholder="Comportamento do pet, particularidades, intercorrências…"
+                  className="mt-1 min-h-[90px]" />
+              </div>
+              <div>
+                <Label htmlFor="obsint">Observações internas (não vão para o tutor)</Label>
+                <Textarea id="obsint" value={obsInt} disabled={readOnly}
+                  onChange={(e) => setObsInt(e.target.value)}
+                  className="mt-1 min-h-[70px]" />
+              </div>
+              <div>
+                <Label htmlFor="rec">Recomendações para o tutor</Label>
+                <Textarea id="rec" value={rec} disabled={readOnly}
+                  onChange={(e) => setRec(e.target.value)}
+                  placeholder="Produtos, cuidados em casa, alertas…"
+                  className="mt-1 min-h-[80px]" />
+              </div>
+              <div className="max-w-xs">
+                <Label htmlFor="prox">Próxima visita recomendada</Label>
+                <Input id="prox" type="date" value={prox ?? ""} disabled={readOnly}
+                  onChange={(e) => setProx(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+            {!readOnly && (
+              <Button className="mt-4 w-full uppercase"
+                onClick={async () => {
+                  await patchMut.mutateAsync({
+                    observacoes: obs, observacoes_internas: obsInt, recomendacoes: rec,
+                    proxima_visita: prox || null, usou_focinheira: focinheira, precisou_pausa: pausa,
+                  });
+                  await confirmarEtapa(4);
+                }}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Salvar e confirmar informações
+              </Button>
+            )}
+            <ConfirmadaFooter st={st(4)} />
+          </Card>
+
+          {/* 5. Fotos depois */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="font-display text-xl flex items-center gap-2">
+                <Camera className="h-5 w-5 text-muted-foreground" /> Fotos do pet finalizado
+              </h2>
+              <div className="flex items-center gap-2">
+                <EtapaBadge st={st(5)} />
+                {!readOnly && <UploadButton onFile={(f) => addFoto("depois", f)} label="Adicionar" />}
+              </div>
             </div>
             {fotosDepois.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic text-center py-8">
-                Nenhuma foto ainda.
-              </p>
+              <p className="text-sm text-muted-foreground italic text-center py-8">Nenhuma foto ainda.</p>
             ) : (
               <>
                 <div className="flex flex-wrap gap-3">
                   {fotosDepois.map((f, i) => (
-                    <Thumb
-                      key={i} path={f.path} disabled={readOnly}
+                    <Thumb key={i} path={f.path} disabled={readOnly}
                       starred={!!f.principal}
+                      onClick={() => setZoomFoto(f.path)}
                       onStar={() => setPrincipal(i)}
-                      onRemove={() => removeFoto("depois", i)}
-                    />
+                      onRemove={() => removeFoto("depois", i)} />
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Clique na estrela para escolher a foto principal (perfil do pet).
+                  Clique na estrela para marcar a foto principal do resultado.
                 </p>
               </>
             )}
-          </Card>
-
-          {/* Observações e Recomendações */}
-          <Card className="p-6">
-            <h2 className="font-display text-xl mb-4">Observações e Recomendações</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="obs">Observações do dia</Label>
-                <Textarea
-                  id="obs" value={obs} disabled={readOnly}
-                  onChange={(e) => setObs(e.target.value)}
-                  onBlur={() => patchMut.mutate({ observacoes: obs })}
-                  placeholder="Comportamento, particularidades, incidentes…"
-                  className="mt-1 min-h-[90px]"
-                />
-              </div>
-              <div>
-                <Label htmlFor="rec">Recomendações para o tutor</Label>
-                <Textarea
-                  id="rec" value={rec} disabled={readOnly}
-                  onChange={(e) => setRec(e.target.value)}
-                  onBlur={() => patchMut.mutate({ recomendacoes: rec })}
-                  placeholder="Produtos recomendados, cuidados em casa, alertas…"
-                  className="mt-1 min-h-[80px]"
-                />
-              </div>
-              <div className="max-w-xs">
-                <Label htmlFor="prox">Próxima visita</Label>
-                <Input
-                  id="prox" type="date" value={prox ?? ""} disabled={readOnly}
-                  onChange={(e) => setProx(e.target.value)}
-                  onBlur={() => patchMut.mutate({ proxima_visita: prox || null })}
-                  className="mt-1"
-                />
-              </div>
-            </div>
+            {!readOnly && !isEtapaConfirmada(atendimento, 5) && (
+              <Button className="mt-4 w-full uppercase" onClick={() => confirmarEtapa(5)}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Salvar e confirmar fotos do resultado
+              </Button>
+            )}
+            <ConfirmadaFooter st={st(5)} />
           </Card>
         </div>
 
-        {/* ---- Right sidebar: Fechamento ---- */}
+        {/* ---- Right sidebar ---- */}
         <div className="lg:col-span-1">
           <div className="lg:sticky lg:top-6 space-y-4">
+
+            {/* Fechamento e pagamento */}
             <Card className="p-6">
-              <h2 className="font-display text-xl mb-4 flex items-center gap-2">
-                <PawPrint className="h-5 w-5 text-primary" /> Fechamento
-              </h2>
-
-              <div className="flex items-center justify-between py-2 text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium tabular-nums">{brl(subtotal)}</span>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 className="font-display text-xl flex items-center gap-2">
+                  <PawPrint className="h-5 w-5 text-primary" /> Fechamento
+                </h2>
+                <EtapaBadge st={st(7)} />
               </div>
 
-              <div className="flex items-center justify-between py-2 gap-3">
-                <Label className="text-sm text-muted-foreground">Taxa de entrega</Label>
-                <Input
-                  type="number" min={0} step="0.01"
-                  value={taxa} disabled={readOnly}
-                  onChange={(e) => setTaxa(Number(e.target.value || 0))}
-                  onBlur={() => patchMut.mutate({ taxa_leva_traz: Number(taxa || 0) })}
-                  className="w-24 h-9 text-right"
-                />
-              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Serviço solicitado</span>
+                  <span className="font-medium tabular-nums">{brl(valorSolicitados)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Serviços extras</span>
+                  <span className="font-medium tabular-nums">{brl(valorExtras)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t pt-2">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium tabular-nums">{brl(subtotal)}</span>
+                </div>
 
-              <div className="flex items-center justify-between py-2 gap-3">
-                <Label className="text-sm text-muted-foreground">Desconto</Label>
-                <Input
-                  type="number" min={0} step="0.01"
-                  value={desc} disabled={readOnly}
-                  onChange={(e) => setDesc(Number(e.target.value || 0))}
-                  onBlur={() => patchMut.mutate({ desconto: Number(desc || 0) })}
-                  className="w-24 h-9 text-right"
-                />
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <Label className="text-sm text-muted-foreground">Taxa leva-e-traz (R$)</Label>
+                  <Input type="number" min={0} step="0.01" value={taxa}
+                    disabled={readOnly}
+                    onChange={(e) => setTaxa(Number(e.target.value || 0))}
+                    className="w-24 h-9 text-right" />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-sm text-muted-foreground">Desconto (R$)</Label>
+                  <Input type="number" min={0} step="0.01" value={desc}
+                    disabled={readOnly}
+                    onChange={(e) => setDesc(Number(e.target.value || 0))}
+                    className="w-24 h-9 text-right" />
+                </div>
               </div>
 
               <div className="border-t mt-3 pt-4 flex items-center justify-between">
                 <span className="font-display text-lg">Total</span>
-                <span className="font-display text-3xl text-primary tabular-nums">
-                  {brl(total)}
-                </span>
+                <span className="font-display text-3xl text-primary tabular-nums">{brl(total)}</span>
               </div>
 
               <div className="mt-4 space-y-3">
                 <div>
                   <Label>Forma de pagamento</Label>
-                  <Select
-                    value={(atendimento as any).pagamento_forma ?? ""}
-                    disabled={readOnly}
-                    onValueChange={(v) => patchMut.mutate({
-                      pagamento_forma: v,
-                      pagamento_status: v === "pendente" ? "pendente" : "pago",
-                    })}
-                  >
+                  <Select value={formaPag || undefined} disabled={readOnly}
+                    onValueChange={(v) => setFormaPag(v)}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
@@ -664,82 +905,149 @@ function AtendimentoDetalhe() {
                       {FORMAS_PAGAMENTO.map((f) => (
                         <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
                       ))}
+                      <SelectItem value="parcial">Pagamento parcial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <Button
-                  className="w-full h-12 text-base gap-2"
-                  disabled={readOnly || encerrarMut.isPending || executados.length === 0}
-                  onClick={() => encerrarMut.mutate()}
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                  {encerrarMut.isPending ? "Finalizando…" : "Finalizar atendimento"}
-                </Button>
+                {formaPag === "parcial" && (
+                  <div>
+                    <Label>Valor pago agora (R$)</Label>
+                    <Input type="number" min={0} step="0.01" value={valorPagoInput}
+                      disabled={readOnly}
+                      onChange={(e) => setValorPagoInput(Number(e.target.value || 0))}
+                      className="mt-1" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Restante em aberto: {brl(Math.max(0, total - Number(valorPagoInput || 0)))}
+                    </p>
+                  </div>
+                )}
 
-                {executados.length === 0 && !encerrado && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    Adicione ao menos um serviço para finalizar.
+                {pagStatus && (
+                  <p className="text-xs text-muted-foreground">
+                    Status atual: <span className="font-medium">{pagStatus}</span>
                   </p>
                 )}
 
-                {(atendimento as any).pdf_path && (
-                  <Button
-                    variant="outline" className="w-full gap-2"
-                    onClick={async () => {
-                      const { data } = await supabase.storage.from("spa-fotos")
-                        .createSignedUrl((atendimento as any).pdf_path, 60 * 5);
-                      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-                    }}
-                  >
-                    <FileText className="h-4 w-4" /> Ver relatório
-                  </Button>
-                )}
-
-                {encerrado && (atendimento as any).pdf_path && (
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                    onClick={async () => {
-                      const fone = (cliente?.whatsapp ?? "").replace(/\D/g, "");
-                      if (!fone) {
-                        toast.error("Cliente não tem WhatsApp cadastrado");
-                        return;
-                      }
-                      const { data, error } = await supabase.storage
-                        .from("spa-fotos")
-                        .createSignedUrl((atendimento as any).pdf_path, 60 * 60 * 24 * 7);
-                      if (error || !data?.signedUrl) {
-                        toast.error("Não foi possível gerar o link do relatório");
-                        return;
-                      }
-                      const iniciais = (myProfile?.nome ?? "")
-                        .split(" ").filter(Boolean).slice(0, 2)
-                        .map((s) => s[0]?.toUpperCase()).join("");
-                      const assinatura = myProfile?.nome
-                        ? `\n\nAtenciosamente,\n${myProfile.nome}${iniciais ? ` (${iniciais})` : ""}`
-                        : "";
-                      const msg =
-                        `Olá, ${cliente?.nome ?? ""}! 🐾\n\n` +
-                        `O atendimento do ${pet?.nome ?? "seu pet"} foi encerrado. ` +
-                        `Segue o relatório completo em PDF:\n\n${data.signedUrl}\n\n` +
-                        `O link fica ativo por 7 dias.${assinatura}`;
-                      const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
-                      window.open(
-                        `https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`,
-                        "_blank",
-                      );
-                    }}
-                  >
-                    <MessageCircle className="h-4 w-4" /> Enviar PDF por WhatsApp
-                  </Button>
-                )}
-
+                <Button className="w-full h-11 uppercase"
+                  disabled={readOnly || !formaPag}
+                  onClick={confirmarPagamento}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Confirmar pagamento ou pendência
+                </Button>
               </div>
+              <ConfirmadaFooter st={st(7)} />
+            </Card>
+
+            {/* Relatório */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h2 className="font-display text-xl flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" /> Relatório final
+                </h2>
+                <EtapaBadge st={st(6)} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" onClick={visualizarRelatorio} disabled={readOnly}>
+                  <Eye className="h-4 w-4 mr-1" /> Visualizar
+                </Button>
+                <Button variant="outline" size="sm" onClick={baixarRelatorio} disabled={readOnly}>
+                  <Download className="h-4 w-4 mr-1" /> Baixar PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={imprimirRelatorio} disabled={readOnly}>
+                  <Printer className="h-4 w-4 mr-1" /> Imprimir
+                </Button>
+                <Button variant="outline" size="sm"
+                  disabled={readOnly || !(atendimento as any).pdf_path}
+                  onClick={async () => {
+                    const fone = (cliente?.whatsapp ?? "").replace(/\D/g, "");
+                    if (!fone) { toast.error("Cliente sem WhatsApp"); return; }
+                    const { data } = await supabase.storage.from("spa-fotos")
+                      .createSignedUrl((atendimento as any).pdf_path, 60 * 60 * 24 * 7);
+                    if (!data?.signedUrl) { toast.error("Erro ao gerar link"); return; }
+                    const msg = `Olá, ${cliente?.nome ?? ""}! O relatório do atendimento de ${pet?.nome ?? "seu pet"} está pronto:\n\n${data.signedUrl}`;
+                    const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
+                    window.open(`https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`, "_blank");
+                  }}>
+                  <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
+                </Button>
+              </div>
+              {!readOnly && !isEtapaConfirmada(atendimento, 6) && (
+                <Button className="mt-3 w-full uppercase" onClick={confirmarRelatorio}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Gerar e confirmar relatório
+                </Button>
+              )}
+              <ConfirmadaFooter st={st(6)} />
+            </Card>
+
+            {/* Encerrar */}
+            <Card className="p-6">
+              <h2 className="font-display text-xl mb-3 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" /> Encerrar atendimento
+              </h2>
+              {pendentesFinais.length > 0 ? (
+                <>
+                  <p className="text-sm text-muted-foreground mb-2">Etapas pendentes:</p>
+                  <ul className="text-sm space-y-1 mb-3">
+                    {pendentesFinais.map((p) => (
+                      <li key={p} className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> {p}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-sm text-success mb-3">Todas as etapas confirmadas.</p>
+              )}
+              <Button className="w-full h-12 uppercase"
+                disabled={readOnly || encerrado || encerrarMut.isPending || pendentesFinais.length > 0}
+                onClick={() => encerrarMut.mutate()}>
+                <CheckCircle2 className="h-5 w-5 mr-2" />
+                {encerrado ? "Já encerrado" : encerrarMut.isPending ? "Encerrando…" : "Encerrar atendimento"}
+              </Button>
             </Card>
           </div>
         </div>
       </div>
+
+      {/* Zoom foto */}
+      <Dialog open={!!zoomFoto} onOpenChange={(v) => !v && setZoomFoto(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>Foto</DialogTitle></DialogHeader>
+          {zoomFoto && <ZoomImage path={zoomFoto} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview PDF */}
+      <Dialog open={!!pdfPreview} onOpenChange={(v) => { if (!v) { if (pdfPreview) URL.revokeObjectURL(pdfPreview); setPdfPreview(null); } }}>
+        <DialogContent className="max-w-4xl h-[85vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2"><DialogTitle>Pré-visualização do relatório</DialogTitle></DialogHeader>
+          {pdfPreview && <iframe src={pdfPreview} className="w-full h-full border-0" title="Relatório" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reabrir dialog */}
+      <Dialog open={reabrirOpen} onOpenChange={setReabrirOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reabrir atendimento</DialogTitle>
+            <DialogDescription>Descreva o motivo. Ficará registrado no histórico.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={motivoReabrir} onChange={(e) => setMotivoReabrir(e.target.value)}
+            placeholder="Motivo da reabertura" rows={4} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReabrirOpen(false)}>Cancelar</Button>
+            <Button onClick={reabrir}>Confirmar reabertura</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
+}
+
+function ZoomImage({ path }: { path: string }) {
+  const { data: url } = useSignedUrl(path);
+  if (!url) return <div className="w-full h-96 bg-muted animate-pulse" />;
+  return <img src={url} alt="foto ampliada" className="w-full max-h-[80vh] object-contain rounded-lg" />;
 }
