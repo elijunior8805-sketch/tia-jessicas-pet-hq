@@ -458,7 +458,13 @@ function AgendaPage() {
         </aside>
       </div>
 
-      <NovoAgendamentoDialog open={openNew} onOpenChange={setOpenNew} defaultDate={date} />
+      <NovoAgendamentoDialog
+        open={openNew}
+        onOpenChange={(v) => { setOpenNew(v); if (!v) setPrefill({}); }}
+        defaultDate={date}
+        defaultClienteId={prefill.cliente}
+        defaultPetId={prefill.pet}
+      />
     </PageShell>
   );
 }
