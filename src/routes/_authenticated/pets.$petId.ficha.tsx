@@ -5,7 +5,8 @@ import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, PawPrint, ArrowLeft, Ruler, Cake, Syringe, Heart, ClipboardList } from "lucide-react";
+import { AlertTriangle, PawPrint, ArrowLeft, Ruler, Cake, Syringe, Heart, ClipboardList, Pencil } from "lucide-react";
+import { useSignedUrl } from "@/lib/use-signed-url";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/ficha")({
   component: FichaOperacional,
