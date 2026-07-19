@@ -992,6 +992,39 @@ export type Database = {
           },
         ]
       }
+      datas_comemorativas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          dia: number
+          id: string
+          mes: number
+          nome: string
+          template: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          dia: number
+          id?: string
+          mes: number
+          nome: string
+          template: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          dia?: number
+          id?: string
+          mes?: number
+          nome?: string
+          template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       empresa_config: {
         Row: {
           cnpj: string | null
@@ -1099,11 +1132,16 @@ export type Database = {
           aniversario_hora: string
           aniversario_pet_ativo: boolean
           aniversario_template: string
+          aniversario_tutor_ativo: boolean
+          aniversario_tutor_template: string
           created_at: string
+          datas_especiais_ativo: boolean
           id: string
           lembrete_24h_ativo: boolean
           lembrete_24h_hora: string
           lembrete_24h_template: string
+          petversario_ativo: boolean
+          petversario_template: string
           pos_atendimento_ativo: boolean
           pos_atendimento_horas: number
           pos_atendimento_template: string
@@ -1113,11 +1151,16 @@ export type Database = {
           aniversario_hora?: string
           aniversario_pet_ativo?: boolean
           aniversario_template?: string
+          aniversario_tutor_ativo?: boolean
+          aniversario_tutor_template?: string
           created_at?: string
+          datas_especiais_ativo?: boolean
           id?: string
           lembrete_24h_ativo?: boolean
           lembrete_24h_hora?: string
           lembrete_24h_template?: string
+          petversario_ativo?: boolean
+          petversario_template?: string
           pos_atendimento_ativo?: boolean
           pos_atendimento_horas?: number
           pos_atendimento_template?: string
@@ -1127,11 +1170,16 @@ export type Database = {
           aniversario_hora?: string
           aniversario_pet_ativo?: boolean
           aniversario_template?: string
+          aniversario_tutor_ativo?: boolean
+          aniversario_tutor_template?: string
           created_at?: string
+          datas_especiais_ativo?: boolean
           id?: string
           lembrete_24h_ativo?: boolean
           lembrete_24h_hora?: string
           lembrete_24h_template?: string
+          petversario_ativo?: boolean
+          petversario_template?: string
           pos_atendimento_ativo?: boolean
           pos_atendimento_horas?: number
           pos_atendimento_template?: string
