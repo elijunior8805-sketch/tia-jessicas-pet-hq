@@ -275,6 +275,72 @@ function AtendimentoDetalhe() {
     setPausa(!!(atendimento as any).precisou_pausa);
   }, [atendimento?.id]);
 
+  // Hooks must run on every render — declare BEFORE any early return.
+  const encerrarMut = useMutation({
+    mutationFn: async () => {
+      if (!atendimento) throw new Error("Atendimento não carregado");
+      const pendentes: string[] = [];
+      const need = [
+        [1, "Serviço solicitado"], [2, "Serviços extras"], [3, "Fotos antes"],
+        [4, "Informações do atendimento"], [5, "Fotos depois"],
+        [7, "Pagamento"], [6, "Relatório"],
+      ] as const;
+      for (const [n, label] of need) {
+        if (!isEtapaConfirmada(atendimento, n)) pendentes.push(label);
+      }
+      if (pendentes.length) {
+        throw new Error("Etapas pendentes:\n• " + pendentes.join("\n• "));
+      }
+      const executados = [...(((atendimento as any).servicos_solicitados ?? (atendimento as any).servicos_planejados ?? []) as ServicoItem[]), ...(((atendimento as any).servicos_extras ?? []) as ServicoItem[])];
+      const subtotalCalc = sumItens(executados) + Number(taxa || 0) - Number(desc || 0);
+      const { error } = await supabase.from("atendimentos").update({
+        finalizado: true,
+        data_fim: new Date().toISOString(),
+        encerrado_em: new Date().toISOString(),
+        encerrado_por: myProfile?.id ?? null,
+        servicos_executados: executados as any,
+        valor_executado: subtotalCalc,
+        taxa_leva_traz: Number(taxa || 0),
+        desconto: Number(desc || 0),
+      } as never).eq("id", atendId);
+      if (error) throw error;
+
+      if ((atendimento as any).agendamento_id) {
+        await supabase.from("agendamentos")
+          .update({ status: "finalizado" })
+          .eq("id", (atendimento as any).agendamento_id);
+      }
+      const hojeISO = new Date().toISOString().slice(0, 10);
+      if ((atendimento as any).pet_id) {
+        const petPatch: Record<string, any> = {
+          proxima_visita: (atendimento as any).proxima_visita ?? null,
+        };
+        if (executados.some(isBanho)) petPatch.ultimo_banho = hojeISO;
+        if (executados.some(isTosa)) petPatch.ultima_tosa = hojeISO;
+        await supabase.from("pets").update(petPatch as any).eq("id", (atendimento as any).pet_id);
+      }
+      await confirmarEtapa(8);
+    },
+    onSuccess: () => {
+      toast.success("Atendimento encerrado com sucesso");
+      qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
+      qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao encerrar"),
+  });
+
+  const pendentesFinais = useMemo(() => {
+    if (!atendimento) return [];
+    const items = [
+      [1, "Serviço solicitado"], [2, "Serviços realizados"], [3, "Fotos antes"],
+      [4, "Informações do atendimento"], [5, "Fotos depois"],
+      [7, "Pagamento"], [6, "Relatório"],
+    ] as const;
+    return items.filter(([n]) => !isEtapaConfirmada(atendimento, n)).map(([, l]) => l);
+  }, [atendimento]);
+
   if (isLoading) {
     return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
   }
@@ -452,67 +518,6 @@ function AtendimentoDetalhe() {
     await confirmarEtapa(6, { pdf_path: path });
   };
 
-  // ---- Encerrar ----
-
-  const encerrarMut = useMutation({
-    mutationFn: async () => {
-      const pendentes: string[] = [];
-      const need = [
-        [1, "Serviço solicitado"], [2, "Serviços extras"], [3, "Fotos antes"],
-        [4, "Informações do atendimento"], [5, "Fotos depois"],
-        [7, "Pagamento"], [6, "Relatório"],
-      ] as const;
-      for (const [n, label] of need) {
-        if (!isEtapaConfirmada(atendimento, n)) pendentes.push(label);
-      }
-      // etapa 2 só é obrigatória confirmar (não precisa ter extras)
-      if (pendentes.length) {
-        throw new Error("Etapas pendentes:\n• " + pendentes.join("\n• "));
-      }
-
-      const executados = [...solicitados, ...extras];
-      const { error } = await supabase.from("atendimentos").update({
-        finalizado: true,
-        data_fim: new Date().toISOString(),
-        encerrado_em: new Date().toISOString(),
-        encerrado_por: myProfile?.id ?? null,
-        servicos_executados: executados as any,
-        valor_executado: subtotal,
-        taxa_leva_traz: Number(taxa || 0),
-        desconto: Number(desc || 0),
-      } as never).eq("id", atendId);
-      if (error) throw error;
-
-      // Atualiza agendamento
-      if ((atendimento as any).agendamento_id) {
-        await supabase.from("agendamentos")
-          .update({ status: "finalizado" })
-          .eq("id", (atendimento as any).agendamento_id);
-      }
-
-      // Atualiza pet
-      const hojeISO = new Date().toISOString().slice(0, 10);
-      if ((atendimento as any).pet_id) {
-        const petPatch: Record<string, any> = {
-          proxima_visita: (atendimento as any).proxima_visita ?? null,
-        };
-        if (executados.some(isBanho)) petPatch.ultimo_banho = hojeISO;
-        if (executados.some(isTosa)) petPatch.ultima_tosa = hojeISO;
-        await supabase.from("pets").update(petPatch as any).eq("id", (atendimento as any).pet_id);
-      }
-
-      await confirmarEtapa(8);
-    },
-    onSuccess: () => {
-      toast.success("Atendimento encerrado com sucesso");
-      qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
-      qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
-      qc.invalidateQueries({ queryKey: ["agendamentos"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-    },
-    onError: (e: any) => toast.error(e.message ?? "Erro ao encerrar"),
-  });
-
   // ---- Reabrir (admin) ----
   const reabrir = async () => {
     if (!motivoReabrir.trim()) { toast.error("Informe o motivo"); return; }
@@ -525,16 +530,6 @@ function AtendimentoDetalhe() {
     toast.success("Atendimento reaberto");
     setReabrirOpen(false);
   };
-
-  // ---- Pendentes list ----
-  const pendentesFinais = useMemo(() => {
-    const items = [
-      [1, "Serviço solicitado"], [2, "Serviços realizados"], [3, "Fotos antes"],
-      [4, "Informações do atendimento"], [5, "Fotos depois"],
-      [7, "Pagamento"], [6, "Relatório"],
-    ] as const;
-    return items.filter(([n]) => !isEtapaConfirmada(atendimento, n)).map(([, l]) => l);
-  }, [atendimento]);
 
   const pagStatus = (atendimento as any).pagamento_status;
 
