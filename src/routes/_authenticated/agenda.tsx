@@ -522,15 +522,6 @@ function NovoAgendamentoDialog({
             <Input type="number" min={0} step="0.01" value={taxa} onChange={(e) => setTaxa(e.target.value)} />
           </div>
           <div>
-            <Label>Valor previsto (R$)</Label>
-            <Input type="number" min={0} step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
-          </div>
-
-          <div>
-            <Label>Taxa leva-e-traz (R$)</Label>
-            <Input type="number" min={0} step="0.01" value={taxa} onChange={(e) => setTaxa(e.target.value)} />
-          </div>
-          <div>
             <Label>Status inicial</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
