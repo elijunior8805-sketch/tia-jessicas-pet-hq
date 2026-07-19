@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
@@ -139,40 +139,15 @@ function DashboardPage() {
       </div>
 
       {/* Filtro segmentado */}
-      <div className="mb-5">
-        <div
-          role="tablist"
-          aria-label="Período"
-          className="grid grid-cols-4 sm:inline-flex sm:w-auto items-center rounded-full bg-muted/60 p-1 border border-border/50"
-        >
-          {periodos.map(([k, longLabel, shortLabel]) => {
-            const active = period === k;
-            return (
-              <button
-                key={k}
-                role="tab"
-                aria-selected={active}
-                onClick={() => setPeriod(k)}
-                className={`h-9 px-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium transition text-center leading-none ${
-                  active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="sm:hidden">{shortLabel}</span>
-                <span className="hidden sm:inline">{longLabel}</span>
-              </button>
-            );
-          })}
-        </div>
-        {period === "personalizado" && (
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 w-full sm:w-auto" />
-            <span className="text-muted-foreground text-sm">até</span>
-            <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 w-full sm:w-auto" />
-          </div>
-        )}
-      </div>
+      <PeriodTabs
+        period={period}
+        onChange={setPeriod}
+        periodos={periodos}
+        customFrom={customFrom}
+        customTo={customTo}
+        setCustomFrom={setCustomFrom}
+        setCustomTo={setCustomTo}
+      />
 
 
       {/* KPI Cards — 1/2/3 colunas */}
@@ -278,5 +253,134 @@ function DashboardPage() {
         </Card>
       </div>
     </PageShell>
+  );
+}
+
+type PeriodTuple = readonly [Period, string, string];
+
+function PeriodTabs({
+  period,
+  onChange,
+  periodos,
+  customFrom,
+  customTo,
+  setCustomFrom,
+  setCustomTo,
+}: {
+  period: Period;
+  onChange: (p: Period) => void;
+  periodos: readonly PeriodTuple[];
+  customFrom: string;
+  customTo: string;
+  setCustomFrom: (v: string) => void;
+  setCustomTo: (v: string) => void;
+}) {
+  const tabsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const activeIndex = periodos.findIndex(([k]) => k === period);
+
+  const focusTab = (idx: number) => {
+    const len = periodos.length;
+    const next = ((idx % len) + len) % len;
+    const btn = tabsRef.current[next];
+    if (btn) {
+      btn.focus();
+      onChange(periodos[next][0]);
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    switch (e.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        e.preventDefault();
+        focusTab(activeIndex + 1);
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        e.preventDefault();
+        focusTab(activeIndex - 1);
+        break;
+      case "Home":
+        e.preventDefault();
+        focusTab(0);
+        break;
+      case "End":
+        e.preventDefault();
+        focusTab(periodos.length - 1);
+        break;
+    }
+  };
+
+  const activeLongLabel = periodos[activeIndex]?.[1] ?? "";
+
+  return (
+    <div className="mb-5">
+      <div
+        role="tablist"
+        aria-label="Filtro de período"
+        aria-orientation="horizontal"
+        className="grid grid-cols-4 sm:inline-flex sm:w-auto items-center rounded-full bg-muted/60 p-1 border border-border/50"
+      >
+        {periodos.map(([k, longLabel, shortLabel], idx) => {
+          const active = period === k;
+          return (
+            <button
+              key={k}
+              ref={(el) => {
+                tabsRef.current[idx] = el;
+              }}
+              type="button"
+              role="tab"
+              id={`period-tab-${k}`}
+              aria-selected={active}
+              aria-label={longLabel}
+              tabIndex={active ? 0 : -1}
+              onClick={() => onChange(k)}
+              onKeyDown={onKeyDown}
+              className={`h-9 px-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium transition text-center leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                active
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="sm:hidden" aria-hidden="true">{shortLabel}</span>
+              <span className="hidden sm:inline" aria-hidden="true">{longLabel}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Anúncio para leitores de tela */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        Período selecionado: {activeLongLabel}
+        {period === "personalizado" && customFrom && customTo
+          ? `, de ${customFrom} até ${customTo}`
+          : ""}
+      </div>
+
+      {period === "personalizado" && (
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <label className="sr-only" htmlFor="period-custom-from">Data inicial</label>
+          <Input
+            id="period-custom-from"
+            type="date"
+            value={customFrom}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            className="h-9 w-full sm:w-auto"
+            aria-label="Data inicial do período personalizado"
+          />
+          <span className="text-muted-foreground text-sm" aria-hidden="true">até</span>
+          <label className="sr-only" htmlFor="period-custom-to">Data final</label>
+          <Input
+            id="period-custom-to"
+            type="date"
+            value={customTo}
+            onChange={(e) => setCustomTo(e.target.value)}
+            className="h-9 w-full sm:w-auto"
+            aria-label="Data final do período personalizado"
+          />
+        </div>
+      )}
+    </div>
   );
 }
