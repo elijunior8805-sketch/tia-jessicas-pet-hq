@@ -1266,14 +1266,21 @@ export type Database = {
       }
       recibos_enviados: {
         Row: {
+          cancelado: boolean
+          codigo_publico: string | null
           contraparte: string | null
           created_at: string
+          data_atendimento: string | null
+          data_pagamento: string | null
           enviado_em: string
           enviado_por: string | null
+          forma_pagamento: string | null
           id: string
           mensagem: string | null
           numero_recibo: string
+          pet_nome: string | null
           referencia_id: string
+          servico: string | null
           signed_url: string | null
           storage_path: string | null
           telefone: string | null
@@ -1281,14 +1288,21 @@ export type Database = {
           valor: number
         }
         Insert: {
+          cancelado?: boolean
+          codigo_publico?: string | null
           contraparte?: string | null
           created_at?: string
+          data_atendimento?: string | null
+          data_pagamento?: string | null
           enviado_em?: string
           enviado_por?: string | null
+          forma_pagamento?: string | null
           id?: string
           mensagem?: string | null
           numero_recibo: string
+          pet_nome?: string | null
           referencia_id: string
+          servico?: string | null
           signed_url?: string | null
           storage_path?: string | null
           telefone?: string | null
@@ -1296,14 +1310,21 @@ export type Database = {
           valor: number
         }
         Update: {
+          cancelado?: boolean
+          codigo_publico?: string | null
           contraparte?: string | null
           created_at?: string
+          data_atendimento?: string | null
+          data_pagamento?: string | null
           enviado_em?: string
           enviado_por?: string | null
+          forma_pagamento?: string | null
           id?: string
           mensagem?: string | null
           numero_recibo?: string
+          pet_nome?: string | null
           referencia_id?: string
+          servico?: string | null
           signed_url?: string | null
           storage_path?: string | null
           telefone?: string | null
@@ -1673,6 +1694,27 @@ export type Database = {
       gerar_parcelas_compra: {
         Args: { _compra_id: string }
         Returns: undefined
+      }
+      get_recibo_publico: {
+        Args: { _codigo: string }
+        Returns: {
+          cancelado: boolean
+          codigo: string
+          contraparte: string
+          data_atendimento: string
+          data_pagamento: string
+          empresa_logo: string
+          empresa_nome: string
+          empresa_telefone: string
+          empresa_whatsapp: string
+          enviado_em: string
+          forma_pagamento: string
+          numero_recibo: string
+          pet_nome: string
+          servico: string
+          tipo: string
+          valor: number
+        }[]
       }
       has_role: {
         Args: {

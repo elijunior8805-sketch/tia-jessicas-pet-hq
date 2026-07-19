@@ -30,21 +30,43 @@ function digits(s: string) {
 }
 
 const FALLBACK_TEMPLATES = {
-  receita:
-    'Olá, {contraparte}! 🐾\n\nSegue o recibo de pagamento nº {numero} no valor de *{valor}* referente a "{descricao}".\n\nObrigada pela confiança! ✨\n{assinatura}',
-  despesa:
-    'Olá, {contraparte}!\n\nSegue o comprovante nº {numero} referente a "{descricao}" no valor de *{valor}*, pago em {data}.\n\nObrigada!\n{assinatura}',
+  receita: `Olá, {contraparte}! Tudo bem?
+
+Seu pagamento de *{valor}* foi confirmado com sucesso. Agradecemos pela confiança em nosso trabalho e pelo carinho com o Spa de Pet Tia Jéssica. 🐾
+
+Você pode consultar seu recibo com segurança pelo link abaixo:
+{link}
+
+{assinatura}
+Cuidado e carinho em cada atendimento.`,
+  despesa: `Olá, {contraparte}!
+
+Segue o comprovante de pagamento no valor de *{valor}*, referente a "{descricao}", pago em {data}.
+
+Consulte o comprovante com segurança pelo link:
+{link}
+
+{assinatura}`,
 };
+
+function gerarCodigoPublico() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(12);
+  (globalThis.crypto ?? window.crypto).getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
 
 function applyVars(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 
+
 export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId }: Props) {
   const qc = useQueryClient();
-  const [uploading, setUploading] = useState(false);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [storagePath, setStoragePath] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [codigo, setCodigo] = useState<string>("");
   const [mensagem, setMensagem] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState(false);
@@ -52,6 +74,15 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
   const isReceita = data.tipo === "receita";
   const numeroRaw = digits(telefone || "");
   const numero = numeroRaw ? (numeroRaw.startsWith("55") ? numeroRaw : `55${numeroRaw}`) : "";
+
+  const publicUrl = useMemo(() => {
+    if (!codigo) return "";
+    const origin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "";
+    return `${origin}/recibo/${codigo}`;
+  }, [codigo]);
 
   const { data: config } = useQuery({
     queryKey: ["empresa-config-whatsapp"],
@@ -71,7 +102,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     queryFn: async () => {
       const { data: rows } = await supabase
         .from("recibos_enviados")
-        .select("id, enviado_em, signed_url, mensagem")
+        .select("id, enviado_em, codigo_publico, mensagem")
         .eq("tipo", isReceita ? "receita" : "despesa")
         .eq("referencia_id", referenciaId!)
         .order("enviado_em", { ascending: false })
@@ -80,6 +111,16 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     },
   });
 
+  // Ao abrir: reaproveita codigo_publico anterior se houver, senão gera um novo
+  useEffect(() => {
+    if (!open) return;
+    if (envioAnterior?.codigo_publico) {
+      setCodigo(envioAnterior.codigo_publico);
+    } else if (!codigo) {
+      setCodigo(gerarCodigoPublico());
+    }
+  }, [open, envioAnterior, codigo]);
+
   const vars = useMemo(() => ({
     contraparte: data.contraparte,
     valor: brl(data.valor),
@@ -87,8 +128,9 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     descricao: data.descricao || "—",
     forma: (data.forma || "").replace(/_/g, " "),
     data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
-    assinatura: config?.whatsapp_assinatura ?? "",
-  }), [data, config]);
+    assinatura: config?.whatsapp_assinatura ?? "Spa de Pet Tia Jéssica",
+    link: publicUrl,
+  }), [data, config, publicUrl]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,7 +140,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     setMensagem(applyVars(tpl, vars));
   }, [open, config, isReceita, vars]);
 
-  // Prévia do PDF: gera blob URL sempre que abrir/dados mudarem
+  // Prévia do PDF
   useEffect(() => {
     if (!open) {
       setConfirmado(false);
@@ -125,76 +167,68 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     return m ? Array.from(new Set(m)) : [];
   }, [mensagemFinal]);
 
-
-
   const baixar = () => {
     generateReciboPDF(data);
   };
 
-  const gerarLinkCompartilhavel = async (): Promise<{ url: string; path: string } | null> => {
-    if (signedUrl && storagePath) return { url: signedUrl, path: storagePath };
-    setUploading(true);
-    try {
-      const r = generateReciboPDF(data, true) as { blob: Blob; fileName: string };
-      const path = `recibos/${data.numero}.pdf`;
-      const { error: upErr } = await supabase.storage
-        .from("spa-fotos")
-        .upload(path, r.blob, { contentType: "application/pdf", upsert: true });
-      if (upErr) throw upErr;
-      const { data: signed, error: sErr } = await supabase.storage
-        .from("spa-fotos")
-        .createSignedUrl(path, 60 * 60 * 24 * 30);
-      if (sErr) throw sErr;
-      setSignedUrl(signed.signedUrl);
-      setStoragePath(path);
-      return { url: signed.signedUrl, path };
-    } catch (e: any) {
-      toast.error(e.message || "Falha ao gerar link do comprovante");
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const registrarEnvio = async (url: string, path: string) => {
+  const registrarEnvio = async (): Promise<string | null> => {
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    if (!u.user) return null;
+    // Se já existe registro para essa referência, apenas devolve o código dele
+    if (envioAnterior?.codigo_publico) {
+      return envioAnterior.codigo_publico;
+    }
+    const cod = codigo || gerarCodigoPublico();
     const { error } = await supabase.from("recibos_enviados").insert({
       tipo: isReceita ? "receita" : "despesa",
       referencia_id: referenciaId ?? data.numero,
       numero_recibo: data.numero,
+      codigo_publico: cod,
       contraparte: data.contraparte,
       telefone: telefone || null,
       valor: data.valor,
       mensagem: mensagemFinal,
-      signed_url: url,
-      storage_path: path,
+      pet_nome: null,
+      servico: data.descricao || null,
+      forma_pagamento: data.forma || null,
+      data_pagamento: data.data || null,
       enviado_por: u.user.id,
     });
     if (error) {
       console.error(error);
-      toast.error("Envio realizado, mas não foi possível registrar auditoria");
-      return;
+      toast.error("Não foi possível registrar o envio");
+      return null;
     }
     qc.invalidateQueries({ queryKey: ["recibo-envio", isReceita ? "receita" : "despesa", referenciaId] });
+    return cod;
   };
 
   const enviarWhats = async () => {
     if (!numero) {
-      toast.error("Contato sem telefone/WhatsApp cadastrado");
+      toast.error("Contato sem WhatsApp cadastrado");
       return;
     }
-    const link = await gerarLinkCompartilhavel();
-    if (!link) return;
-    const texto = `${mensagemFinal}\n\n${link.url}`;
-    await registrarEnvio(link.url, link.path);
-    window.open(
-      `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-    toast.success("WhatsApp aberto — envio registrado");
+    setEnviando(true);
+    try {
+      const cod = await registrarEnvio();
+      if (!cod) return;
+      const origin =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "";
+      const link = `${origin}/recibo/${cod}`;
+      const textoFinal = applyVars(mensagem, { ...vars, link });
+      window.open(
+        `https://wa.me/${numero}?text=${encodeURIComponent(textoFinal)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      toast.success("WhatsApp aberto — envio registrado");
+    } finally {
+      setEnviando(false);
+    }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -283,14 +317,14 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
               <div className="text-muted-foreground">
                 {format(new Date(envioAnterior.enviado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </div>
-              {envioAnterior.signed_url && (
+              {envioAnterior.codigo_publico && (
                 <a
-                  href={envioAnterior.signed_url}
+                  href={`/recibo/${envioAnterior.codigo_publico}`}
                   target="_blank"
                   rel="noreferrer"
                   className="underline text-primary"
                 >
-                  Abrir link enviado
+                  Abrir página do recibo
                 </a>
               )}
             </div>
@@ -311,7 +345,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             className="text-sm font-normal resize-none"
           />
           <p className="text-[11px] text-muted-foreground">
-            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}.
+            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}, {"{link}"}.
           </p>
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
@@ -325,11 +359,20 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             </div>
             <div className="rounded-md bg-white border p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
               {mensagemFinal || <span className="text-muted-foreground italic">Mensagem vazia</span>}
-              {"\n\n"}
-              <span className="text-primary underline break-all">
-                {signedUrl ?? "[link do comprovante será anexado no envio]"}
-              </span>
             </div>
+            {publicUrl && (
+              <p className="text-[11px] text-emerald-800">
+                Link seguro do recibo:{" "}
+                <a
+                  href={publicUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline break-all"
+                >
+                  {publicUrl}
+                </a>
+              </p>
+            )}
             {variaveisRestantes.length > 0 && (
               <p className="text-[11px] text-amber-700">
                 Atenção: variáveis não substituídas — {variaveisRestantes.join(", ")}
@@ -364,19 +407,19 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           >
             <Download className="h-4 w-4 mr-1" /> Baixar PDF
           </Button>
-          {signedUrl && (
+          {publicUrl && (
             <Button variant="ghost" asChild className="w-full sm:w-auto">
-              <a href={signedUrl} target="_blank" rel="noreferrer">
+              <a href={publicUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4 mr-1" /> Abrir link
               </a>
             </Button>
           )}
           <Button
             onClick={enviarWhats}
-            disabled={!numero || uploading || !confirmado}
+            disabled={!numero || enviando || !confirmado}
             className="w-full sm:w-auto"
           >
-            {uploading ? (
+            {enviando ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (
               <MessageCircle className="h-4 w-4 mr-1" />
