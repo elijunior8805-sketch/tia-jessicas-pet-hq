@@ -71,9 +71,14 @@ function FichaOperacional() {
         title={pet.nome}
         description={`Ficha operacional · ${pet.clientes?.nome ?? ""}`}
         actions={
-          <Link to="/clientes/$id" params={{ id: pet.cliente_id }}>
-            <Button variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar ao cliente</Button>
-          </Link>
+          <>
+            <Link to="/pets/$petId/editar" params={{ petId }}>
+              <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar pet</Button>
+            </Link>
+            <Link to="/clientes/$id" params={{ id: pet.cliente_id }}>
+              <Button variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar ao cliente</Button>
+            </Link>
+          </>
         }
       />
 
