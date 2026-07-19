@@ -95,14 +95,27 @@ function NovoClientePage() {
       if (error) throw error;
 
       if (parsed.pet_nome && parsed.pet_nome.trim()) {
-        const { error: petErr } = await supabase.from("pets").insert({
+        const { data: pet, error: petErr } = await supabase.from("pets").insert({
           cliente_id: cliente.id,
           nome: parsed.pet_nome.trim(),
           raca: clean(parsed.pet_raca),
           porte: clean(parsed.pet_porte),
           sexo: clean(parsed.pet_sexo),
-        });
+        }).select("id").single();
         if (petErr) throw petErr;
+
+        if (petFoto && pet?.id) {
+          const ext = (petFoto.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `pets/${pet.id}-${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from("spa-fotos")
+            .upload(path, petFoto, { upsert: true, contentType: petFoto.type || "image/jpeg" });
+          if (upErr) {
+            toast.error("Cliente e pet salvos, mas a foto falhou: " + upErr.message);
+          } else {
+            await supabase.from("pets").update({ foto_url: path }).eq("id", pet.id);
+          }
+        }
       }
 
       return cliente.id as string;
