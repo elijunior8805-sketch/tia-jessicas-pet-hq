@@ -574,11 +574,15 @@ function Etapa1Solicitado({ atendimento, readOnly, onPatch }: any) {
   const total = sumItens(solicitados);
   const taxa = Number(atendimento.taxa_leva_traz ?? 0);
 
-  const snapshotIfEmpty = () => {
-    if (!atendimento.servicos_solicitados?.length && solicitados.length) {
-      onPatch({ servicos_solicitados: solicitados });
+  // Cria snapshot uma vez, se estiver vazio
+  useEffect(() => {
+    if (readOnly) return;
+    if (!atendimento.servicos_solicitados?.length) {
+      const base: ServicoItem[] = atendimento.servicos_planejados ?? [];
+      if (base.length > 0) onPatch({ servicos_solicitados: base });
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atendimento.id]);
 
   return (
     <div>
@@ -604,26 +608,10 @@ function Etapa1Solicitado({ atendimento, readOnly, onPatch }: any) {
         <span className="text-muted-foreground">Taxa leva-e-traz: <b>{brl(taxa)}</b></span>
         <span className="font-semibold text-primary">Total solicitado: {brl(total + taxa)}</span>
       </div>
-      {!readOnly && !atendimento.servicos_solicitados?.length && (
-        <div className="mt-3 text-xs text-muted-foreground" onMouseEnter={snapshotIfEmpty}>
-          Ao confirmar, este serviço será travado como o que foi solicitado.
-        </div>
-      )}
-      <SnapshotHelper atendimento={atendimento} onPatch={onPatch} />
     </div>
   );
 }
 
-function SnapshotHelper({ atendimento, onPatch }: any) {
-  // Garante snapshot na primeira confirmação, sem re-renderizar em loop
-  if (!atendimento.servicos_solicitados?.length) {
-    const base: ServicoItem[] = atendimento.servicos_planejados ?? [];
-    if (base.length > 0) {
-      setTimeout(() => onPatch({ servicos_solicitados: base }), 0);
-    }
-  }
-  return null;
-}
 
 // ETAPA 2 — Serviços extras
 function Etapa2Extras({ atendimento, readOnly, servicos, onPatch }: any) {
