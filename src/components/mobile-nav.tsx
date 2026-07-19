@@ -69,6 +69,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Cobranças", url: "/cobrancas", icon: HandCoins },
       { title: "Lembretes", url: "/lembretes", icon: BellRing },
       { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
+      { title: "Campanhas", url: "/campanhas", icon: Megaphone },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],
