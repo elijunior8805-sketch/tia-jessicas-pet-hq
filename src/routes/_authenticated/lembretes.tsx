@@ -182,7 +182,10 @@ function LembretesPage() {
       const total =
         Number(r?.lembrete_24h ?? 0) +
         Number(r?.pos_atendimento ?? 0) +
-        Number(r?.aniversario_pet ?? 0);
+        Number(r?.aniversario_pet ?? 0) +
+        Number(r?.aniversario_tutor ?? 0) +
+        Number(r?.petversario ?? 0) +
+        Number(r?.data_especial ?? 0);
       toast.success(
         total > 0
           ? `${total} lembrete(s) adicionados à fila`
