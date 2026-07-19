@@ -460,7 +460,14 @@ function ServicoFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="s-cat">Categoria</Label>
-              <Input id="s-cat" value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Banho, Tosa…" />
+              <Select value={categoria} onValueChange={setCategoria}>
+                <SelectTrigger id="s-cat"><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS_SERVICO.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="s-dur">Duração (min)</Label>
@@ -473,6 +480,10 @@ function ServicoFormDialog({
             <p className="text-xs text-muted-foreground">
               Usado quando não houver preço específico por porte.
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch id="s-partir" checked={precoAPartir} onCheckedChange={setPrecoAPartir} />
+            <Label htmlFor="s-partir">Exibir como “a partir de”</Label>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="s-desc">Descrição</Label>
