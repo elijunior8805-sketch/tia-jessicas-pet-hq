@@ -21,8 +21,76 @@ import { toast } from "sonner";
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
-  ChevronLeft, ChevronRight, MessageCircle,
+  ChevronLeft, ChevronRight, MessageCircle, Send,
 } from "lucide-react";
+
+// ---------- WhatsApp helpers ----------
+
+function onlyDigits(v: string | null | undefined) {
+  return (v ?? "").replace(/\D+/g, "");
+}
+function waPhone(v: string | null | undefined) {
+  const d = onlyDigits(v);
+  if (!d) return "";
+  // Adiciona DDI 55 (Brasil) se ausente
+  if (d.length <= 11) return `55${d}`;
+  return d;
+}
+function fmtDataBR(iso: string) {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+function waMessage(row: any): string {
+  const nomeCliente = row.clientes?.nome?.split(" ")[0] ?? "";
+  const pet = row.pets?.nome ?? "seu pet";
+  const servico = row.servicos?.nome ?? "atendimento";
+  const hora = row.hora ? String(row.hora).slice(0, 5) : "";
+  const data = row.data ? fmtDataBR(row.data) : "";
+  const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
+  const valor = total > 0
+    ? total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+    : "";
+
+  switch (row.status) {
+    case "agendado":
+      return (
+        `Olá${nomeCliente ? `, ${nomeCliente}` : ""}! 🐾\n\n` +
+        `Aqui é do *Spa de Pet Tia Jéssica*. Confirmando o agendamento de *${pet}*:\n\n` +
+        `• Serviço: ${servico}\n` +
+        `• Data: ${data}\n` +
+        `• Horário: ${hora}\n` +
+        (valor ? `• Valor previsto: ${valor}\n` : "") +
+        `\nPodemos confirmar sua presença? 💚`
+      );
+    case "confirmado":
+      return (
+        `Oi${nomeCliente ? `, ${nomeCliente}` : ""}! ✨\n\n` +
+        `Passando para *lembrar* do atendimento de *${pet}* no *Spa de Pet Tia Jéssica*:\n\n` +
+        `• Serviço: ${servico}\n` +
+        `• Data: ${data}\n` +
+        `• Horário: ${hora}\n\n` +
+        `Estamos ansiosas para receber vocês! 🐶💚`
+      );
+    case "aguardando":
+      return (
+        `Oi${nomeCliente ? `, ${nomeCliente}` : ""}! 🕒\n\n` +
+        `Estamos *aguardando a chegada* de *${pet}* para o ${servico} das ${hora}.\n` +
+        `Está tudo certo? Qualquer imprevisto, é só nos avisar por aqui. 💚`
+      );
+    default:
+      return `Olá${nomeCliente ? `, ${nomeCliente}` : ""}! Sobre o atendimento de ${pet} em ${data} às ${hora}.`;
+  }
+}
+function openWhatsApp(row: any) {
+  const phone = waPhone(row.clientes?.whatsapp);
+  if (!phone) {
+    toast.error("Cliente sem WhatsApp cadastrado");
+    return;
+  }
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(row))}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 
 export const Route = createFileRoute("/_authenticated/agenda")({
   component: AgendaPage,
@@ -277,26 +345,47 @@ function AgendamentoRow({
               </div>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1">
-                Status <MoreHorizontal className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2">
+            {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-success/40 text-success hover:bg-success/10"
+                onClick={() => openWhatsApp(row)}
+                title={
+                  row.status === "agendado"
+                    ? "Enviar confirmação por WhatsApp"
+                    : row.status === "confirmado"
+                    ? "Enviar lembrete por WhatsApp"
+                    : "Enviar mensagem de aguardando"
+                }
+              >
+                <Send className="h-3.5 w-3.5" />
+                {row.status === "agendado" ? "Confirmar" : row.status === "confirmado" ? "Lembrar" : "Cobrar"}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {STATUS.map((s) => (
-                <DropdownMenuItem
-                  key={s.value}
-                  disabled={row.status === s.value}
-                  onClick={() => onChangeStatus(s.value)}
-                >
-                  {s.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  Status <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {STATUS.map((s) => (
+                  <DropdownMenuItem
+                    key={s.value}
+                    disabled={row.status === s.value}
+                    onClick={() => onChangeStatus(s.value)}
+                  >
+                    {s.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
         </div>
       </div>
     </Card>
