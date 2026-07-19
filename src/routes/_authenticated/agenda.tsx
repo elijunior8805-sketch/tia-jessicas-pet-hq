@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
-  ChevronLeft, ChevronRight, MessageCircle, Send, Play,
+  ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2,
 } from "lucide-react";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 
@@ -554,6 +554,9 @@ function AgendamentoRow({
   const previewStorageKey = `wa-preview:finalizado:${row.id}`;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState("");
+  const [editServicosOpen, setEditServicosOpen] = useState(false);
+
+  const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
 
   const openFinalizadoPreview = () => {
     let saved: string | null = null;
@@ -700,6 +703,18 @@ function AgendamentoRow({
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {podeEditarServicos && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => setEditServicosOpen(true)}
+                title="Editar serviços deste agendamento"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Serviços
+              </Button>
+            )}
             {["agendado","confirmado","aguardando","em_atendimento"].includes(row.status) && (
               <Button
                 size="sm"
@@ -814,6 +829,12 @@ function AgendamentoRow({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditarServicosDialog
+        open={editServicosOpen}
+        onOpenChange={setEditServicosOpen}
+        agendamento={row}
+      />
     </Card>
   );
 }
@@ -1169,4 +1190,268 @@ function NovoAgendamentoDialog({
 function useMemoReset(key: boolean, fn: () => void) {
   useMemo(() => { if (key) fn(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+}
+
+// ---------- Editar serviços de um agendamento existente ----------
+
+function EditarServicosDialog({
+  open,
+  onOpenChange,
+  agendamento,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  agendamento: any;
+}) {
+  const qc = useQueryClient();
+  const [itens, setItens] = useState<ItemServico[]>([]);
+  const [servicoAdd, setServicoAdd] = useState<string>("");
+  const [taxa, setTaxa] = useState<string>("0");
+
+  // Inicializa itens quando abre
+  useMemoReset(open, () => {
+    const base = Array.isArray(agendamento?.agendamento_servicos) ? agendamento.agendamento_servicos : [];
+    const ordered = base.length > 0
+      ? [...base].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0)).map((it: any) => ({
+          servico_id: it.servico_id,
+          nome: it.nome,
+          valor_unit: Number(it.valor_unit ?? 0),
+          duracao_min: it.duracao_min ?? null,
+        }))
+      : agendamento?.servicos
+        ? [{
+            servico_id: agendamento.servicos.id,
+            nome: agendamento.servicos.nome,
+            valor_unit: Number(agendamento.servicos.valor ?? agendamento.valor_previsto ?? 0),
+            duracao_min: agendamento.servicos.duracao_min ?? agendamento.duracao_min ?? null,
+          }]
+        : [];
+    setItens(ordered);
+    setServicoAdd("");
+    setTaxa(String(agendamento?.taxa_leva_traz ?? 0));
+  });
+
+  const { data: servicos } = useQuery({
+    queryKey: ["servicos-ativos"],
+    enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("servicos")
+        .select("id, nome, valor, duracao_min, categoria")
+        .eq("ativo", true)
+        .order("nome");
+      return data ?? [];
+    },
+  });
+
+  const totalValor = useMemo(() => itens.reduce((s, it) => s + Number(it.valor_unit ?? 0), 0), [itens]);
+  const totalDuracao = useMemo(() => itens.reduce((s, it) => s + Number(it.duracao_min ?? 0), 0), [itens]);
+  const totalComTaxa = totalValor + Number(taxa || 0);
+
+  function adicionarServico(id: string) {
+    if (!id) return;
+    if (itens.some((it) => it.servico_id === id)) {
+      toast.info("Este serviço já foi adicionado");
+      setServicoAdd("");
+      return;
+    }
+    const s = servicos?.find((x) => x.id === id);
+    if (!s) return;
+    setItens((prev) => [...prev, {
+      servico_id: s.id,
+      nome: s.nome,
+      valor_unit: Number(s.valor ?? 0),
+      duracao_min: s.duracao_min ?? null,
+    }]);
+    setServicoAdd("");
+  }
+
+  function removerItem(idx: number) {
+    setItens((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function alterarItem(idx: number, patch: Partial<ItemServico>) {
+    setItens((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
+  }
+
+  function moverItem(idx: number, dir: -1 | 1) {
+    setItens((prev) => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[idx], copy[j]] = [copy[j], copy[idx]];
+      return copy;
+    });
+  }
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      if (itens.length === 0) throw new Error("Adicione ao menos um serviço");
+      const principal = itens[0];
+
+      // Atualiza o agendamento (serviço principal, totais, taxa)
+      const { error: errUp } = await supabase.from("agendamentos").update({
+        servico_id: principal.servico_id,
+        valor_previsto: totalValor,
+        duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
+        taxa_leva_traz: Number(taxa || 0),
+      }).eq("id", agendamento.id);
+      if (errUp) throw errUp;
+
+      // Reseta os itens (delete + insert)
+      const { error: errDel } = await supabase
+        .from("agendamento_servicos")
+        .delete()
+        .eq("agendamento_id", agendamento.id);
+      if (errDel) throw errDel;
+
+      const rows = itens.map((it, i) => ({
+        agendamento_id: agendamento.id,
+        servico_id: it.servico_id,
+        nome: it.nome,
+        valor_unit: it.valor_unit,
+        duracao_min: it.duracao_min,
+        ordem: i,
+      }));
+      const { error: errIns } = await supabase.from("agendamento_servicos").insert(rows);
+      if (errIns) throw errIns;
+    },
+    onSuccess: () => {
+      toast.success("Serviços atualizados");
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
+  });
+
+  const servicosDisponiveis = (servicos ?? []).filter((s) => !itens.some((it) => it.servico_id === s.id));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display">Editar serviços do agendamento</DialogTitle>
+          <DialogDescription>
+            {agendamento?.pets?.nome ? `${agendamento.pets.nome} · ` : ""}
+            {agendamento?.clientes?.nome ?? ""}
+            {" — "}
+            Valor e duração totais são recalculados automaticamente.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Adicionar serviço</Label>
+            <Select value={servicoAdd || undefined} onValueChange={adicionarServico}>
+              <SelectTrigger>
+                <SelectValue placeholder={servicosDisponiveis.length ? "Escolher serviço…" : "Todos os serviços já adicionados"} />
+              </SelectTrigger>
+              <SelectContent>
+                {servicosDisponiveis.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.nome} {s.valor != null ? `· ${brl(Number(s.valor))}` : ""}
+                    {s.duracao_min ? ` · ${s.duracao_min}min` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {itens.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">Nenhum serviço no agendamento.</p>
+          ) : (
+            <div className="space-y-2 rounded-md border border-border/60 p-2 bg-muted/20">
+              {itens.map((it, idx) => (
+                <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_100px_80px_auto] gap-2 items-center">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{it.nome}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {idx === 0 && (
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</span>
+                      )}
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-primary disabled:opacity-30"
+                        onClick={() => moverItem(idx, -1)}
+                        disabled={idx === 0}
+                        title="Subir"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-primary disabled:opacity-30"
+                        onClick={() => moverItem(idx, 1)}
+                        disabled={idx === itens.length - 1}
+                        title="Descer"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </div>
+                  <Input
+                    type="number" min={0} step="0.01"
+                    value={it.valor_unit}
+                    onChange={(e) => alterarItem(idx, { valor_unit: Number(e.target.value || 0) })}
+                    aria-label="Valor"
+                  />
+                  <Input
+                    type="number" min={0}
+                    value={it.duracao_min ?? ""}
+                    onChange={(e) => alterarItem(idx, { duracao_min: e.target.value ? Number(e.target.value) : null })}
+                    placeholder="min"
+                    aria-label="Duração"
+                  />
+                  <Button
+                    type="button" variant="ghost" size="icon"
+                    onClick={() => removerItem(idx)}
+                    className="text-destructive hover:text-destructive"
+                    title="Remover"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex flex-wrap justify-end gap-4 pt-2 border-t border-border/60 text-sm">
+                <span className="text-muted-foreground">
+                  Duração total: <strong className="text-foreground">{totalDuracao} min</strong>
+                </span>
+                <span className="text-muted-foreground">
+                  Serviços: <strong className="text-foreground">{brl(totalValor)}</strong>
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Taxa leva-e-traz (R$)</Label>
+              <Input
+                type="number" min={0} step="0.01"
+                value={taxa}
+                onChange={(e) => setTaxa(e.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <div className="w-full rounded-md border border-border/60 bg-card p-3">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total previsto</div>
+                <div className="font-display text-xl font-semibold text-primary">{brl(totalComTaxa)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            onClick={() => salvar.mutate()}
+            disabled={salvar.isPending || itens.length === 0}
+          >
+            {salvar.isPending ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
