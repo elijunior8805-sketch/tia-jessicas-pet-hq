@@ -27,6 +27,8 @@ import {
   brl, sumItens, itemFromServico, isBanho, isTosa,
   COMPORTAMENTOS, OCORRENCIA_TIPOS, type ServicoItem,
 } from "@/lib/atendimento-utils";
+import { generateAtendimentoPDF } from "@/lib/atendimento-pdf";
+import { useMyProfile } from "@/hooks/use-my-profile";
 
 export const Route = createFileRoute("/_authenticated/atendimentos/$atendId")({
   component: AtendimentoDetalhe,
@@ -130,6 +132,26 @@ function AtendimentoDetalhe() {
   const { atendId } = Route.useParams();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { data: myProfile } = useMyProfile();
+
+  const { data: empresa } = useQuery({
+    queryKey: ["empresa-config"],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("empresa_config")
+        .select("nome_fantasia, cnpj, telefone, endereco")
+        .limit(1)
+        .maybeSingle();
+      if (!data) return null;
+      return {
+        nome: (data as any).nome_fantasia as string | null,
+        cnpj: (data as any).cnpj as string | null,
+        telefone: (data as any).telefone as string | null,
+        endereco: (data as any).endereco as string | null,
+      };
+    },
+  });
 
   const { data: atendimento, isLoading } = useQuery({
     queryKey: ["atendimento", atendId],
@@ -244,6 +266,26 @@ function AtendimentoDetalhe() {
     },
     onSuccess: () => {
       toast.success("Atendimento finalizado");
+      // Gera o PDF final com os dados mais recentes em memória
+      try {
+        const executados = (atendimento?.servicos_executados ?? []) as ServicoItem[];
+        const valor_executado = sumItens(executados);
+        const enriched = {
+          ...atendimento,
+          finalizado: true,
+          data_fim: new Date().toISOString(),
+          valor_executado,
+        };
+        generateAtendimentoPDF({
+          atendimento: enriched,
+          ocorrencias,
+          empresa: empresa ?? null,
+          operador: myProfile?.nome ?? null,
+        });
+        toast.success("PDF do atendimento gerado");
+      } catch (err: any) {
+        toast.error(`Não foi possível gerar o PDF: ${err?.message ?? "erro"}`);
+      }
       qc.invalidateQueries({ queryKey: ["atendimento", atendId] });
       qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
       qc.invalidateQueries({ queryKey: ["agenda"] });
