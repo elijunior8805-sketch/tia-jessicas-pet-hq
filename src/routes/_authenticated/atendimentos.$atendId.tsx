@@ -102,20 +102,60 @@ function Thumb({
   );
 }
 
+function extFromMime(mime: string): string {
+  const m = mime.toLowerCase();
+  if (m.includes("png")) return "png";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("heic")) return "heic";
+  if (m.includes("heif")) return "heif";
+  if (m.includes("gif")) return "gif";
+  return "jpg";
+}
+
 async function baixarFoto(path: string, filename: string) {
   try {
     const { data, error } = await supabase.storage.from("spa-fotos").createSignedUrl(path, 60 * 5);
     if (error || !data?.signedUrl) throw error ?? new Error("Sem URL");
     const resp = await fetch(data.signedUrl);
-    const blob = await resp.blob();
+    if (!resp.ok) throw new Error("Falha ao carregar foto");
+    const rawBlob = await resp.blob();
+    const mime = rawBlob.type || "image/jpeg";
+    // Ensure filename has an extension matching the actual MIME type
+    const base = filename.replace(/\.[a-z0-9]+$/i, "");
+    const finalName = `${base}.${extFromMime(mime)}`;
+    // Rewrap the blob with the resolved MIME so browsers save with the right type
+    const blob = rawBlob.type ? rawBlob : new Blob([rawBlob], { type: mime });
+
+    // iOS/Android: Web Share API with a File opens the native share sheet,
+    // which offers "Save Image" / "Save to Files" / "Photos" — the reliable
+    // way to save a blob to the camera roll on mobile.
+    const nav = navigator as Navigator & {
+      canShare?: (data: { files?: File[] }) => boolean;
+      share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+    };
+    if (typeof File !== "undefined" && nav.canShare && nav.share) {
+      try {
+        const file = new File([blob], finalName, { type: mime });
+        if (nav.canShare({ files: [file] })) {
+          await nav.share({ files: [file], title: finalName });
+          return;
+        }
+      } catch (shareErr: any) {
+        // User cancelled — do nothing. Any other error falls through to <a download>.
+        if (shareErr?.name === "AbortError") return;
+      }
+    }
+
+    // Desktop and Android Chrome without share: classic <a download>.
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    a.download = finalName;
+    a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e: any) {
     toast.error(e?.message ?? "Erro ao baixar foto");
   }
