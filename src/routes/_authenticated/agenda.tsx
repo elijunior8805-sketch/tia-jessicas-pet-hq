@@ -810,15 +810,58 @@ function AgendamentoRow({
               </Button>
 
             )}
+            {podeCheckIn && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-gold/50 text-gold-foreground hover:bg-gold/10"
+                onClick={() => onChangeStatus("aguardando")}
+                title="Registrar chegada do pet (check-in)"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                Check-in
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1">
-                  Status <MoreHorizontal className="h-3.5 w-3.5" />
+                  Ações <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Ações rápidas</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {podeReagendar && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setNovaData(row.data ?? "");
+                      setNovaHora(row.hora ? String(row.hora).slice(0, 5) : "");
+                      setReagendarOpen(true);
+                    }}
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5 mr-2" /> Reagendar…
+                  </DropdownMenuItem>
+                )}
+                {podeCheckIn && (
+                  <DropdownMenuItem onClick={() => onChangeStatus("aguardando")}>
+                    <LogIn className="h-3.5 w-3.5 mr-2" /> Marcar check-in
+                  </DropdownMenuItem>
+                )}
+                {row.status === "aguardando" && (
+                  <DropdownMenuItem onClick={onIniciar} disabled={iniciando}>
+                    <Play className="h-3.5 w-3.5 mr-2" /> Iniciar atendimento
+                  </DropdownMenuItem>
+                )}
+                {podeCancelar && (
+                  <DropdownMenuItem
+                    onClick={() => setCancelarOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Cancelar agendamento
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
                 {STATUS.map((s) => (
                   <DropdownMenuItem
                     key={s.value}
