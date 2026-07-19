@@ -1066,6 +1066,101 @@ export type Database = {
         }
         Relationships: []
       }
+      relatorios_agendamentos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          criado_por: string | null
+          destinatarios: Json
+          hora_envio: string
+          id: string
+          nome: string
+          ultima_execucao: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          destinatarios?: Json
+          hora_envio?: string
+          id?: string
+          nome: string
+          ultima_execucao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          destinatarios?: Json
+          hora_envio?: string
+          id?: string
+          nome?: string
+          ultima_execucao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      relatorios_execucoes: {
+        Row: {
+          agendamento_id: string | null
+          agendamento_nome: string
+          created_at: string
+          destinatario_nome: string
+          destinatario_whatsapp: string
+          enviado_em: string | null
+          enviado_por: string | null
+          gerado_em: string
+          id: string
+          mensagem: string
+          observacao: string | null
+          periodo_ate: string
+          periodo_de: string
+          wa_url: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          agendamento_nome: string
+          created_at?: string
+          destinatario_nome: string
+          destinatario_whatsapp: string
+          enviado_em?: string | null
+          enviado_por?: string | null
+          gerado_em?: string
+          id?: string
+          mensagem: string
+          observacao?: string | null
+          periodo_ate: string
+          periodo_de: string
+          wa_url: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          agendamento_nome?: string
+          created_at?: string
+          destinatario_nome?: string
+          destinatario_whatsapp?: string
+          enviado_em?: string | null
+          enviado_por?: string | null
+          gerado_em?: string
+          id?: string
+          mensagem?: string
+          observacao?: string | null
+          periodo_ate?: string
+          periodo_de?: string
+          wa_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorios_execucoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "relatorios_agendamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicos: {
         Row: {
           ativo: boolean
