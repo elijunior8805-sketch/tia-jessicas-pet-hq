@@ -63,6 +63,23 @@ export const registrarAberturaWhatsApp = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error("Falha ao registrar abertura");
+
+    // Também alimenta a Central de Mensagens (inbox unificada)
+    if (data.cliente_id) {
+      await supabase.from("mensagens").insert({
+        cliente_id: data.cliente_id,
+        direcao: "out",
+        canal: "whatsapp",
+        corpo: data.mensagem,
+        status: "enviada",
+        autor_id: userId,
+        atendimento_id: data.atendimento_id ?? null,
+        pagamento_id: data.pagamento_id ?? null,
+        cobranca_id: data.cobranca_id ?? null,
+        tags: [data.tipo],
+        metadata: { destinatario: data.destinatario, telefone: data.telefone },
+      });
+    }
     return { id: ins.id as string };
   });
 
