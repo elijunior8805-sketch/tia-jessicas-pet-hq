@@ -21,6 +21,7 @@ import {
   Megaphone,
   Settings,
   PawPrint,
+  Cake,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -68,6 +69,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
       { title: "Cobranças", url: "/cobrancas", icon: HandCoins },
       { title: "Lembretes", url: "/lembretes", icon: BellRing },
+      { title: "Aniversários", url: "/aniversarios", icon: Cake },
       { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
       { title: "Campanhas", url: "/campanhas", icon: Megaphone },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },

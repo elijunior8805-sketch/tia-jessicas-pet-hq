@@ -30,6 +30,7 @@ import { Route as AuthenticatedComunicacaoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedComprasRouteImport } from './routes/_authenticated/compras'
 import { Route as AuthenticatedCobrancasRouteImport } from './routes/_authenticated/cobrancas'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
+import { Route as AuthenticatedAniversariosRouteImport } from './routes/_authenticated/aniversarios'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes.index'
 import { Route as AuthenticatedAtendimentosIndexRouteImport } from './routes/_authenticated/atendimentos.index'
@@ -152,6 +153,12 @@ const AuthenticatedCampanhasRoute = AuthenticatedCampanhasRouteImport.update({
   path: '/campanhas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAniversariosRoute =
+  AuthenticatedAniversariosRouteImport.update({
+    id: '/aniversarios',
+    path: '/aniversarios',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -232,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agenda': typeof AuthenticatedAgendaRoute
+  '/aniversarios': typeof AuthenticatedAniversariosRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/cobrancas': typeof AuthenticatedCobrancasRoute
   '/compras': typeof AuthenticatedComprasRoute
@@ -267,6 +275,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agenda': typeof AuthenticatedAgendaRoute
+  '/aniversarios': typeof AuthenticatedAniversariosRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/cobrancas': typeof AuthenticatedCobrancasRoute
   '/compras': typeof AuthenticatedComprasRoute
@@ -304,6 +313,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
+  '/_authenticated/aniversarios': typeof AuthenticatedAniversariosRoute
   '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/cobrancas': typeof AuthenticatedCobrancasRoute
   '/_authenticated/compras': typeof AuthenticatedComprasRoute
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agenda'
+    | '/aniversarios'
     | '/campanhas'
     | '/cobrancas'
     | '/compras'
@@ -376,6 +387,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agenda'
+    | '/aniversarios'
     | '/campanhas'
     | '/cobrancas'
     | '/compras'
@@ -412,6 +424,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/agenda'
+    | '/_authenticated/aniversarios'
     | '/_authenticated/campanhas'
     | '/_authenticated/cobrancas'
     | '/_authenticated/compras'
@@ -603,6 +616,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampanhasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/aniversarios': {
+      id: '/_authenticated/aniversarios'
+      path: '/aniversarios'
+      fullPath: '/aniversarios'
+      preLoaderRoute: typeof AuthenticatedAniversariosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/agenda': {
       id: '/_authenticated/agenda'
       path: '/agenda'
@@ -713,6 +733,7 @@ const AuthenticatedClientesIdRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
+  AuthenticatedAniversariosRoute: typeof AuthenticatedAniversariosRoute
   AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedCobrancasRoute: typeof AuthenticatedCobrancasRoute
   AuthenticatedComprasRoute: typeof AuthenticatedComprasRoute
@@ -741,6 +762,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
+  AuthenticatedAniversariosRoute: AuthenticatedAniversariosRoute,
   AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedCobrancasRoute: AuthenticatedCobrancasRoute,
   AuthenticatedComprasRoute: AuthenticatedComprasRoute,
@@ -783,13 +805,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

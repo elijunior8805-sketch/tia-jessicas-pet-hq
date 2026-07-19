@@ -82,6 +82,21 @@ const TIPO_INFO: Record<
     icon: Cake,
     badge: "bg-amber-500/15 text-amber-700 border-amber-500/30",
   },
+  aniversario_tutor: {
+    label: "Aniversário do tutor",
+    icon: Cake,
+    badge: "bg-pink-500/15 text-pink-700 border-pink-500/30",
+  },
+  petversario: {
+    label: "Petversário",
+    icon: Cake,
+    badge: "bg-fuchsia-500/15 text-fuchsia-700 border-fuchsia-500/30",
+  },
+  data_especial: {
+    label: "Data especial",
+    icon: Sparkles,
+    badge: "bg-rose-500/15 text-rose-700 border-rose-500/30",
+  },
 };
 
 const STATUS_INFO: Record<string, { label: string; classe: string }> = {
@@ -167,7 +182,10 @@ function LembretesPage() {
       const total =
         Number(r?.lembrete_24h ?? 0) +
         Number(r?.pos_atendimento ?? 0) +
-        Number(r?.aniversario_pet ?? 0);
+        Number(r?.aniversario_pet ?? 0) +
+        Number(r?.aniversario_tutor ?? 0) +
+        Number(r?.petversario ?? 0) +
+        Number(r?.data_especial ?? 0);
       toast.success(
         total > 0
           ? `${total} lembrete(s) adicionados à fila`
@@ -214,6 +232,12 @@ function LembretesPage() {
     const tipoWa =
       row.tipo === "aniversario_pet"
         ? "aniversario_pet"
+        : row.tipo === "aniversario_tutor"
+        ? "parabens_cliente"
+        : row.tipo === "petversario"
+        ? "aniversario_pet"
+        : row.tipo === "data_especial"
+        ? "personalizada"
         : row.tipo === "pos_atendimento"
         ? "solicitacao_avaliacao"
         : "lembrete_atendimento";

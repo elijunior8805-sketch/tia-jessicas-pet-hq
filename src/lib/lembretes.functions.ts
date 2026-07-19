@@ -2,7 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-export type LembreteTipo = "lembrete_24h" | "pos_atendimento" | "aniversario_pet";
+export type LembreteTipo =
+  | "lembrete_24h"
+  | "pos_atendimento"
+  | "aniversario_pet"
+  | "aniversario_tutor"
+  | "petversario"
+  | "data_especial";
 export type LembreteStatus = "pendente" | "enviado" | "falhou" | "cancelado";
 
 export type LembreteRow = {
@@ -38,6 +44,11 @@ export type LembreteConfig = {
   aniversario_pet_ativo: boolean;
   aniversario_hora: string;
   aniversario_template: string;
+  aniversario_tutor_ativo: boolean;
+  aniversario_tutor_template: string;
+  petversario_ativo: boolean;
+  petversario_template: string;
+  datas_especiais_ativo: boolean;
   updated_at: string;
 };
 
@@ -64,6 +75,11 @@ const ConfigSchema = z.object({
   aniversario_pet_ativo: z.boolean(),
   aniversario_hora: z.string(),
   aniversario_template: z.string().min(5).max(2000),
+  aniversario_tutor_ativo: z.boolean(),
+  aniversario_tutor_template: z.string().min(5).max(2000),
+  petversario_ativo: z.boolean(),
+  petversario_template: z.string().min(5).max(2000),
+  datas_especiais_ativo: z.boolean(),
 });
 
 export const salvarLembretesConfig = createServerFn({ method: "POST" })
@@ -82,7 +98,7 @@ export const salvarLembretesConfig = createServerFn({ method: "POST" })
 const ListaSchema = z
   .object({
     status: z.enum(["pendente", "enviado", "falhou", "cancelado", "todos"]).optional().default("pendente"),
-    tipo: z.enum(["lembrete_24h", "pos_atendimento", "aniversario_pet", "todos"]).optional().default("todos"),
+    tipo: z.enum(["lembrete_24h", "pos_atendimento", "aniversario_pet", "aniversario_tutor", "petversario", "data_especial", "todos"]).optional().default("todos"),
     busca: z.string().trim().max(120).optional().default(""),
   })
   .default({});

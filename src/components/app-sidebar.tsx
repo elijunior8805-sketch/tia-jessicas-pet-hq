@@ -20,6 +20,7 @@ import {
   Megaphone,
   Settings,
   PawPrint,
+  Cake,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,7 @@ const groups = [
     items: [
       { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
       { title: "Lembretes", url: "/lembretes", icon: BellRing },
+      { title: "Aniversários", url: "/aniversarios", icon: Cake },
       { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
       { title: "Campanhas", url: "/campanhas", icon: Megaphone },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
