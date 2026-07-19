@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
-  ChevronLeft, ChevronRight, MessageCircle, Send,
+  ChevronLeft, ChevronRight, MessageCircle, Send, Play,
 } from "lucide-react";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 
@@ -204,6 +204,7 @@ function AgendaPage() {
     [agendamentos],
   );
 
+  const navigate = useNavigate();
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Status }) => {
       const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
@@ -215,6 +216,55 @@ function AgendaPage() {
       toast.success("Status atualizado");
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar"),
+  });
+
+  const iniciarAtendimentoMut = useMutation({
+    mutationFn: async (row: any) => {
+      // Se já existir atendimento vinculado, reutiliza
+      const { data: existing } = await supabase.from("atendimentos")
+        .select("id").eq("agendamento_id", row.id).maybeSingle();
+      if (existing?.id) return existing.id as string;
+
+      const servicoSolicitado = row.servicos ? [{
+        servico_id: row.servicos.id,
+        nome: row.servicos.nome,
+        categoria: null,
+        quantidade: 1,
+        valor_unit: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
+        valor_total: Number(row.servicos.valor ?? row.valor_previsto ?? 0),
+      }] : [];
+
+      const { data: novo, error } = await supabase.from("atendimentos").insert({
+        agendamento_id: row.id,
+        cliente_id: row.clientes?.id ?? row.cliente_id,
+        pet_id: row.pets?.id ?? row.pet_id,
+        profissional_id: row.profissional_id ?? null,
+        data_inicio: new Date().toISOString(),
+        servicos_solicitados: servicoSolicitado as any,
+        servicos_planejados: servicoSolicitado as any,
+        servicos_executados: [] as any,
+        servicos_extras: [] as any,
+        valor_planejado: Number(row.valor_previsto ?? 0),
+        valor_executado: 0,
+        taxa_leva_traz: Number(row.taxa_leva_traz ?? 0),
+        observacoes_checkin: row.observacoes ?? null,
+        etapa_atual: 1,
+        etapas_status: {} as any,
+        finalizado: false,
+      } as any).select("id").single();
+      if (error) throw error;
+
+      await supabase.from("agendamentos")
+        .update({ status: "em_atendimento" })
+        .eq("id", row.id);
+
+      return novo.id as string;
+    },
+    onSuccess: (atendId) => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      navigate({ to: "/atendimentos/$atendId", params: { atendId } });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao iniciar atendimento"),
   });
 
   const [busca, setBusca] = useState("");
@@ -324,6 +374,8 @@ function AgendaPage() {
                   key={a.id}
                   row={a}
                   onChangeStatus={(status) => updateStatus.mutate({ id: a.id, status })}
+                  onIniciar={() => iniciarAtendimentoMut.mutate(a)}
+                  iniciando={iniciarAtendimentoMut.isPending}
                   signer={signer}
                 />
               ))}
@@ -396,10 +448,14 @@ function AgendaPage() {
 function AgendamentoRow({
   row,
   onChangeStatus,
+  onIniciar,
+  iniciando,
   signer,
 }: {
   row: any;
   onChangeStatus: (s: Status) => void;
+  onIniciar: () => void;
+  iniciando: boolean;
   signer: { name: string; initials: string };
 }) {
   const previewStorageKey = `wa-preview:finalizado:${row.id}`;
@@ -484,7 +540,19 @@ function AgendamentoRow({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {["agendado","confirmado","aguardando","em_atendimento"].includes(row.status) && (
+              <Button
+                size="sm"
+                className="gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={iniciando}
+                onClick={onIniciar}
+                title={row.status === "em_atendimento" ? "Retomar atendimento" : "Iniciar atendimento"}
+              >
+                <Play className="h-3.5 w-3.5" />
+                {row.status === "em_atendimento" ? "Retomar" : "Iniciar atendimento"}
+              </Button>
+            )}
             {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando" || row.status === "finalizado") && (
               <Button
                 variant="outline"
