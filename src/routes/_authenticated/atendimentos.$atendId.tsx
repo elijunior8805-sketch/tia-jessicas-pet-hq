@@ -132,6 +132,20 @@ function AtendimentoDetalhe() {
   const { atendId } = Route.useParams();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { data: myProfile } = useMyProfile();
+
+  const { data: empresa } = useQuery({
+    queryKey: ["empresa-config"],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("empresa_config")
+        .select("nome, cnpj, telefone, endereco")
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
 
   const { data: atendimento, isLoading } = useQuery({
     queryKey: ["atendimento", atendId],
