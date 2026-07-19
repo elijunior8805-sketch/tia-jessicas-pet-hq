@@ -98,59 +98,65 @@ function DashboardPage() {
     { label: "Despesas", value: data ? brl(data.despesas) : "—", hint: "Saídas no período", icon: Wallet, tone: "muted" as const },
     { label: "Lucro", value: data ? brl(data.lucro) : "—", hint: "Receitas − despesas", icon: Sparkles, tone: "gold" as const },
     { label: "Atendimentos", value: data?.atendCount ?? "—", hint: "No período", icon: PawPrint, tone: "primary" as const },
-    { label: "Bilhete Médio", value: data ? brl(data.bilhete) : "—", hint: "Por atendimento", icon: Receipt, tone: "primary" as const },
+    { label: "Ticket Médio", value: data ? brl(data.bilhete) : "—", hint: "Por atendimento", icon: Receipt, tone: "gold" as const },
     { label: "Novos Clientes", value: data?.novosClientes ?? "—", hint: "Cadastrados no período", icon: Users, tone: "primary" as const },
   ];
 
   const hoje = new Date();
+  const periodos = [
+    ["hoje", "Hoje"],
+    ["semana", "Semana"],
+    ["mes", "Mês"],
+    ["personalizado", "Personalizado"],
+  ] as const;
 
   return (
     <PageShell>
-      {/* Barra de busca + CTA */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <div className="relative flex-1">
+      {/* Busca + CTA (70/30) */}
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-3 mb-4">
+        <div className="relative min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar cliente, pet, serviço…" className="pl-9 h-11 bg-card rounded-full border-border/60" />
+          <Input
+            placeholder="Buscar cliente, pet, serviço…"
+            className="pl-9 h-10 bg-card rounded-full border-border/60 w-full max-w-full"
+          />
         </div>
-        <Link to="/agenda">
-          <Button size="lg" className="rounded-full gap-2 shadow-elegant w-full sm:w-auto">
+        <Link to="/agenda" className="w-full">
+          <Button size="default" className="rounded-full gap-2 shadow-elegant h-10 w-full">
             <Plus className="h-4 w-4" /> Novo Agendamento
           </Button>
         </Link>
       </div>
 
-      {/* Saudação */}
-      <div className="mb-6">
-        <h1 className="font-display text-4xl sm:text-5xl font-semibold text-primary tracking-tight">
+      {/* Saudação + data */}
+      <div className="mb-4">
+        <h1 className="font-display text-[1.9rem] sm:text-[2.4rem] leading-tight font-semibold text-primary tracking-tight">
           {greeting()}, {firstName(profile)}
         </h1>
-        <p className="text-muted-foreground mt-2 capitalize">
+        <p className="text-sm text-muted-foreground mt-1 lowercase">
           {format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}
         </p>
       </div>
 
-      {/* Filtro de período */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        {([
-          ["hoje", "Hoje"],
-          ["semana", "Semana"],
-          ["mes", "Mês"],
-          ["personalizado", "Personalizado"],
-        ] as const).map(([k, l]) => (
-          <button
-            key={k}
-            onClick={() => setPeriod(k)}
-            className={`px-5 py-2 rounded-full text-sm font-medium transition ${
-              period === k
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "bg-card border border-border/60 text-foreground hover:bg-accent"
-            }`}
-          >
-            {l}
-          </button>
-        ))}
+      {/* Filtro segmentado */}
+      <div className="mb-5">
+        <div className="inline-flex items-center rounded-full bg-muted/60 p-1 border border-border/50">
+          {periodos.map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => setPeriod(k)}
+              className={`px-4 h-8 rounded-full text-xs sm:text-sm font-medium transition ${
+                period === k
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
         {period === "personalizado" && (
-          <div className="flex items-center gap-2 ml-1">
+          <div className="flex items-center gap-2 mt-2">
             <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 w-auto" />
             <span className="text-muted-foreground text-sm">até</span>
             <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 w-auto" />
@@ -158,35 +164,49 @@ function DashboardPage() {
         )}
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
-        {kpis.map((k) => (
-          <Card key={k.label} className="p-5 hover:shadow-elegant transition rounded-2xl border-border/60">
-            <div className="flex items-start justify-between mb-4">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {k.label}
-              </span>
-              <k.icon className={`h-4 w-4 ${k.tone === "gold" ? "text-gold" : k.tone === "muted" ? "text-muted-foreground" : "text-primary"}`} />
-            </div>
-            <div className="font-display text-2xl sm:text-[26px] font-semibold text-primary leading-tight">
-              {k.value}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2">{k.hint}</p>
-          </Card>
-        ))}
+      {/* KPI Cards — 1/2/3 colunas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        {kpis.map((k) => {
+          const isGold = k.tone === "gold";
+          return (
+            <Card
+              key={k.label}
+              className="relative overflow-hidden p-4 sm:p-5 rounded-xl border-border/60 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all"
+            >
+              {isGold && (
+                <span className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent" />
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {k.label}
+                </span>
+                <k.icon
+                  className={`h-4 w-4 shrink-0 ${
+                    isGold ? "text-gold" : k.tone === "muted" ? "text-muted-foreground" : "text-primary"
+                  }`}
+                  strokeWidth={1.75}
+                />
+              </div>
+              <div className="font-display text-2xl sm:text-[1.65rem] font-semibold text-primary leading-tight mt-3 tabular-nums">
+                {k.value}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">{k.hint}</p>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Chart + Próximos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 p-6 rounded-2xl border-border/60">
+      {/* Chart + Próximos — 65/35 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-4">
+        <Card className="p-5 sm:p-6 rounded-xl border-border/60 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl font-semibold text-primary">Receita do período</h2>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+            <h2 className="font-display text-lg sm:text-xl font-semibold text-primary">Receita do período</h2>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-[0.14em]">
               {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : "Custom"}
             </span>
           </div>
           {data && data.serie.some((p) => p.valor > 0) ? (
-            <div className="h-64">
+            <div className="h-56 sm:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
@@ -201,40 +221,49 @@ function DashboardPage() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-64 grid place-items-center text-sm text-muted-foreground">
-              Sem receitas registradas neste período
+            <div className="min-h-[9rem] grid place-items-center py-6">
+              <div className="text-center">
+                <LineChartIcon className="mx-auto h-6 w-6 text-gold/70" strokeWidth={1.5} />
+                <p className="text-sm text-muted-foreground mt-2">Sem receitas registradas neste período</p>
+              </div>
             </div>
           )}
         </Card>
 
-        <Card className="p-6 rounded-2xl border-border/60">
+        <Card className="p-5 sm:p-6 rounded-xl border-border/60 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl font-semibold text-primary">Próximos agendamentos</h2>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-display text-lg sm:text-xl font-semibold text-primary">Próximos agendamentos</h2>
+            <Calendar className="h-4 w-4 text-gold" strokeWidth={1.75} />
           </div>
-          <div className="space-y-3">
-            {(data?.proximos ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground py-8 text-center">Nenhum agendamento futuro.</p>
-            )}
-            {(data?.proximos ?? []).map((a: any) => (
-              <Link key={a.id} to="/agenda" className="flex gap-3 items-start rounded-xl p-3 -m-3 hover:bg-accent transition">
-                <div className="text-center shrink-0 w-14">
-                  <div className="font-display text-lg font-semibold text-primary leading-none">
-                    {a.hora_inicio?.slice(0, 5)}
+          {(data?.proximos ?? []).length === 0 ? (
+            <div className="min-h-[7rem] grid place-items-center py-4">
+              <div className="text-center">
+                <Calendar className="mx-auto h-6 w-6 text-gold/70" strokeWidth={1.5} />
+                <p className="text-sm text-muted-foreground mt-2">Nenhum agendamento futuro</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {(data?.proximos ?? []).map((a: any) => (
+                <Link key={a.id} to="/agenda" className="flex gap-3 items-start rounded-xl p-3 -m-3 hover:bg-accent transition">
+                  <div className="text-center shrink-0 w-14">
+                    <div className="font-display text-lg font-semibold text-primary leading-none tabular-nums">
+                      {a.hora_inicio?.slice(0, 5)}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
+                      {format(parseISO(a.data), "dd MMM", { locale: ptBR })}
+                    </div>
                   </div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
-                    {format(parseISO(a.data), "dd MMM", { locale: ptBR })}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">
+                      {a.pets?.nome ?? "Pet"} <span className="text-muted-foreground">— {a.servicos?.nome ?? "serviço"}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{a.clientes?.nome}</div>
                   </div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">
-                    {a.pets?.nome ?? "Pet"} <span className="text-muted-foreground">— {a.servicos?.nome ?? "serviço"}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">{a.clientes?.nome}</div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </PageShell>
