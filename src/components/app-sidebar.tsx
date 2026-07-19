@@ -16,6 +16,7 @@ import {
   Inbox,
   HandCoins,
   HeartHandshake,
+  BellRing,
   Settings,
   PawPrint,
 } from "lucide-react";
@@ -60,6 +61,7 @@ const groups = [
     label: "Sistema",
     items: [
       { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
+      { title: "Lembretes", url: "/lembretes", icon: BellRing },
       { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
