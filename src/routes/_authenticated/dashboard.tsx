@@ -7,11 +7,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon,
+  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle,
 } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, eachDayOfInterval, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useMyProfile, firstName } from "@/hooks/use-my-profile";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -28,6 +28,24 @@ function greeting(d = new Date()) {
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+// Paleta sofisticada por indicador (oklch inline — escopo visual)
+const KPI_TONES = {
+  esmeralda:  { chip: "oklch(0.55 0.13 155)", soft: "oklch(0.55 0.13 155 / 0.12)", bar: "oklch(0.45 0.11 155)" },
+  terracota:  { chip: "oklch(0.62 0.13 40)",  soft: "oklch(0.62 0.13 40 / 0.12)",  bar: "oklch(0.55 0.12 40)"  },
+  dourado:    { chip: "oklch(0.78 0.11 82)",  soft: "oklch(0.78 0.11 82 / 0.14)",  bar: "oklch(0.72 0.12 78)"  },
+  petroleo:   { chip: "oklch(0.45 0.07 220)", soft: "oklch(0.45 0.07 220 / 0.12)", bar: "oklch(0.42 0.08 220)" },
+  ambar:      { chip: "oklch(0.72 0.14 68)",  soft: "oklch(0.72 0.14 68 / 0.14)",  bar: "oklch(0.66 0.14 65)"  },
+  salvia:     { chip: "oklch(0.62 0.06 150)", soft: "oklch(0.62 0.06 150 / 0.14)", bar: "oklch(0.55 0.07 150)" },
+} as const;
+
+const STATUS_STYLE: Record<string, { label: string; className: string }> = {
+  agendado:     { label: "Agendado",   className: "bg-[oklch(0.94_0.02_155)] text-[oklch(0.32_0.06_155)] border border-[oklch(0.85_0.03_155)]" },
+  confirmado:   { label: "Confirmado", className: "bg-[oklch(0.94_0.06_150)] text-[oklch(0.32_0.09_155)] border border-[oklch(0.75_0.08_150)]" },
+  aguardando:   { label: "Aguardando", className: "bg-[oklch(0.95_0.08_82)]  text-[oklch(0.38_0.08_60)]  border border-[oklch(0.80_0.10_82)]" },
+  finalizado:   { label: "Concluído",  className: "bg-[oklch(0.92_0.03_155)] text-[oklch(0.30_0.06_155)] border border-[oklch(0.78_0.05_155)]" },
+  cancelado:    { label: "Cancelado",  className: "bg-[oklch(0.95_0.03_25)]  text-[oklch(0.45_0.15_25)]  border border-[oklch(0.85_0.06_25)]"  },
+};
 
 function DashboardPage() {
   const [period, setPeriod] = useState<Period>("hoje");
@@ -54,7 +72,7 @@ function DashboardPage() {
         supabase.from("atendimentos").select("id,valor_executado,data_inicio").gte("data_inicio", `${from}T00:00:00`).lte("data_inicio", `${to}T23:59:59`),
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
-          .select("id,data,hora_inicio,pets(nome),servicos(nome),clientes(nome)")
+          .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
           .gte("data", format(new Date(), "yyyy-MM-dd"))
           .in("status", ["agendado", "confirmado", "aguardando"])
           .order("data", { ascending: true })
@@ -73,14 +91,13 @@ function DashboardPage() {
       const atendCount = atendimentos.length;
       const bilhete = atendCount > 0 ? atendimentos.reduce((s, a) => s + Number(a.valor_executado ?? 0), 0) / atendCount : 0;
 
-      // Série de receita por dia
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
       const serie = dias.map((d) => {
         const key = format(d, "yyyy-MM-dd");
         const val = pagamentos
           .filter((p) => (p.data_pagamento ?? "").slice(0, 10) === key)
           .reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
-        return { dia: format(d, dias.length <= 31 ? "dd/MM" : "dd/MM"), valor: val };
+        return { dia: format(d, "dd/MM"), valor: val };
       });
 
       return {
@@ -94,12 +111,12 @@ function DashboardPage() {
   });
 
   const kpis = [
-    { label: "Faturamento", value: data ? brl(data.faturamento) : "—", hint: "Receitas no período", icon: TrendingUp, tone: "primary" as const },
-    { label: "Despesas", value: data ? brl(data.despesas) : "—", hint: "Saídas no período", icon: Wallet, tone: "muted" as const },
-    { label: "Lucro", value: data ? brl(data.lucro) : "—", hint: "Receitas − despesas", icon: Sparkles, tone: "gold" as const },
-    { label: "Atendimentos", value: data?.atendCount ?? "—", hint: "No período", icon: PawPrint, tone: "primary" as const },
-    { label: "Ticket Médio", value: data ? brl(data.bilhete) : "—", hint: "Por atendimento", icon: Receipt, tone: "gold" as const },
-    { label: "Novos Clientes", value: data?.novosClientes ?? "—", hint: "Cadastrados no período", icon: Users, tone: "primary" as const },
+    { label: "Faturamento",   value: data ? brl(data.faturamento) : "—", hint: "Receitas no período",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Despesas",      value: data ? brl(data.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
+    { label: "Lucro",         value: data ? brl(data.lucro)       : "—", hint: "Receitas − despesas",     icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Atendimentos",  value: data?.atendCount ?? "—",           hint: "Realizados no período",   icon: PawPrint,   tone: KPI_TONES.petroleo  },
+    { label: "Ticket Médio",  value: data ? brl(data.bilhete)     : "—", hint: "Por atendimento",         icon: Receipt,    tone: KPI_TONES.ambar     },
+    { label: "Novos Clientes",value: data?.novosClientes ?? "—",         hint: "Cadastrados no período",  icon: Users,      tone: KPI_TONES.salvia    },
   ];
 
   const hoje = new Date();
@@ -110,32 +127,99 @@ function DashboardPage() {
     ["personalizado", "Personalizado", "Custom"],
   ] as const;
 
+  const proximos = data?.proximos ?? [];
+  const atendimentosHoje = proximos.filter((a: any) => a.data === format(hoje, "yyyy-MM-dd")).length;
+  const aguardando = proximos.filter((a: any) => a.status === "aguardando");
+
   return (
     <PageShell>
-      {/* Busca + CTA (70/30) */}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-4">
-        <div className="relative min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente, pet, serviço…"
-            className="pl-9 h-10 bg-card rounded-full border-border/60 w-full max-w-full"
-          />
-        </div>
-        <Link to="/agenda" className="w-full sm:w-auto">
-          <Button size="default" className="rounded-full gap-2 shadow-elegant h-10 w-full sm:w-auto px-5 whitespace-nowrap">
-            <Plus className="h-4 w-4" /> Novo Agendamento
-          </Button>
-        </Link>
-      </div>
+      {/* ============ HERO BANNER PREMIUM ============ */}
+      <div
+        className="relative overflow-hidden rounded-3xl mb-6 border border-[oklch(0.30_0.06_155)]"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.24 0.045 155) 0%, oklch(0.30 0.06 155) 55%, oklch(0.34 0.07 155) 100%)",
+          boxShadow: "0 20px 50px -22px oklch(0.20 0.05 155 / 0.55)",
+        }}
+      >
+        {/* Textura dourada sutil */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.14]"
+          style={{
+            background:
+              "radial-gradient(circle at 88% 20%, oklch(0.85 0.11 82 / 0.9), transparent 40%), radial-gradient(circle at 100% 100%, oklch(0.78 0.11 82 / 0.6), transparent 45%)",
+          }}
+        />
+        {/* Marca d'água pet */}
+        <PawPrint
+          className="pointer-events-none absolute -right-6 -bottom-8 h-56 w-56 text-white/[0.06] rotate-[-18deg]"
+          strokeWidth={1}
+        />
+        <PawPrint
+          className="pointer-events-none absolute right-24 top-6 h-16 w-16 text-white/[0.08] rotate-[22deg] hidden sm:block"
+          strokeWidth={1}
+        />
 
-      {/* Saudação + data */}
-      <div className="mb-4">
-        <h1 className="font-display text-[1.9rem] sm:text-[2.4rem] leading-tight font-semibold text-primary tracking-tight">
-          {greeting()}, {firstName(profile)}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 lowercase">
-          {format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}
-        </p>
+        <div className="relative p-6 sm:p-8 lg:p-10">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-[oklch(0.85_0.10_82)] font-semibold">
+                Spa de Pet · Painel
+              </p>
+              <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl leading-[1.05] font-semibold text-white tracking-tight mt-2">
+                {greeting()},{" "}
+                <span
+                  style={{
+                    background:
+                      "linear-gradient(120deg, oklch(0.92 0.09 82), oklch(0.78 0.11 82))",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  {firstName(profile)}
+                </span>
+              </h1>
+              <p className="text-sm sm:text-base text-white/75 mt-2 capitalize">
+                {format(hoje, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              </p>
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-3.5 py-1.5 border border-white/15">
+                <Calendar className="h-3.5 w-3.5 text-[oklch(0.88_0.10_82)]" strokeWidth={2} />
+                <span className="text-xs sm:text-sm text-white/90">
+                  {atendimentosHoje > 0
+                    ? `${atendimentosHoje} atendimento${atendimentosHoje > 1 ? "s" : ""} agendado${atendimentosHoje > 1 ? "s" : ""} para hoje`
+                    : "Nenhum agendamento para hoje"}
+                </span>
+              </div>
+            </div>
+
+            {/* Busca + CTA no banner */}
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-3 lg:min-w-[460px]">
+              <div className="relative min-w-0">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+                <Input
+                  placeholder="Buscar cliente, pet, serviço…"
+                  className="pl-10 h-11 rounded-full bg-white/10 backdrop-blur border-white/20 text-white placeholder:text-white/60 focus-visible:ring-[oklch(0.78_0.11_82)] focus-visible:ring-offset-0"
+                />
+              </div>
+              <Link to="/agenda" className="w-full sm:w-auto">
+                <Button
+                  size="default"
+                  className="h-11 w-full sm:w-auto px-6 rounded-full gap-2 whitespace-nowrap font-semibold border-0 transition-all hover:-translate-y-[1px]"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.85 0.11 82), oklch(0.72 0.12 78))",
+                    color: "oklch(0.22 0.04 60)",
+                    boxShadow:
+                      "0 8px 20px -8px oklch(0.55 0.12 78 / 0.7), inset 0 1px 0 oklch(0.95 0.08 82 / 0.5)",
+                  }}
+                >
+                  <Plus className="h-4 w-4" /> Novo Agendamento
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filtro segmentado */}
@@ -149,108 +233,173 @@ function DashboardPage() {
         setCustomTo={setCustomTo}
       />
 
-
-      {/* KPI Cards — 1/2/3 colunas */}
+      {/* ============ KPI CARDS PREMIUM ============ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-        {kpis.map((k) => {
-          const isGold = k.tone === "gold";
-          return (
-            <Card
-              key={k.label}
-              className="relative overflow-hidden p-4 sm:p-5 rounded-xl border-border/60 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all"
-            >
-              {isGold && (
-                <span className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent" />
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {kpis.map((k) => (
+          <Card
+            key={k.label}
+            className="group relative overflow-hidden p-5 rounded-2xl border-border/60 bg-card shadow-[0_1px_2px_oklch(0.25_0.05_155/0.05),0_4px_16px_-8px_oklch(0.30_0.08_155/0.10)] hover:shadow-[0_8px_28px_-12px_oklch(0.30_0.08_155/0.22)] hover:-translate-y-0.5 transition-all duration-300"
+          >
+            {/* Faixa lateral colorida */}
+            <span
+              className="absolute left-0 top-0 bottom-0 w-[3px]"
+              style={{ background: `linear-gradient(180deg, ${k.tone.chip}, ${k.tone.bar})` }}
+            />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   {k.label}
-                </span>
-                <k.icon
-                  className={`h-4 w-4 shrink-0 ${
-                    isGold ? "text-gold" : k.tone === "muted" ? "text-muted-foreground" : "text-primary"
-                  }`}
-                  strokeWidth={1.75}
-                />
+                </p>
+                <div className="font-display text-[1.75rem] sm:text-3xl font-semibold text-primary leading-tight mt-2 tabular-nums truncate">
+                  {k.value}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">{k.hint}</p>
               </div>
-              <div className="font-display text-2xl sm:text-[1.65rem] font-semibold text-primary leading-tight mt-3 tabular-nums">
-                {k.value}
+              <div
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-transform group-hover:scale-110"
+                style={{ backgroundColor: k.tone.soft, color: k.tone.chip }}
+              >
+                <k.icon className="h-[18px] w-[18px]" strokeWidth={2} />
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5">{k.hint}</p>
-            </Card>
-          );
-        })}
+            </div>
+          </Card>
+        ))}
       </div>
 
-      {/* Chart + Próximos — 65/35 */}
+      {/* ============ CHART + PRÓXIMOS ============ */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-4">
-        <Card className="p-5 sm:p-6 rounded-xl border-border/60 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg sm:text-xl font-semibold text-primary">Receita do período</h2>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-[0.14em]">
+        <Card className="p-5 sm:p-6 rounded-2xl border-border/60 bg-card shadow-[0_1px_2px_oklch(0.25_0.05_155/0.05),0_4px_16px_-8px_oklch(0.30_0.08_155/0.10)]">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="font-display text-lg sm:text-xl font-semibold text-primary">Receita do período</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Total recebido dia a dia</p>
+            </div>
+            <span className="text-[10px] text-[oklch(0.45_0.11_155)] uppercase tracking-[0.16em] font-semibold px-2.5 py-1 rounded-full bg-[oklch(0.94_0.04_150)]">
               {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : "Custom"}
             </span>
           </div>
           {data && data.serie.some((p) => p.valor > 0) ? (
-            <div className="h-44 sm:h-56 lg:h-64">
+            <div className="h-48 sm:h-60 lg:h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="dia" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} />
+                <AreaChart data={data.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="fillReceita" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="oklch(0.55 0.13 155)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="oklch(0.55 0.13 155)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="oklch(0.90 0.01 120)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="dia" tick={{ fill: "oklch(0.50 0.02 155)", fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: "oklch(0.50 0.02 155)", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} width={50} />
                   <Tooltip
-                    contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
-                    formatter={(v: number) => brl(v)}
+                    contentStyle={{ borderRadius: 12, border: "1px solid oklch(0.90 0.01 120)", background: "oklch(1 0 0)", boxShadow: "0 10px 30px -12px oklch(0.30 0.08 155 / 0.18)" }}
+                    labelStyle={{ color: "oklch(0.32 0.06 155)", fontWeight: 600 }}
+                    formatter={(v: number) => [brl(v), "Receita"]}
                   />
-                  <Line type="monotone" dataKey="valor" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(var(--primary))" }} activeDot={{ r: 5 }} />
-                </LineChart>
+                  <Area
+                    type="monotone"
+                    dataKey="valor"
+                    stroke="oklch(0.45 0.11 155)"
+                    strokeWidth={2.5}
+                    fill="url(#fillReceita)"
+                    dot={{ r: 3.5, fill: "oklch(0.45 0.11 155)", strokeWidth: 2, stroke: "oklch(1 0 0)" }}
+                    activeDot={{ r: 6, fill: "oklch(0.78 0.11 82)", strokeWidth: 2, stroke: "oklch(1 0 0)" }}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="min-h-[9rem] grid place-items-center py-6">
-              <div className="text-center">
-                <LineChartIcon className="mx-auto h-6 w-6 text-gold/70" strokeWidth={1.5} />
-                <p className="text-sm text-muted-foreground mt-2">Sem receitas registradas neste período</p>
+            <div className="min-h-[11rem] grid place-items-center py-8 rounded-xl bg-[oklch(0.97_0.01_120)]/50 border border-dashed border-border/60">
+              <div className="text-center px-6">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[oklch(0.94_0.04_150)]">
+                  <LineChartIcon className="h-5 w-5 text-[oklch(0.45_0.11_155)]" strokeWidth={1.8} />
+                </div>
+                <p className="text-sm font-medium text-primary mt-3">Sem receitas neste período</p>
+                <p className="text-xs text-muted-foreground mt-1">Os pagamentos recebidos aparecerão aqui.</p>
               </div>
             </div>
           )}
         </Card>
 
-        <Card className="p-5 sm:p-6 rounded-xl border-border/60 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg sm:text-xl font-semibold text-primary">Próximos agendamentos</h2>
-            <Calendar className="h-4 w-4 text-gold" strokeWidth={1.75} />
-          </div>
-          {(data?.proximos ?? []).length === 0 ? (
-            <div className="min-h-[7rem] grid place-items-center py-4">
-              <div className="text-center">
-                <Calendar className="mx-auto h-6 w-6 text-gold/70" strokeWidth={1.5} />
-                <p className="text-sm text-muted-foreground mt-2">Nenhum agendamento futuro</p>
+        <div className="space-y-4">
+          {/* Atenção hoje */}
+          {aguardando.length > 0 && (
+            <Card className="p-4 rounded-2xl border-[oklch(0.85_0.10_82)] bg-[oklch(0.98_0.03_82)]/70">
+              <div className="flex items-start gap-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[oklch(0.85_0.11_82)] text-[oklch(0.30_0.06_60)]">
+                  <AlertCircle className="h-4 w-4" strokeWidth={2.2} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-display text-sm font-semibold text-[oklch(0.35_0.08_60)]">Atenção hoje</h3>
+                  <p className="text-xs text-[oklch(0.40_0.06_60)] mt-0.5">
+                    {aguardando.length} pet{aguardando.length > 1 ? "s" : ""} aguardando check-in.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <Card className="p-5 sm:p-6 rounded-2xl border-border/60 bg-card shadow-[0_1px_2px_oklch(0.25_0.05_155/0.05),0_4px_16px_-8px_oklch(0.30_0.08_155/0.10)]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-display text-lg sm:text-xl font-semibold text-primary">Próximos agendamentos</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Fila operacional</p>
+              </div>
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-[oklch(0.95_0.08_82)] text-[oklch(0.55_0.12_78)]">
+                <Calendar className="h-4 w-4" strokeWidth={2} />
               </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {(data?.proximos ?? []).map((a: any) => (
-                <Link key={a.id} to="/agenda" className="flex gap-3 items-start rounded-xl p-3 -m-3 hover:bg-accent transition">
-                  <div className="text-center shrink-0 w-14">
-                    <div className="font-display text-lg font-semibold text-primary leading-none tabular-nums">
-                      {a.hora_inicio?.slice(0, 5)}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
-                      {format(parseISO(a.data), "dd MMM", { locale: ptBR })}
-                    </div>
+            {proximos.length === 0 ? (
+              <div className="min-h-[8rem] grid place-items-center py-4 rounded-xl bg-[oklch(0.97_0.01_120)]/50 border border-dashed border-border/60">
+                <div className="text-center px-4">
+                  <div className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-[oklch(0.94_0.04_150)]">
+                    <Calendar className="h-5 w-5 text-[oklch(0.45_0.11_155)]" strokeWidth={1.8} />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">
-                      {a.pets?.nome ?? "Pet"} <span className="text-muted-foreground">— {a.servicos?.nome ?? "serviço"}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">{a.clientes?.nome}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
+                  <p className="text-sm font-medium text-primary mt-3">Agenda livre</p>
+                  <p className="text-xs text-muted-foreground mt-1">Nenhum agendamento futuro.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {proximos.map((a: any) => {
+                  const st = STATUS_STYLE[a.status] ?? STATUS_STYLE.agendado;
+                  const dt = parseISO(a.data);
+                  const initial = (a.pets?.nome ?? "P").trim().charAt(0).toUpperCase();
+                  return (
+                    <Link
+                      key={a.id}
+                      to="/agenda"
+                      className="group flex gap-3 items-center rounded-xl p-2.5 -mx-2.5 hover:bg-[oklch(0.97_0.02_150)] transition-colors"
+                    >
+                      <div className="flex flex-col items-center justify-center w-14 shrink-0 rounded-lg py-1.5 bg-[oklch(0.96_0.02_155)] border border-[oklch(0.90_0.02_155)]">
+                        <div className="flex items-center gap-1 font-display text-[15px] font-semibold text-primary leading-none tabular-nums">
+                          <Clock className="h-3 w-3 text-[oklch(0.55_0.10_82)]" strokeWidth={2.2} />
+                          {a.hora_inicio?.slice(0, 5)}
+                        </div>
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-1">
+                          {isToday(dt) ? "Hoje" : format(dt, "dd MMM", { locale: ptBR })}
+                        </div>
+                      </div>
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.94_0.04_150)] to-[oklch(0.88_0.05_150)] text-[oklch(0.32_0.06_155)] font-display font-semibold text-sm border border-[oklch(0.85_0.04_150)]">
+                        {initial}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-foreground truncate">
+                          {a.pets?.nome ?? "Pet"}
+                          <span className="text-muted-foreground font-normal"> · {a.servicos?.nome ?? "serviço"}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{a.clientes?.nome}</div>
+                      </div>
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full shrink-0 ${st.className}`}>
+                        {st.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
     </PageShell>
   );
@@ -314,12 +463,12 @@ function PeriodTabs({
   const activeLongLabel = periodos[activeIndex]?.[1] ?? "";
 
   return (
-    <div className="mb-5">
+    <div className="mb-6">
       <div
         role="tablist"
         aria-label="Filtro de período"
         aria-orientation="horizontal"
-        className="grid grid-cols-4 sm:inline-flex sm:w-auto items-center rounded-full bg-muted/60 p-1 border border-border/50"
+        className="grid grid-cols-4 sm:inline-flex sm:w-auto items-center rounded-full bg-card p-1 border border-border/60 shadow-[0_1px_2px_oklch(0.25_0.05_155/0.05)]"
       >
         {periodos.map(([k, longLabel, shortLabel], idx) => {
           const active = period === k;
@@ -337,10 +486,10 @@ function PeriodTabs({
               tabIndex={active ? 0 : -1}
               onClick={() => onChange(k)}
               onKeyDown={onKeyDown}
-              className={`h-9 px-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium transition text-center leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              className={`h-9 px-2 sm:px-5 rounded-full text-xs sm:text-sm font-semibold transition-all text-center leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-[0_4px_12px_-4px_oklch(0.30_0.08_155/0.40)]"
+                  : "text-muted-foreground hover:text-primary hover:bg-[oklch(0.96_0.02_150)]"
               }`}
             >
               <span className="sm:hidden" aria-hidden="true">{shortLabel}</span>
@@ -350,7 +499,6 @@ function PeriodTabs({
         })}
       </div>
 
-      {/* Anúncio para leitores de tela */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         Período selecionado: {activeLongLabel}
         {period === "personalizado" && customFrom && customTo
@@ -359,14 +507,14 @@ function PeriodTabs({
       </div>
 
       {period === "personalizado" && (
-        <div className="flex flex-wrap items-center gap-2 mt-2">
+        <div className="flex flex-wrap items-center gap-2 mt-3">
           <label className="sr-only" htmlFor="period-custom-from">Data inicial</label>
           <Input
             id="period-custom-from"
             type="date"
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="h-9 w-full sm:w-auto"
+            className="h-9 w-full sm:w-auto rounded-full"
             aria-label="Data inicial do período personalizado"
           />
           <span className="text-muted-foreground text-sm" aria-hidden="true">até</span>
@@ -376,7 +524,7 @@ function PeriodTabs({
             type="date"
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="h-9 w-full sm:w-auto"
+            className="h-9 w-full sm:w-auto rounded-full"
             aria-label="Data final do período personalizado"
           />
         </div>
