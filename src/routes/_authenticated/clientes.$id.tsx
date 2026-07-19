@@ -129,7 +129,7 @@ function ClienteDetalhe() {
               <Button variant="outline" className="gap-2"><Plus className="h-4 w-4"/> Novo pet</Button>
             </Link>
             <Button
-              onClick={() => navigate({ to: "/agenda" })}
+              onClick={() => navigate({ to: "/agenda", search: { cliente: id } })}
               className="gap-2"
             >
               <CalendarPlus className="h-4 w-4"/> Novo agendamento
