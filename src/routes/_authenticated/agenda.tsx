@@ -595,9 +595,21 @@ function AgendamentoRow({
               {meta.label}
             </span>
             {row.clientes?.vip && <Badge className="badge-gold text-[10px]">VIP</Badge>}
-            <span className="font-display font-semibold text-primary truncate">
-              {row.servicos?.nome ?? "Serviço"}
-            </span>
+            {(() => {
+              const extras = Array.isArray(row.agendamento_servicos) ? row.agendamento_servicos.length : 0;
+              const nomePrincipal = row.servicos?.nome ?? (extras > 0 ? row.agendamento_servicos[0]?.nome : "Serviço");
+              const totalItens = Math.max(extras, row.servicos ? 1 : 0);
+              return (
+                <>
+                  <span className="font-display font-semibold text-primary truncate">
+                    {nomePrincipal ?? "Serviço"}
+                  </span>
+                  {totalItens > 1 && (
+                    <Badge variant="secondary" className="text-[10px]">+{totalItens - 1} serviço{totalItens - 1 > 1 ? "s" : ""}</Badge>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1 min-w-0">
