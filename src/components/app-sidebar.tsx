@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Inbox,
   HandCoins,
+  HeartHandshake,
   Settings,
   PawPrint,
 } from "lucide-react";
@@ -59,6 +60,7 @@ const groups = [
     label: "Sistema",
     items: [
       { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
+      { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],

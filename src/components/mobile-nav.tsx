@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Inbox,
   HandCoins,
+  HeartHandshake,
   Settings,
   PawPrint,
   type LucideIcon,
@@ -64,6 +65,7 @@ const groups: { label: string; items: Item[] }[] = [
     items: [
       { title: "Central de Mensagens", url: "/inbox", icon: Inbox },
       { title: "Cobranças", url: "/cobrancas", icon: HandCoins },
+      { title: "Reativação", url: "/reativacao", icon: HeartHandshake },
       { title: "Comunicação / IA", url: "/comunicacao", icon: MessageSquare },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],
