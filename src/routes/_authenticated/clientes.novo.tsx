@@ -114,22 +114,19 @@ function NovoClientePage() {
         onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}
         className="space-y-6"
       >
-        <Card className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <FotoPicker
-              onFileChange={setClienteFoto}
-              placeholderIcon={User}
-              size="md"
-              label="Foto do tutor"
-            />
-            <div className="flex-1 w-full">
-              <ClienteFormFields
-                value={cliente}
-                onChange={(patch) => setCliente((s) => ({ ...s, ...patch }))}
-              />
-            </div>
-          </div>
+        <Card className="p-4 sm:p-6 flex justify-center">
+          <FotoPicker
+            onFileChange={setClienteFoto}
+            placeholderIcon={User}
+            size="md"
+            label="Foto do tutor"
+          />
         </Card>
+
+        <ClienteFormFields
+          value={cliente}
+          onChange={(patch) => setCliente((s) => ({ ...s, ...patch }))}
+        />
 
         <Card className="p-4 sm:p-6 border-primary/20 bg-primary/5">
           <div className="flex items-center justify-between gap-3 mb-4">
