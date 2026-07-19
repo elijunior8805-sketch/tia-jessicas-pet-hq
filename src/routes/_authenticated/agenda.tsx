@@ -24,6 +24,7 @@ import {
   ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
 } from "lucide-react";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
+import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
 
 // ---------- WhatsApp helpers ----------
@@ -102,14 +103,21 @@ function waMessage(row: any, signer?: { name: string; initials: string }): strin
   }
 }
 function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
-  const phone = waPhone(row.clientes?.whatsapp);
-  if (!phone) {
+  const raw = row.clientes?.whatsapp;
+  if (!raw) {
     toast.error("Cliente sem WhatsApp cadastrado");
     return;
   }
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(row, signer))}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+  openWhatsAppComposerGlobal({
+    tipo: (row.status === "aguardando" || row.status === "em_atendimento") ? "aviso_atraso" : "confirmacao_agendamento",
+    destinatario: row.clientes?.nome ?? "",
+    telefone: raw,
+    mensagem: waMessage(row, signer),
+    motivo: `Agenda — ${row.status}`,
+    cliente_id: row.cliente_id ?? null,
+  });
 }
+
 
 
 
@@ -165,6 +173,7 @@ const brl = (v: number | null | undefined) =>
 function AgendaPage() {
   const search = Route.useSearch();
   const navigateSelf = useNavigate({ from: Route.fullPath });
+  const composer = useWhatsAppComposer();
   const [date, setDate] = useState(todayISO());
   const [statusFilter, setStatusFilter] = useState<"todos" | Status>("todos");
   const [openNew, setOpenNew] = useState(false);
@@ -568,6 +577,11 @@ function AgendaPage() {
         defaultClienteId={prefill.cliente}
         defaultPetId={prefill.pet}
       />
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </PageShell>
   );
 }
@@ -941,15 +955,22 @@ function AgendamentoRow({
             <Button
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
               onClick={() => {
-                const phone = waPhone(row.clientes?.whatsapp);
-                if (!phone) {
+                const raw = row.clientes?.whatsapp;
+                if (!raw) {
                   toast.error("Cliente sem WhatsApp cadastrado");
                   return;
                 }
-                const url = `https://wa.me/${phone}?text=${encodeURIComponent(previewText)}`;
-                window.open(url, "_blank", "noopener,noreferrer");
+                openWhatsAppComposerGlobal({
+                  tipo: "confirmacao_agendamento",
+                  destinatario: row.clientes?.nome ?? "",
+                  telefone: raw,
+                  mensagem: previewText,
+                  motivo: `Agenda — ${row.status}`,
+                  cliente_id: row.cliente_id ?? null,
+                });
                 setPreviewOpen(false);
               }}
+
             >
               <Send className="h-4 w-4" /> Enviar no WhatsApp
             </Button>

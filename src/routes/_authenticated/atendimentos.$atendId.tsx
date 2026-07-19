@@ -28,6 +28,7 @@ import {
 } from "@/lib/atendimento-utils";
 import { generateAtendimentoPDF } from "@/lib/atendimento-pdf";
 import { useMyProfile } from "@/hooks/use-my-profile";
+import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
 export const Route = createFileRoute("/_authenticated/atendimentos/$atendId")({
   component: AtendimentoDetalhe,
@@ -162,14 +163,19 @@ async function baixarFoto(path: string, filename: string) {
 }
 
 async function compartilharFotoWhats(path: string, whatsapp: string | null | undefined, petNome: string, clienteNome: string) {
-  const fone = (whatsapp ?? "").replace(/\D/g, "");
-  if (!fone) { toast.error("Cliente sem WhatsApp"); return; }
+  if (!whatsapp) { toast.error("Cliente sem WhatsApp"); return; }
   const { data, error } = await supabase.storage.from("spa-fotos").createSignedUrl(path, 60 * 60 * 24 * 7);
   if (error || !data?.signedUrl) { toast.error("Erro ao gerar link"); return; }
   const msg = `Olá, ${clienteNome}! 🐾 Foto do ${petNome} pronto no Spa da Tia Jéssica:\n\n${data.signedUrl}`;
-  const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
-  window.open(`https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`, "_blank");
+  openWhatsAppComposerGlobal({
+    tipo: "pet_pronto",
+    destinatario: clienteNome,
+    telefone: whatsapp,
+    mensagem: msg,
+    motivo: "Foto do pet pronto",
+  });
 }
+
 
 function ResultadoFotoCard({
   path, principal, disabled, hero, onZoom, onStar, onRemove, onDownload, onShare, filename,
@@ -313,6 +319,7 @@ function AtendimentoDetalhe() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { data: myProfile } = useMyProfile();
+  const composer = useWhatsAppComposer();
 
   const { data: isAdmin } = useQuery({
     queryKey: ["is-admin", myProfile?.id],
@@ -1178,15 +1185,22 @@ function AtendimentoDetalhe() {
                 <Button variant="outline" size="sm"
                   disabled={readOnly || !(atendimento as any).pdf_path}
                   onClick={async () => {
-                    const fone = (cliente?.whatsapp ?? "").replace(/\D/g, "");
-                    if (!fone) { toast.error("Cliente sem WhatsApp"); return; }
+                    if (!cliente?.whatsapp) { toast.error("Cliente sem WhatsApp"); return; }
                     const { data } = await supabase.storage.from("spa-fotos")
                       .createSignedUrl((atendimento as any).pdf_path, 60 * 60 * 24 * 7);
                     if (!data?.signedUrl) { toast.error("Erro ao gerar link"); return; }
                     const msg = `Olá, ${cliente?.nome ?? ""}! O relatório do atendimento de ${pet?.nome ?? "seu pet"} está pronto:\n\n${data.signedUrl}`;
-                    const numeroCC = fone.startsWith("55") ? fone : `55${fone}`;
-                    window.open(`https://wa.me/${numeroCC}?text=${encodeURIComponent(msg)}`, "_blank");
+                    openWhatsAppComposerGlobal({
+                      tipo: "agradecimento",
+                      destinatario: cliente?.nome ?? "",
+                      telefone: cliente.whatsapp,
+                      mensagem: msg,
+                      motivo: "Envio do relatório de atendimento",
+                      cliente_id: cliente?.id ?? null,
+                      atendimento_id: (atendimento as any).id ?? null,
+                    });
                   }}>
+
                   <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
                 </Button>
               </div>
@@ -1287,6 +1301,11 @@ function AtendimentoDetalhe() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </PageShell>
   );
 }

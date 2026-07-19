@@ -58,6 +58,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
+import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
 export const Route = createFileRoute("/_authenticated/cobrancas")({
   component: CobrancasPage,
@@ -122,6 +123,7 @@ function CobrancasPage() {
 
   const [selecionada, setSelecionada] = useState<CobrancaDTO | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const composer = useWhatsAppComposer();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -303,6 +305,12 @@ function CobrancasPage() {
       )}
 
       {showConfig && <ConfigDialog onClose={() => setShowConfig(false)} />}
+      
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </div>
   );
 }
@@ -389,10 +397,17 @@ function CobrancaDialog({
       toast.error("Cliente sem WhatsApp cadastrado");
       return;
     }
-    const numero = cobranca.cliente_whatsapp.replace(/\D+/g, "");
-    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
-    window.open(url, "_blank", "noopener");
+    openWhatsAppComposerGlobal({
+      tipo: "cobranca_vencida",
+      destinatario: cobranca.cliente_nome ?? "",
+      telefone: cobranca.cliente_whatsapp,
+      mensagem,
+      motivo: "Cobrança",
+      cliente_id: cobranca.cliente_id ?? null,
+      cobranca_id: cobranca.id,
+    });
   };
+
 
   const registrarEnviado = useMutation({
     mutationFn: () =>

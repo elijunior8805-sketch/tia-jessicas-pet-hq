@@ -23,6 +23,10 @@ import {
 } from "@/components/ui/dialog";
 import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
+import { renderTemplate } from "@/lib/whatsapp-templates";
+
+
 
 
 export const Route = createFileRoute("/_authenticated/pagamentos-abertos")({
@@ -51,6 +55,8 @@ function PagamentosAbertosPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [loteAberto, setLoteAberto] = useState(false);
   const [loteResultado, setLoteResultado] = useState<CobrancaLoteItem[] | null>(null);
+  const composer = useWhatsAppComposer();
+
 
   const query = useQuery({
     queryKey: ["pagamentos-abertos", { somenteAtrasados }],
@@ -97,19 +103,32 @@ function PagamentosAbertosPage() {
       toast.error("Cliente sem WhatsApp cadastrado");
       return;
     }
-    const fone = p.cliente_whatsapp.replace(/\D/g, "");
-    const petTxt = p.pet_nome ? ` referente ao atendimento do ${p.pet_nome}` : "";
-    const vencTxt = p.vencimento
-      ? ` com vencimento em ${new Date(p.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}`
+    const dataAt = (p as any).data_atendimento
+      ? new Date((p as any).data_atendimento + "T00:00:00").toLocaleDateString("pt-BR")
       : "";
-    const atrasoTxt = p.dias_atraso > 0 ? ` (em atraso há ${p.dias_atraso} dia(s))` : "";
-    const msg =
-      `Olá, ${p.cliente_nome}! Passando para lembrar do pagamento de ${brl(p.saldo)}${petTxt}${vencTxt}${atrasoTxt}. ` +
-      `Se já efetuou o pagamento, por favor desconsidere. Obrigada! 🐾`;
-    const url = `https://wa.me/55${fone}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    registrarMut.mutate({ pagamentoId: p.id, observacao: "Link WhatsApp aberto" });
+    const venc = p.vencimento
+      ? new Date(p.vencimento + "T00:00:00").toLocaleDateString("pt-BR")
+      : "";
+    const tipo = p.dias_atraso > 0 ? "cobranca_vencida" : "lembrete_pagamento";
+    const mensagem = renderTemplate(tipo, {
+      tutor: p.cliente_nome,
+      pet: p.pet_nome ?? "seu pet",
+      valor: p.saldo.toFixed(2).replace(".", ","),
+      data: dataAt,
+      vencimento: venc,
+      pix: (p as any).pix_chave ?? null,
+    });
+    composer.open({
+      tipo,
+      destinatario: p.cliente_nome,
+      telefone: p.cliente_whatsapp,
+      mensagem,
+      motivo: p.dias_atraso > 0 ? `Cobrança de valor vencido (${p.dias_atraso}d)` : "Lembrete de pagamento",
+      pagamento_id: p.id,
+      cliente_id: (p as any).cliente_id ?? null,
+    });
   }
+
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -333,9 +352,17 @@ function PagamentosAbertosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+        onSent={() => qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] })}
+      />
     </div>
   );
 }
+
 
 
 function KpiCard({

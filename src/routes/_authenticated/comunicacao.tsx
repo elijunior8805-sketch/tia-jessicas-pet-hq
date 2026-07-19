@@ -33,6 +33,7 @@ import {
 import { format, differenceInDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { sugerirMensagemWhatsApp } from "@/lib/comunicacao.functions";
+import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
   component: ComunicacaoPage,
@@ -155,6 +156,8 @@ function ComunicacaoPage() {
     }
   }
 
+  const composer = useWhatsAppComposer();
+
   function enviar() {
     if (!clienteSel?.whatsapp) {
       toast.error("Este cliente não possui WhatsApp");
@@ -164,8 +167,16 @@ function ComunicacaoPage() {
       toast.error("Escreva ou gere uma mensagem");
       return;
     }
-    openWa(clienteSel.whatsapp, mensagem);
+    composer.open({
+      tipo: tipo as any,
+      destinatario: clienteSel.nome,
+      telefone: clienteSel.whatsapp,
+      mensagem,
+      motivo: `Comunicação — ${tipo}`,
+      cliente_id: clienteSel.id,
+    });
   }
+
 
   // ---- sugestões inteligentes ----
   const hoje = new Date();
@@ -463,6 +474,12 @@ function ComunicacaoPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <WhatsAppComposer
+        open={composer.state.open}
+        onOpenChange={composer.setOpen}
+        payload={composer.state.payload}
+      />
     </PageShell>
   );
 }
