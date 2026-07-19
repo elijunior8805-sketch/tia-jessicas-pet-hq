@@ -314,8 +314,27 @@ function AgendamentoRow({
   onChangeStatus: (s: Status) => void;
   signer: { name: string; initials: string };
 }) {
+  const previewStorageKey = `wa-preview:finalizado:${row.id}`;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState("");
+
+  const openFinalizadoPreview = () => {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(previewStorageKey); } catch {}
+    setPreviewText(saved ?? waMessage(row, signer));
+    setPreviewOpen(true);
+  };
+
+  const updatePreviewText = (v: string) => {
+    setPreviewText(v);
+    try { localStorage.setItem(previewStorageKey, v); } catch {}
+  };
+
+  const resetPreviewText = () => {
+    const def = waMessage(row, signer);
+    setPreviewText(def);
+    try { localStorage.removeItem(previewStorageKey); } catch {}
+  };
 
   const meta = statusMeta(row.status);
   const total = Number(row.valor_previsto ?? 0) + Number(row.taxa_leva_traz ?? 0);
@@ -385,8 +404,7 @@ function AgendamentoRow({
                 className="gap-1 border-success/40 text-success hover:bg-success/10"
                 onClick={() => {
                   if (row.status === "finalizado") {
-                    setPreviewText(waMessage(row, signer));
-                    setPreviewOpen(true);
+                    openFinalizadoPreview();
                   } else {
                     openWhatsApp(row, signer);
                   }
@@ -449,7 +467,7 @@ function AgendamentoRow({
             <div className="ml-auto max-w-[85%] rounded-lg bg-[#dcf8c6] px-3 py-2 shadow-sm">
               <Textarea
                 value={previewText}
-                onChange={(e) => setPreviewText(e.target.value)}
+                onChange={(e) => updatePreviewText(e.target.value)}
                 rows={10}
                 className="min-h-[180px] resize-none border-0 bg-transparent p-0 text-sm text-foreground shadow-none focus-visible:ring-0 whitespace-pre-wrap"
               />
@@ -459,7 +477,7 @@ function AgendamentoRow({
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Cancelar</Button>
             <Button
               variant="outline"
-              onClick={() => setPreviewText(waMessage(row, signer))}
+              onClick={resetPreviewText}
             >
               Restaurar padrão
             </Button>
