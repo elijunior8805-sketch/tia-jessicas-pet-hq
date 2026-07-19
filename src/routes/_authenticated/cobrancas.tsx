@@ -360,6 +360,7 @@ function CobrancaDialog({
   const pausar = useServerFn(pausarCobranca);
   const pagar = useServerFn(marcarPagamento);
   const sugerir = useServerFn(sugerirMensagemCobranca);
+  const registrarResposta = useServerFn(registrarRespostaCliente);
 
   const qHist = useQuery({
     queryKey: ["cobrancas", "historico", cobranca.id],
@@ -369,6 +370,15 @@ function CobrancaDialog({
   const [mensagem, setMensagem] = useState("");
   const [carregandoIa, setCarregandoIa] = useState(false);
   const [promessaData, setPromessaData] = useState("");
+
+  // Resposta recebida do cliente
+  const [respostaTexto, setRespostaTexto] = useState("");
+  const [respostaIntencao, setRespostaIntencao] = useState<
+    "auto" | "pagou" | "promessa" | "negociar" | "contestou" | "sem_intencao"
+  >("auto");
+  const [respostaData, setRespostaData] = useState("");
+  const [respostaValor, setRespostaValor] = useState<string>("");
+  const [salvandoResp, setSalvandoResp] = useState(false);
 
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ["cobrancas"] });
