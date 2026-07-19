@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import { User, Lock, Eye, EyeOff, MessageCircle, History } from "lucide-react";
 import { z } from "zod";
 import { useMyProfile } from "@/hooks/use-my-profile";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
