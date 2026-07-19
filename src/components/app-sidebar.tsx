@@ -13,6 +13,7 @@ import {
   Building2,
   BarChart3,
   MessageSquare,
+  HandCoins,
   Settings,
   PawPrint,
 } from "lucide-react";
