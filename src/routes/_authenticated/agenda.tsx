@@ -414,7 +414,7 @@ function NovoAgendamentoDialog({
         servico_id: parsed.servico_id,
         data: parsed.data,
         hora: parsed.hora,
-        duracao_min: parsed.duracao_min,
+        duracao_min: parsed.duracao_min ?? undefined,
         valor_previsto: parsed.valor_previsto,
         taxa_leva_traz: parsed.taxa_leva_traz,
         status: parsed.status,
