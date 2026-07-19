@@ -7,6 +7,7 @@ type AtendPDFData = {
   ocorrencias?: any[];
   empresa?: { nome?: string | null; cnpj?: string | null; telefone?: string | null; endereco?: string | null } | null;
   operador?: string | null;
+  returnBlob?: boolean;
 };
 
 // Deep-forest, off-white, gold palette (RGB)
