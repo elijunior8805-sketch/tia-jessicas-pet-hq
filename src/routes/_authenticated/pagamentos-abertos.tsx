@@ -130,7 +130,19 @@ function PagamentosAbertosPage() {
             <AlertCircle className="w-4 h-4 mr-2" />
             {somenteAtrasados ? "Mostrando atrasados" : "Somente atrasados"}
           </Button>
+          <Button
+            disabled={selecionados.size === 0 || loteMut.isPending}
+            onClick={() => {
+              setLoteAberto(true);
+              setLoteResultado(null);
+              loteMut.mutate(Array.from(selecionados));
+            }}
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Cobrar selecionados ({selecionados.size})
+          </Button>
         </div>
+
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
