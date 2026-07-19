@@ -260,6 +260,7 @@ function AtendimentoDetalhe() {
   const [motivoReabrir, setMotivoReabrir] = useState("");
   const [reabrirOpen, setReabrirOpen] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<string | null>(null);
+  const [excluirOpen, setExcluirOpen] = useState(false);
 
   useEffect(() => {
     if (!atendimento) return;
