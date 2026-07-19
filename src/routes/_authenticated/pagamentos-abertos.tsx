@@ -5,18 +5,25 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   listarPagamentosAbertos,
   registrarContatoCobranca,
+  registrarContatoCobrancaLote,
   type PagamentoAbertoDTO,
+  type CobrancaLoteItem,
 } from "@/lib/pagamentos.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, Calendar, MessageCircle, Search, TrendingDown, Wallet } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/pagamentos-abertos")({
   component: PagamentosAbertosPage,
