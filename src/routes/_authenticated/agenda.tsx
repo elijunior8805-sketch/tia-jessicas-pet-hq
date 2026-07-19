@@ -171,11 +171,14 @@ function AgendaPage() {
   const [prefill, setPrefill] = useState<{ cliente?: string; pet?: string }>({});
 
   // Abrir dialog automaticamente quando vier ?cliente=&pet= na URL
-  useMemo(() => {
+  useEffect(() => {
     if (search.cliente || search.pet) {
       setPrefill({ cliente: search.cliente, pet: search.pet });
       setOpenNew(true);
+      // limpa a query string para não reabrir ao fechar o diálogo
+      navigateSelf({ search: {}, replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.cliente, search.pet]);
   const qc = useQueryClient();
   const { data: profile } = useMyProfile();
