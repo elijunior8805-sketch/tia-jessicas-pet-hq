@@ -13,6 +13,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReciboCodigoRouteImport } from './routes/recibo.$codigo'
 import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticated/servicos'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
@@ -55,6 +56,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReciboCodigoRoute = ReciboCodigoRouteImport.update({
+  id: '/recibo/$codigo',
+  path: '/recibo/$codigo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedServicosRoute = AuthenticatedServicosRouteImport.update({
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
+  '/recibo/$codigo': typeof ReciboCodigoRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
+  '/recibo/$codigo': typeof ReciboCodigoRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
+  '/recibo/$codigo': typeof ReciboCodigoRoute
   '/_authenticated/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/_authenticated/clientes/novo': typeof AuthenticatedClientesNovoRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/pagamentos-abertos'
     | '/relatorios'
     | '/servicos'
+    | '/recibo/$codigo'
     | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/pagamentos-abertos'
     | '/relatorios'
     | '/servicos'
+    | '/recibo/$codigo'
     | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
@@ -358,6 +369,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pagamentos-abertos'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
+    | '/recibo/$codigo'
     | '/_authenticated/atendimentos/$atendId'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/novo'
@@ -376,6 +388,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ReciboCodigoRoute: typeof ReciboCodigoRoute
   ApiPublicHooksReguaCobrancaRoute: typeof ApiPublicHooksReguaCobrancaRoute
   ApiPublicHooksRelatoriosDiariosRoute: typeof ApiPublicHooksRelatoriosDiariosRoute
 }
@@ -408,6 +421,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recibo/$codigo': {
+      id: '/recibo/$codigo'
+      path: '/recibo/$codigo'
+      fullPath: '/recibo/$codigo'
+      preLoaderRoute: typeof ReciboCodigoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/servicos': {
@@ -651,6 +671,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ReciboCodigoRoute: ReciboCodigoRoute,
   ApiPublicHooksReguaCobrancaRoute: ApiPublicHooksReguaCobrancaRoute,
   ApiPublicHooksRelatoriosDiariosRoute: ApiPublicHooksRelatoriosDiariosRoute,
 }

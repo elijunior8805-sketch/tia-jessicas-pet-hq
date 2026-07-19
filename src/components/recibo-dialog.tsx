@@ -30,15 +30,38 @@ function digits(s: string) {
 }
 
 const FALLBACK_TEMPLATES = {
-  receita:
-    'Olá, {contraparte}! 🐾\n\nSegue o recibo de pagamento nº {numero} no valor de *{valor}* referente a "{descricao}".\n\nObrigada pela confiança! ✨\n{assinatura}',
-  despesa:
-    'Olá, {contraparte}!\n\nSegue o comprovante nº {numero} referente a "{descricao}" no valor de *{valor}*, pago em {data}.\n\nObrigada!\n{assinatura}',
+  receita: `Olá, {contraparte}! Tudo bem?
+
+Seu pagamento de *{valor}* foi confirmado com sucesso. Agradecemos pela confiança em nosso trabalho e pelo carinho com o Spa de Pet Tia Jéssica. 🐾
+
+Você pode consultar seu recibo com segurança pelo link abaixo:
+{link}
+
+{assinatura}
+Cuidado e carinho em cada atendimento.`,
+  despesa: `Olá, {contraparte}!
+
+Segue o comprovante de pagamento no valor de *{valor}*, referente a "{descricao}", pago em {data}.
+
+Consulte o comprovante com segurança pelo link:
+{link}
+
+{assinatura}`,
 };
+
+function gerarCodigoPublico() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(12);
+  (globalThis.crypto ?? window.crypto).getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
 
 function applyVars(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
+
 
 export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId }: Props) {
   const qc = useQueryClient();
