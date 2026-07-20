@@ -9,12 +9,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   Clock, PawPrint, User, PlayCircle, ArrowRight, ClipboardCheck,
-  AlertTriangle, Sparkles, ListChecks,
+  AlertTriangle, Sparkles, ListChecks, Star,
 } from "lucide-react";
 import { brl, itemFromServico } from "@/lib/atendimento-utils";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { cn } from "@/lib/utils";
+import { z } from "zod";
+
+const searchSchema = z.object({
+  vip: z.enum(["1"]).optional(),
+});
 
 export const Route = createFileRoute("/_authenticated/atendimentos/")({
+  validateSearch: (s) => searchSchema.parse(s),
   component: AtendimentosPainel,
 });
 
@@ -26,7 +33,12 @@ function todayISO() {
 function AtendimentosPainel() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { vip: vipParam } = Route.useSearch();
+  const onlyVip = vipParam === "1";
   const hoje = todayISO();
+
+  const filterVip = <T extends { clientes?: { vip?: boolean | null } | null }>(arr: T[]) =>
+    onlyVip ? arr.filter((r) => r.clientes?.vip === true) : arr;
 
   const { data: agendamentos = [] } = useQuery({
     queryKey: ["atendimentos-painel", "agenda", hoje],
@@ -72,14 +84,15 @@ function AtendimentosPainel() {
   );
 
   const aguardando = useMemo(
-    () => agendamentos.filter((a: any) => !iniciados.has(a.id)),
-    [agendamentos, iniciados],
+    () => filterVip(agendamentos.filter((a: any) => !iniciados.has(a.id))),
+    [agendamentos, iniciados, onlyVip],
   );
 
-  const emAndamento = atendimentos.filter((a: any) => !a.finalizado);
-  const finalizadosHoje = atendimentos.filter(
-    (a: any) => a.finalizado && a.data_fim && a.data_fim.slice(0, 10) === hoje,
+  const emAndamento = filterVip(atendimentos.filter((a: any) => !a.finalizado));
+  const finalizadosHoje = filterVip(
+    atendimentos.filter((a: any) => a.finalizado && a.data_fim && a.data_fim.slice(0, 10) === hoje),
   );
+
 
   const iniciar = useMutation({
     mutationFn: async (ag: any) => {
@@ -140,7 +153,28 @@ function AtendimentosPainel() {
       <PageHeader
         title="Atendimentos"
         description="Check-in, execução e check-out dos pets do dia."
+        actions={
+          <Button
+            variant={onlyVip ? "default" : "outline"}
+            className={cn(
+              "gap-1.5",
+              onlyVip && "bg-[var(--color-gold)] text-primary hover:bg-[var(--color-gold)]/90 border-[var(--color-gold)]",
+            )}
+            onClick={() =>
+              navigate({
+                to: "/atendimentos",
+                search: (prev: any) => ({ ...prev, vip: onlyVip ? undefined : "1" }),
+                replace: true,
+              })
+            }
+            title="Mostrar somente pets de clientes VIP"
+          >
+            <Star className={cn("h-4 w-4", onlyVip && "fill-current")} />
+            {onlyVip ? "Somente VIP" : "Filtrar VIP"}
+          </Button>
+        }
       />
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Coluna

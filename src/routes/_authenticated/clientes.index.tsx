@@ -291,6 +291,16 @@ function ClientesPage() {
               </span>
               {buscando && searching && <span className="text-primary">Buscando…</span>}
             </div>
+            {onlyVip && (
+              <Link
+                to="/atendimentos"
+                search={{ vip: "1" } as any}
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+              >
+                <Star className="h-3 w-3 fill-[var(--color-gold)] text-[var(--color-gold)]" />
+                Ver atendimentos de clientes VIP →
+              </Link>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
