@@ -267,16 +267,24 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 export const Route = createFileRoute("/recibo/$codigo")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Recibo ${params.codigo} — Spa de Pet Tia Jéssica` },
-      {
-        name: "description",
-        content:
-          "Consulte com segurança o recibo de pagamento emitido pelo Spa de Pet Tia Jéssica.",
-      },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
-  }),
+  head: ({ params }) => {
+    const title = `Recibo ${params.codigo} — Spa de Pet Tia Jéssica`;
+    const description =
+      "Consulte com segurança o recibo de pagamento emitido pelo Spa de Pet Tia Jéssica.";
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { name: "robots", content: "noindex, nofollow" },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "website" },
+        { property: "og:site_name", content: "Spa de Pet Tia Jéssica" },
+        { name: "twitter:card", content: "summary" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+      ],
+    };
+  },
   component: ReciboPublicoPage,
 });
