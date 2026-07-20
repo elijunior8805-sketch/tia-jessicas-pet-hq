@@ -30,18 +30,27 @@ function digits(s: string) {
 }
 
 const FALLBACK_TEMPLATES = {
-  receita: `Olá, {contraparte}! Tudo bem?
+  receita_com_pet: `Olá, {contraparte}! Tudo bem?
 
-Seu pagamento de *{valor}* foi confirmado com sucesso. Agradecemos pela confiança em nosso trabalho e pelo carinho com o Spa de Pet Tia Jéssica. 🐾
+Confirmamos o seu pagamento de {valor} referente ao atendimento do {pet}. ✅
 
-Você pode consultar seu recibo com segurança pelo link abaixo:
+Seu recibo está disponível com segurança no link abaixo:
 {link}
 
-{assinatura}
-Cuidado e carinho em cada atendimento.`,
+Muito obrigada pela confiança! 🐾
+{assinatura}`,
+  receita_sem_pet: `Olá, {contraparte}! Tudo bem?
+
+Confirmamos o seu pagamento de {valor} referente aos serviços realizados. ✅
+
+Seu recibo está disponível com segurança no link abaixo:
+{link}
+
+Muito obrigada pela confiança! 🐾
+{assinatura}`,
   despesa: `Olá, {contraparte}!
 
-Segue o comprovante de pagamento no valor de *{valor}*, referente a "{descricao}", pago em {data}.
+Segue o comprovante de pagamento no valor de {valor}, referente a "{descricao}", pago em {data}.
 
 Consulte o comprovante com segurança pelo link:
 {link}
