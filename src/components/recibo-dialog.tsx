@@ -11,7 +11,9 @@ import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye, File
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateReciboPDF, type ReciboData } from "@/lib/recibo-pdf";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import { toast } from "sonner";
+
 
 type Props = {
   open: boolean;
