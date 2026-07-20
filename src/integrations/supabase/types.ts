@@ -57,6 +57,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agendamento_servicos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
             foreignKeyName: "agendamento_servicos_servico_id_fkey"
             columns: ["servico_id"]
             isOneToOne: false
@@ -175,6 +182,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "agendamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -358,6 +372,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "atendimentos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: true
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
             foreignKeyName: "atendimentos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -369,6 +390,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -550,6 +578,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "campanhas_destinatarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -791,6 +826,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -1079,6 +1121,68 @@ export type Database = {
           },
         ]
       }
+      conversas_estado: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          resolvida_em: string | null
+          resolvida_por: string | null
+          responsavel_atribuido_em: string | null
+          responsavel_atribuido_por: string | null
+          responsavel_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          resolvida_em?: string | null
+          resolvida_por?: string | null
+          responsavel_atribuido_em?: string | null
+          responsavel_atribuido_por?: string | null
+          responsavel_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          resolvida_em?: string | null
+          resolvida_por?: string | null
+          responsavel_atribuido_em?: string | null
+          responsavel_atribuido_por?: string | null
+          responsavel_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversas_estado_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_estado_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "conversas_estado_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "conversas_estado_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+        ]
+      }
       datas_comemorativas: {
         Row: {
           ativo: boolean
@@ -1362,6 +1466,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lembretes_fila_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
             foreignKeyName: "lembretes_fila_atendimento_id_fkey"
             columns: ["atendimento_id"]
             isOneToOne: false
@@ -1380,6 +1491,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "lembretes_fila_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -1443,6 +1561,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "agendamentos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leva_traz_eventos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
           },
           {
             foreignKeyName: "leva_traz_eventos_tarefa_id_fkey"
@@ -1529,6 +1654,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "leva_traz_tarefas_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
             foreignKeyName: "leva_traz_tarefas_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1540,6 +1672,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "leva_traz_tarefas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -1635,6 +1774,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "mensagem_sugestoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
             foreignKeyName: "mensagem_sugestoes_atendimento_id_fkey"
             columns: ["atendimento_id"]
             isOneToOne: false
@@ -1653,6 +1799,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -1811,6 +1964,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "mensagens_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -2003,6 +2163,13 @@ export type Database = {
             foreignKeyName: "ocorrencias_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "ocorrencias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
             referencedRelation: "pets_reativacao"
             referencedColumns: ["cliente_id"]
           },
@@ -2106,6 +2273,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "pagamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -2260,6 +2434,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "pets_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["cliente_id"]
           },
           {
@@ -2902,6 +3083,13 @@ export type Database = {
             foreignKeyName: "whatsapp_contatos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
             referencedRelation: "pets_reativacao"
             referencedColumns: ["cliente_id"]
           },
@@ -2953,6 +3141,31 @@ export type Database = {
           ultima_direcao?: never
           ultima_em?: never
           ultima_mensagem?: never
+        }
+        Relationships: []
+      }
+      mensagens_threads_v2: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_telefone: string | null
+          cliente_whatsapp: string | null
+          nao_lidas: number | null
+          pet_primeiro_nome: string | null
+          proximo_agendamento_data: string | null
+          proximo_agendamento_hora: string | null
+          proximo_agendamento_id: string | null
+          resolvida_em: string | null
+          responsavel_avatar: string | null
+          responsavel_email: string | null
+          responsavel_id: string | null
+          responsavel_nome: string | null
+          status_conversa: string | null
+          total_mensagens: number | null
+          ultima_direcao: string | null
+          ultima_em: string | null
+          ultima_em_in: string | null
+          ultima_mensagem: string | null
         }
         Relationships: []
       }
