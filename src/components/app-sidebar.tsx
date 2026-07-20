@@ -19,9 +19,11 @@ import {
   BellRing,
   Megaphone,
   Settings,
+  Shield,
   PawPrint,
   Cake,
 } from "lucide-react";
+import { useMyAccess } from "@/hooks/use-my-permissions";
 import {
   Sidebar,
   SidebarContent,
@@ -73,11 +75,20 @@ const groups = [
   },
 ];
 
+const adminGroup = {
+  label: "Segurança",
+  items: [
+    { title: "Usuários e Acessos", url: "/usuarios", icon: Shield },
+  ],
+};
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (u: string) => pathname === u || pathname.startsWith(u + "/");
+  const { data: access } = useMyAccess();
+  const visibleGroups = access?.canManageUsers ? [...groups, adminGroup] : groups;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -96,7 +107,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="gap-4 py-2">
-        {groups.map((g) => (
+        {visibleGroups.map((g) => (
           <SidebarGroup key={g.label} className="px-2">
             {!collapsed && (
               <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/50 px-2">
