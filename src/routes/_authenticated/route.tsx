@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
+import { NotificationBell } from "@/components/notification-bell";
+
 
 
 export const Route = createFileRoute("/_authenticated")({
