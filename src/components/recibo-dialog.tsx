@@ -228,7 +228,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       telefone: telefone || null,
       valor: data.valor,
       mensagem: mensagemFinal,
-      pet_nome: null,
+      pet_nome: petNome || null,
       servico: data.descricao || null,
       forma_pagamento: data.forma || null,
       data_pagamento: data.data || null,
