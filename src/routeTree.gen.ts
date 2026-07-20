@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReciboCodigoRouteImport } from './routes/recibo.$codigo'
+import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
 import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticated/servicos'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedReativacaoRouteImport } from './routes/_authenticated/reativacao'
@@ -70,6 +71,11 @@ const ReciboCodigoRoute = ReciboCodigoRouteImport.update({
   id: '/recibo/$codigo',
   path: '/recibo/$codigo',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedUsuariosRoute = AuthenticatedUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedServicosRoute = AuthenticatedServicosRouteImport.update({
   id: '/servicos',
@@ -270,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
+  '/usuarios': typeof AuthenticatedUsuariosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
@@ -308,6 +315,7 @@ export interface FileRoutesByTo {
   '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
+  '/usuarios': typeof AuthenticatedUsuariosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
@@ -348,6 +356,7 @@ export interface FileRoutesById {
   '/_authenticated/reativacao': typeof AuthenticatedReativacaoRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
+  '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
   '/_authenticated/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
@@ -388,6 +397,7 @@ export interface FileRouteTypes {
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
+    | '/usuarios'
     | '/recibo/$codigo'
     | '/atendimentos/$atendId'
     | '/clientes/$id'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
+    | '/usuarios'
     | '/recibo/$codigo'
     | '/atendimentos/$atendId'
     | '/clientes/$id'
@@ -465,6 +476,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reativacao'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
+    | '/_authenticated/usuarios'
     | '/recibo/$codigo'
     | '/_authenticated/atendimentos/$atendId'
     | '/_authenticated/clientes/$id'
@@ -529,6 +541,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/recibo/$codigo'
       preLoaderRoute: typeof ReciboCodigoRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/usuarios': {
+      id: '/_authenticated/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof AuthenticatedUsuariosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/servicos': {
       id: '/_authenticated/servicos'
@@ -790,6 +809,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReativacaoRoute: typeof AuthenticatedReativacaoRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
+  AuthenticatedUsuariosRoute: typeof AuthenticatedUsuariosRoute
   AuthenticatedAtendimentosAtendIdRoute: typeof AuthenticatedAtendimentosAtendIdRoute
   AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRouteWithChildren
   AuthenticatedClientesNovoRoute: typeof AuthenticatedClientesNovoRoute
@@ -821,6 +841,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReativacaoRoute: AuthenticatedReativacaoRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
+  AuthenticatedUsuariosRoute: AuthenticatedUsuariosRoute,
   AuthenticatedAtendimentosAtendIdRoute: AuthenticatedAtendimentosAtendIdRoute,
   AuthenticatedClientesIdRoute: AuthenticatedClientesIdRouteWithChildren,
   AuthenticatedClientesNovoRoute: AuthenticatedClientesNovoRoute,
