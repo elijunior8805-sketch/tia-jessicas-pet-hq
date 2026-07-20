@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import {
   Sheet,
   SheetContent,
