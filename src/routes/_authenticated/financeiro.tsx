@@ -780,6 +780,7 @@ function FinanceiroPage() {
           `Pagamento de serviços do spa · vencimento ${p.vencimento ? format(parseISO(p.vencimento), "dd/MM/yyyy") : "—"}`,
         valor: Number(p.valor_total),
         forma: p.forma,
+        petNome: p.atendimento?.pet?.nome ?? null,
         empresa: empresaInfo,
       },
       telefone: p.cliente?.whatsapp || p.cliente?.telefone || null,

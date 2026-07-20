@@ -20,6 +20,7 @@ export type ReciboData = {
   forma?: string | null;
   categoria?: string | null;
   observacoes?: string | null;
+  petNome?: string | null;
   empresa?: {
     nome?: string | null;
     cnpj?: string | null;

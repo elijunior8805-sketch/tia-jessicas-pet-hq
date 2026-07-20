@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 
-import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye } from "lucide-react";
+import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateReciboPDF, type ReciboData } from "@/lib/recibo-pdf";
@@ -30,18 +30,27 @@ function digits(s: string) {
 }
 
 const FALLBACK_TEMPLATES = {
-  receita: `Olá, {contraparte}! Tudo bem?
+  receita_com_pet: `Olá, {contraparte}! Tudo bem?
 
-Seu pagamento de *{valor}* foi confirmado com sucesso. Agradecemos pela confiança em nosso trabalho e pelo carinho com o Spa de Pet Tia Jéssica. 🐾
+Confirmamos o seu pagamento de {valor} referente ao atendimento do {pet}. ✅
 
-Você pode consultar seu recibo com segurança pelo link abaixo:
+Seu recibo está disponível com segurança no link abaixo:
 {link}
 
-{assinatura}
-Cuidado e carinho em cada atendimento.`,
+Muito obrigada pela confiança! 🐾
+{assinatura}`,
+  receita_sem_pet: `Olá, {contraparte}! Tudo bem?
+
+Confirmamos o seu pagamento de {valor} referente aos serviços realizados. ✅
+
+Seu recibo está disponível com segurança no link abaixo:
+{link}
+
+Muito obrigada pela confiança! 🐾
+{assinatura}`,
   despesa: `Olá, {contraparte}!
 
-Segue o comprovante de pagamento no valor de *{valor}*, referente a "{descricao}", pago em {data}.
+Segue o comprovante de pagamento no valor de {valor}, referente a "{descricao}", pago em {data}.
 
 Consulte o comprovante com segurança pelo link:
 {link}
@@ -142,6 +151,8 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     }
   }, [open, envioAnterior, codigo]);
 
+  const petNome = (data.petNome ?? "").trim();
+
   const vars = useMemo(() => ({
     contraparte: data.contraparte,
     valor: brl(data.valor),
@@ -150,18 +161,24 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     forma: (data.forma || "").replace(/_/g, " "),
     data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
     assinatura: config?.whatsapp_assinatura ?? "Spa de Pet Tia Jéssica",
+    pet: petNome || "seu pet",
     link: publicUrl,
-  }), [data, config, publicUrl]);
+  }), [data, config, publicUrl, petNome]);
 
   useEffect(() => {
     if (!open) return;
+    const fallbackKey: keyof typeof FALLBACK_TEMPLATES = isReceita
+      ? petNome
+        ? "receita_com_pet"
+        : "receita_sem_pet"
+      : "despesa";
     const rawTpl =
       (isReceita ? config?.whatsapp_template_receber : config?.whatsapp_template_pagar) ||
-      FALLBACK_TEMPLATES[isReceita ? "receita" : "despesa"];
-    // Bloqueia links inseguros (Supabase signed URLs, tokens, etc.)
-    const safeTpl = sanitizeTemplate(rawTpl, publicUrl);
+      FALLBACK_TEMPLATES[fallbackKey];
+    // Bloqueia links inseguros (Supabase signed URLs, tokens, etc.) e caracteres quebrados
+    const safeTpl = sanitizeTemplate(rawTpl, publicUrl).replace(/\uFFFD/g, "");
     setMensagem(applyVars(safeTpl, vars));
-  }, [open, config, isReceita, vars, publicUrl]);
+  }, [open, config, isReceita, vars, publicUrl, petNome]);
 
   // Prévia do PDF
   useEffect(() => {
@@ -184,7 +201,11 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     };
   }, [open, data]);
 
-  const mensagemFinal = useMemo(() => applyVars(mensagem, vars), [mensagem, vars]);
+  const mensagemFinal = useMemo(
+    () =>
+      applyVars(sanitizeTemplate(mensagem, publicUrl), vars).replace(/\uFFFD/g, ""),
+    [mensagem, vars, publicUrl],
+  );
   const variaveisRestantes = useMemo(() => {
     const m = mensagemFinal.match(/\{(\w+)\}/g);
     return m ? Array.from(new Set(m)) : [];
@@ -211,7 +232,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       telefone: telefone || null,
       valor: data.valor,
       mensagem: mensagemFinal,
-      pet_nome: null,
+      pet_nome: petNome || null,
       servico: data.descricao || null,
       forma_pagamento: data.forma || null,
       data_pagamento: data.data || null,
@@ -224,6 +245,13 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     }
     qc.invalidateQueries({ queryKey: ["recibo-envio", isReceita ? "receita" : "despesa", referenciaId] });
     return cod;
+  };
+
+  const buildTextoFinal = (link: string) => {
+    // Sanitiza a mensagem editada pelo usuário: URLs cruas (incl. Supabase
+    // signed URLs) viram {link}; caracteres quebrados (�) são removidos.
+    const safeMensagem = sanitizeTemplate(mensagem, link).replace(/\uFFFD/g, "");
+    return applyVars(safeMensagem, { ...vars, link }).replace(/\uFFFD/g, "");
   };
 
   const enviarWhats = async () => {
@@ -240,10 +268,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           ? window.location.origin
           : "";
       const link = `${origin}/recibo/${cod}`;
-      // Sanitiza a mensagem editada pelo usuário antes de aplicar as variáveis:
-      // qualquer URL crua (incl. Supabase signed URLs) vira {link} seguro.
-      const safeMensagem = sanitizeTemplate(mensagem, link);
-      const textoFinal = applyVars(safeMensagem, { ...vars, link });
+      const textoFinal = buildTextoFinal(link);
       window.open(
         `https://wa.me/${numero}?text=${encodeURIComponent(textoFinal)}`,
         "_blank",
@@ -254,6 +279,28 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       setEnviando(false);
     }
   };
+
+  const baixarEAbrirWhats = async () => {
+    if (!numero) {
+      toast.error("Contato sem WhatsApp cadastrado");
+      return;
+    }
+    // 1) Baixa o PDF para o dispositivo do operador
+    baixar();
+    // 2) Abre a conversa do cliente com uma orientação — SEM link
+    const texto =
+      `Olá, ${data.contraparte}! Segue em anexo o recibo do seu pagamento de ${brl(data.valor)}` +
+      (petNome ? ` referente ao atendimento do ${petNome}.` : `.`) +
+      `\n\n(Anexe o PDF baixado antes de enviar. O WhatsApp não anexa o arquivo automaticamente.)`;
+    window.open(
+      `https://wa.me/${numero}?text=${encodeURIComponent(texto.replace(/\uFFFD/g, ""))}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    toast.info("PDF baixado — anexe manualmente antes de enviar");
+  };
+
+
 
 
   return (
@@ -371,7 +418,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             className="text-sm font-normal resize-none"
           />
           <p className="text-[11px] text-muted-foreground">
-            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}, {"{link}"}.
+            Variáveis: {"{contraparte}"}, {"{pet}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}, {"{link}"}.
           </p>
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
@@ -440,6 +487,15 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
               </a>
             </Button>
           )}
+          <Button
+            variant="secondary"
+            onClick={baixarEAbrirWhats}
+            disabled={!numero || !confirmado}
+            className="w-full sm:w-auto"
+            title="Baixa o PDF e abre a conversa do cliente com orientação para anexar"
+          >
+            <FileDown className="h-4 w-4 mr-1" /> Baixar PDF e abrir WhatsApp
+          </Button>
           <Button
             onClick={enviarWhats}
             disabled={!numero || enviando || !confirmado}
