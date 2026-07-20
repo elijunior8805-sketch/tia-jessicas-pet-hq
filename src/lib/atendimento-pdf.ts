@@ -3,6 +3,7 @@ import { deliverPdf } from "./pdf-open";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, sumItens, type ServicoItem } from "./atendimento-utils";
+import { getLogoDataUrl, drawLogoBadge } from "./logo-pdf";
 
 type AtendPDFData = {
   atendimento: any;
@@ -151,21 +152,25 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   }
 
   // ============ HEADER ============
+  const logoDataUrl = await getLogoDataUrl();
   doc.setFillColor(...C.forest);
   doc.rect(0, 0, W, 90, "F");
   doc.setFillColor(...C.gold);
   doc.rect(0, 90, W, 3, "F");
 
+  drawLogoBadge(doc, logoDataUrl, M + 30, 45, 56);
+  const textX = logoDataUrl ? M + 74 : M;
+
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text(empresa?.nome ?? "Spa de Pet Tia Jessica", M, 42);
+  doc.text(empresa?.nome ?? "Spa de Pet Tia Jessica", textX, 42);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   const infoLine = [empresa?.cnpj, empresa?.telefone, empresa?.endereco].filter(Boolean).join("  ·  ");
-  if (infoLine) doc.text(infoLine, M, 58);
+  if (infoLine) doc.text(infoLine, textX, 58);
   doc.setFontSize(9);
-  doc.text("Relatorio de Atendimento", M, 76);
+  doc.text("Relatorio de Atendimento", textX, 76);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
@@ -338,6 +343,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     doc.rect(0, 0, W, 60, "F");
     doc.setFillColor(...C.gold);
     doc.rect(0, 60, W, 2, "F");
+    drawLogoBadge(doc, logoDataUrl, W - M - 18, 30, 36);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold"); doc.setFontSize(16);
     doc.text("Resultado do atendimento", M, 38);

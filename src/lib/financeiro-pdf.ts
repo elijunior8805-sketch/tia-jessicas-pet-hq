@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { deliverPdf } from "./pdf-open";
+import { getLogoDataUrl, drawLogoBadge } from "./logo-pdf";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],
@@ -107,18 +108,21 @@ export function generateFinanceiroPDF(d: FinPdfData) {
   };
 
   // ===== Header =====
+  const logoDataUrl = await getLogoDataUrl();
   doc.setFillColor(...C.forest);
   doc.rect(0, 0, W, 84, "F");
   doc.setFillColor(...C.gold);
   doc.rect(0, 84, W, 3, "F");
+  drawLogoBadge(doc, logoDataUrl, M + 26, 42, 50);
+  const textX = logoDataUrl ? M + 66 : M;
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(d.empresa?.nome ?? "Spa de Pet Tia Jéssica", M, 36);
+  doc.text(d.empresa?.nome ?? "Spa de Pet Tia Jéssica", textX, 36);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   const sub = [d.empresa?.cnpj, d.empresa?.telefone].filter(Boolean).join(" · ");
-  if (sub) doc.text(sub, M, 52);
+  if (sub) doc.text(sub, textX, 52);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
