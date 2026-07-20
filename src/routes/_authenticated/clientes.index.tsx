@@ -307,7 +307,7 @@ function ClientesPage() {
                 ))}
                 {(recentes ?? []).length === 0 && (
                   <div className="p-6 text-sm text-muted-foreground text-center">
-                    Nenhum cliente cadastrado ainda.
+                    {onlyVip ? "Nenhum cliente marcado como VIP." : "Nenhum cliente cadastrado ainda."}
                   </div>
                 )}
               </div>
