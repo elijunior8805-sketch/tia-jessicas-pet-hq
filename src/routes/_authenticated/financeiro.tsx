@@ -152,11 +152,11 @@ const brl = (v: number) =>
 const pct = (v: number) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 
 const FORMA_META: Record<string, { label: string; color: string; bg: string; text: string }> = {
-  dinheiro: { label: "Dinheiro", color: "#10b981", bg: "bg-emerald-50", text: "text-emerald-700" },
-  pix: { label: "Pix", color: "#0e7490", bg: "bg-cyan-50", text: "text-cyan-800" },
-  credito: { label: "Crédito", color: "#c5a059", bg: "bg-amber-50", text: "text-amber-700" },
-  debito: { label: "Débito", color: "#7ba076", bg: "bg-lime-50", text: "text-lime-800" },
-  outras: { label: "Outras", color: "#8b5cf6", bg: "bg-violet-50", text: "text-violet-700" },
+  dinheiro: { label: "Dinheiro", color: "#168055", bg: "bg-emerald-50", text: "text-emerald-700" },
+  pix: { label: "Pix", color: "#1F4C5C", bg: "bg-cyan-50", text: "text-cyan-800" },
+  credito: { label: "Crédito", color: "#C99845", bg: "bg-amber-50", text: "text-amber-700" },
+  debito: { label: "Débito", color: "#7d9b76", bg: "bg-lime-50", text: "text-lime-800" },
+  outras: { label: "Outras", color: "#8b7355", bg: "bg-stone-50", text: "text-stone-700" },
   pendente: { label: "Pendente", color: "#94a3b8", bg: "bg-slate-50", text: "text-slate-700" },
 };
 
