@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { lookupCep, formatCep } from "@/lib/cep";
 import { toast } from "sonner";
 
@@ -26,12 +27,16 @@ export type ClienteFormState = {
   observacoes: string;
   indicacao: string;
   vip: boolean;
+  tom_preferido: string;
+  opt_out_comunicacao: boolean;
+  opt_out_motivo: string;
 };
 
 export const emptyClienteForm: ClienteFormState = {
   nome: "", cpf: "", nascimento: "", telefone: "", whatsapp: "", email: "",
   cep: "", rua: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
   observacoes: "", indicacao: "", vip: false,
+  tom_preferido: "", opt_out_comunicacao: false, opt_out_motivo: "",
 };
 
 export function ClienteFormFields({
