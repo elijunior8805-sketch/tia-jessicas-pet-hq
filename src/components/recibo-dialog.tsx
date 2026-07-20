@@ -449,28 +449,55 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
                 Como o cliente vai ver
               </Badge>
             </div>
-            <div className="rounded-md bg-white border p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
-              {mensagemFinal || <span className="text-muted-foreground italic">Mensagem vazia</span>}
+            <div className="rounded-md bg-white border overflow-hidden">
+              {/* Cabeçalho branded — reforça marca e confiabilidade */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#123F2A] text-white">
+                <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center overflow-hidden ring-2 ring-[#C99845]/60 shrink-0">
+                  <img
+                    src={logoAsset.url}
+                    alt="Spa de Pet Tia Jéssica"
+                    className="h-7 w-7 object-contain"
+                  />
+                </div>
+                <div className="leading-tight">
+                  <div className="text-[11px] font-semibold">Spa de Pet Tia Jéssica</div>
+                  <div className="text-[9px] text-emerald-100/80">Recibo oficial</div>
+                </div>
+              </div>
+              <div className="p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
+                {mensagemFinal || (
+                  <span className="text-muted-foreground italic">Mensagem vazia</span>
+                )}
+              </div>
+              {publicUrl && (
+                <div className="border-t bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900 flex items-start gap-2">
+                  <ShieldCheckSmall />
+                  <div>
+                    Link público seguro do recibo:{" "}
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline break-all font-medium"
+                    >
+                      {publicUrl}
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
-            {publicUrl && (
-              <p className="text-[11px] text-emerald-800">
-                Link seguro do recibo:{" "}
-                <a
-                  href={publicUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline break-all"
-                >
-                  {publicUrl}
-                </a>
-              </p>
-            )}
+            <p className="text-[10px] text-emerald-900/70 leading-relaxed">
+              Somente dados públicos (nome, valor, pet, serviço e data) são
+              enviados. Nada de tokens, links internos ou identificadores
+              sensíveis.
+            </p>
             {variaveisRestantes.length > 0 && (
               <p className="text-[11px] text-amber-700">
                 Atenção: variáveis não substituídas — {variaveisRestantes.join(", ")}
               </p>
             )}
           </div>
+
         </div>
 
           {!numero && (
