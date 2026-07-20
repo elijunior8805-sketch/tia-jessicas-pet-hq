@@ -633,8 +633,12 @@ export type Database = {
           nome: string
           numero: string | null
           observacoes: string | null
+          opt_out_comunicacao: boolean
+          opt_out_em: string | null
+          opt_out_motivo: string | null
           rua: string | null
           telefone: string | null
+          tom_preferido: string | null
           updated_at: string
           updated_by: string | null
           version: number
@@ -659,8 +663,12 @@ export type Database = {
           nome: string
           numero?: string | null
           observacoes?: string | null
+          opt_out_comunicacao?: boolean
+          opt_out_em?: string | null
+          opt_out_motivo?: string | null
           rua?: string | null
           telefone?: string | null
+          tom_preferido?: string | null
           updated_at?: string
           updated_by?: string | null
           version?: number
@@ -685,8 +693,12 @@ export type Database = {
           nome?: string
           numero?: string | null
           observacoes?: string | null
+          opt_out_comunicacao?: boolean
+          opt_out_em?: string | null
+          opt_out_motivo?: string | null
           rua?: string | null
           telefone?: string | null
+          tom_preferido?: string | null
           updated_at?: string
           updated_by?: string | null
           version?: number
@@ -1220,6 +1232,9 @@ export type Database = {
           pos_atendimento_ativo: boolean
           pos_atendimento_horas: number
           pos_atendimento_template: string
+          sugestao_confirmacao_horas: number
+          sugestao_pos_atendimento_horas: number
+          sugestao_reengajamento_dias: number
           updated_at: string
         }
         Insert: {
@@ -1239,6 +1254,9 @@ export type Database = {
           pos_atendimento_ativo?: boolean
           pos_atendimento_horas?: number
           pos_atendimento_template?: string
+          sugestao_confirmacao_horas?: number
+          sugestao_pos_atendimento_horas?: number
+          sugestao_reengajamento_dias?: number
           updated_at?: string
         }
         Update: {
@@ -1258,6 +1276,9 @@ export type Database = {
           pos_atendimento_ativo?: boolean
           pos_atendimento_horas?: number
           pos_atendimento_template?: string
+          sugestao_confirmacao_horas?: number
+          sugestao_pos_atendimento_horas?: number
+          sugestao_reengajamento_dias?: number
           updated_at?: string
         }
         Relationships: []
@@ -1544,6 +1565,168 @@ export type Database = {
           },
         ]
       }
+      mensagem_sugestoes: {
+        Row: {
+          agendamento_id: string | null
+          atendimento_id: string | null
+          cliente_id: string | null
+          cobranca_id: string | null
+          created_at: string
+          feedback: string | null
+          feedback_em: string | null
+          feedback_por: string | null
+          id: string
+          idempotency_key: string | null
+          mensagem_sugerida: string | null
+          motivo: string
+          pet_id: string | null
+          prevista_para: string | null
+          prioridade: number
+          status: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          created_at?: string
+          feedback?: string | null
+          feedback_em?: string | null
+          feedback_por?: string | null
+          id?: string
+          idempotency_key?: string | null
+          mensagem_sugerida?: string | null
+          motivo: string
+          pet_id?: string | null
+          prevista_para?: string | null
+          prioridade?: number
+          status?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          created_at?: string
+          feedback?: string | null
+          feedback_em?: string | null
+          feedback_por?: string | null
+          id?: string
+          idempotency_key?: string | null
+          mensagem_sugerida?: string | null
+          motivo?: string
+          pet_id?: string | null
+          prevista_para?: string | null
+          prioridade?: number
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagem_sugestoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_sugestoes_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
+      }
+      mensagem_templates: {
+        Row: {
+          ativo: boolean
+          corpo: string
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          id: string
+          is_padrao: boolean
+          nome: string
+          tipo: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          corpo: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          id?: string
+          is_padrao?: boolean
+          nome: string
+          tipo: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          corpo?: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          id?: string
+          is_padrao?: boolean
+          nome?: string
+          tipo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       mensagens: {
         Row: {
           atendimento_id: string | null
@@ -1557,10 +1740,14 @@ export type Database = {
           direcao: string
           id: string
           lida_em: string | null
+          mensagem_original: string | null
           metadata: Json
           pagamento_id: string | null
           status: string
+          sugestao_id: string | null
           tags: Json
+          template_id: string | null
+          tipo: string | null
         }
         Insert: {
           atendimento_id?: string | null
@@ -1574,10 +1761,14 @@ export type Database = {
           direcao: string
           id?: string
           lida_em?: string | null
+          mensagem_original?: string | null
           metadata?: Json
           pagamento_id?: string | null
           status?: string
+          sugestao_id?: string | null
           tags?: Json
+          template_id?: string | null
+          tipo?: string | null
         }
         Update: {
           atendimento_id?: string | null
@@ -1591,10 +1782,14 @@ export type Database = {
           direcao?: string
           id?: string
           lida_em?: string | null
+          mensagem_original?: string | null
           metadata?: Json
           pagamento_id?: string | null
           status?: string
+          sugestao_id?: string | null
           tags?: Json
+          template_id?: string | null
+          tipo?: string | null
         }
         Relationships: [
           {
@@ -1637,6 +1832,20 @@ export type Database = {
             columns: ["pagamento_id"]
             isOneToOne: false
             referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_sugestao_id_fkey"
+            columns: ["sugestao_id"]
+            isOneToOne: false
+            referencedRelation: "mensagem_sugestoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "mensagem_templates"
             referencedColumns: ["id"]
           },
         ]
