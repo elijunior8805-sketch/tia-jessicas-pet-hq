@@ -276,6 +276,25 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     }
   };
 
+  const baixarEAbrirWhats = async () => {
+    if (!numero) {
+      toast.error("Contato sem WhatsApp cadastrado");
+      return;
+    }
+    // 1) Baixa o PDF para o dispositivo do operador
+    baixar();
+    // 2) Abre a conversa do cliente com uma orientação — SEM link
+    const texto =
+      `Olá, ${data.contraparte}! Segue em anexo o recibo do seu pagamento de ${brl(data.valor)}` +
+      (petNome ? ` referente ao atendimento do ${petNome}.` : `.`) +
+      `\n\n(Anexe o PDF baixado antes de enviar. O WhatsApp não anexa o arquivo automaticamente.)`;
+    window.open(
+      `https://wa.me/${numero}?text=${encodeURIComponent(texto.replace(/\uFFFD/g, ""))}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    toast.info("PDF baixado — anexe manualmente antes de enviar");
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
