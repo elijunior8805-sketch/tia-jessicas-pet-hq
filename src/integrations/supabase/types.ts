@@ -1854,6 +1854,51 @@ export type Database = {
           },
         ]
       }
+      pet_acessos_log: {
+        Row: {
+          acao: string
+          created_at: string
+          escopo: Json
+          id: string
+          pet_id: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          escopo?: Json
+          id?: string
+          pet_id: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          escopo?: Json
+          id?: string
+          pet_id?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_acessos_log_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_acessos_log_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
+      }
       pets: {
         Row: {
           alergias: string | null
