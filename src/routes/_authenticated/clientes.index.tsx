@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 const searchSchema = z.object({
   q: z.string().optional(),
   sel: z.string().optional(),
+  vip: z.enum(["1"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/clientes/")({
@@ -33,7 +34,8 @@ const PAGE_SIZE = 10;
 
 function ClientesPage() {
   const navigate = useNavigate();
-  const { q: qParam, sel } = Route.useSearch();
+  const { q: qParam, sel, vip: vipParam } = Route.useSearch();
+  const onlyVip = vipParam === "1";
   const [rawQ, setRawQ] = useState(qParam ?? "");
   const [q, setQ] = useState(qParam ?? "");
   const [page, setPage] = useState(0);
@@ -70,29 +72,44 @@ function ClientesPage() {
     },
   });
 
-  // Cadastrados recentemente (estado inicial)
+  // Total de VIPs
+  const { data: totalVip } = useQuery({
+    queryKey: ["clientes-total-vip"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("clientes")
+        .select("*", { count: "exact", head: true })
+        .eq("vip", true);
+      return count ?? 0;
+    },
+  });
+
+  // Cadastrados recentemente (estado inicial) — respeita filtro VIP
   const { data: recentes } = useQuery({
-    queryKey: ["clientes-recentes"],
+    queryKey: ["clientes-recentes", onlyVip],
     enabled: !searching,
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("clientes")
         .select("id, nome, telefone, whatsapp, bairro, vip, ativo, foto_url, created_at, pets(id, nome, foto_url)")
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .order(onlyVip ? "nome" : "created_at", { ascending: onlyVip ? true : false })
+        .limit(onlyVip ? 100 : 5);
+      if (onlyVip) query = query.eq("vip", true);
+      const { data } = await query;
       return data ?? [];
     },
   });
 
   // Resultados da busca
   const { data: resultados, isFetching: buscando } = useQuery({
-    queryKey: ["clientes-busca", termo, page],
+    queryKey: ["clientes-busca", termo, page, onlyVip],
     enabled: searching,
     staleTime: 15_000,
     queryFn: async () => {
       const like = `%${termo}%`;
       // Busca em clientes (nome, cpf, telefone, whatsapp, bairro, email)
-      const baseQ = supabase
+      let baseQ = supabase
         .from("clientes")
         .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url)")
         .or(
@@ -100,6 +117,7 @@ function ClientesPage() {
         )
         .order("nome")
         .range(0, (page + 1) * PAGE_SIZE - 1);
+      if (onlyVip) baseQ = baseQ.eq("vip", true);
 
       const { data: byCliente } = await baseQ;
 
@@ -119,11 +137,13 @@ function ClientesPage() {
         const alreadyIds = new Set((byCliente ?? []).map((c: any) => c.id));
         const missing = clienteIds.filter((id) => !alreadyIds.has(id));
         if (missing.length > 0) {
-          const { data } = await supabase
+          let q2 = supabase
             .from("clientes")
             .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url)")
             .in("id", missing)
             .limit(20);
+          if (onlyVip) q2 = q2.eq("vip", true);
+          const { data } = await q2;
           byPet = data ?? [];
         }
       }
@@ -235,11 +255,39 @@ function ClientesPage() {
                 </button>
               )}
             </div>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: undefined }), replace: true })}
+                className={cn(
+                  "flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
+                  !onlyVip ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border text-foreground",
+                )}
+              >
+                Todos {totalClientes != null && <span className="opacity-70">({totalClientes})</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: "1" }), replace: true })}
+                className={cn(
+                  "flex-1 px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors inline-flex items-center justify-center gap-1",
+                  onlyVip
+                    ? "bg-[var(--color-gold)] text-primary border-[var(--color-gold)]"
+                    : "bg-background hover:bg-[var(--color-gold)]/10 border-[var(--color-gold)]/40 text-foreground",
+                )}
+                title="Mostrar somente clientes marcados como VIP"
+              >
+                <Star className={cn("h-3.5 w-3.5", onlyVip && "fill-current")} />
+                VIP {totalVip != null && <span className="opacity-80">({totalVip})</span>}
+              </button>
+            </div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center justify-between">
               <span>
                 {searching
-                  ? `${lista.length} resultado${lista.length === 1 ? "" : "s"}`
-                  : "Cadastrados recentemente"}
+                  ? `${lista.length} resultado${lista.length === 1 ? "" : "s"}${onlyVip ? " VIP" : ""}`
+                  : onlyVip
+                    ? "Clientes VIP"
+                    : "Cadastrados recentemente"}
               </span>
               {buscando && searching && <span className="text-primary">Buscando…</span>}
             </div>
@@ -259,7 +307,7 @@ function ClientesPage() {
                 ))}
                 {(recentes ?? []).length === 0 && (
                   <div className="p-6 text-sm text-muted-foreground text-center">
-                    Nenhum cliente cadastrado ainda.
+                    {onlyVip ? "Nenhum cliente marcado como VIP." : "Nenhum cliente cadastrado ainda."}
                   </div>
                 )}
               </div>
