@@ -55,6 +55,9 @@ function digits(v: string) {
 
 function ReciboPublicoPage() {
   const { codigo } = Route.useParams();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [gerandoPreview, setGerandoPreview] = useState(false);
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["recibo-publico", codigo],
