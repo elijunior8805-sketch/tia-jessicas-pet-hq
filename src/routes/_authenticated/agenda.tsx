@@ -1287,6 +1287,23 @@ function NovoAgendamentoDialog({
       // Serviço principal = primeiro item (mantém compat com servico_id)
       const principal = parsed.itens[0];
 
+      // Validações LT
+      if (ltModalidade !== "nao_utilizar") {
+        if (ltIsento && !ltIsencaoMotivo.trim()) {
+          throw new Error("Informe a justificativa da isenção do Leva e Traz");
+        }
+      }
+      const valorLT = ltModalidade === "nao_utilizar" ? 0
+                    : ltIsento ? 0
+                    : Number(taxa || 0);
+
+      const buscaEndFinal = ltModalidade === "somente_buscar" || ltModalidade === "buscar_entregar"
+        ? (buscaUsaClienteEnd ? null : buscaEnd)
+        : null;
+      const entregaEndFinal = ltModalidade === "somente_entregar" || ltModalidade === "buscar_entregar"
+        ? (entregaUsaClienteEnd ? null : entregaEnd)
+        : null;
+
       const { data: novo, error } = await supabase.from("agendamentos").insert({
         cliente_id: parsed.cliente_id,
         pet_id: parsed.pet_id,
@@ -1295,10 +1312,22 @@ function NovoAgendamentoDialog({
         hora: parsed.hora,
         duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
         valor_previsto: totalValor,
-        taxa_leva_traz: parsed.taxa_leva_traz,
+        taxa_leva_traz: valorLT,
         status: parsed.status,
         observacoes: parsed.observacoes || null,
-      }).select("id").single();
+        leva_traz_modalidade: ltModalidade,
+        leva_traz_responsavel_id: ltResponsavel || null,
+        leva_traz_telefone: ltTelefone || null,
+        leva_traz_obs: ltObs || null,
+        leva_traz_isento: ltIsento,
+        leva_traz_isencao_motivo: ltIsento ? ltIsencaoMotivo : null,
+        busca_data: buscaData || null,
+        busca_hora: buscaHora || null,
+        entrega_data: entregaData || null,
+        entrega_hora: entregaHora || null,
+        busca_endereco: buscaEndFinal as any,
+        entrega_endereco: entregaEndFinal as any,
+      } as any).select("id").single();
       if (error) throw error;
 
       // Insere todos os itens (inclusive o principal) para simetria
