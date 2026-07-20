@@ -53,6 +53,7 @@ function AuthenticatedLayout() {
               </span>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              <SyncStatusBadge status={syncStatus} />
               <NotificationBell />
 
               <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-border/60">
