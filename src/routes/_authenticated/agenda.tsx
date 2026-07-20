@@ -1790,7 +1790,7 @@ function NovoAgendamentoDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || itens.length === 0}>
-            {mutation.isPending ? "Salvando…" : `Criar agendamento${itens.length > 1 ? ` (${itens.length} serviços)` : ""}`}
+            {mutation.isPending ? "Salvando…" : isEdit ? "Salvar alterações" : `Criar agendamento${itens.length > 1 ? ` (${itens.length} serviços)` : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>
