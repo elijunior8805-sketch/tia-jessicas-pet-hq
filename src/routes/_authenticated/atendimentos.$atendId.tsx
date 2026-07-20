@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
@@ -260,30 +260,67 @@ function UploadButton({
   onFile, disabled, label = "Adicionar foto",
 }: { onFile: (f: File) => Promise<void> | void; disabled?: boolean; label?: string }) {
   const [busy, setBusy] = useState(false);
+  const camRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handle = async (files: File[]) => {
+    if (files.length === 0) return;
+    setBusy(true);
+    try {
+      for (const f of files) await onFile(f);
+      toast.success("Foto(s) enviada(s)");
+    } catch (err: any) {
+      toast.error(err.message ?? "Erro ao enviar foto");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const btnCls =
+    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm cursor-pointer hover:bg-accent transition " +
+    (disabled || busy ? "opacity-60 pointer-events-none" : "");
+
   return (
-    <label className="inline-flex">
+    <div className="inline-flex flex-wrap gap-2">
+      {/* Câmera — captura na hora (mobile) */}
       <input
-        type="file" accept="image/*" multiple capture="environment" className="hidden"
+        ref={camRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
         disabled={disabled || busy}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (files.length === 0) return;
-          setBusy(true);
-          try { for (const f of files) await onFile(f); toast.success("Foto(s) enviada(s)"); }
-          catch (err: any) { toast.error(err.message ?? "Erro ao enviar foto"); }
-          finally { setBusy(false); }
+          await handle(files);
         }}
       />
-      <span className={
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm cursor-pointer hover:bg-accent transition " +
-        (disabled || busy ? "opacity-60 pointer-events-none" : "")
-      }>
-        <Upload className="h-4 w-4" /> {busy ? "Enviando…" : label}
-      </span>
-    </label>
+      {/* Galeria / arquivos — múltiplos, sem capture */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
+        multiple
+        className="hidden"
+        disabled={disabled || busy}
+        onChange={async (e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          await handle(files);
+        }}
+      />
+
+      <button type="button" onClick={() => camRef.current?.click()} className={btnCls} disabled={disabled || busy}>
+        <Camera className="h-4 w-4" /> {busy ? "Enviando…" : "Tirar foto"}
+      </button>
+      <button type="button" onClick={() => fileRef.current?.click()} className={btnCls} disabled={disabled || busy}>
+        <Upload className="h-4 w-4" /> {label === "Adicionar foto" ? "Da galeria" : label}
+      </button>
+    </div>
   );
 }
+
 
 // ---------- Etapa badge + confirm ----------
 
