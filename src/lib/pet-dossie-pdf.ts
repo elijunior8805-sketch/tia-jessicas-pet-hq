@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { loadImageAsDataURL, type LoadedImage } from "./atendimento-pdf";
 import { deliverPdf } from "./pdf-open";
+import { getLogoDataUrl, drawLogoBadge } from "./logo-pdf";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],
@@ -92,6 +93,7 @@ export async function generateDossiePDF(opts: DossieOpts): Promise<DossieResult>
   }
   const hero = await heroPromise;
 
+  const logoDataUrl = await getLogoDataUrl();
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -102,6 +104,8 @@ export async function generateDossiePDF(opts: DossieOpts): Promise<DossieResult>
   doc.rect(0, 0, W, H, "F");
   doc.setFillColor(...C.gold);
   doc.rect(0, 240, W, 4, "F");
+
+  drawLogoBadge(doc, logoDataUrl, W / 2, 180, 96);
 
   doc.setTextColor(...C.gold);
   doc.setFont("helvetica", "bold");
@@ -154,6 +158,7 @@ export async function generateDossiePDF(opts: DossieOpts): Promise<DossieResult>
     doc.rect(0, 0, W, 40, "F");
     doc.setFillColor(...C.gold);
     doc.rect(0, 40, W, 2, "F");
+    drawLogoBadge(doc, logoDataUrl, W - M - 12, 21, 26);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
