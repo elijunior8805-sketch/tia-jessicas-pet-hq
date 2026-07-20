@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const TipoEnum = z.enum([
+  // legado
   "confirmacao_agendamento",
   "lembrete_atendimento",
   "aviso_atraso",
@@ -17,6 +18,16 @@ const TipoEnum = z.enum([
   "parabens_cliente",
   "aniversario_pet",
   "personalizada",
+  // novos (comunicação e IA v2)
+  "lembrete_agendamento",
+  "pos_atendimento",
+  "vacina_vencendo",
+  "cobranca_pendente",
+  "reagendamento",
+  "boas_vindas",
+  "pesquisa_satisfacao",
+  "promocao",
+  "reengajamento",
 ]);
 
 const StatusEnum = z.enum([
@@ -76,6 +87,7 @@ export const registrarAberturaWhatsApp = createServerFn({ method: "POST" })
         atendimento_id: data.atendimento_id ?? null,
         pagamento_id: data.pagamento_id ?? null,
         cobranca_id: data.cobranca_id ?? null,
+        tipo: data.tipo,
         tags: [data.tipo],
         metadata: { destinatario: data.destinatario, telefone: data.telefone },
       });
