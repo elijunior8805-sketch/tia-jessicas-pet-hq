@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import {
   Download,
   Eye,
@@ -58,6 +59,31 @@ function ReciboPublicoPage() {
   const { codigo } = Route.useParams();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [gerandoPreview, setGerandoPreview] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  const publicUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/recibo/${codigo}`
+      : `https://tia-jessicas-pet-hq.lovable.app/recibo/${codigo}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(publicUrl, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 320,
+      color: { dark: "#123F2A", light: "#FFFFFF" },
+    })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [publicUrl]);
+
+
 
 
   const { data, isLoading, error } = useQuery({
@@ -289,6 +315,77 @@ function ReciboPublicoPage() {
             </div>
           )}
         </section>
+
+        {/* Bloco de verificação — código + QR + logo */}
+        <section className="mt-5 rounded-2xl overflow-hidden shadow-md border border-[#E7E1D3] bg-white">
+          <div className="bg-gradient-to-r from-[#123F2A] to-[#0E2F20] text-white px-5 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-[#C99845]" />
+              <span className="text-[11px] uppercase tracking-widest text-[#C99845] font-semibold">
+                Verificação do recibo
+              </span>
+            </div>
+            <img
+              src={logoAsset.url}
+              alt="Spa de Pet Tia Jéssica"
+              className="h-7 w-7 rounded-full bg-white p-0.5 border border-[#C99845]"
+            />
+          </div>
+
+          <div className="p-5 flex flex-col sm:flex-row items-center gap-5">
+            <div className="relative shrink-0">
+              <div className="p-2 rounded-xl bg-white border-2 border-[#C99845] shadow-sm">
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR Code do recibo ${codigo}`}
+                    className="h-40 w-40 block"
+                  />
+                ) : (
+                  <div className="h-40 w-40 flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#123F2A]" />
+                  </div>
+                )}
+              </div>
+              {qrDataUrl && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="h-10 w-10 rounded-full bg-white border-2 border-[#C99845] flex items-center justify-center shadow">
+                    <img
+                      src={logoAsset.url}
+                      alt=""
+                      className="h-8 w-8 rounded-full object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 text-center sm:text-left">
+              <div className="text-[11px] uppercase tracking-widest text-[#8A8F87]">
+                Código de verificação
+              </div>
+              <div className="mt-1 font-mono text-2xl font-bold text-[#123F2A] tracking-[0.2em] break-all">
+                {codigo}
+              </div>
+              <p className="mt-3 text-xs text-[#525852] leading-relaxed">
+                Escaneie o QR Code ou acesse o link abaixo para conferir a
+                autenticidade deste recibo diretamente no sistema do{" "}
+                <span className="font-semibold text-[#123F2A]">
+                  {r.empresa_nome ?? "Spa de Pet Tia Jéssica"}
+                </span>
+                .
+              </p>
+              <a
+                href={publicUrl}
+                className="mt-2 inline-block text-[11px] font-mono text-[#7A5A1D] underline break-all"
+              >
+                {publicUrl}
+              </a>
+            </div>
+          </div>
+          <div className="h-1 bg-gradient-to-r from-[#C99845] via-[#E5C87A] to-[#C99845]" />
+        </section>
+
 
         <div className="mt-4 flex items-start gap-2 text-xs text-[#525852] px-1">
           <ShieldCheck className="h-4 w-4 text-[#168055] shrink-0 mt-0.5" />
