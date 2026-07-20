@@ -44,13 +44,13 @@ function fmtDate(iso?: string | null) {
   } catch { return "—"; }
 }
 
-type LoadedImage = { dataUrl: string; w: number; h: number; path: string };
+export type LoadedImage = { dataUrl: string; w: number; h: number; path: string };
 
 /**
  * Carrega imagem privada do bucket como dataURL, corrigindo orientação (EXIF)
  * via createImageBitmap quando disponível. Redimensiona para no máx. 1400px.
  */
-async function loadImageAsDataURL(path: string): Promise<LoadedImage> {
+export async function loadImageAsDataURL(path: string): Promise<LoadedImage> {
   const { data, error } = await supabase.storage
     .from("spa-fotos")
     .createSignedUrl(path, 60 * 5);
