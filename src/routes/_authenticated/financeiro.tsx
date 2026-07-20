@@ -1153,519 +1153,877 @@ function FinanceiroPage() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 bg-[hsl(var(--background))] min-h-screen">
-      {/* Header */}
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-6 w-6 text-primary" />
-            <h1 className="font-display text-2xl md:text-3xl font-semibold">Financeiro</h1>
-          </div>
-          <p className="text-sm text-muted-foreground lowercase">{periodoLabel}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={exportarPDF} className="gap-2">
-            <Download className="h-4 w-4" /> Exportar PDF
-          </Button>
-          <TesteToolbar onChange={refreshAll} />
-          <LancamentoManualDialog onCreated={refreshAll} />
-        </div>
-      </header>
+    <TooltipProvider delayDuration={200}>
+    <div className="min-h-screen bg-[color:var(--color-background)]">
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
 
-      {/* Filtros */}
-      <Card className="border-primary/10">
-        <CardContent className="p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {(["hoje", "ontem", "semana", "mes", "personalizado"] as Preset[]).map((p) => (
-              <Button
-                key={p}
-                size="sm"
-                variant={preset === p ? "default" : "outline"}
-                onClick={() => aplicarPreset(p)}
-              >
-                {p === "hoje" && "Hoje"}
-                {p === "ontem" && "Ontem"}
-                {p === "semana" && "Semana"}
-                {p === "mes" && "Mês"}
-                {p === "personalizado" && "Personalizado"}
-              </Button>
-            ))}
-            <Input
-              type="date"
-              value={inicio}
-              onChange={(e) => {
-                setInicio(e.target.value);
-                setPreset("personalizado");
-              }}
-              className="w-[150px]"
-            />
-            <span className="text-muted-foreground text-sm">até</span>
-            <Input
-              type="date"
-              value={fim}
-              onChange={(e) => {
-                setFim(e.target.value);
-                setPreset("personalizado");
-              }}
-              className="w-[150px]"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-1">
-              {(["todos", "entradas", "saidas"] as const).map((b) => (
-                <Button
-                  key={b}
-                  size="sm"
-                  variant={fBloco === b ? "default" : "outline"}
-                  onClick={() => setFBloco(b)}
-                >
-                  {b === "todos" ? "Todos" : b === "entradas" ? "Entradas" : "Saídas"}
-                </Button>
-              ))}
+        {/* ============ Cabeçalho ============ */}
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <h1 className="truncate font-display text-2xl font-semibold tracking-tight md:text-3xl">
+                Financeiro
+              </h1>
             </div>
-
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(FORMA_META)
-                .filter(([k]) => k !== "pendente")
-                .map(([k, m]) => (
-                  <Button
-                    key={k}
-                    size="sm"
-                    variant={fFormas.includes(k) ? "default" : "outline"}
-                    onClick={() => toggleForma(k)}
-                    className="capitalize"
-                    style={fFormas.includes(k) ? { backgroundColor: m.color, borderColor: m.color } : undefined}
-                  >
-                    {m.label}
-                  </Button>
-                ))}
-            </div>
-
-            <Select value={fStatus} onValueChange={setFStatus}>
-              <SelectTrigger className="w-[150px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Status: todos</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                <SelectItem value="parcial">Pago parcialmente</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="atrasado">Vencido</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={fCategoria} onValueChange={setFCategoria}>
-              <SelectTrigger className="w-[190px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Categoria: todas</SelectItem>
-                <SelectItem value="servico">Serviço</SelectItem>
-                {CATEGORIA_RECEITA_OPTS.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={fCliente} onValueChange={setFCliente}>
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Cliente: todos</SelectItem>
-                {clientesUnicos.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <label className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
-              <input
-                type="checkbox"
-                checked={incluirTeste}
-                onChange={(e) => setIncluirTeste(e.target.checked)}
-              />
-              Incluir teste
-            </label>
-
-            <Button size="sm" variant="ghost" onClick={limparFiltros} className="ml-auto">
-              <X className="h-4 w-4 mr-1" /> Limpar filtros
+            <p className="text-sm text-muted-foreground">{periodoLabel}</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" onClick={exportarPDF} className="gap-2 rounded-xl">
+              <Download className="h-4 w-4" /> <span className="hidden sm:inline">Exportar PDF</span>
             </Button>
+            <LancamentoManualDialog onCreated={refreshAll} />
+          </div>
+        </header>
+
+        {/* Toolbar de teste (apenas em DEV) */}
+        {IS_DEV && (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-300/40 bg-amber-50/60 px-3 py-2">
+            <FlaskConical className="h-4 w-4 text-amber-700" />
+            <span className="text-xs text-amber-800">Ferramentas de teste (visíveis somente em desenvolvimento)</span>
+            <div className="ml-auto flex items-center gap-2">
+              <label className="flex items-center gap-1 text-xs text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={incluirTeste}
+                  onChange={(e) => setIncluirTeste(e.target.checked)}
+                />
+                Incluir teste
+              </label>
+              <TesteToolbar onChange={refreshAll} />
+            </div>
+          </div>
+        )}
+
+        {/* ============ Filtros ============ */}
+        <section className="card-premium overflow-hidden">
+          <div className="flex flex-col gap-3 p-4">
+            {/* Presets + range */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl bg-muted p-1">
+                {(["hoje", "ontem", "semana", "mes", "personalizado"] as Preset[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => aplicarPreset(p)}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                      preset === p
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {p === "hoje" && "Hoje"}
+                    {p === "ontem" && "Ontem"}
+                    {p === "semana" && "Semana"}
+                    {p === "mes" && "Mês"}
+                    {p === "personalizado" && "Personalizado"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="date"
+                  value={inicio}
+                  onChange={(e) => { setInicio(e.target.value); setPreset("personalizado"); }}
+                  className="h-9 w-[145px] rounded-xl"
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <Input
+                  type="date"
+                  value={fim}
+                  onChange={(e) => { setFim(e.target.value); setPreset("personalizado"); }}
+                  className="h-9 w-[145px] rounded-xl"
+                />
+              </div>
+
+              <div className="ml-auto flex items-center gap-2">
+                <div className="inline-flex rounded-xl bg-muted p-1">
+                  {(["todos", "entradas", "saidas"] as const).map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setFBloco(b)}
+                      className={cn(
+                        "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                        fBloco === b
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {b === "todos" ? "Todos" : b === "entradas" ? "Entradas" : "Saídas"}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowMoreFilters((v) => !v)}
+                  className="gap-2 rounded-xl"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mais filtros</span>
+                  {filtrosAtivos.length > 0 && (
+                    <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5 text-[10px]">
+                      {filtrosAtivos.length}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Filtros avançados */}
+            {showMoreFilters && (
+              <div className="grid gap-2 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1">
+                  <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Forma de pagamento</Label>
+                  <Select
+                    value={fFormas.length === 1 ? fFormas[0] : fFormas.length === 0 ? "todas" : "multi"}
+                    onValueChange={(v) => setFFormas(v === "todas" ? [] : [v])}
+                  >
+                    <SelectTrigger className="h-9 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas as formas</SelectItem>
+                      {Object.entries(FORMA_META)
+                        .filter(([k]) => k !== "pendente")
+                        .map(([k, m]) => (
+                          <SelectItem key={k} value={k}>
+                            <span className="inline-flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full" style={{ background: m.color }} />
+                              {m.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Status</Label>
+                  <Select value={fStatus} onValueChange={setFStatus}>
+                    <SelectTrigger className="h-9 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="pago">Pago</SelectItem>
+                      <SelectItem value="parcial">Pago parcialmente</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="atrasado">Vencido</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Categoria</Label>
+                  <Select value={fCategoria} onValueChange={setFCategoria}>
+                    <SelectTrigger className="h-9 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="servico">Serviço</SelectItem>
+                      {CATEGORIA_RECEITA_OPTS.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Cliente</Label>
+                  <Select value={fCliente} onValueChange={setFCliente}>
+                    <SelectTrigger className="h-9 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {clientesUnicos.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+                  <Button size="sm" variant="ghost" onClick={limparFiltros} className="rounded-xl">
+                    <X className="h-4 w-4 mr-1" /> Limpar filtros
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {filtrosAtivos.length > 0 && (
+              <div className="flex flex-wrap gap-1 border-t border-border pt-2">
+                <span className="mr-1 self-center text-xs text-muted-foreground">
+                  <Filter className="inline h-3 w-3 mr-1" />
+                  Ativos:
+                </span>
+                {filtrosAtivos.map((f, i) => (
+                  <Badge
+                    key={i}
+                    variant="outline"
+                    className="cursor-pointer rounded-full border-primary/20 bg-primary/5 hover:bg-primary/10"
+                    onClick={f.onRemove}
+                  >
+                    {f.label} <X className="ml-1 h-3 w-3" />
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ============ KPIs — Linha 1 (destaque) ============ */}
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <HeroKpi
+            label="Receita bruta"
+            value={brl(kpis.receitaBruta)}
+            hint="Faturamento por competência"
+            tooltip="Soma dos atendimentos do período (valor executado ou planejado)."
+            accent="emerald"
+            icon={<TrendingUp className="h-4 w-4" />}
+          />
+          <HeroKpi
+            label="Total recebido"
+            value={brl(kpis.totalRecebido)}
+            hint="Caixa efetivo no período"
+            tooltip="Soma dos pagamentos com data de pagamento dentro do período."
+            accent="primary"
+            icon={<ArrowUpRight className="h-4 w-4" />}
+          />
+          <HeroKpi
+            label="Despesas"
+            value={brl(kpis.despesas)}
+            hint="Parcelas pagas no período"
+            tooltip="Soma das parcelas de compras quitadas no período."
+            accent="terracotta"
+            icon={<ArrowDownRight className="h-4 w-4" />}
+          />
+          <HeroKpi
+            label="Lucro estimado"
+            value={brl(kpis.lucroEstimado)}
+            hint="Receita bruta − Despesas"
+            tooltip="Receita por competência menos despesas pagas no período."
+            accent={kpis.lucroEstimado >= 0 ? "gold" : "terracotta"}
+            icon={<Coins className="h-4 w-4" />}
+          />
+        </section>
+
+        {/* ============ KPIs — Linha 2 ============ */}
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <MiniKpi
+            label="Saldo do período"
+            value={brl(kpis.saldoPeriodo)}
+            icon={<Scale className="h-3.5 w-3.5" />}
+            tone={kpis.saldoPeriodo >= 0 ? "positive" : "negative"}
+            tooltip="Recebido − Despesas do período."
+          />
+          <MiniKpi
+            label="A receber"
+            value={brl(kpis.totalAReceber)}
+            icon={<Clock className="h-3.5 w-3.5" />}
+            tone="neutral"
+            tooltip="Saldo em aberto (pendentes + parciais)."
+          />
+          <MiniKpi
+            label="Vencidos"
+            value={brl(kpis.vencidos)}
+            icon={<AlertTriangle className="h-3.5 w-3.5" />}
+            tone="negative"
+            tooltip="Parcelas em aberto com vencimento anterior a hoje."
+          />
+          <MiniKpi
+            label="Ticket médio"
+            value={brl(kpis.ticketMedio)}
+            icon={<Receipt className="h-3.5 w-3.5" />}
+            tone="neutral"
+            tooltip="Média dos recebimentos de serviços no período."
+          />
+          <MiniKpi
+            label="Pendentes"
+            value={String(kpis.qtdPendentes)}
+            icon={<Clock className="h-3.5 w-3.5" />}
+            tone="neutral"
+            tooltip="Quantidade de pagamentos em aberto."
+          />
+          <MiniKpi
+            label="Aportes/ajustes"
+            value={brl(kpis.aportesAjustes)}
+            icon={<Wallet className="h-3.5 w-3.5" />}
+            tone="neutral"
+            tooltip="Não somam ao faturamento de serviços."
+          />
+        </section>
+
+        {/* ============ Recebimentos por forma de pagamento ============ */}
+        <section className="card-premium overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-semibold">Recebimentos por forma de pagamento</h2>
+              <p className="text-xs text-muted-foreground">
+                Total: <span className="font-semibold text-foreground">{brl(porForma.reduce((s, r) => s + r.valor, 0))}</span>
+                {" · "}{porForma.reduce((s, r) => s + r.qtd, 0)} pagamentos
+              </p>
+            </div>
           </div>
 
-          {filtrosAtivos.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-1 border-t border-primary/10">
-              <span className="text-xs text-muted-foreground self-center mr-1">Filtros ativos:</span>
-              {filtrosAtivos.map((f, i) => (
-                <Badge
-                  key={i}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-muted"
-                  onClick={f.onRemove}
-                >
-                  {f.label} <X className="h-3 w-3 ml-1" />
-                </Badge>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label="Receita bruta" value={brl(kpis.receitaBruta)} icon={<TrendingUp className="h-4 w-4" />} accent="emerald" hint="Competência" />
-        <KpiCard label="Total recebido" value={brl(kpis.totalRecebido)} icon={<ArrowUpRight className="h-4 w-4" />} accent="emerald" />
-        <KpiCard label="A receber" value={brl(kpis.totalAReceber)} icon={<Clock className="h-4 w-4" />} accent="amber" />
-        <KpiCard label="Despesas" value={brl(kpis.despesas)} icon={<ArrowDownRight className="h-4 w-4" />} accent="rose" />
-        <KpiCard label="Valores vencidos" value={brl(kpis.vencidos)} icon={<AlertTriangle className="h-4 w-4" />} accent="rose" />
-        <KpiCard label="Lucro estimado" value={brl(kpis.lucroEstimado)} icon={<Coins className="h-4 w-4" />} accent={kpis.lucroEstimado >= 0 ? "emerald" : "rose"} hint="Receita − Despesas" />
-        <KpiCard label="Saldo do período" value={brl(kpis.saldoPeriodo)} icon={<Scale className="h-4 w-4" />} accent={kpis.saldoPeriodo >= 0 ? "primary" : "rose"} hint="Recebido − Despesas" />
-        <KpiCard label="Ticket médio" value={brl(kpis.ticketMedio)} icon={<Receipt className="h-4 w-4" />} accent="primary" hint="Serviços" />
-        <KpiCard label="Pagamentos pendentes" value={String(kpis.qtdPendentes)} icon={<Clock className="h-4 w-4" />} accent="slate" />
-        <KpiCard label="Aportes/ajustes" value={brl(kpis.aportesAjustes)} icon={<Wallet className="h-4 w-4" />} accent="violet" hint="Não somam ao faturamento" />
-      </div>
-
-      {/* Recebimentos por forma */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Recebimentos por forma</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+          <div className="grid gap-6 p-4 lg:grid-cols-[1fr_1.4fr]">
+            {/* Rosca */}
+            <div className="min-h-[240px]">
+              <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
                     data={porForma.filter((r) => r.valor > 0)}
                     dataKey="valor"
                     nameKey="label"
-                    innerRadius={55}
-                    outerRadius={95}
-                    paddingAngle={3}
+                    innerRadius={62}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    strokeWidth={0}
                   >
                     {porForma.filter((r) => r.valor > 0).map((r) => (
                       <Cell key={r.forma} fill={r.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => brl(v)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(v: number) => brl(v)}
+                    contentStyle={{ borderRadius: 12, fontSize: 12, border: "1px solid var(--color-border)" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="text-center text-xs text-muted-foreground">
-              Soma: <span className="font-semibold">{brl(porForma.reduce((s, r) => s + r.valor, 0))}</span>
-              {" "}· {porForma.reduce((s, r) => s + r.qtd, 0)} pagamentos
+
+            {/* Cards por forma */}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {porForma.map((r) => (
+                <div
+                  key={r.forma}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+                >
+                  <div
+                    className="h-9 w-9 shrink-0 rounded-lg"
+                    style={{ background: `${r.color}22`, border: `1px solid ${r.color}55` }}
+                  >
+                    <div className="grid h-full w-full place-items-center">
+                      <span className="h-2 w-2 rounded-full" style={{ background: r.color }} />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium">{r.label}</span>
+                      <span className="text-xs text-muted-foreground">{pct(r.pct)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-mono text-sm font-semibold">{brl(r.valor)}</span>
+                      <span className="text-[11px] text-muted-foreground">{r.qtd} pgto</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Detalhamento por forma</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Forma</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-right">% receita</TableHead>
-                  <TableHead className="text-right">Qtd</TableHead>
-                  <TableHead className="text-right">Ticket</TableHead>
-                  <TableHead className="text-right">vs anterior</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {porForma.map((r) => (
-                  <TableRow key={r.forma}>
-                    <TableCell>
-                      <span
-                        className="inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs font-medium"
-                        style={{ backgroundColor: r.color + "22", color: r.color }}
-                      >
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: r.color }} />
-                        {r.label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">{brl(r.valor)}</TableCell>
-                    <TableCell className="text-right">{pct(r.pct)}</TableCell>
-                    <TableCell className="text-right">{r.qtd}</TableCell>
-                    <TableCell className="text-right font-mono">{brl(r.ticket)}</TableCell>
-                    <TableCell
-                      className={`text-right font-mono ${r.delta > 0 ? "text-emerald-700" : r.delta < 0 ? "text-rose-700" : "text-muted-foreground"}`}
-                    >
-                      {r.anterior === 0 && r.valor === 0
-                        ? "—"
-                        : (r.delta > 0 ? "+" : "") + pct(r.delta)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gráfico fluxo */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Evolução de receitas e despesas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-56 md:h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#c2410c" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#c2410c" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="dia" fontSize={11} />
-                <YAxis fontSize={11} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v: number) => brl(v)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                <Area type="monotone" dataKey="Entradas" stroke="hsl(var(--primary))" fill="url(#gE)" strokeWidth={2} />
-                <Area type="monotone" dataKey="Saídas" stroke="#c2410c" fill="url(#gS)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
+        </section>
 
-      {/* Entradas / Saídas */}
-      <Tabs defaultValue="entradas">
-        <TabsList>
-          <TabsTrigger value="entradas">Entradas ({receitasFiltradas.length})</TabsTrigger>
-          <TabsTrigger value="saidas">Saídas ({despesasFiltradas.length})</TabsTrigger>
-        </TabsList>
+        {/* ============ Evolução ============ */}
+        <section className="card-premium overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <h2 className="font-display text-lg font-semibold">Evolução de receitas e despesas</h2>
+            <div className="hidden items-center gap-3 text-xs text-muted-foreground sm:flex">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[color:var(--color-emerald)]" /> Entradas
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[color:var(--color-terracotta)]" /> Saídas
+              </span>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className="h-56 md:h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-emerald)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--color-emerald)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-terracotta)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--color-terracotta)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis dataKey="dia" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} />
+                  <Tooltip
+                    formatter={(v: number) => brl(v)}
+                    contentStyle={{ borderRadius: 12, fontSize: 12, border: "1px solid var(--color-border)" }}
+                  />
+                  <Area type="monotone" dataKey="Entradas" stroke="var(--color-emerald)" fill="url(#gE)" strokeWidth={2.5} />
+                  <Area type="monotone" dataKey="Saídas" stroke="var(--color-terracotta)" fill="url(#gS)" strokeWidth={2.5} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
 
-        <TabsContent value="entradas">
-          <Card>
-            <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Forma</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {receitasFiltradas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
-                        Sem entradas com os filtros atuais.
-                      </TableCell>
+        {/* ============ Lançamentos ============ */}
+        <section className="card-premium overflow-hidden">
+          <Tabs defaultValue="entradas">
+            <div className="flex items-center justify-between border-b border-border px-4 pt-4">
+              <TabsList className="bg-muted">
+                <TabsTrigger value="entradas" className="rounded-lg">
+                  Entradas <Badge variant="secondary" className="ml-2">{receitasFiltradas.length}</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="saidas" className="rounded-lg">
+                  Saídas <Badge variant="secondary" className="ml-2">{despesasFiltradas.length}</Badge>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="entradas" className="mt-0">
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border">
+                      <TableHead>Data</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Forma</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
                     </TableRow>
-                  ) : (
-                    receitasFiltradas.map((p) => {
-                      const meta = FORMA_META[p.forma] ?? FORMA_META.pendente;
-                      const cat =
-                        p.categoria_receita === "servico"
-                          ? "Serviço"
-                          : CATEGORIA_RECEITA_OPTS.find((x) => x.value === p.categoria_receita)?.label ?? "—";
-                      return (
-                        <TableRow key={p.id} className={p.is_teste ? "bg-amber-50/40" : ""}>
-                          <TableCell className="text-xs">
-                            {p.data_pagamento
-                              ? format(parseISO(p.data_pagamento), "dd/MM/yy")
-                              : p.vencimento
-                                ? format(parseISO(p.vencimento), "dd/MM/yy")
-                                : "—"}
-                          </TableCell>
-                          <TableCell className="max-w-[240px] truncate">
-                            {p.is_teste && (
-                              <Badge variant="outline" className="mr-1 text-[10px] border-amber-400 text-amber-700">
-                                TESTE
-                              </Badge>
-                            )}
-                            {p.descricao ||
-                              p.atendimento?.pet?.nome ||
-                              p.observacoes ||
-                              (p.atendimento_id ? "Atendimento" : "Lançamento avulso")}
-                          </TableCell>
-                          <TableCell className="max-w-[160px] truncate">{p.cliente?.nome || "—"}</TableCell>
-                          <TableCell className="text-xs">{cat}</TableCell>
-                          <TableCell>
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-                              style={{ backgroundColor: meta.color + "22", color: meta.color }}
-                            >
-                              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
-                              {meta.label}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={statusBadgeCls(p.status)}>
-                              {p.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {p.status === "parcial" ? (
-                              <span>
-                                {brl(Number(p.valor_pago))}{" "}
-                                <span className="text-muted-foreground">/ {brl(Number(p.valor_total))}</span>
-                              </span>
-                            ) : (
-                              brl(Number(p.valor_total))
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              {p.status !== "pago" && p.status !== "cancelado" ? (
-                                <>
-                                  <Button size="sm" variant="outline" onClick={() => marcarPagRecebido.mutate(p)}>
-                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Receber
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      if (confirm("Cancelar este pagamento?")) cancelarPag.mutate(p);
-                                    }}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                </>
-                              ) : p.status === "pago" ? (
-                                <Button size="sm" variant="ghost" onClick={() => abrirReciboReceita(p)}>
-                                  <FileText className="h-3.5 w-3.5 mr-1" /> Recibo
-                                </Button>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="saidas">
-          <Card>
-            <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Centro</TableHead>
-                    <TableHead>Forma</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {despesasFiltradas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
-                        Sem saídas com os filtros atuais.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    despesasFiltradas.map((p) => {
-                      const meta = FORMA_META[p.forma_pagamento ?? "pendente"] ?? FORMA_META.pendente;
-                      return (
-                        <TableRow key={p.id} className={p.is_teste ? "bg-amber-50/40" : ""}>
-                          <TableCell className="text-xs">
-                            {p.data_pagamento ? format(parseISO(p.data_pagamento), "dd/MM/yy") : "—"}
-                          </TableCell>
-                          <TableCell className="max-w-[220px] truncate">
-                            {p.is_teste && (
-                              <Badge variant="outline" className="mr-1 text-[10px] border-amber-400 text-amber-700">
-                                TESTE
-                              </Badge>
-                            )}
-                            {p.compra?.descricao || p.compra?.numero_documento || `Parcela ${p.numero}/${p.total_parcelas}`}
-                          </TableCell>
-                          <TableCell className="max-w-[140px] truncate">{p.compra?.fornecedor?.nome || "—"}</TableCell>
-                          <TableCell className="text-xs">
-                            {p.compra?.categoria?.nome ? (
-                              <Badge variant="outline">{p.compra.categoria.nome}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {p.compra?.centro_custo?.nome ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-                              style={{ backgroundColor: meta.color + "22", color: meta.color }}
-                            >
-                              {meta.label}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs">{format(parseISO(p.vencimento), "dd/MM/yy")}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={statusBadgeCls(p.status)}>
-                              {p.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">{brl(Number(p.valor))}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              {p.status !== "pago" ? (
-                                <Button size="sm" variant="outline" onClick={() => marcarParcelaPaga.mutate(p)}>
-                                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Pagar
-                                </Button>
-                              ) : (
-                                <Button size="sm" variant="ghost" onClick={() => abrirReciboDespesa(p)}>
-                                  <FileText className="h-3.5 w-3.5 mr-1" /> Comprovante
-                                </Button>
+                  </TableHeader>
+                  <TableBody>
+                    {receitasFiltradas.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                          Sem entradas com os filtros atuais.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      receitasFiltradas.map((p) => {
+                        const meta = FORMA_META[p.forma] ?? FORMA_META.pendente;
+                        const cat =
+                          p.categoria_receita === "servico"
+                            ? "Serviço"
+                            : CATEGORIA_RECEITA_OPTS.find((x) => x.value === p.categoria_receita)?.label ?? "—";
+                        return (
+                          <TableRow key={p.id} className={cn("border-border", p.is_teste && "bg-amber-50/40")}>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {p.data_pagamento
+                                ? format(parseISO(p.data_pagamento), "dd/MM/yy")
+                                : p.vencimento
+                                  ? format(parseISO(p.vencimento), "dd/MM/yy")
+                                  : "—"}
+                            </TableCell>
+                            <TableCell className="max-w-[240px] truncate">
+                              {p.is_teste && (
+                                <Badge variant="outline" className="mr-1 border-amber-400 text-[10px] text-amber-700">
+                                  TESTE
+                                </Badge>
                               )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                              {p.descricao ||
+                                p.atendimento?.pet?.nome ||
+                                p.observacoes ||
+                                (p.atendimento_id ? "Atendimento" : "Lançamento avulso")}
+                            </TableCell>
+                            <TableCell className="max-w-[160px] truncate">{p.cliente?.nome || "—"}</TableCell>
+                            <TableCell className="text-xs">{cat}</TableCell>
+                            <TableCell>
+                              <FormaChip meta={meta} />
+                            </TableCell>
+                            <TableCell>
+                              <StatusChip status={p.status} />
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {p.status === "parcial" ? (
+                                <span>
+                                  {brl(Number(p.valor_pago))}{" "}
+                                  <span className="text-xs text-muted-foreground">/ {brl(Number(p.valor_total))}</span>
+                                </span>
+                              ) : (
+                                brl(Number(p.valor_total))
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {p.status !== "pago" && p.status !== "cancelado" && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => marcarPagRecebido.mutate(p)}>
+                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Marcar como recebido
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => { if (confirm("Cancelar este pagamento?")) cancelarPag.mutate(p); }}
+                                      >
+                                        <X className="mr-2 h-4 w-4" /> Cancelar
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {p.status === "pago" && (
+                                    <DropdownMenuItem onClick={() => abrirReciboReceita(p)}>
+                                      <FileText className="mr-2 h-4 w-4" /> Emitir recibo
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
-      {recibo && (
-        <ReciboDialog
-          open={!!recibo}
-          onOpenChange={(v) => !v && setRecibo(null)}
-          data={recibo.data}
-          telefone={recibo.telefone}
-          referenciaId={recibo.referenciaId}
-        />
-      )}
+              {/* Mobile cards */}
+              <div className="grid gap-2 p-3 md:hidden">
+                {receitasFiltradas.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Sem entradas com os filtros atuais.
+                  </p>
+                ) : (
+                  receitasFiltradas.map((p) => {
+                    const meta = FORMA_META[p.forma] ?? FORMA_META.pendente;
+                    return (
+                      <div key={p.id} className={cn("rounded-xl border border-border bg-card p-3", p.is_teste && "bg-amber-50/40")}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">
+                              {p.descricao || p.atendimento?.pet?.nome || p.cliente?.nome || "Lançamento"}
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground truncate">
+                              {p.cliente?.nome ?? "—"}
+                              {" · "}
+                              {p.data_pagamento ? format(parseISO(p.data_pagamento), "dd/MM/yy") : "—"}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-mono text-sm font-semibold">{brl(Number(p.valor_total))}</div>
+                            <StatusChip status={p.status} />
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <FormaChip meta={meta} />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {p.status !== "pago" && p.status !== "cancelado" && (
+                                <>
+                                  <DropdownMenuItem onClick={() => marcarPagRecebido.mutate(p)}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Receber
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => { if (confirm("Cancelar este pagamento?")) cancelarPag.mutate(p); }}
+                                  >
+                                    <X className="mr-2 h-4 w-4" /> Cancelar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {p.status === "pago" && (
+                                <DropdownMenuItem onClick={() => abrirReciboReceita(p)}>
+                                  <FileText className="mr-2 h-4 w-4" /> Recibo
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="saidas" className="mt-0">
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border">
+                      <TableHead>Data</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Fornecedor</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Forma</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {despesasFiltradas.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
+                          Sem saídas com os filtros atuais.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      despesasFiltradas.map((p) => {
+                        const meta = FORMA_META[p.forma_pagamento ?? "pendente"] ?? FORMA_META.pendente;
+                        return (
+                          <TableRow key={p.id} className={cn("border-border", p.is_teste && "bg-amber-50/40")}>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {p.data_pagamento ? format(parseISO(p.data_pagamento), "dd/MM/yy") : "—"}
+                            </TableCell>
+                            <TableCell className="max-w-[220px] truncate">
+                              {p.is_teste && (
+                                <Badge variant="outline" className="mr-1 border-amber-400 text-[10px] text-amber-700">
+                                  TESTE
+                                </Badge>
+                              )}
+                              {p.compra?.descricao || p.compra?.numero_documento || `Parcela ${p.numero}/${p.total_parcelas}`}
+                            </TableCell>
+                            <TableCell className="max-w-[140px] truncate">{p.compra?.fornecedor?.nome || "—"}</TableCell>
+                            <TableCell className="text-xs">
+                              {p.compra?.categoria?.nome ? (
+                                <Badge variant="outline" className="rounded-full">{p.compra.categoria.nome}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <FormaChip meta={meta} />
+                            </TableCell>
+                            <TableCell className="text-xs">{format(parseISO(p.vencimento), "dd/MM/yy")}</TableCell>
+                            <TableCell>
+                              <StatusChip status={p.status} />
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">{brl(Number(p.valor))}</TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {p.status !== "pago" ? (
+                                    <DropdownMenuItem onClick={() => marcarParcelaPaga.mutate(p)}>
+                                      <CheckCircle2 className="mr-2 h-4 w-4" /> Marcar como pago
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => abrirReciboDespesa(p)}>
+                                      <FileText className="mr-2 h-4 w-4" /> Comprovante
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="grid gap-2 p-3 md:hidden">
+                {despesasFiltradas.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Sem saídas com os filtros atuais.
+                  </p>
+                ) : (
+                  despesasFiltradas.map((p) => {
+                    const meta = FORMA_META[p.forma_pagamento ?? "pendente"] ?? FORMA_META.pendente;
+                    return (
+                      <div key={p.id} className={cn("rounded-xl border border-border bg-card p-3", p.is_teste && "bg-amber-50/40")}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">
+                              {p.compra?.descricao || `Parcela ${p.numero}/${p.total_parcelas}`}
+                            </div>
+                            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                              {p.compra?.fornecedor?.nome ?? "—"}
+                              {" · Venc: "}{format(parseISO(p.vencimento), "dd/MM/yy")}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-mono text-sm font-semibold">{brl(Number(p.valor))}</div>
+                            <StatusChip status={p.status} />
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <FormaChip meta={meta} />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {p.status !== "pago" ? (
+                                <DropdownMenuItem onClick={() => marcarParcelaPaga.mutate(p)}>
+                                  <CheckCircle2 className="mr-2 h-4 w-4" /> Pagar
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => abrirReciboDespesa(p)}>
+                                  <FileText className="mr-2 h-4 w-4" /> Comprovante
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </section>
+
+        {recibo && (
+          <ReciboDialog
+            open={!!recibo}
+            onOpenChange={(v) => !v && setRecibo(null)}
+            data={recibo.data}
+            telefone={recibo.telefone}
+            referenciaId={recibo.referenciaId}
+          />
+        )}
+      </div>
     </div>
+    </TooltipProvider>
   );
 }
 
 /* ============================================================
- * KpiCard
+ * Componentes visuais
+ * ============================================================ */
+
+function HeroKpi({
+  label,
+  value,
+  hint,
+  tooltip,
+  accent,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tooltip?: string;
+  accent: "primary" | "emerald" | "terracotta" | "gold" | "petrol";
+  icon?: React.ReactNode;
+}) {
+  const accentMap: Record<string, { bg: string; text: string; ring: string }> = {
+    primary: { bg: "bg-primary/10", text: "text-primary", ring: "ring-primary/15" },
+    emerald: { bg: "bg-[color:var(--color-emerald)]/10", text: "text-[color:var(--color-emerald)]", ring: "ring-[color:var(--color-emerald)]/15" },
+    terracotta: { bg: "bg-[color:var(--color-terracotta)]/10", text: "text-[color:var(--color-terracotta)]", ring: "ring-[color:var(--color-terracotta)]/15" },
+    gold: { bg: "bg-[color:var(--color-gold)]/15", text: "text-[color:var(--color-gold-foreground)]", ring: "ring-[color:var(--color-gold)]/25" },
+    petrol: { bg: "bg-[color:var(--color-petrol)]/10", text: "text-[color:var(--color-petrol)]", ring: "ring-[color:var(--color-petrol)]/15" },
+  };
+  const a = accentMap[accent];
+  return (
+    <div className="card-premium card-hover p-4 md:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className={cn("grid h-9 w-9 place-items-center rounded-xl ring-1", a.bg, a.ring)}>
+          <span className={a.text}>{icon}</span>
+        </div>
+        {tooltip && (
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground/60 hover:text-muted-foreground">
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[220px] text-xs">{tooltip}</TooltipContent>
+          </UITooltip>
+        )}
+      </div>
+      <div className="mt-3">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className={cn("mt-1 font-display text-2xl font-semibold md:text-3xl", a.text)}>{value}</div>
+        {hint && <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>}
+      </div>
+    </div>
+  );
+}
+
+function MiniKpi({
+  label,
+  value,
+  icon,
+  tone,
+  tooltip,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  tone: "positive" | "negative" | "neutral";
+  tooltip?: string;
+}) {
+  const toneCls =
+    tone === "positive"
+      ? "text-[color:var(--color-emerald)]"
+      : tone === "negative"
+        ? "text-[color:var(--color-terracotta)]"
+        : "text-foreground";
+  return (
+    <div className="card-premium p-3">
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {icon}
+        <span className="truncate">{label}</span>
+        {tooltip && (
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="ml-auto text-muted-foreground/50 hover:text-muted-foreground">
+                <Info className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[220px] text-xs">{tooltip}</TooltipContent>
+          </UITooltip>
+        )}
+      </div>
+      <div className={cn("mt-1 font-mono text-base font-semibold md:text-lg", toneCls)}>{value}</div>
+    </div>
+  );
+}
+
+function FormaChip({ meta }: { meta: { label: string; color: string } }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+      style={{ backgroundColor: meta.color + "1f", color: meta.color }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
+      {meta.label}
+    </span>
+  );
+}
+
+function StatusChip({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    pago: { label: "Pago", cls: "bg-[color:var(--color-emerald)]/12 text-[color:var(--color-emerald)] border-[color:var(--color-emerald)]/25" },
+    parcial: { label: "Parcial", cls: "bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold-foreground)] border-[color:var(--color-gold)]/30" },
+    pendente: { label: "Pendente", cls: "bg-muted text-muted-foreground border-border" },
+    atrasado: { label: "Vencido", cls: "bg-[color:var(--color-terracotta)]/12 text-[color:var(--color-terracotta)] border-[color:var(--color-terracotta)]/25" },
+    cancelado: { label: "Cancelado", cls: "bg-muted/50 text-muted-foreground border-transparent" },
+  };
+  const m = map[status] ?? { label: status, cls: "bg-muted text-muted-foreground border-border" };
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium", m.cls)}>
+      {m.label}
+    </span>
+  );
+}
+
+/* ============================================================
+ * (KpiCard antigo — mantido para compat, não usado)
  * ============================================================ */
 
 function KpiCard({
@@ -1689,26 +2047,19 @@ function KpiCard({
     slate: "border-t-slate-400/60",
     violet: "border-t-violet-500/60",
   };
-  const text: Record<string, string> = {
-    primary: "text-foreground",
-    emerald: "text-emerald-700",
-    rose: "text-rose-700",
-    amber: "text-amber-700",
-    slate: "text-foreground",
-    violet: "text-violet-700",
-  };
   return (
     <Card className={`border-t-2 ${border[accent]} shadow-sm`}>
       <CardContent className="p-4">
         <div className="flex items-center gap-1 text-[11px] uppercase tracking-widest text-muted-foreground">
           {icon} {label}
         </div>
-        <div className={`text-xl md:text-2xl font-semibold mt-1 ${text[accent]}`}>{value}</div>
+        <div className="text-xl md:text-2xl font-semibold mt-1">{value}</div>
         {hint && <div className="text-[10px] text-muted-foreground mt-1">{hint}</div>}
       </CardContent>
     </Card>
   );
 }
+
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
   component: FinanceiroPage,
