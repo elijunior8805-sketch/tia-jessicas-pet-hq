@@ -72,16 +72,31 @@ function ClientesPage() {
     },
   });
 
-  // Cadastrados recentemente (estado inicial)
+  // Total de VIPs
+  const { data: totalVip } = useQuery({
+    queryKey: ["clientes-total-vip"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("clientes")
+        .select("*", { count: "exact", head: true })
+        .eq("vip", true);
+      return count ?? 0;
+    },
+  });
+
+  // Cadastrados recentemente (estado inicial) — respeita filtro VIP
   const { data: recentes } = useQuery({
-    queryKey: ["clientes-recentes"],
+    queryKey: ["clientes-recentes", onlyVip],
     enabled: !searching,
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("clientes")
         .select("id, nome, telefone, whatsapp, bairro, vip, ativo, foto_url, created_at, pets(id, nome, foto_url)")
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .order(onlyVip ? "nome" : "created_at", { ascending: onlyVip ? true : false })
+        .limit(onlyVip ? 100 : 5);
+      if (onlyVip) query = query.eq("vip", true);
+      const { data } = await query;
       return data ?? [];
     },
   });
