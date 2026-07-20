@@ -106,23 +106,52 @@ function ReciboPublicoPage() {
     ? r.forma_pagamento.replace(/_/g, " ")
     : null;
 
-  const baixarPdf = () => {
-    void generateReciboPDF({
-      tipo: r.tipo,
-      numero: r.numero_recibo,
-      data: r.data_pagamento || r.enviado_em.slice(0, 10),
-      contraparte: r.contraparte,
-      descricao: [r.servico, r.pet_nome ? `Pet: ${r.pet_nome}` : null]
+  const buildReciboData = () => ({
+    tipo: r.tipo,
+    numero: r.numero_recibo,
+    data: r.data_pagamento || r.enviado_em.slice(0, 10),
+    contraparte: r.contraparte,
+    descricao:
+      [r.servico, r.pet_nome ? `Pet: ${r.pet_nome}` : null]
         .filter(Boolean)
         .join(" · ") || "Serviços do spa",
-      valor: Number(r.valor),
-      forma: r.forma_pagamento || null,
-      empresa: {
-        nome: r.empresa_nome,
-        telefone: r.empresa_telefone,
-      },
-    });
+    valor: Number(r.valor),
+    forma: r.forma_pagamento || null,
+    empresa: {
+      nome: r.empresa_nome,
+      telefone: r.empresa_telefone,
+    },
+  });
+
+  const baixarPdf = () => {
+    void generateReciboPDF(buildReciboData());
   };
+
+  const abrirPreview = async () => {
+    if (previewUrl) {
+      // fecha se já estiver aberto
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      return;
+    }
+    setGerandoPreview(true);
+    try {
+      const res = (await generateReciboPDF(buildReciboData(), true)) as {
+        blob: Blob;
+        fileName: string;
+      };
+      setPreviewUrl(URL.createObjectURL(res.blob));
+    } finally {
+      setGerandoPreview(false);
+    }
+  };
+
+  const fecharPreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+
+
 
 
   const whatsappNumero = r.empresa_whatsapp
