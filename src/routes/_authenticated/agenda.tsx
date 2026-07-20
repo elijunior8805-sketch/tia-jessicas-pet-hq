@@ -1516,9 +1516,20 @@ function NovoAgendamentoDialog({
       onOpenChange(false);
     },
     onError: (e: any) => {
-      const msg = e?.issues?.[0]?.message ?? e?.message ?? "Erro ao salvar";
+      const raw = e?.message ?? "";
+      let msg = e?.issues?.[0]?.message ?? raw ?? "Erro ao salvar";
+      if (raw.includes("HORARIO_OCUPADO")) {
+        msg = "Este horário acabou de ser ocupado por outro usuário. Escolha um novo horário.";
+      } else if (raw.includes("VERSAO_DESATUALIZADA")) {
+        msg = "Este agendamento foi atualizado por outro usuário. Recarregue as informações antes de salvar.";
+        qc.invalidateQueries({ queryKey: ["agendamento-edit", editId] });
+        qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      } else if (raw.includes("AGENDAMENTO_NAO_ENCONTRADO")) {
+        msg = "Agendamento não encontrado. Ele pode ter sido excluído.";
+      }
       toast.error(msg);
     },
+
   });
 
   const servicosDisponiveis = (servicos ?? []).filter((s) => !itens.some((it) => it.servico_id === s.id));
