@@ -62,6 +62,27 @@ function applyVars(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 
+/**
+ * Remove QUALQUER URL insegura de um template (links assinados do Supabase,
+ * domínios técnicos de storage, tokens) e garante que só reste {link} — que
+ * será substituído pelo link curto /recibo/{codigo}. Templates antigos, salvos
+ * antes da correção, podem ainda conter URLs cruas: essa função neutraliza.
+ */
+function sanitizeTemplate(tpl: string, safeLink: string): string {
+  if (!tpl) return tpl;
+  let out = tpl;
+  // 1) Remove URLs http(s) que não sejam o link seguro (ex.: *.supabase.co,
+  //    storage/v1/object/sign, tokens, presigned URLs de qualquer origem).
+  out = out.replace(/https?:\/\/\S+/gi, (match) => {
+    if (safeLink && match === safeLink) return match;
+    return "{link}";
+  });
+  // 2) Colapsa múltiplos {link} consecutivos que possam ter surgido.
+  out = out.replace(/(\{link\}[\s]*){2,}/g, "{link}\n");
+  return out;
+}
+
+
 
 export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId }: Props) {
   const qc = useQueryClient();
