@@ -186,6 +186,41 @@ export function ClienteFormFields({
           </div>
         </div>
       </Card>
+
+      <Card className="p-4 sm:p-6">
+        <h2 className="font-display text-lg font-semibold mb-1">Comunicação</h2>
+        <p className="text-xs text-muted-foreground mb-4">Preferências para mensagens automáticas e opt-out (LGPD).</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Tom preferido nas mensagens</Label>
+            <Select value={value.tom_preferido || "amigavel"} onValueChange={(v) => onChange({ tom_preferido: v })}>
+              <SelectTrigger><SelectValue placeholder="Padrão" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="amigavel">Amigável</SelectItem>
+                <SelectItem value="carinhoso">Carinhoso</SelectItem>
+                <SelectItem value="acolhedor">Acolhedor</SelectItem>
+                <SelectItem value="profissional">Profissional</SelectItem>
+                <SelectItem value="formal">Formal</SelectItem>
+                <SelectItem value="direto">Direto</SelectItem>
+                <SelectItem value="descontraido">Descontraído</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border p-3 bg-destructive/5">
+            <div>
+              <div className="font-medium text-sm">Recusar comunicação</div>
+              <div className="text-xs text-muted-foreground">Bloqueia sugestões e envios automáticos.</div>
+            </div>
+            <Switch checked={value.opt_out_comunicacao} onCheckedChange={(b) => onChange({ opt_out_comunicacao: b })} />
+          </div>
+          {value.opt_out_comunicacao && (
+            <div className="sm:col-span-2">
+              <Label>Motivo / observação do opt-out</Label>
+              <Input value={value.opt_out_motivo} onChange={(e) => onChange({ opt_out_motivo: e.target.value })} maxLength={200} placeholder="Ex.: cliente pediu por telefone em 15/07" />
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -208,6 +243,9 @@ export function clienteFormFromRow(row: any): ClienteFormState {
     observacoes: row?.observacoes ?? "",
     indicacao: row?.indicacao ?? "",
     vip: !!row?.vip,
+    tom_preferido: row?.tom_preferido ?? "",
+    opt_out_comunicacao: !!row?.opt_out_comunicacao,
+    opt_out_motivo: row?.opt_out_motivo ?? "",
   };
 }
 
@@ -230,5 +268,9 @@ export function clienteFormToInsert(f: ClienteFormState) {
     observacoes: clean(f.observacoes),
     indicacao: clean(f.indicacao),
     vip: f.vip,
+    tom_preferido: clean(f.tom_preferido),
+    opt_out_comunicacao: f.opt_out_comunicacao,
+    opt_out_em: f.opt_out_comunicacao ? new Date().toISOString() : null,
+    opt_out_motivo: clean(f.opt_out_motivo),
   };
 }
