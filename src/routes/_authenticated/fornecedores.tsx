@@ -188,7 +188,7 @@ function FornecedoresPage() {
       <PageHeader
         icon={Truck}
         title="Fornecedores"
-        subtitle="Cadastro completo e histórico de compras por fornecedor."
+        description="Cadastro completo e histórico de compras por fornecedor."
         actions={
           <Button
             className="btn-premium"
@@ -203,10 +203,10 @@ function FornecedoresPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={Building2} label="Total" value={String(kpis.total)} tone="primary" />
-        <KpiCard icon={Power} label="Ativos" value={String(kpis.ativos)} tone="success" />
-        <KpiCard icon={Power} label="Inativos" value={String(kpis.inativos)} tone="muted" />
-        <KpiCard icon={Package} label="Categorias" value={String(kpis.tipos)} tone="warning" />
+        <KpiCard icon={Building2} label="Total" value={String(kpis.total)} accent="petrol" />
+        <KpiCard icon={Power} label="Ativos" value={String(kpis.ativos)} accent="emerald" />
+        <KpiCard icon={Power} label="Inativos" value={String(kpis.inativos)} accent="sage" />
+        <KpiCard icon={Package} label="Categorias" value={String(kpis.tipos)} accent="gold" />
       </div>
 
       <Toolbar>
@@ -360,13 +360,13 @@ function FornecedoresPage() {
                     icon={ShoppingCart}
                     label="Compras"
                     value={String(comprasFornecedor.length)}
-                    tone="primary"
+                    accent="petrol"
                   />
                   <KpiCard
                     icon={CircleDollarSign}
                     label="Total gasto"
                     value={brl(totalGasto)}
-                    tone="success"
+                    accent="emerald"
                   />
                 </div>
 
