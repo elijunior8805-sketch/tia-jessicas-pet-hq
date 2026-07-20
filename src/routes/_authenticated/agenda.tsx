@@ -642,6 +642,7 @@ function AgendamentoRow({
   const [cancelarOpen, setCancelarOpen] = useState(false);
   const [motivoCancel, setMotivoCancel] = useState("");
   const [excluirOpen, setExcluirOpen] = useState(false);
+  const [editarOpen, setEditarOpen] = useState(false);
 
   const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
   const podeReagendar = ["agendado", "confirmado", "aguardando"].includes(row.status);
