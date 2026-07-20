@@ -48,6 +48,8 @@ function AuthenticatedLayout() {
               </span>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              <NotificationBell />
+
               <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-border/60">
                 <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
                   {initials(profile)}
