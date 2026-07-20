@@ -1478,10 +1478,6 @@ function NovoAgendamentoDialog({
           </div>
 
           <div>
-            <Label>Taxa leva-e-traz (R$)</Label>
-            <Input type="number" min={0} step="0.01" value={taxa} onChange={(e) => setTaxa(e.target.value)} />
-          </div>
-          <div>
             <Label>Status inicial</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1494,8 +1490,137 @@ function NovoAgendamentoDialog({
           </div>
 
           <div className="sm:col-span-2">
-            <Label>Observações</Label>
+            <Label>Observações do atendimento</Label>
             <Textarea rows={3} value={obs} onChange={(e) => setObs(e.target.value)} />
+          </div>
+
+          {/* ---------------- Leva e Traz ---------------- */}
+          <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="font-display text-base font-semibold">Leva e Traz</div>
+              {ltModalidade !== "nao_utilizar" && !ltIsento && (
+                <div className="text-sm text-muted-foreground">
+                  Somado ao total: <strong className="text-primary">{brl(Number(taxa || 0))}</strong>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { v: "nao_utilizar", l: "Não utilizar" },
+                { v: "somente_buscar", l: "Somente buscar" },
+                { v: "somente_entregar", l: "Somente entregar" },
+                { v: "buscar_entregar", l: "Buscar e entregar" },
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setLtModalidade(o.v as LTModalidade)}
+                  className={`rounded-lg border px-3 py-2 text-sm text-left transition ${
+                    ltModalidade === o.v
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card hover:bg-muted"
+                  }`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+
+            {ltModalidade !== "nao_utilizar" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label>Valor do Leva e Traz (R$) *</Label>
+                  <Input type="number" min={0} step="0.01" value={taxa}
+                    disabled={ltIsento}
+                    onChange={(e) => setTaxa(e.target.value)} />
+                  <label className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={ltIsento} onChange={(e) => setLtIsento(e.target.checked)} />
+                    Isentar valor (exige justificativa)
+                  </label>
+                </div>
+                <div>
+                  <Label>Responsável pelo transporte</Label>
+                  <Select value={ltResponsavel || undefined} onValueChange={setLtResponsavel}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar responsável…" /></SelectTrigger>
+                    <SelectContent>
+                      {responsaveis.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.nome || r.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {ltIsento && (
+                  <div className="sm:col-span-2">
+                    <Label>Justificativa da isenção *</Label>
+                    <Textarea rows={2} value={ltIsencaoMotivo} onChange={(e) => setLtIsencaoMotivo(e.target.value)} />
+                  </div>
+                )}
+
+                {(ltModalidade === "somente_buscar" || ltModalidade === "buscar_entregar") && (
+                  <>
+                    <div>
+                      <Label>Data da busca *</Label>
+                      <Input type="date" value={buscaData || data} onChange={(e) => setBuscaData(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Horário da busca *</Label>
+                      <TimeField value={buscaHora || hora} onChange={setBuscaHora} />
+                    </div>
+                    <div className="sm:col-span-2 rounded-md border border-border/60 p-3 bg-card space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Endereço de busca</span>
+                        <label className="text-xs flex items-center gap-1 text-muted-foreground">
+                          <input type="checkbox" checked={buscaUsaClienteEnd}
+                            onChange={(e) => setBuscaUsaClienteEnd(e.target.checked)} />
+                          Usar endereço do cliente
+                        </label>
+                      </div>
+                      {!buscaUsaClienteEnd && (
+                        <EnderecoInputs value={buscaEnd} onChange={setBuscaEnd} />
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {(ltModalidade === "somente_entregar" || ltModalidade === "buscar_entregar") && (
+                  <>
+                    <div>
+                      <Label>Data da entrega *</Label>
+                      <Input type="date" value={entregaData || data} onChange={(e) => setEntregaData(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Horário previsto da entrega *</Label>
+                      <TimeField value={entregaHora || hora} onChange={setEntregaHora} />
+                    </div>
+                    <div className="sm:col-span-2 rounded-md border border-border/60 p-3 bg-card space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Endereço de entrega</span>
+                        <label className="text-xs flex items-center gap-1 text-muted-foreground">
+                          <input type="checkbox" checked={entregaUsaClienteEnd}
+                            onChange={(e) => setEntregaUsaClienteEnd(e.target.checked)} />
+                          Usar endereço do cliente
+                        </label>
+                      </div>
+                      {!entregaUsaClienteEnd && (
+                        <EnderecoInputs value={entregaEnd} onChange={setEntregaEnd} />
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <Label>Telefone para contato</Label>
+                  <Input value={ltTelefone} onChange={(e) => setLtTelefone(e.target.value)}
+                    placeholder="(00) 00000-0000" />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Observações do transporte</Label>
+                  <Textarea rows={2} value={ltObs} onChange={(e) => setLtObs(e.target.value)}
+                    placeholder="Referência de endereço, orientações, alergias, temperamento durante o transporte…" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
