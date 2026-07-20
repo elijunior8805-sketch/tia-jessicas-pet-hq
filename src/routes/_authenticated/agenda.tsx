@@ -689,6 +689,22 @@ function AgendamentoRow({
     onError: (e: any) => toast.error(e?.message ?? "Erro ao cancelar"),
   });
 
+  const excluirMut = useMutation({
+    mutationFn: async () => {
+      // Remove serviços vinculados (caso não haja cascade)
+      await supabase.from("agendamento_servicos").delete().eq("agendamento_id", row.id);
+      const { error } = await supabase.from("agendamentos").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Agendamento excluído");
+      setExcluirOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao excluir"),
+  });
+
   const openFinalizadoPreview = () => {
     let saved: string | null = null;
     try { saved = localStorage.getItem(previewStorageKey); } catch {}
