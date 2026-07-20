@@ -243,6 +243,13 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     return cod;
   };
 
+  const buildTextoFinal = (link: string) => {
+    // Sanitiza a mensagem editada pelo usuário: URLs cruas (incl. Supabase
+    // signed URLs) viram {link}; caracteres quebrados (�) são removidos.
+    const safeMensagem = sanitizeTemplate(mensagem, link).replace(/\uFFFD/g, "");
+    return applyVars(safeMensagem, { ...vars, link }).replace(/\uFFFD/g, "");
+  };
+
   const enviarWhats = async () => {
     if (!numero) {
       toast.error("Contato sem WhatsApp cadastrado");
@@ -257,10 +264,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           ? window.location.origin
           : "";
       const link = `${origin}/recibo/${cod}`;
-      // Sanitiza a mensagem editada pelo usuário antes de aplicar as variáveis:
-      // qualquer URL crua (incl. Supabase signed URLs) vira {link} seguro.
-      const safeMensagem = sanitizeTemplate(mensagem, link);
-      const textoFinal = applyVars(safeMensagem, { ...vars, link });
+      const textoFinal = buildTextoFinal(link);
       window.open(
         `https://wa.me/${numero}?text=${encodeURIComponent(textoFinal)}`,
         "_blank",
