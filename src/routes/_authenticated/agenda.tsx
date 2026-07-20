@@ -1448,13 +1448,13 @@ function NovoAgendamentoDialog({
         ? (entregaUsaClienteEnd ? null : entregaEnd)
         : null;
 
-      const { data: novo, error } = await supabase.from("agendamentos").insert({
+      const payload = {
         cliente_id: parsed.cliente_id,
         pet_id: parsed.pet_id,
         servico_id: principal.servico_id,
         data: parsed.data,
         hora: parsed.hora,
-        duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
+        duracao_min: totalDuracao > 0 ? totalDuracao : null,
         valor_previsto: totalValor,
         taxa_leva_traz: valorLT,
         status: parsed.status,
@@ -1471,12 +1471,30 @@ function NovoAgendamentoDialog({
         entrega_hora: entregaHora || null,
         busca_endereco: buscaEndFinal as any,
         entrega_endereco: entregaEndFinal as any,
-      } as any).select("id").single();
-      if (error) throw error;
+      };
+
+      let agendamentoId: string;
+      if (isEdit && editId) {
+        const { error: errUpd } = await supabase
+          .from("agendamentos")
+          .update(payload as any)
+          .eq("id", editId);
+        if (errUpd) throw errUpd;
+        agendamentoId = editId;
+        // Substitui itens vinculados
+        const { error: errDel } = await supabase
+          .from("agendamento_servicos").delete().eq("agendamento_id", editId);
+        if (errDel) throw errDel;
+      } else {
+        const { data: novo, error } = await supabase
+          .from("agendamentos").insert(payload as any).select("id").single();
+        if (error) throw error;
+        agendamentoId = novo.id;
+      }
 
       // Insere todos os itens (inclusive o principal) para simetria
       const rowsItens = parsed.itens.map((it, i) => ({
-        agendamento_id: novo.id,
+        agendamento_id: agendamentoId,
         servico_id: it.servico_id,
         nome: it.nome,
         valor_unit: it.valor_unit,
@@ -1487,8 +1505,9 @@ function NovoAgendamentoDialog({
       if (errItens) throw errItens;
     },
     onSuccess: () => {
-      toast.success("Agendamento criado");
+      toast.success(isEdit ? "Agendamento atualizado" : "Agendamento criado");
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["agendamento-edit", editId] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       onOpenChange(false);
     },
