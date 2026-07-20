@@ -1245,20 +1245,73 @@ function NovoAgendamentoDialog({
   const [buscaEnd, setBuscaEnd] = useState<EnderecoLT>({});
   const [entregaEnd, setEntregaEnd] = useState<EnderecoLT>({});
 
-  // reset ao abrir
-  useMemoReset(open, () => {
-    setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
-    setItens([]); setServicoAdd("");
-    setData(defaultDate); setHora("09:00");
-    setTaxa("0");
-    setStatus("agendado"); setObs(""); setClienteSearch("");
-    setLtModalidade("nao_utilizar");
-    setLtResponsavel(""); setLtTelefone(""); setLtObs("");
-    setLtIsento(false); setLtIsencaoMotivo("");
-    setBuscaData(""); setBuscaHora(""); setEntregaData(""); setEntregaHora("");
-    setBuscaUsaClienteEnd(true); setEntregaUsaClienteEnd(true);
-    setBuscaEnd({}); setEntregaEnd({});
+  // Carrega dados do agendamento existente ao editar
+  const { data: editData } = useQuery({
+    queryKey: ["agendamento-edit", editId],
+    enabled: open && !!editId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("*, agendamento_servicos(id, servico_id, nome, valor_unit, duracao_min, ordem)")
+        .eq("id", editId!)
+        .single();
+      if (error) throw error;
+      return data as any;
+    },
   });
+
+  // reset ao abrir (novo) ou quando editData chega (edição)
+  useEffect(() => {
+    if (!open) return;
+    if (isEdit) {
+      if (!editData) return;
+      setClienteId(editData.cliente_id ?? "");
+      setPetId(editData.pet_id ?? "");
+      const itensRaw = Array.isArray(editData.agendamento_servicos) ? editData.agendamento_servicos : [];
+      const itensSorted = [...itensRaw].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0));
+      setItens(itensSorted.map((it: any) => ({
+        servico_id: it.servico_id,
+        nome: it.nome,
+        valor_unit: Number(it.valor_unit ?? 0),
+        duracao_min: it.duracao_min ?? null,
+      })));
+      setServicoAdd("");
+      setData(editData.data ?? defaultDate);
+      setHora(normalizarHora(editData.hora));
+      setTaxa(String(editData.taxa_leva_traz ?? 0));
+      setStatus((editData.status ?? "agendado") as Status);
+      setObs(editData.observacoes ?? "");
+      setClienteSearch("");
+      setLtModalidade((editData.leva_traz_modalidade ?? "nao_utilizar") as LTModalidade);
+      setLtResponsavel(editData.leva_traz_responsavel_id ?? "");
+      setLtTelefone(editData.leva_traz_telefone ?? "");
+      setLtObs(editData.leva_traz_obs ?? "");
+      setLtIsento(!!editData.leva_traz_isento);
+      setLtIsencaoMotivo(editData.leva_traz_isencao_motivo ?? "");
+      setBuscaData(editData.busca_data ?? "");
+      setBuscaHora(editData.busca_hora ? normalizarHora(editData.busca_hora) : "");
+      setEntregaData(editData.entrega_data ?? "");
+      setEntregaHora(editData.entrega_hora ? normalizarHora(editData.entrega_hora) : "");
+      setBuscaUsaClienteEnd(!editData.busca_endereco);
+      setEntregaUsaClienteEnd(!editData.entrega_endereco);
+      setBuscaEnd(editData.busca_endereco ?? {});
+      setEntregaEnd(editData.entrega_endereco ?? {});
+    } else {
+      setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
+      setItens([]); setServicoAdd("");
+      setData(defaultDate); setHora("09:00");
+      setTaxa("0");
+      setStatus("agendado"); setObs(""); setClienteSearch("");
+      setLtModalidade("nao_utilizar");
+      setLtResponsavel(""); setLtTelefone(""); setLtObs("");
+      setLtIsento(false); setLtIsencaoMotivo("");
+      setBuscaData(""); setBuscaHora(""); setEntregaData(""); setEntregaHora("");
+      setBuscaUsaClienteEnd(true); setEntregaUsaClienteEnd(true);
+      setBuscaEnd({}); setEntregaEnd({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, editData?.id]);
+
 
   // Carrega responsáveis (admin + transportador)
   const { data: responsaveis = [] } = useQuery({
