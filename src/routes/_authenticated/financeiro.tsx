@@ -47,6 +47,10 @@ import {
   X,
   FlaskConical,
   Trash2,
+  SlidersHorizontal,
+  Filter,
+  MoreHorizontal,
+  Info,
 } from "lucide-react";
 import { ReciboDialog } from "@/components/recibo-dialog";
 import type { ReciboData } from "@/lib/recibo-pdf";
@@ -78,8 +82,20 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 /* ============================================================
  * Tipos e utilitários
