@@ -88,13 +88,13 @@ function DashboardPage() {
       const faturamento = pagamentos.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const lucro = faturamento - despesas;
-      const atendCount = atendimentos.length;
-      // Ticket Médio: apenas atendimentos efetivamente executados (encerrados/finalizados
-      // com valor_executado > 0). Sem execução real, retorna 0 -> exibe "—".
+      // Atendimentos e Ticket Médio: apenas os efetivamente executados
+      // (encerrados/finalizados com valor_executado > 0).
       const executados = atendimentos.filter((a) => {
         const exec = Number(a.valor_executado ?? 0);
         return exec > 0 && (a.encerrado_em || (a as any).finalizado);
       });
+      const atendCount = executados.length;
       const somaExec = executados.reduce((s, a) => s + Number(a.valor_executado ?? 0), 0);
       const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
 
