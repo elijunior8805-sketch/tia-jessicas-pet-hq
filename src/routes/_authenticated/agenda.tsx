@@ -1043,6 +1043,14 @@ function AgendamentoRow({
         agendamento={row}
       />
 
+      <NovoAgendamentoDialog
+        open={editarOpen}
+        onOpenChange={setEditarOpen}
+        defaultDate={row.data}
+        editId={row.id}
+      />
+
+
       <Dialog open={reagendarOpen} onOpenChange={setReagendarOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
