@@ -44,7 +44,7 @@ function fmtDate(iso?: string | null) {
   } catch { return "—"; }
 }
 
-type LoadedImage = { dataUrl: string; w: number; h: number; path: string };
+export type LoadedImage = { dataUrl: string; w: number; h: number; path: string };
 
 /**
  * Carrega imagem privada do bucket como dataURL, corrigindo orientação (EXIF)
