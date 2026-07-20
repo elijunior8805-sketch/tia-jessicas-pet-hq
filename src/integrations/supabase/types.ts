@@ -2136,28 +2136,46 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bloqueado_em: string | null
+          convidado_por: string | null
           created_at: string
+          desativado_em: string | null
           email: string | null
           id: string
           nome: string
+          observacoes_admin: string | null
+          perfil: string
+          status: string
           telefone: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
+          bloqueado_em?: string | null
+          convidado_por?: string | null
           created_at?: string
+          desativado_em?: string | null
           email?: string | null
           id: string
           nome: string
+          observacoes_admin?: string | null
+          perfil?: string
+          status?: string
           telefone?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
+          bloqueado_em?: string | null
+          convidado_por?: string | null
           created_at?: string
+          desativado_em?: string | null
           email?: string | null
           id?: string
           nome?: string
+          observacoes_admin?: string | null
+          perfil?: string
+          status?: string
           telefone?: string | null
           updated_at?: string
         }
@@ -2498,6 +2516,84 @@ export type Database = {
         }
         Relationships: []
       }
+      user_invites: {
+        Row: {
+          aceito_em: string | null
+          aceito_por: string | null
+          cancelado_em: string | null
+          criado_em: string
+          criado_por: string | null
+          email: string
+          expira_em: string | null
+          id: string
+          mensagem: string | null
+          nome: string | null
+          perfil: string
+          permissoes: Json | null
+          status: string
+          telefone: string | null
+        }
+        Insert: {
+          aceito_em?: string | null
+          aceito_por?: string | null
+          cancelado_em?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          email: string
+          expira_em?: string | null
+          id?: string
+          mensagem?: string | null
+          nome?: string | null
+          perfil: string
+          permissoes?: Json | null
+          status?: string
+          telefone?: string | null
+        }
+        Update: {
+          aceito_em?: string | null
+          aceito_por?: string | null
+          cancelado_em?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          email?: string
+          expira_em?: string | null
+          id?: string
+          mensagem?: string | null
+          nome?: string | null
+          perfil?: string
+          permissoes?: Json | null
+          status?: string
+          telefone?: string | null
+        }
+        Relationships: []
+      }
+      user_permissions: {
+        Row: {
+          acao: string
+          concedido_em: string
+          concedido_por: string | null
+          modulo: string
+          permitido: boolean
+          user_id: string
+        }
+        Insert: {
+          acao: string
+          concedido_em?: string
+          concedido_por?: string | null
+          modulo: string
+          permitido?: boolean
+          user_id: string
+        }
+        Update: {
+          acao?: string
+          concedido_em?: string
+          concedido_por?: string | null
+          modulo?: string
+          permitido?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2740,6 +2836,10 @@ export type Database = {
           valor: number
         }[]
       }
+      has_permission: {
+        Args: { _acao: string; _modulo: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2747,8 +2847,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_proprietario: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
       limpar_dados_teste_financeiro: { Args: never; Returns: Json }
+      pode_gerenciar_usuarios: { Args: { _user_id: string }; Returns: boolean }
       render_lembrete: {
         Args: {
           _data: string
