@@ -77,13 +77,13 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .returns<any[]>();
 
     const rows = atendRows ?? [];
-    // Ticket usa valor executado; se ausente/zero, cai para o valor planejado.
-    const valorRow = (r: any) => {
-      const exec = Number(r.valor_executado ?? 0);
-      const plan = Number(r.valor_planejado ?? 0);
-      return exec > 0 ? exec : plan;
-    };
-    const faturamento = rows.reduce((s, r) => s + valorRow(r), 0);
+    // Faturamento/ticket usam SOMENTE valor efetivamente executado (encerrado/finalizado).
+    // Valor planejado não entra no faturamento nem no ticket médio.
+    const isExecutado = (r: any) =>
+      Number(r.valor_executado ?? 0) > 0 && (r.encerrado_em || r.finalizado);
+    const valorRow = (r: any) => (isExecutado(r) ? Number(r.valor_executado ?? 0) : 0);
+    const rowsExecutados = rows.filter(isExecutado);
+    const faturamento = rowsExecutados.reduce((s, r) => s + Number(r.valor_executado ?? 0), 0);
     const faturamentoPlan = rows.reduce((s, r) => s + Number(r.valor_planejado ?? 0), 0);
     const taxaLevaTraz = rows.reduce((s, r) => s + Number(r.taxa_leva_traz ?? 0), 0);
     const descontos = rows.reduce((s, r) => s + Number(r.desconto ?? 0), 0);
