@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { generateReciboPDF } from "@/lib/recibo-pdf";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 
 
 type ReciboPublico = {
