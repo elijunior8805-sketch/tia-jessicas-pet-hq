@@ -1112,6 +1112,14 @@ const novoSchema = z.object({
   observacoes: z.string().max(1000).optional().or(z.literal("")),
 });
 
+type LTModalidade = "nao_utilizar" | "somente_buscar" | "somente_entregar" | "buscar_entregar";
+
+type EnderecoLT = {
+  rua?: string; numero?: string; complemento?: string;
+  bairro?: string; cidade?: string; estado?: string; cep?: string;
+  referencia?: string;
+};
+
 function NovoAgendamentoDialog({
   open, onOpenChange, defaultDate, defaultClienteId, defaultPetId,
 }: {
@@ -1130,6 +1138,22 @@ function NovoAgendamentoDialog({
   const [obs, setObs] = useState("");
   const [clienteSearch, setClienteSearch] = useState("");
 
+  // Leva e Traz
+  const [ltModalidade, setLtModalidade] = useState<LTModalidade>("nao_utilizar");
+  const [ltResponsavel, setLtResponsavel] = useState<string>("");
+  const [ltTelefone, setLtTelefone] = useState<string>("");
+  const [ltObs, setLtObs] = useState<string>("");
+  const [ltIsento, setLtIsento] = useState(false);
+  const [ltIsencaoMotivo, setLtIsencaoMotivo] = useState<string>("");
+  const [buscaData, setBuscaData] = useState<string>("");
+  const [buscaHora, setBuscaHora] = useState<string>("");
+  const [entregaData, setEntregaData] = useState<string>("");
+  const [entregaHora, setEntregaHora] = useState<string>("");
+  const [buscaUsaClienteEnd, setBuscaUsaClienteEnd] = useState(true);
+  const [entregaUsaClienteEnd, setEntregaUsaClienteEnd] = useState(true);
+  const [buscaEnd, setBuscaEnd] = useState<EnderecoLT>({});
+  const [entregaEnd, setEntregaEnd] = useState<EnderecoLT>({});
+
   // reset ao abrir
   useMemoReset(open, () => {
     setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
@@ -1137,6 +1161,29 @@ function NovoAgendamentoDialog({
     setData(defaultDate); setHora("09:00");
     setTaxa("0");
     setStatus("agendado"); setObs(""); setClienteSearch("");
+    setLtModalidade("nao_utilizar");
+    setLtResponsavel(""); setLtTelefone(""); setLtObs("");
+    setLtIsento(false); setLtIsencaoMotivo("");
+    setBuscaData(""); setBuscaHora(""); setEntregaData(""); setEntregaHora("");
+    setBuscaUsaClienteEnd(true); setEntregaUsaClienteEnd(true);
+    setBuscaEnd({}); setEntregaEnd({});
+  });
+
+  // Carrega responsáveis (admin + transportador)
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["responsaveis-transporte"],
+    enabled: open,
+    queryFn: async () => {
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("role", ["admin", "transportador", "user"] as any);
+      const ids = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
+      if (ids.length === 0) return [] as { id: string; nome: string; email: string | null }[];
+      const { data: profs } = await supabase
+        .from("profiles").select("id, nome, email").in("id", ids);
+      return (profs ?? []) as { id: string; nome: string; email: string | null }[];
+    },
   });
 
   const { data: clientes } = useQuery({
