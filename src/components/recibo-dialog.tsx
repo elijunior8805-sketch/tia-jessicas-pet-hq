@@ -240,7 +240,10 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           ? window.location.origin
           : "";
       const link = `${origin}/recibo/${cod}`;
-      const textoFinal = applyVars(mensagem, { ...vars, link });
+      // Sanitiza a mensagem editada pelo usuário antes de aplicar as variáveis:
+      // qualquer URL crua (incl. Supabase signed URLs) vira {link} seguro.
+      const safeMensagem = sanitizeTemplate(mensagem, link);
+      const textoFinal = applyVars(safeMensagem, { ...vars, link });
       window.open(
         `https://wa.me/${numero}?text=${encodeURIComponent(textoFinal)}`,
         "_blank",
