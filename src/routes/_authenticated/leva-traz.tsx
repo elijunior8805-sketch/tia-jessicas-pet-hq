@@ -1,323 +1,313 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
-  Truck,
-  MapPin,
-  Phone,
-  MessageCircle,
-  ArrowUp,
-  ArrowDown,
-  Calendar as CalendarIcon,
-  Clock,
-  DollarSign,
-  Navigation,
-  PawPrint,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import {
+  Truck, MapPin, Phone, MessageCircle, Navigation, PawPrint, Clock,
+  DollarSign, User as UserIcon, AlertTriangle, CheckCircle2, CalendarDays,
 } from "lucide-react";
-import { format, parseISO, addDays } from "date-fns";
+import { format, addDays, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useMyProfile } from "@/hooks/use-my-profile";
 
-type Row = {
-  id: string;
-  data: string;
-  hora: string;
-  duracao_min: number | null;
-  taxa_leva_traz: number | null;
-  observacoes: string | null;
-  status: string;
-  cliente: {
-    id: string;
-    nome: string;
-    telefone: string | null;
-    whatsapp: string | null;
-    cep: string | null;
-    rua: string | null;
-    numero: string | null;
-    complemento: string | null;
-    bairro: string | null;
-    cidade: string | null;
-    estado: string | null;
-    vip: boolean | null;
-  } | null;
-  pet: { id: string; nome: string; porte_id: string | null } | null;
-  servico: { nome: string } | null;
+type LTStatus =
+  | "aguardando_responsavel" | "agendado" | "a_caminho_busca" | "pet_coletado"
+  | "chegou_spa" | "aguardando_entrega" | "a_caminho_entrega" | "pet_entregue"
+  | "cancelado" | "nao_realizado";
+
+const STATUS_META: Record<LTStatus, { label: string; color: string }> = {
+  aguardando_responsavel: { label: "Aguardando responsável", color: "bg-rose-500/10 text-rose-700 border-rose-200" },
+  agendado:               { label: "Agendado", color: "bg-primary/10 text-primary border-primary/20" },
+  a_caminho_busca:        { label: "A caminho da busca", color: "bg-blue-500/10 text-blue-700 border-blue-200" },
+  pet_coletado:           { label: "Pet coletado", color: "bg-amber-500/10 text-amber-700 border-amber-200" },
+  chegou_spa:             { label: "Chegou ao spa", color: "bg-emerald-500/10 text-emerald-700 border-emerald-200" },
+  aguardando_entrega:     { label: "Aguardando entrega", color: "bg-amber-500/10 text-amber-700 border-amber-200" },
+  a_caminho_entrega:      { label: "A caminho da entrega", color: "bg-blue-500/10 text-blue-700 border-blue-200" },
+  pet_entregue:           { label: "Pet entregue", color: "bg-muted text-muted-foreground" },
+  cancelado:              { label: "Cancelado", color: "bg-rose-500/10 text-rose-700 border-rose-200" },
+  nao_realizado:          { label: "Não realizado", color: "bg-rose-500/10 text-rose-700 border-rose-200" },
 };
 
-function enderecoStr(c: Row["cliente"]) {
-  if (!c) return "";
-  const parts = [
-    [c.rua, c.numero].filter(Boolean).join(", "),
-    c.complemento,
-    c.bairro,
-    [c.cidade, c.estado].filter(Boolean).join(" - "),
-    c.cep,
-  ].filter(Boolean);
-  return parts.join(" · ");
+const NEXT_STATUS: Record<LTStatus, LTStatus[]> = {
+  aguardando_responsavel: ["agendado", "cancelado"],
+  agendado:               ["a_caminho_busca", "a_caminho_entrega", "cancelado"],
+  a_caminho_busca:        ["pet_coletado", "nao_realizado"],
+  pet_coletado:           ["chegou_spa"],
+  chegou_spa:             ["aguardando_entrega"],
+  aguardando_entrega:     ["a_caminho_entrega"],
+  a_caminho_entrega:      ["pet_entregue", "nao_realizado"],
+  pet_entregue:           [],
+  cancelado:              [],
+  nao_realizado:          [],
+};
+
+type Endereco = {
+  rua?: string; numero?: string; complemento?: string;
+  bairro?: string; cidade?: string; estado?: string; cep?: string; referencia?: string;
+};
+
+type Tarefa = {
+  id: string;
+  agendamento_id: string;
+  cliente_id: string;
+  pet_id: string;
+  tipo: "busca" | "entrega";
+  data: string;
+  hora_prevista: string;
+  responsavel_id: string | null;
+  status: LTStatus;
+  endereco: Endereco;
+  telefone: string | null;
+  observacoes: string | null;
+  alergias_snapshot: string | null;
+  temperamento_snapshot: string | null;
+  valor_rateado: number | null;
+  cliente: { nome: string; whatsapp: string | null; telefone: string | null; vip: boolean | null } | null;
+  pet: { nome: string; foto_url: string | null } | null;
+};
+
+function enderecoStr(e: Endereco | null | undefined) {
+  if (!e) return "";
+  return [
+    [e.rua, e.numero].filter(Boolean).join(", "),
+    e.complemento, e.bairro,
+    [e.cidade, e.estado].filter(Boolean).join(" - "),
+    e.cep,
+  ].filter(Boolean).join(" · ");
 }
 
-function enderecoCurto(c: Row["cliente"]) {
-  if (!c) return "Endereço não cadastrado";
-  const linha1 = [c.rua, c.numero].filter(Boolean).join(", ");
-  const linha2 = [c.bairro, c.cidade].filter(Boolean).join(" · ");
-  return [linha1, linha2].filter(Boolean).join(" — ") || "Endereço não cadastrado";
+function enderecoCurto(e: Endereco | null | undefined) {
+  if (!e) return "Endereço não cadastrado";
+  const l1 = [e.rua, e.numero].filter(Boolean).join(", ");
+  const l2 = [e.bairro, e.cidade].filter(Boolean).join(" · ");
+  return [l1, l2].filter(Boolean).join(" — ") || "Endereço não cadastrado";
 }
 
-function mapsHref(c: Row["cliente"]) {
-  const q = enderecoStr(c);
+function mapsHref(e: Endereco | null | undefined) {
+  const q = enderecoStr(e);
   if (!q) return "#";
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }
 
-function waHref(c: Row["cliente"], texto: string) {
-  const raw = (c?.whatsapp || c?.telefone || "").replace(/\D/g, "");
+function waHref(fone: string | null | undefined, texto: string) {
+  const raw = (fone || "").replace(/\D/g, "");
   if (!raw) return "#";
   const num = raw.startsWith("55") ? raw : `55${raw}`;
   return `https://wa.me/${num}?text=${encodeURIComponent(texto)}`;
 }
 
-function statusLabel(s: string) {
-  const m: Record<string, string> = {
-    agendado: "Agendado",
-    confirmado: "Confirmado",
-    aguardando: "Aguardando",
-    em_atendimento: "Em atendimento",
-    finalizado: "Finalizado",
-    cancelado: "Cancelado",
-    nao_compareceu: "Não compareceu",
-  };
-  return m[s] || s;
+function isAtrasada(t: Tarefa) {
+  if (["pet_entregue", "cancelado", "nao_realizado"].includes(t.status)) return false;
+  const alvo = new Date(`${t.data}T${t.hora_prevista}`);
+  return alvo.getTime() < Date.now() - 10 * 60 * 1000;
 }
 
-function statusColor(s: string) {
-  switch (s) {
-    case "confirmado":
-      return "bg-emerald-500/10 text-emerald-700 border-emerald-200";
-    case "aguardando":
-      return "bg-amber-500/10 text-amber-700 border-amber-200";
-    case "em_atendimento":
-      return "bg-blue-500/10 text-blue-700 border-blue-200";
-    case "finalizado":
-      return "bg-muted text-muted-foreground";
-    case "cancelado":
-    case "nao_compareceu":
-      return "bg-rose-500/10 text-rose-700 border-rose-200";
-    default:
-      return "bg-primary/10 text-primary border-primary/20";
-  }
-}
+function TarefaCard({ tarefa }: { tarefa: Tarefa }) {
+  const qc = useQueryClient();
+  const [expanded, setExpanded] = useState(false);
+  const meta = STATUS_META[tarefa.status];
+  const proximos = NEXT_STATUS[tarefa.status] || [];
+  const atrasada = isAtrasada(tarefa);
+  const nomePet = tarefa.pet?.nome ?? "Pet";
+  const nomeCli = tarefa.cliente?.nome ?? "Cliente";
 
-function useOrdem(chave: string, ids: string[]) {
-  const storageKey = `leva-traz:ordem:${chave}`;
-  const [ordem, setOrdem] = useState<string[]>([]);
+  const mudarStatus = useMutation({
+    mutationFn: async (novo: LTStatus) => {
+      const { error } = await (supabase as any).from("leva_traz_tarefas")
+        .update({ status: novo }).eq("id", tarefa.id);
+      if (error) throw error;
+      const { data: u } = await supabase.auth.getUser();
+      await (supabase as any).from("leva_traz_eventos").insert({
+        tarefa_id: tarefa.id,
+        agendamento_id: tarefa.agendamento_id,
+        tipo: "status_atualizado",
+        payload: { de: tarefa.status, para: novo },
+        user_id: u.user?.id ?? null,
+        user_email: u.user?.email ?? null,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Status atualizado");
+      qc.invalidateQueries({ queryKey: ["leva-traz-tarefas"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar"),
+  });
 
-  useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    const savedArr: string[] = saved ? JSON.parse(saved) : [];
-    // mantém ordem salva + acrescenta novos
-    const filtered = savedArr.filter((id) => ids.includes(id));
-    const novos = ids.filter((id) => !filtered.includes(id));
-    setOrdem([...filtered, ...novos]);
-  }, [storageKey, ids.join(",")]);
+  const texto = tarefa.tipo === "busca"
+    ? `Olá, ${nomeCli}! Estou a caminho para buscar o ${nomePet} para o spa. 🐾`
+    : `Olá, ${nomeCli}! Estou a caminho para entregar o ${nomePet} pronto e cheiroso. 🐾✨`;
 
-  const persist = (novaOrdem: string[]) => {
-    setOrdem(novaOrdem);
-    localStorage.setItem(storageKey, JSON.stringify(novaOrdem));
+  const confirmarMaps = () => {
+    if (window.confirm(`Abrir rota para:\n\n${enderecoStr(tarefa.endereco) || "endereço vazio"}?`)) {
+      window.open(mapsHref(tarefa.endereco), "_blank");
+    }
   };
-
-  const mover = (id: string, dir: -1 | 1) => {
-    const idx = ordem.indexOf(id);
-    const alvo = idx + dir;
-    if (idx < 0 || alvo < 0 || alvo >= ordem.length) return;
-    const novo = [...ordem];
-    [novo[idx], novo[alvo]] = [novo[alvo], novo[idx]];
-    persist(novo);
-  };
-
-  return { ordem, mover };
-}
-
-function RotaCard({
-  row,
-  idx,
-  total,
-  tipo,
-  onSubir,
-  onDescer,
-}: {
-  row: Row;
-  idx: number;
-  total: number;
-  tipo: "coleta" | "entrega";
-  onSubir: () => void;
-  onDescer: () => void;
-}) {
-  const nomePet = row.pet?.nome || "Pet";
-  const nomeCli = row.cliente?.nome || "Cliente";
-  const texto =
-    tipo === "coleta"
-      ? `Olá, ${nomeCli}! Estou a caminho para buscar o ${nomePet} para o spa. 🐾`
-      : `Olá, ${nomeCli}! Estou a caminho para entregar o ${nomePet} pronto e cheiroso. 🐾✨`;
 
   return (
-    <div className="flex gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex flex-col items-center gap-1">
-        <div className="grid h-8 w-8 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-          {idx + 1}
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            disabled={idx === 0}
-            onClick={onSubir}
-            aria-label="Subir"
-          >
-            <ArrowUp className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            disabled={idx === total - 1}
-            onClick={onDescer}
-            aria-label="Descer"
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-sm truncate">{nomeCli}</span>
-          {row.cliente?.vip && (
-            <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-              VIP
+    <div className={`rounded-xl border p-3 space-y-2 transition ${
+      atrasada ? "border-rose-300 bg-rose-50/40" : "border-border/60 bg-card"
+    } shadow-sm hover:shadow-md`}>
+      <div className="flex items-start gap-3">
+        {tarefa.pet?.foto_url ? (
+          <img src={tarefa.pet.foto_url} alt={nomePet}
+            className="h-12 w-12 rounded-full object-cover border" />
+        ) : (
+          <div className="h-12 w-12 rounded-full bg-primary/10 grid place-items-center">
+            <PawPrint className="h-5 w-5 text-primary" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className={tarefa.tipo === "busca" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-amber-300 bg-amber-50 text-amber-700"}>
+              {tarefa.tipo === "busca" ? "Buscar" : "Entregar"}
             </Badge>
-          )}
-          <Badge variant="outline" className={statusColor(row.status)}>
-            {statusLabel(row.status)}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <PawPrint className="h-3.5 w-3.5" />
-          <span className="truncate">
-            {nomePet} · {row.servico?.nome || "Serviço"}
-          </span>
-        </div>
-        <div className="flex items-start gap-1.5 text-xs">
-          <MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
-          <span className="text-foreground/80">{enderecoCurto(row.cliente)}</span>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {row.hora?.slice(0, 5)}
-          </span>
-          {row.taxa_leva_traz && Number(row.taxa_leva_traz) > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <DollarSign className="h-3.5 w-3.5" />
-              {Number(row.taxa_leva_traz).toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
+            <span className="inline-flex items-center gap-1 text-sm font-semibold">
+              <Clock className="h-3.5 w-3.5" /> {tarefa.hora_prevista?.slice(0, 5)}
             </span>
+            {tarefa.cliente?.vip && (
+              <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">VIP</Badge>
+            )}
+            {atrasada && (
+              <Badge className="bg-rose-500 text-white gap-1">
+                <AlertTriangle className="h-3 w-3" /> Atrasada
+              </Badge>
+            )}
+            <Badge variant="outline" className={meta.color}>{meta.label}</Badge>
+          </div>
+          <div className="mt-1 text-sm">
+            <span className="font-medium">{nomePet}</span>
+            <span className="text-muted-foreground"> · {nomeCli}</span>
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground flex items-start gap-1">
+            <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>{enderecoCurto(tarefa.endereco)}</span>
+          </div>
+          {Number(tarefa.valor_rateado) > 0 && (
+            <div className="mt-0.5 text-xs text-muted-foreground inline-flex items-center gap-1">
+              <DollarSign className="h-3.5 w-3.5" />
+              {Number(tarefa.valor_rateado).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </div>
           )}
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-            <a href={mapsHref(row.cliente)} target="_blank" rel="noreferrer">
-              <Navigation className="h-3 w-3 mr-1" />
-              Mapa
-            </a>
-          </Button>
-          <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-            <a href={waHref(row.cliente, texto)} target="_blank" rel="noreferrer">
-              <MessageCircle className="h-3 w-3 mr-1" />
-              WhatsApp
-            </a>
-          </Button>
-          {row.cliente?.telefone && (
-            <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
-              <a href={`tel:${row.cliente.telefone}`}>
-                <Phone className="h-3 w-3 mr-1" />
-                Ligar
-              </a>
-            </Button>
-          )}
-          <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
-            <Link to="/clientes/$id" params={{ id: row.cliente?.id || "" }}>
-              Perfil
-            </Link>
-          </Button>
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={confirmarMaps}>
+          <Navigation className="h-3 w-3 mr-1" /> Rota
+        </Button>
+        <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+          <a href={waHref(tarefa.telefone || tarefa.cliente?.whatsapp || tarefa.cliente?.telefone, texto)}
+             target="_blank" rel="noreferrer">
+            <MessageCircle className="h-3 w-3 mr-1" /> WhatsApp
+          </a>
+        </Button>
+        {tarefa.telefone && (
+          <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
+            <a href={`tel:${tarefa.telefone}`}><Phone className="h-3 w-3 mr-1" /> Ligar</a>
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Menos" : "Detalhes"}
+        </Button>
+        <Button asChild size="sm" variant="ghost" className="h-7 text-xs ml-auto">
+          <Link to="/clientes/$id" params={{ id: tarefa.cliente_id }}>Perfil</Link>
+        </Button>
+      </div>
+
+      {expanded && (
+        <div className="rounded-md bg-muted/40 p-2 text-xs space-y-1 border border-border/50">
+          <div><strong>Endereço:</strong> {enderecoStr(tarefa.endereco) || "—"}</div>
+          {tarefa.endereco?.referencia && <div><strong>Referência:</strong> {tarefa.endereco.referencia}</div>}
+          {tarefa.observacoes && <div><strong>Observações:</strong> {tarefa.observacoes}</div>}
+          {tarefa.alergias_snapshot && <div className="text-rose-700"><strong>Alergias:</strong> {tarefa.alergias_snapshot}</div>}
+          {tarefa.temperamento_snapshot && <div><strong>Temperamento:</strong> {tarefa.temperamento_snapshot}</div>}
+        </div>
+      )}
+
+      {proximos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/50">
+          {proximos.map((n) => (
+            <Button key={n} size="sm" variant={n === "cancelado" || n === "nao_realizado" ? "outline" : "default"}
+              className="h-7 text-xs"
+              disabled={mudarStatus.isPending}
+              onClick={() => mudarStatus.mutate(n)}>
+              {n === "cancelado" || n === "nao_realizado" ? null : <CheckCircle2 className="h-3 w-3 mr-1" />}
+              {STATUS_META[n].label}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function LevaTrazPage() {
-  const [data, setData] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [aba, setAba] = useState<"hoje" | "amanha" | "semana" | "todos">("hoje");
+  const [filtroResp, setFiltroResp] = useState<string>("todos");
+  const [filtroStatus, setFiltroStatus] = useState<string>("ativos");
+  const { data: me } = useMyProfile();
 
-  const { data: rows = [], isLoading } = useQuery<Row[]>({
-    queryKey: ["leva-traz", data],
+  const hoje = new Date();
+  const range = useMemo(() => {
+    const start = aba === "hoje" ? hoje
+      : aba === "amanha" ? addDays(hoje, 1)
+      : aba === "semana" ? startOfWeek(hoje, { weekStartsOn: 1 })
+      : null;
+    const end = aba === "hoje" ? hoje
+      : aba === "amanha" ? addDays(hoje, 1)
+      : aba === "semana" ? endOfWeek(hoje, { weekStartsOn: 1 })
+      : null;
+    return { start: start ? format(start, "yyyy-MM-dd") : null, end: end ? format(end, "yyyy-MM-dd") : null };
+  }, [aba]);
+
+  const { data: tarefas = [], isLoading } = useQuery<Tarefa[]>({
+    queryKey: ["leva-traz-tarefas", range, filtroResp, filtroStatus],
     queryFn: async () => {
-      const { data: ags, error } = await supabase
-        .from("agendamentos")
-        .select(
-          `id, data, hora, duracao_min, taxa_leva_traz, observacoes, status,
-           cliente:clientes(id, nome, telefone, whatsapp, cep, rua, numero, complemento, bairro, cidade, estado, vip),
-           pet:pets(id, nome, porte_id),
-           servico:servicos(nome)`,
-        )
-        .eq("data", data)
-        .gt("taxa_leva_traz", 0)
-        .order("hora", { ascending: true });
+      let q = (supabase as any).from("leva_traz_tarefas")
+        .select(`id, agendamento_id, cliente_id, pet_id, tipo, data, hora_prevista,
+                 responsavel_id, status, endereco, telefone, observacoes,
+                 alergias_snapshot, temperamento_snapshot, valor_rateado,
+                 cliente:clientes(nome, whatsapp, telefone, vip),
+                 pet:pets(nome, foto_url)`)
+        .order("data", { ascending: true })
+        .order("hora_prevista", { ascending: true });
+      if (range.start) q = q.gte("data", range.start);
+      if (range.end)   q = q.lte("data", range.end);
+      if (filtroResp === "mim") q = q.eq("responsavel_id", me?.id);
+      else if (filtroResp === "sem") q = q.is("responsavel_id", null);
+      else if (filtroResp !== "todos") q = q.eq("responsavel_id", filtroResp);
+      if (filtroStatus === "ativos") {
+        q = q.not("status", "in", "(pet_entregue,cancelado,nao_realizado)");
+      } else if (filtroStatus !== "todos") {
+        q = q.eq("status", filtroStatus);
+      }
+      const { data, error } = await q;
       if (error) throw error;
-      return (ags as any) || [];
+      return (data as any) ?? [];
     },
   });
 
-  const ativos = useMemo(
-    () => rows.filter((r) => r.status !== "cancelado" && r.status !== "nao_compareceu"),
-    [rows],
-  );
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["lt-responsaveis"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, nome, email").order("nome");
+      return data ?? [];
+    },
+  });
 
-  const coletaIds = useMemo(() => ativos.map((r) => r.id), [ativos]);
-  const entregaIds = useMemo(
-    () =>
-      [...ativos]
-        .sort((a, b) => {
-          const durA = a.duracao_min ?? 0;
-          const durB = b.duracao_min ?? 0;
-          const fimA = a.hora + `+${durA}`;
-          const fimB = b.hora + `+${durB}`;
-          return fimA.localeCompare(fimB);
-        })
-        .map((r) => r.id),
-    [ativos],
-  );
-
-  const coletas = useOrdem(`coleta:${data}`, coletaIds);
-  const entregas = useOrdem(`entrega:${data}`, entregaIds);
-
-  const rowById = useMemo(() => {
-    const m = new Map<string, Row>();
-    ativos.forEach((r) => m.set(r.id, r));
-    return m;
-  }, [ativos]);
-
-  const totalTaxa = ativos.reduce((acc, r) => acc + Number(r.taxa_leva_traz || 0), 0);
-  const dataFmt = data
-    ? format(parseISO(data), "EEEE, dd 'de' MMMM", { locale: ptBR })
-    : "";
+  const totalReceita = tarefas
+    .filter((t) => !["cancelado", "nao_realizado"].includes(t.status))
+    .reduce((s, t) => s + Number(t.valor_rateado || 0), 0);
+  const semResponsavel = tarefas.filter((t) => !t.responsavel_id && t.status !== "cancelado").length;
+  const atrasadas = tarefas.filter(isAtrasada).length;
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -327,136 +317,81 @@ function LevaTrazPage() {
             <Truck className="h-6 w-6 text-primary" />
             <h1 className="font-display text-2xl md:text-3xl font-semibold">Leva e Traz</h1>
           </div>
-          <p className="text-sm text-muted-foreground lowercase">{dataFmt}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setData(format(addDays(parseISO(data), -1), "yyyy-MM-dd"))}
-          >
-            ◀
-          </Button>
-          <div className="relative">
-            <CalendarIcon className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              className="pl-8 w-[170px]"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setData(format(addDays(parseISO(data), 1), "yyyy-MM-dd"))}
-          >
-            ▶
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setData(format(new Date(), "yyyy-MM-dd"))}>
-            Hoje
-          </Button>
+          <p className="text-sm text-muted-foreground">Painel operacional integrado ao agendamento</p>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">Paradas</div>
-            <div className="text-2xl font-semibold mt-1">{ativos.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">Coletas + Entregas</div>
-            <div className="text-2xl font-semibold mt-1">{ativos.length * 2}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-t-2 border-t-amber-400/60">
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">Receita do trajeto</div>
-            <div className="text-2xl font-semibold mt-1">
-              {totalTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="inline-flex rounded-lg border border-border overflow-hidden">
+          {(["hoje", "amanha", "semana", "todos"] as const).map((k) => (
+            <button key={k}
+              onClick={() => setAba(k)}
+              className={`px-3 py-1.5 text-sm ${aba === k ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}>
+              {k === "hoje" ? "Hoje" : k === "amanha" ? "Amanhã" : k === "semana" ? "Semana" : "Todos"}
+            </button>
+          ))}
+        </div>
+        <Select value={filtroResp} onValueChange={setFiltroResp}>
+          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os responsáveis</SelectItem>
+            <SelectItem value="mim">Só minhas tarefas</SelectItem>
+            <SelectItem value="sem">Sem responsável</SelectItem>
+            {responsaveis.map((r: any) => (
+              <SelectItem key={r.id} value={r.id}>{r.nome || r.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ativos">Ativas (padrão)</SelectItem>
+            <SelectItem value="todos">Todos os status</SelectItem>
+            {(Object.keys(STATUS_META) as LTStatus[]).map((s) => (
+              <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card><CardContent className="p-4">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Tarefas</div>
+          <div className="text-2xl font-semibold mt-1">{tarefas.length}</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Sem responsável</div>
+          <div className={`text-2xl font-semibold mt-1 ${semResponsavel > 0 ? "text-rose-600" : ""}`}>{semResponsavel}</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Atrasadas</div>
+          <div className={`text-2xl font-semibold mt-1 ${atrasadas > 0 ? "text-rose-600" : ""}`}>{atrasadas}</div>
+        </CardContent></Card>
+        <Card className="border-t-2 border-t-amber-400/60"><CardContent className="p-4">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Receita</div>
+          <div className="text-2xl font-semibold mt-1">
+            {totalReceita.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </div>
+        </CardContent></Card>
       </div>
 
       {isLoading ? (
         <div className="text-center text-muted-foreground py-16">Carregando roteiro…</div>
-      ) : ativos.length === 0 ? (
-        <Card>
-          <CardContent className="py-14 text-center">
-            <Truck className="h-10 w-10 mx-auto text-muted-foreground/60" />
-            <p className="mt-3 font-medium">Nenhuma coleta ou entrega para este dia</p>
-            <p className="text-sm text-muted-foreground">
-              Marque um agendamento com taxa de Leva e Traz para aparecer aqui.
-            </p>
-          </CardContent>
-        </Card>
+      ) : tarefas.length === 0 ? (
+        <Card><CardContent className="py-14 text-center">
+          <Truck className="h-10 w-10 mx-auto text-muted-foreground/60" />
+          <p className="mt-3 font-medium">Nenhuma tarefa para este filtro</p>
+          <p className="text-sm text-muted-foreground">
+            Marque um agendamento com Leva e Traz para aparecer aqui.
+          </p>
+        </CardContent></Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                  1
-                </span>
-                Coletas
-                <Badge variant="secondary" className="ml-auto">
-                  {coletas.ordem.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {coletas.ordem.map((id, idx) => {
-                const r = rowById.get(id);
-                if (!r) return null;
-                return (
-                  <RotaCard
-                    key={id}
-                    row={r}
-                    idx={idx}
-                    total={coletas.ordem.length}
-                    tipo="coleta"
-                    onSubir={() => coletas.mover(id, -1)}
-                    onDescer={() => coletas.mover(id, 1)}
-                  />
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-amber-500/15 text-amber-700 text-xs font-bold">
-                  2
-                </span>
-                Entregas
-                <Badge variant="secondary" className="ml-auto">
-                  {entregas.ordem.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {entregas.ordem.map((id, idx) => {
-                const r = rowById.get(id);
-                if (!r) return null;
-                return (
-                  <RotaCard
-                    key={id}
-                    row={r}
-                    idx={idx}
-                    total={entregas.ordem.length}
-                    tipo="entrega"
-                    onSubir={() => entregas.mover(id, -1)}
-                    onDescer={() => entregas.mover(id, 1)}
-                  />
-                );
-              })}
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {tarefas.map((t) => (
+            <TarefaCard key={t.id} tarefa={t} />
+          ))}
         </div>
       )}
     </div>

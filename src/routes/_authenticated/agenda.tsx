@@ -1089,6 +1089,35 @@ function AgendamentoRow({
 
 // ---------- Novo agendamento ----------
 
+function EnderecoInputs({
+  value,
+  onChange,
+}: {
+  value: { rua?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string; referencia?: string };
+  onChange: (v: any) => void;
+}) {
+  const set = (patch: any) => onChange({ ...value, ...patch });
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+      <Input className="col-span-2 sm:col-span-4" placeholder="Rua/Avenida"
+        value={value.rua ?? ""} onChange={(e) => set({ rua: e.target.value })} />
+      <Input placeholder="Número" value={value.numero ?? ""} onChange={(e) => set({ numero: e.target.value })} />
+      <Input placeholder="CEP" value={value.cep ?? ""} onChange={(e) => set({ cep: e.target.value })} />
+      <Input className="col-span-2 sm:col-span-3" placeholder="Complemento"
+        value={value.complemento ?? ""} onChange={(e) => set({ complemento: e.target.value })} />
+      <Input className="col-span-2 sm:col-span-3" placeholder="Bairro"
+        value={value.bairro ?? ""} onChange={(e) => set({ bairro: e.target.value })} />
+      <Input className="col-span-2 sm:col-span-3" placeholder="Cidade"
+        value={value.cidade ?? ""} onChange={(e) => set({ cidade: e.target.value })} />
+      <Input placeholder="UF" maxLength={2} value={value.estado ?? ""}
+        onChange={(e) => set({ estado: e.target.value.toUpperCase() })} />
+      <Input className="col-span-2 sm:col-span-6" placeholder="Ponto de referência"
+        value={value.referencia ?? ""} onChange={(e) => set({ referencia: e.target.value })} />
+    </div>
+  );
+}
+
+
 type ItemServico = {
   servico_id: string;
   nome: string;
@@ -1112,6 +1141,14 @@ const novoSchema = z.object({
   observacoes: z.string().max(1000).optional().or(z.literal("")),
 });
 
+type LTModalidade = "nao_utilizar" | "somente_buscar" | "somente_entregar" | "buscar_entregar";
+
+type EnderecoLT = {
+  rua?: string; numero?: string; complemento?: string;
+  bairro?: string; cidade?: string; estado?: string; cep?: string;
+  referencia?: string;
+};
+
 function NovoAgendamentoDialog({
   open, onOpenChange, defaultDate, defaultClienteId, defaultPetId,
 }: {
@@ -1130,6 +1167,22 @@ function NovoAgendamentoDialog({
   const [obs, setObs] = useState("");
   const [clienteSearch, setClienteSearch] = useState("");
 
+  // Leva e Traz
+  const [ltModalidade, setLtModalidade] = useState<LTModalidade>("nao_utilizar");
+  const [ltResponsavel, setLtResponsavel] = useState<string>("");
+  const [ltTelefone, setLtTelefone] = useState<string>("");
+  const [ltObs, setLtObs] = useState<string>("");
+  const [ltIsento, setLtIsento] = useState(false);
+  const [ltIsencaoMotivo, setLtIsencaoMotivo] = useState<string>("");
+  const [buscaData, setBuscaData] = useState<string>("");
+  const [buscaHora, setBuscaHora] = useState<string>("");
+  const [entregaData, setEntregaData] = useState<string>("");
+  const [entregaHora, setEntregaHora] = useState<string>("");
+  const [buscaUsaClienteEnd, setBuscaUsaClienteEnd] = useState(true);
+  const [entregaUsaClienteEnd, setEntregaUsaClienteEnd] = useState(true);
+  const [buscaEnd, setBuscaEnd] = useState<EnderecoLT>({});
+  const [entregaEnd, setEntregaEnd] = useState<EnderecoLT>({});
+
   // reset ao abrir
   useMemoReset(open, () => {
     setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
@@ -1137,6 +1190,29 @@ function NovoAgendamentoDialog({
     setData(defaultDate); setHora("09:00");
     setTaxa("0");
     setStatus("agendado"); setObs(""); setClienteSearch("");
+    setLtModalidade("nao_utilizar");
+    setLtResponsavel(""); setLtTelefone(""); setLtObs("");
+    setLtIsento(false); setLtIsencaoMotivo("");
+    setBuscaData(""); setBuscaHora(""); setEntregaData(""); setEntregaHora("");
+    setBuscaUsaClienteEnd(true); setEntregaUsaClienteEnd(true);
+    setBuscaEnd({}); setEntregaEnd({});
+  });
+
+  // Carrega responsáveis (admin + transportador)
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["responsaveis-transporte"],
+    enabled: open,
+    queryFn: async () => {
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("role", ["admin", "transportador", "user"] as any);
+      const ids = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
+      if (ids.length === 0) return [] as { id: string; nome: string; email: string | null }[];
+      const { data: profs } = await supabase
+        .from("profiles").select("id, nome, email").in("id", ids);
+      return (profs ?? []) as { id: string; nome: string; email: string | null }[];
+    },
   });
 
   const { data: clientes } = useQuery({
@@ -1240,6 +1316,23 @@ function NovoAgendamentoDialog({
       // Serviço principal = primeiro item (mantém compat com servico_id)
       const principal = parsed.itens[0];
 
+      // Validações LT
+      if (ltModalidade !== "nao_utilizar") {
+        if (ltIsento && !ltIsencaoMotivo.trim()) {
+          throw new Error("Informe a justificativa da isenção do Leva e Traz");
+        }
+      }
+      const valorLT = ltModalidade === "nao_utilizar" ? 0
+                    : ltIsento ? 0
+                    : Number(taxa || 0);
+
+      const buscaEndFinal = ltModalidade === "somente_buscar" || ltModalidade === "buscar_entregar"
+        ? (buscaUsaClienteEnd ? null : buscaEnd)
+        : null;
+      const entregaEndFinal = ltModalidade === "somente_entregar" || ltModalidade === "buscar_entregar"
+        ? (entregaUsaClienteEnd ? null : entregaEnd)
+        : null;
+
       const { data: novo, error } = await supabase.from("agendamentos").insert({
         cliente_id: parsed.cliente_id,
         pet_id: parsed.pet_id,
@@ -1248,10 +1341,22 @@ function NovoAgendamentoDialog({
         hora: parsed.hora,
         duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
         valor_previsto: totalValor,
-        taxa_leva_traz: parsed.taxa_leva_traz,
+        taxa_leva_traz: valorLT,
         status: parsed.status,
         observacoes: parsed.observacoes || null,
-      }).select("id").single();
+        leva_traz_modalidade: ltModalidade,
+        leva_traz_responsavel_id: ltResponsavel || null,
+        leva_traz_telefone: ltTelefone || null,
+        leva_traz_obs: ltObs || null,
+        leva_traz_isento: ltIsento,
+        leva_traz_isencao_motivo: ltIsento ? ltIsencaoMotivo : null,
+        busca_data: buscaData || null,
+        busca_hora: buscaHora || null,
+        entrega_data: entregaData || null,
+        entrega_hora: entregaHora || null,
+        busca_endereco: buscaEndFinal as any,
+        entrega_endereco: entregaEndFinal as any,
+      } as any).select("id").single();
       if (error) throw error;
 
       // Insere todos os itens (inclusive o principal) para simetria
@@ -1402,10 +1507,6 @@ function NovoAgendamentoDialog({
           </div>
 
           <div>
-            <Label>Taxa leva-e-traz (R$)</Label>
-            <Input type="number" min={0} step="0.01" value={taxa} onChange={(e) => setTaxa(e.target.value)} />
-          </div>
-          <div>
             <Label>Status inicial</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1418,8 +1519,137 @@ function NovoAgendamentoDialog({
           </div>
 
           <div className="sm:col-span-2">
-            <Label>Observações</Label>
+            <Label>Observações do atendimento</Label>
             <Textarea rows={3} value={obs} onChange={(e) => setObs(e.target.value)} />
+          </div>
+
+          {/* ---------------- Leva e Traz ---------------- */}
+          <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="font-display text-base font-semibold">Leva e Traz</div>
+              {ltModalidade !== "nao_utilizar" && !ltIsento && (
+                <div className="text-sm text-muted-foreground">
+                  Somado ao total: <strong className="text-primary">{brl(Number(taxa || 0))}</strong>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { v: "nao_utilizar", l: "Não utilizar" },
+                { v: "somente_buscar", l: "Somente buscar" },
+                { v: "somente_entregar", l: "Somente entregar" },
+                { v: "buscar_entregar", l: "Buscar e entregar" },
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setLtModalidade(o.v as LTModalidade)}
+                  className={`rounded-lg border px-3 py-2 text-sm text-left transition ${
+                    ltModalidade === o.v
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card hover:bg-muted"
+                  }`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+
+            {ltModalidade !== "nao_utilizar" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label>Valor do Leva e Traz (R$) *</Label>
+                  <Input type="number" min={0} step="0.01" value={taxa}
+                    disabled={ltIsento}
+                    onChange={(e) => setTaxa(e.target.value)} />
+                  <label className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={ltIsento} onChange={(e) => setLtIsento(e.target.checked)} />
+                    Isentar valor (exige justificativa)
+                  </label>
+                </div>
+                <div>
+                  <Label>Responsável pelo transporte</Label>
+                  <Select value={ltResponsavel || undefined} onValueChange={setLtResponsavel}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar responsável…" /></SelectTrigger>
+                    <SelectContent>
+                      {responsaveis.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.nome || r.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {ltIsento && (
+                  <div className="sm:col-span-2">
+                    <Label>Justificativa da isenção *</Label>
+                    <Textarea rows={2} value={ltIsencaoMotivo} onChange={(e) => setLtIsencaoMotivo(e.target.value)} />
+                  </div>
+                )}
+
+                {(ltModalidade === "somente_buscar" || ltModalidade === "buscar_entregar") && (
+                  <>
+                    <div>
+                      <Label>Data da busca *</Label>
+                      <Input type="date" value={buscaData || data} onChange={(e) => setBuscaData(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Horário da busca *</Label>
+                      <TimeField value={buscaHora || hora} onChange={setBuscaHora} />
+                    </div>
+                    <div className="sm:col-span-2 rounded-md border border-border/60 p-3 bg-card space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Endereço de busca</span>
+                        <label className="text-xs flex items-center gap-1 text-muted-foreground">
+                          <input type="checkbox" checked={buscaUsaClienteEnd}
+                            onChange={(e) => setBuscaUsaClienteEnd(e.target.checked)} />
+                          Usar endereço do cliente
+                        </label>
+                      </div>
+                      {!buscaUsaClienteEnd && (
+                        <EnderecoInputs value={buscaEnd} onChange={setBuscaEnd} />
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {(ltModalidade === "somente_entregar" || ltModalidade === "buscar_entregar") && (
+                  <>
+                    <div>
+                      <Label>Data da entrega *</Label>
+                      <Input type="date" value={entregaData || data} onChange={(e) => setEntregaData(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Horário previsto da entrega *</Label>
+                      <TimeField value={entregaHora || hora} onChange={setEntregaHora} />
+                    </div>
+                    <div className="sm:col-span-2 rounded-md border border-border/60 p-3 bg-card space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Endereço de entrega</span>
+                        <label className="text-xs flex items-center gap-1 text-muted-foreground">
+                          <input type="checkbox" checked={entregaUsaClienteEnd}
+                            onChange={(e) => setEntregaUsaClienteEnd(e.target.checked)} />
+                          Usar endereço do cliente
+                        </label>
+                      </div>
+                      {!entregaUsaClienteEnd && (
+                        <EnderecoInputs value={entregaEnd} onChange={setEntregaEnd} />
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <Label>Telefone para contato</Label>
+                  <Input value={ltTelefone} onChange={(e) => setLtTelefone(e.target.value)}
+                    placeholder="(00) 00000-0000" />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Observações do transporte</Label>
+                  <Textarea rows={2} value={ltObs} onChange={(e) => setLtObs(e.target.value)}
+                    placeholder="Referência de endereço, orientações, alergias, temperamento durante o transporte…" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
