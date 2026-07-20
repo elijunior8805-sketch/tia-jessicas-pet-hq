@@ -1210,12 +1210,14 @@ type EnderecoLT = {
 };
 
 function NovoAgendamentoDialog({
-  open, onOpenChange, defaultDate, defaultClienteId, defaultPetId,
+  open, onOpenChange, defaultDate, defaultClienteId, defaultPetId, editId,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void; defaultDate: string;
   defaultClienteId?: string; defaultPetId?: string;
+  editId?: string;
 }) {
   const qc = useQueryClient();
+  const isEdit = !!editId;
   const [clienteId, setClienteId] = useState<string>("");
   const [petId, setPetId] = useState<string>("");
   const [itens, setItens] = useState<ItemServico[]>([]);
