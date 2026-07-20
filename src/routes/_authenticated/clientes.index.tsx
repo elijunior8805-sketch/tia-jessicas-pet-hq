@@ -49,7 +49,7 @@ function ClientesPage() {
     setPage(0);
     navigate({
       to: "/clientes",
-      search: (prev) => ({ ...prev, q: q || undefined }),
+      search: (prev: any) => ({ ...prev, q: q || undefined }),
       replace: true,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
