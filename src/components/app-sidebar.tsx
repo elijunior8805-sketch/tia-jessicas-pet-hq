@@ -23,6 +23,7 @@ import {
   PawPrint,
   Cake,
 } from "lucide-react";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import { useMyAccess } from "@/hooks/use-my-permissions";
 import {
   Sidebar,
@@ -94,8 +95,8 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <PawPrint className="h-5 w-5" />
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white shadow-sm ring-1 ring-sidebar-border overflow-hidden">
+            <img src={logoAsset.url} alt="Spa de Pet Tia Jéssica" className="h-8 w-8 object-contain" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
