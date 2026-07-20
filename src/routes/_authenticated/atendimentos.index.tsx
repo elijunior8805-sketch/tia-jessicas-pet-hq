@@ -33,7 +33,12 @@ function todayISO() {
 function AtendimentosPainel() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { vip: vipParam } = Route.useSearch();
+  const onlyVip = vipParam === "1";
   const hoje = todayISO();
+
+  const filterVip = <T extends { clientes?: { vip?: boolean | null } | null }>(arr: T[]) =>
+    onlyVip ? arr.filter((r) => r.clientes?.vip === true) : arr;
 
   const { data: agendamentos = [] } = useQuery({
     queryKey: ["atendimentos-painel", "agenda", hoje],
