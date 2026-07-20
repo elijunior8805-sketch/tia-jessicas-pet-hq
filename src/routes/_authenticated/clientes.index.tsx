@@ -103,13 +103,13 @@ function ClientesPage() {
 
   // Resultados da busca
   const { data: resultados, isFetching: buscando } = useQuery({
-    queryKey: ["clientes-busca", termo, page],
+    queryKey: ["clientes-busca", termo, page, onlyVip],
     enabled: searching,
     staleTime: 15_000,
     queryFn: async () => {
       const like = `%${termo}%`;
       // Busca em clientes (nome, cpf, telefone, whatsapp, bairro, email)
-      const baseQ = supabase
+      let baseQ = supabase
         .from("clientes")
         .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url)")
         .or(
@@ -117,6 +117,7 @@ function ClientesPage() {
         )
         .order("nome")
         .range(0, (page + 1) * PAGE_SIZE - 1);
+      if (onlyVip) baseQ = baseQ.eq("vip", true);
 
       const { data: byCliente } = await baseQ;
 
