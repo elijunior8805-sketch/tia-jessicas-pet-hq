@@ -187,15 +187,23 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       return;
     }
     let revoked: string | null = null;
-    try {
-      const res = generateReciboPDF(data, true) as { blob: Blob; fileName: string };
-      const url = URL.createObjectURL(res.blob);
-      revoked = url;
-      setPreviewUrl(url);
-    } catch (e) {
-      console.error(e);
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = (await generateReciboPDF(data, true)) as {
+          blob: Blob;
+          fileName: string;
+        };
+        if (cancelled) return;
+        const url = URL.createObjectURL(res.blob);
+        revoked = url;
+        setPreviewUrl(url);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
     return () => {
+      cancelled = true;
       if (revoked) URL.revokeObjectURL(revoked);
       setPreviewUrl(null);
     };
@@ -212,8 +220,9 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
   }, [mensagemFinal]);
 
   const baixar = () => {
-    generateReciboPDF(data);
+    void generateReciboPDF(data);
   };
+
 
   const registrarEnvio = async (): Promise<string | null> => {
     const { data: u } = await supabase.auth.getUser();

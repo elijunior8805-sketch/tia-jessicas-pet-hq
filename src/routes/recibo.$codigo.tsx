@@ -101,7 +101,7 @@ function ReciboPublicoPage() {
     : null;
 
   const baixarPdf = () => {
-    generateReciboPDF({
+    void generateReciboPDF({
       tipo: r.tipo,
       numero: r.numero_recibo,
       data: r.data_pagamento || r.enviado_em.slice(0, 10),
@@ -117,6 +117,7 @@ function ReciboPublicoPage() {
       },
     });
   };
+
 
   const whatsappNumero = r.empresa_whatsapp
     ? (() => {
