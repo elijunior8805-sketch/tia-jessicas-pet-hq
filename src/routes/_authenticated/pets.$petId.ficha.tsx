@@ -1,26 +1,43 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, PawPrint, ArrowLeft, Ruler, Cake, Syringe, Heart, ClipboardList, Pencil, CalendarPlus } from "lucide-react";
+import {
+  AlertTriangle, PawPrint, ArrowLeft, Ruler, Cake, Syringe, Heart,
+  Pencil, CalendarPlus, FileText, History, User as UserIcon,
+} from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/ficha")({
   component: FichaOperacional,
 });
 
+function idadeStr(nasc?: string | null): string {
+  if (!nasc) return "—";
+  const n = new Date(nasc);
+  if (isNaN(+n)) return "—";
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - n.getFullYear();
+  let meses = hoje.getMonth() - n.getMonth();
+  if (hoje.getDate() < n.getDate()) meses -= 1;
+  if (meses < 0) { anos--; meses += 12; }
+  if (anos <= 0) return `${meses < 0 ? 0 : meses} ${meses === 1 ? "mês" : "meses"}`;
+  return `${anos} ${anos === 1 ? "ano" : "anos"}`;
+}
+
 function FichaOperacional() {
   const { petId } = Route.useParams();
+  const navigate = useNavigate();
 
   const { data: pet, isLoading } = useQuery({
     queryKey: ["pet-ficha", petId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pets")
-        .select("*, clientes(id, nome, whatsapp, vip)")
+        .select("*, clientes(id, nome, whatsapp, telefone, vip)")
         .eq("id", petId)
         .maybeSingle();
       if (error) throw error;
@@ -28,29 +45,23 @@ function FichaOperacional() {
     },
   });
 
-  const { data: historico } = useQuery({
-    queryKey: ["pet-historico", petId],
+  // Só um COUNT + últimas datas — não carrega histórico
+  const { data: resumo } = useQuery({
+    queryKey: ["pet-resumo", petId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { count } = await supabase
         .from("atendimentos")
-        .select("id, data_execucao, valor_final, observacoes_saida, agendamentos(data, hora, servicos(nome))")
+        .select("id", { count: "exact", head: true })
         .eq("pet_id", petId)
-        .order("data_execucao", { ascending: false })
-        .limit(10);
-      return data ?? [];
-    },
-  });
-
-  const { data: ocorrencias } = useQuery({
-    queryKey: ["pet-ocorrencias", petId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("ocorrencias")
-        .select("id, tipo, descricao, gravidade, data_ocorrencia")
+        .not("encerrado_em", "is", null);
+      const { data: ult } = await supabase
+        .from("atendimentos")
+        .select("data_inicio, encerrado_em")
         .eq("pet_id", petId)
-        .order("data_ocorrencia", { ascending: false })
-        .limit(20);
-      return data ?? [];
+        .not("encerrado_em", "is", null)
+        .order("data_inicio", { ascending: false })
+        .limit(1);
+      return { total: count ?? 0, ultima: ult?.[0]?.data_inicio ?? null };
     },
   });
 
@@ -63,26 +74,39 @@ function FichaOperacional() {
   }
   if (pet.alergias) alertas.push(`Alergias: ${pet.alergias}`);
   if ((pet as any).cuidados_saude) alertas.push(`Saúde: ${(pet as any).cuidados_saude}`);
-  if ((pet as any).observacoes) alertas.push(`Observações: ${(pet as any).observacoes}`);
+  if (pet.necessita_focinheira) alertas.push(`Focinheira obrigatória`);
 
   return (
     <PageShell>
       <PageHeader
         title={pet.nome}
-        description={`Ficha operacional · ${pet.clientes?.nome ?? ""}`}
+        description={`Ficha do pet · ${pet.clientes?.nome ?? ""}`}
         actions={
           <>
+            <Button
+              className="gap-2"
+              onClick={() => navigate({ to: "/pets/$petId/historico", params: { petId } })}
+            >
+              <History className="h-4 w-4"/> Consultar histórico
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => navigate({ to: "/pets/$petId/dossie", params: { petId } })}
+            >
+              <FileText className="h-4 w-4"/> Gerar PDF do pet
+            </Button>
+            <Link to="/pets/$petId/editar" params={{ petId }}>
+              <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar pet</Button>
+            </Link>
             <Link
               to="/agenda"
               search={{ cliente: pet.cliente_id, pet: pet.id }}
             >
-              <Button className="gap-2"><CalendarPlus className="h-4 w-4"/> Novo agendamento</Button>
-            </Link>
-            <Link to="/pets/$petId/editar" params={{ petId }}>
-              <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar pet</Button>
+              <Button variant="outline" className="gap-2"><CalendarPlus className="h-4 w-4"/> Novo agendamento</Button>
             </Link>
             <Link to="/clientes/$id" params={{ id: pet.cliente_id }}>
-              <Button variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar ao cliente</Button>
+              <Button variant="ghost" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar</Button>
             </Link>
           </>
         }
@@ -106,18 +130,24 @@ function FichaOperacional() {
         <Card className="p-5 lg:col-span-1">
           <div className="flex items-center gap-3 mb-4">
             <PetAvatar path={pet.foto_url} nome={pet.nome}/>
-            <div>
-              <div className="font-display text-xl font-semibold text-primary">{pet.nome}</div>
-              <div className="text-xs text-muted-foreground">{[pet.raca, pet.porte].filter(Boolean).join(" · ")}</div>
-              {pet.necessita_focinheira && <div className="mt-1 text-xs text-warning-foreground bg-warning/20 rounded px-1.5 py-0.5 inline-block">⚠ Focinheira obrigatória</div>}
+            <div className="min-w-0">
+              <div className="font-display text-xl font-semibold text-primary truncate">{pet.nome}</div>
+              <div className="text-xs text-muted-foreground truncate">
+                {[pet.raca, pet.porte].filter(Boolean).join(" · ") || "—"}
+              </div>
+              {pet.necessita_focinheira && (
+                <div className="mt-1 text-[11px] text-warning-foreground bg-warning/20 rounded px-1.5 py-0.5 inline-block">
+                  ⚠ Focinheira obrigatória
+                </div>
+              )}
             </div>
           </div>
           <dl className="space-y-2 text-sm">
-            {pet.sexo && <Info icon={Heart} label="Sexo" value={pet.sexo}/>}
-            {pet.nascimento && <Info icon={Cake} label="Nascimento" value={new Date(pet.nascimento).toLocaleDateString("pt-BR")}/>}
-            {pet.peso && <Info icon={Ruler} label="Peso" value={`${pet.peso} kg`}/>}
-            {pet.cor && <Info icon={PawPrint} label="Cor / pelagem" value={pet.cor}/>}
-            {(pet as any).cuidados_saude && <Info icon={Syringe} label="Cuidados de saúde" value={(pet as any).cuidados_saude}/>}
+            <Info icon={UserIcon} label="Tutor" value={pet.clientes?.nome ?? "—"}/>
+            {pet.sexo && <Info icon={Heart} label="Sexo" value={pet.sexo === "macho" ? "Macho" : "Fêmea"}/>}
+            {pet.nascimento && <Info icon={Cake} label="Idade" value={idadeStr(pet.nascimento)}/>}
+            {pet.peso != null && <Info icon={Ruler} label="Peso atual" value={`${pet.peso} kg`}/>}
+            {(pet as any).cuidados_saude && <Info icon={Syringe} label="Saúde" value={(pet as any).cuidados_saude}/>}
           </dl>
           {pet.temperamento && (
             <div className="mt-3 pt-3 border-t">
@@ -128,62 +158,35 @@ function FichaOperacional() {
         </Card>
 
         <Card className="p-5 lg:col-span-2">
-          <h2 className="font-display font-semibold text-primary mb-3 flex items-center gap-2">
-            <ClipboardList className="h-4 w-4"/> Últimos atendimentos
-          </h2>
-          {!historico || historico.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center">Sem histórico ainda.</div>
-          ) : (
-            <div className="divide-y">
-              {historico.map((h: any) => (
-                <div key={h.id} className="py-3 grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">
-                      {h.agendamentos?.servicos?.nome ?? "Atendimento"}
-                    </div>
-                    {h.observacoes_saida && (
-                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{h.observacoes_saida}</div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs text-muted-foreground">{h.data_execucao ? new Date(h.data_execucao).toLocaleDateString("pt-BR") : "—"}</div>
-                    {h.valor_final != null && (
-                      <div className="text-sm font-semibold text-primary">
-                        {Number(h.valor_final).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-5 lg:col-span-3">
-          <h2 className="font-display font-semibold text-primary mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4"/> Ocorrências registradas
-          </h2>
-          {!ocorrencias || ocorrencias.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center">Nenhuma ocorrência registrada.</div>
-          ) : (
-            <div className="space-y-2">
-              {ocorrencias.map((o: any) => (
-                <div key={o.id} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium text-sm">{o.tipo}</div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {o.gravidade && <Badge variant={o.gravidade === "alta" ? "destructive" : "secondary"}>{o.gravidade}</Badge>}
-                      <span>{new Date(o.data_ocorrencia).toLocaleDateString("pt-BR")}</span>
-                    </div>
-                  </div>
-                  {o.descricao && <p className="text-sm mt-1 whitespace-pre-wrap">{o.descricao}</p>}
-                </div>
-              ))}
-            </div>
-          )}
+          <h2 className="font-display font-semibold text-primary mb-3">Resumo operacional</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <ResumoItem label="Alergias" value={pet.alergias ?? "—"}/>
+            <ResumoItem label="Última visita" value={fmt(resumo?.ultima)}/>
+            <ResumoItem label="Próxima visita" value={fmt(pet.proxima_visita)}/>
+            <ResumoItem label="Último banho" value={fmt(pet.ultimo_banho)}/>
+            <ResumoItem label="Última tosa" value={fmt(pet.ultima_tosa)}/>
+            <ResumoItem label="Total atendimentos" value={String(resumo?.total ?? 0)}/>
+          </div>
+          <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
+            O histórico completo não é carregado nesta tela. Toque em <strong>Consultar histórico</strong> ou <strong>Gerar PDF do pet</strong> para acessar os registros.
+          </div>
         </Card>
       </div>
     </PageShell>
+  );
+}
+
+function fmt(d?: string | null) {
+  if (!d) return "—";
+  try { return new Date(d).toLocaleDateString("pt-BR"); } catch { return "—"; }
+}
+
+function ResumoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium mt-0.5 break-words">{value || "—"}</div>
+    </div>
   );
 }
 
@@ -193,7 +196,7 @@ function Info({ icon: Icon, label, value }: { icon: React.ComponentType<{ classN
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5"/>
       <div className="min-w-0">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
-        <div className="text-sm">{value}</div>
+        <div className="text-sm break-words">{value}</div>
       </div>
     </div>
   );
