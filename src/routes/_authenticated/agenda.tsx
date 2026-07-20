@@ -1106,6 +1106,31 @@ function AgendamentoRow({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={excluirOpen} onOpenChange={setExcluirOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir agendamento</DialogTitle>
+            <DialogDescription>
+              Esta ação remove permanentemente o agendamento de{" "}
+              <strong>{row.pets?.nome ?? "pet"}</strong> em{" "}
+              <strong>{row.data}</strong> às{" "}
+              <strong>{row.hora ? String(row.hora).slice(0, 5) : "—"}</strong>.
+              Não é possível desfazer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirOpen(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => excluirMut.mutate()}
+              disabled={excluirMut.isPending}
+            >
+              {excluirMut.isPending ? "Excluindo…" : "Excluir definitivamente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
