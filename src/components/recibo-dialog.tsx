@@ -294,6 +294,9 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       "noopener,noreferrer",
     );
     toast.info("PDF baixado — anexe manualmente antes de enviar");
+  };
+
+
 
 
   return (
