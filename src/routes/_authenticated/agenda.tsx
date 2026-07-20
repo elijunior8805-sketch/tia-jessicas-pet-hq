@@ -1475,10 +1475,12 @@ function NovoAgendamentoDialog({
 
       let agendamentoId: string;
       if (isEdit && editId) {
-        const { error: errUpd } = await supabase
-          .from("agendamentos")
-          .update(payload as any)
-          .eq("id", editId);
+        const currentVersion = Number(editData?.version ?? 1);
+        const { error: errUpd } = await supabase.rpc("atualizar_agendamento_seguro", {
+          _id: editId,
+          _version: currentVersion,
+          _payload: payload as any,
+        });
         if (errUpd) throw errUpd;
         agendamentoId = editId;
         // Substitui itens vinculados
@@ -1486,11 +1488,13 @@ function NovoAgendamentoDialog({
           .from("agendamento_servicos").delete().eq("agendamento_id", editId);
         if (errDel) throw errDel;
       } else {
-        const { data: novo, error } = await supabase
-          .from("agendamentos").insert(payload as any).select("id").single();
+        const { data: novoId, error } = await supabase.rpc("criar_agendamento_seguro", {
+          _payload: payload as any,
+        });
         if (error) throw error;
-        agendamentoId = novo.id;
+        agendamentoId = novoId as unknown as string;
       }
+
 
       // Insere todos os itens (inclusive o principal) para simetria
       const rowsItens = parsed.itens.map((it, i) => ({
