@@ -929,6 +929,9 @@ function AgendamentoRow({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Ações rápidas</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setEditarOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5 mr-2" /> Editar agendamento…
+                </DropdownMenuItem>
                 {podeReagendar && (
                   <DropdownMenuItem
                     onClick={() => {
