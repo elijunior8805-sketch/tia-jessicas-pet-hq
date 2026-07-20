@@ -505,12 +505,12 @@ const GRUPOS_MODULOS: Array<{ titulo: string; modulos: string[] }> = [
 
 const ACOES_SENSIVEIS = new Set(["excluir", "valores", "confidencial"]);
 
-const PRESETS = [
-  { key: "none", label: "Nenhum acesso", acoes: [] as string[] },
+const PRESETS: Array<{ key: string; label: string; acoes: string[] }> = [
+  { key: "none", label: "Nenhum acesso", acoes: [] },
   { key: "view", label: "Somente visualizar", acoes: ["visualizar"] },
   { key: "edit", label: "Editar", acoes: ["visualizar", "criar", "editar"] },
   { key: "full", label: "Acesso total", acoes: ACOES.map((a) => a.key) },
-] as const;
+];
 
 function detectarPreset(rowState: Record<string, boolean>): string {
   const marcadas = ACOES.filter((a) => rowState[a.key]).map((a) => a.key).sort();
