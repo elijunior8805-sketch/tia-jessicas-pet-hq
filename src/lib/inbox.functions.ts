@@ -120,9 +120,9 @@ export const listarThreads = createServerFn({ method: "GET" })
       for (const r of [...(byNome.data ?? []), ...(byPet.data ?? []), ...(byMsg.data ?? [])]) {
         if (!map.has(r.cliente_id)) map.set(r.cliente_id, r);
       }
-      rows = Array.from(map.values()).sort((a, b) =>
-        (b.ultima_em ?? "").localeCompare(a.ultima_em ?? "")
-      ) as any[];
+      rows = Array.from(map.values()).sort((a: any, b: any) =>
+        String(b.ultima_em ?? "").localeCompare(String(a.ultima_em ?? ""))
+      );
     } else {
       const { data: r, error } = await q;
       if (error) throw new Error(error.message);
