@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { deliverPdf } from "./pdf-open";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, sumItens, type ServicoItem } from "./atendimento-utils";

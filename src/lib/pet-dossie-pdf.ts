@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { loadImageAsDataURL, type LoadedImage } from "./atendimento-pdf";
+import { deliverPdf } from "./pdf-open";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],

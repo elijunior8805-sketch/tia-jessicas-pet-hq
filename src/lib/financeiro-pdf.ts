@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { deliverPdf } from "./pdf-open";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],
