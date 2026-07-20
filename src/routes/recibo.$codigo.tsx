@@ -232,11 +232,18 @@ function ReciboPublicoPage() {
 
           <div className="px-5 pb-5 flex flex-col sm:flex-row gap-2">
             <Button
-              onClick={baixarPdf}
-              disabled={cancelado}
+              onClick={abrirPreview}
+              disabled={cancelado || gerandoPreview}
               className="w-full sm:w-auto bg-[#123F2A] hover:bg-[#0E2F20] text-white"
             >
-              <Eye className="h-4 w-4 mr-1" /> Visualizar recibo
+              {gerandoPreview ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : previewUrl ? (
+                <X className="h-4 w-4 mr-1" />
+              ) : (
+                <Eye className="h-4 w-4 mr-1" />
+              )}
+              {previewUrl ? "Fechar prévia" : "Visualizar recibo"}
             </Button>
             <Button
               onClick={baixarPdf}
@@ -247,6 +254,39 @@ function ReciboPublicoPage() {
               <Download className="h-4 w-4 mr-1" /> Baixar PDF
             </Button>
           </div>
+
+          {previewUrl && (
+            <div className="border-t border-[#EFEADC] bg-[#F5F2EA]">
+              <div className="flex items-center justify-between px-5 py-2 text-xs uppercase tracking-widest text-[#525852]">
+                <span className="flex items-center gap-1">
+                  <Eye className="h-3.5 w-3.5" /> Prévia do PDF
+                </span>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#123F2A] underline"
+                  >
+                    Abrir em nova aba
+                  </a>
+                  <button
+                    onClick={fecharPreview}
+                    className="text-[#525852] hover:text-[#123F2A]"
+                    aria-label="Fechar prévia"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <iframe
+                key={previewUrl}
+                src={previewUrl}
+                title="Prévia do recibo"
+                className="w-full h-[70vh] bg-white border-t border-[#EFEADC]"
+              />
+            </div>
+          )}
         </section>
 
         <div className="mt-4 flex items-start gap-2 text-xs text-[#525852] px-1">
