@@ -556,7 +556,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               <h2 className="font-display text-2xl sm:text-3xl font-semibold text-primary truncate">
                 {data.nome}
               </h2>
-              {data.vip && <StatusBadge tone="gold"><Star className="h-3 w-3" /> VIP</StatusBadge>}
+              {data.vip === true && <StatusBadge tone="gold" title="Cliente marcado como VIP no cadastro"><Star className="h-3 w-3" /> VIP</StatusBadge>}
               {data.ativo === false ? (
                 <StatusBadge tone="muted">Arquivado</StatusBadge>
               ) : (
