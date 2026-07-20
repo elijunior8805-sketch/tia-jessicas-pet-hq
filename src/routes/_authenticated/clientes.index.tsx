@@ -380,8 +380,13 @@ function ClienteRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="font-display font-semibold text-sm text-primary truncate">{c.nome}</div>
-          {c.vip && (
-            <Star className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)] fill-[var(--color-gold)]" />
+          {c.vip === true && (
+            <Star
+              className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)] fill-[var(--color-gold)]"
+              aria-label="Cliente VIP"
+            >
+              <title>Cliente marcado como VIP no cadastro</title>
+            </Star>
           )}
           {c.ativo === false && <Badge variant="secondary" className="text-[10px] px-1 py-0">Arquivado</Badge>}
         </div>
