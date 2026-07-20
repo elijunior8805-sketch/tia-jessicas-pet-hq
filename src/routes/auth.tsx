@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { PawPrint } from "lucide-react";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
