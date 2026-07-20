@@ -178,7 +178,7 @@ function ClientesPage() {
   const selecionar = (id: string | null) => {
     navigate({
       to: "/clientes",
-      search: (prev) => ({ ...prev, sel: id ?? undefined }),
+      search: (prev: any) => ({ ...prev, sel: id ?? undefined }),
       replace: false,
     });
   };
