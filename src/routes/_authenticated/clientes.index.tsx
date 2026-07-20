@@ -34,7 +34,8 @@ const PAGE_SIZE = 10;
 
 function ClientesPage() {
   const navigate = useNavigate();
-  const { q: qParam, sel } = Route.useSearch();
+  const { q: qParam, sel, vip: vipParam } = Route.useSearch();
+  const onlyVip = vipParam === "1";
   const [rawQ, setRawQ] = useState(qParam ?? "");
   const [q, setQ] = useState(qParam ?? "");
   const [page, setPage] = useState(0);
