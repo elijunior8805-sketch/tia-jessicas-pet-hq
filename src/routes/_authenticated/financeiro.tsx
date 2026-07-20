@@ -706,7 +706,9 @@ function FinanceiroPage() {
   const [fStatus, setFStatus] = useState<string>("todos");
   const [fCategoria, setFCategoria] = useState<string>("todas"); // categoria_receita
   const [fCliente, setFCliente] = useState<string>("todos");
-  const [incluirTeste, setIncluirTeste] = useState<boolean>(true);
+  const [incluirTeste, setIncluirTeste] = useState<boolean>(import.meta.env.DEV);
+  const [showMoreFilters, setShowMoreFilters] = useState<boolean>(false);
+  const IS_DEV = import.meta.env.DEV;
 
   const aplicarPreset = (p: Preset) => {
     setPreset(p);
