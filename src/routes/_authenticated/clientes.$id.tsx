@@ -154,7 +154,11 @@ function ClienteDetalhe() {
             <div className="min-w-0 flex-1">
               <h2 className="font-display font-semibold text-primary truncate">Contato</h2>
               <div className="flex items-center gap-1 flex-wrap">
-                {data.vip && <Badge className="badge-gold text-xs"><Star className="h-3 w-3 mr-0.5"/>VIP</Badge>}
+                {data.vip === true && (
+                  <span title="Cliente marcado como VIP no cadastro" className="inline-flex">
+                    <Badge className="badge-gold text-xs"><Star className="h-3 w-3 mr-0.5"/>VIP</Badge>
+                  </span>
+                )}
                 {data.ativo === false && <Badge variant="secondary" className="text-xs">Arquivado</Badge>}
               </div>
             </div>
