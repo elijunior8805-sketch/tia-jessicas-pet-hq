@@ -201,7 +201,11 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     };
   }, [open, data]);
 
-  const mensagemFinal = useMemo(() => applyVars(mensagem, vars), [mensagem, vars]);
+  const mensagemFinal = useMemo(
+    () =>
+      applyVars(sanitizeTemplate(mensagem, publicUrl), vars).replace(/\uFFFD/g, ""),
+    [mensagem, vars, publicUrl],
+  );
   const variaveisRestantes = useMemo(() => {
     const m = mensagemFinal.match(/\{(\w+)\}/g);
     return m ? Array.from(new Set(m)) : [];
