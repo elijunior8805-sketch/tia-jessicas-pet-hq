@@ -633,20 +633,20 @@ function HistoricoTab({ clientes }: { clientes: Cliente[] }) {
       <div className="grid gap-3 sm:grid-cols-4 mb-4">
         <div>
           <Label className="text-xs">Cliente</Label>
-          <Select value={filtroCliente} onValueChange={setFiltroCliente}>
+          <Select value={filtroCliente || "__all"} onValueChange={(v) => setFiltroCliente(v === "__all" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="__all">Todos</SelectItem>
               {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label className="text-xs">Tipo</Label>
-          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+          <Select value={filtroTipo || "__all"} onValueChange={(v) => setFiltroTipo(v === "__all" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="__all">Todos</SelectItem>
               {TIPO_MENSAGEM.map((t) => <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>)}
             </SelectContent>
           </Select>
