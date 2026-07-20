@@ -10,6 +10,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 import { NotificationBell } from "@/components/notification-bell";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { SyncStatusBadge } from "@/components/sync-status";
 
 
 
