@@ -155,11 +155,13 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
 
   useEffect(() => {
     if (!open) return;
-    const tpl =
+    const rawTpl =
       (isReceita ? config?.whatsapp_template_receber : config?.whatsapp_template_pagar) ||
       FALLBACK_TEMPLATES[isReceita ? "receita" : "despesa"];
-    setMensagem(applyVars(tpl, vars));
-  }, [open, config, isReceita, vars]);
+    // Bloqueia links inseguros (Supabase signed URLs, tokens, etc.)
+    const safeTpl = sanitizeTemplate(rawTpl, publicUrl);
+    setMensagem(applyVars(safeTpl, vars));
+  }, [open, config, isReceita, vars, publicUrl]);
 
   // Prévia do PDF
   useEffect(() => {
