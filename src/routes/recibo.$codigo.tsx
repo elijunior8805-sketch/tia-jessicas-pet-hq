@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useState } from "react";
 import {
   Download,
   Eye,
@@ -9,11 +10,13 @@ import {
   ShieldCheck,
   Loader2,
   PawPrint,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { generateReciboPDF } from "@/lib/recibo-pdf";
+
 
 type ReciboPublico = {
   codigo: string;
@@ -52,6 +55,9 @@ function digits(v: string) {
 
 function ReciboPublicoPage() {
   const { codigo } = Route.useParams();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [gerandoPreview, setGerandoPreview] = useState(false);
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["recibo-publico", codigo],
@@ -100,23 +106,52 @@ function ReciboPublicoPage() {
     ? r.forma_pagamento.replace(/_/g, " ")
     : null;
 
-  const baixarPdf = () => {
-    void generateReciboPDF({
-      tipo: r.tipo,
-      numero: r.numero_recibo,
-      data: r.data_pagamento || r.enviado_em.slice(0, 10),
-      contraparte: r.contraparte,
-      descricao: [r.servico, r.pet_nome ? `Pet: ${r.pet_nome}` : null]
+  const buildReciboData = () => ({
+    tipo: r.tipo,
+    numero: r.numero_recibo,
+    data: r.data_pagamento || r.enviado_em.slice(0, 10),
+    contraparte: r.contraparte,
+    descricao:
+      [r.servico, r.pet_nome ? `Pet: ${r.pet_nome}` : null]
         .filter(Boolean)
         .join(" · ") || "Serviços do spa",
-      valor: Number(r.valor),
-      forma: r.forma_pagamento || null,
-      empresa: {
-        nome: r.empresa_nome,
-        telefone: r.empresa_telefone,
-      },
-    });
+    valor: Number(r.valor),
+    forma: r.forma_pagamento || null,
+    empresa: {
+      nome: r.empresa_nome,
+      telefone: r.empresa_telefone,
+    },
+  });
+
+  const baixarPdf = () => {
+    void generateReciboPDF(buildReciboData());
   };
+
+  const abrirPreview = async () => {
+    if (previewUrl) {
+      // fecha se já estiver aberto
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      return;
+    }
+    setGerandoPreview(true);
+    try {
+      const res = (await generateReciboPDF(buildReciboData(), true)) as {
+        blob: Blob;
+        fileName: string;
+      };
+      setPreviewUrl(URL.createObjectURL(res.blob));
+    } finally {
+      setGerandoPreview(false);
+    }
+  };
+
+  const fecharPreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+
+
 
 
   const whatsappNumero = r.empresa_whatsapp
@@ -197,11 +232,18 @@ function ReciboPublicoPage() {
 
           <div className="px-5 pb-5 flex flex-col sm:flex-row gap-2">
             <Button
-              onClick={baixarPdf}
-              disabled={cancelado}
+              onClick={abrirPreview}
+              disabled={cancelado || gerandoPreview}
               className="w-full sm:w-auto bg-[#123F2A] hover:bg-[#0E2F20] text-white"
             >
-              <Eye className="h-4 w-4 mr-1" /> Visualizar recibo
+              {gerandoPreview ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : previewUrl ? (
+                <X className="h-4 w-4 mr-1" />
+              ) : (
+                <Eye className="h-4 w-4 mr-1" />
+              )}
+              {previewUrl ? "Fechar prévia" : "Visualizar recibo"}
             </Button>
             <Button
               onClick={baixarPdf}
@@ -212,6 +254,39 @@ function ReciboPublicoPage() {
               <Download className="h-4 w-4 mr-1" /> Baixar PDF
             </Button>
           </div>
+
+          {previewUrl && (
+            <div className="border-t border-[#EFEADC] bg-[#F5F2EA]">
+              <div className="flex items-center justify-between px-5 py-2 text-xs uppercase tracking-widest text-[#525852]">
+                <span className="flex items-center gap-1">
+                  <Eye className="h-3.5 w-3.5" /> Prévia do PDF
+                </span>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#123F2A] underline"
+                  >
+                    Abrir em nova aba
+                  </a>
+                  <button
+                    onClick={fecharPreview}
+                    className="text-[#525852] hover:text-[#123F2A]"
+                    aria-label="Fechar prévia"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <iframe
+                key={previewUrl}
+                src={previewUrl}
+                title="Prévia do recibo"
+                className="w-full h-[70vh] bg-white border-t border-[#EFEADC]"
+              />
+            </div>
+          )}
         </section>
 
         <div className="mt-4 flex items-start gap-2 text-xs text-[#525852] px-1">
