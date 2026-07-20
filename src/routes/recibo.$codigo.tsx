@@ -348,8 +348,7 @@ export const Route = createFileRoute("/recibo/$codigo")({
     const description =
       "Consulte com segurança o recibo oficial emitido pelo Spa de Pet Tia Jéssica.";
     const url = `https://tia-jessicas-pet-hq.lovable.app/recibo/${params.codigo}`;
-    const image =
-      "https://tia-jessicas-pet-hq.lovable.app/__l5e/assets-v1/5bd8ece7-a30e-4637-988d-0b03ab54ffed/spa-de-pet-logo.png";
+    const image = `https://tia-jessicas-pet-hq.lovable.app${logoAsset.url}`;
     return {
       meta: [
         { title },
