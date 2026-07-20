@@ -191,6 +191,6 @@ export function generateReciboPDF(d: ReciboData, returnBlob = false) {
 
   const fileName = `${isReceita ? "recibo" : "comprovante"}-${d.numero}.pdf`;
   if (returnBlob) return { blob: doc.output("blob") as Blob, fileName };
-  doc.save(fileName);
+  deliverPdf(doc, fileName);
   return { fileName };
 }

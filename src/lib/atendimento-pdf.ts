@@ -441,7 +441,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   if (returnBlob) {
     result.blob = doc.output("blob") as unknown as Blob;
   } else {
-    doc.save(fileName);
+    deliverPdf(doc, fileName);
   }
   return result;
 }

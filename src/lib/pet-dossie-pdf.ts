@@ -428,6 +428,6 @@ export async function generateDossiePDF(opts: DossieOpts): Promise<DossieResult>
   const fileName = `dossie-${(pet?.nome ?? "pet").toString().toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0,10)}.pdf`;
   const fotosIncluidas = Object.keys(fotosLoaded).length;
   if (returnBlob) return { fileName, blob: doc.output("blob") as Blob, fotosIncluidas, fotosFalhas: falhas };
-  doc.save(fileName);
+  deliverPdf(doc, fileName);
   return { fileName, fotosIncluidas, fotosFalhas: falhas };
 }

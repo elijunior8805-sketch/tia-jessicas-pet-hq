@@ -277,7 +277,7 @@ export function generateFinanceiroPDF(d: FinPdfData) {
   addFooter();
 
   const fileName = `financeiro_${d.periodo.de}_a_${d.periodo.ate}.pdf`;
-  doc.save(fileName);
+  deliverPdf(doc, fileName);
   return { fileName };
 }
 
