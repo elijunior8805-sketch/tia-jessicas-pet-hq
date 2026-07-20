@@ -87,6 +87,7 @@ export const registrarAberturaWhatsApp = createServerFn({ method: "POST" })
         atendimento_id: data.atendimento_id ?? null,
         pagamento_id: data.pagamento_id ?? null,
         cobranca_id: data.cobranca_id ?? null,
+        tipo: data.tipo,
         tags: [data.tipo],
         metadata: { destinatario: data.destinatario, telefone: data.telefone },
       });
