@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 const searchSchema = z.object({
   q: z.string().optional(),
   sel: z.string().optional(),
+  vip: z.enum(["1"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/clientes/")({
