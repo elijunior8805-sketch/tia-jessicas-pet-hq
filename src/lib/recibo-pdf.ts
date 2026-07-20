@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { deliverPdf } from "./pdf-open";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],
@@ -12,9 +13,9 @@ const C = {
 
 export type ReciboData = {
   tipo: "receita" | "despesa";
-  numero: string; // ex: RC-20260719-abcd
-  data: string; // yyyy-mm-dd
-  contraparte: string; // cliente ou fornecedor
+  numero: string;
+  data: string;
+  contraparte: string;
   descricao: string;
   valor: number;
   forma?: string | null;
@@ -38,7 +39,6 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
-// Extenso simplificado
 function valorExtenso(valor: number): string {
   const inteiro = Math.floor(valor);
   const centavos = Math.round((valor - inteiro) * 100);
@@ -49,32 +49,75 @@ function valorExtenso(valor: number): string {
   return partes.join(" e ") || "zero real";
 }
 
-export function generateReciboPDF(d: ReciboData, returnBlob = false) {
+// Cache do logo em dataURL para evitar refetch a cada emissão
+let logoDataUrlCache: string | null = null;
+async function getLogoDataUrl(): Promise<string | null> {
+  if (logoDataUrlCache) return logoDataUrlCache;
+  try {
+    const res = await fetch(logoAsset.url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as string);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(blob);
+    });
+    logoDataUrlCache = dataUrl;
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateReciboPDF(d: ReciboData, returnBlob = false) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const M = 40;
 
+  const logo = await getLogoDataUrl();
+
   const isReceita = d.tipo === "receita";
   const titulo = isReceita ? "RECIBO DE PAGAMENTO" : "COMPROVANTE DE DESPESA";
 
-  // Header
+  // ===== Header =====
   doc.setFillColor(...C.forest);
-  doc.rect(0, 0, W, 90, "F");
+  doc.rect(0, 0, W, 100, "F");
   doc.setFillColor(...C.gold);
-  doc.rect(0, 90, W, 3, "F");
+  doc.rect(0, 100, W, 3, "F");
 
+  // Logo em círculo claro à esquerda
+  if (logo) {
+    const logoSize = 60;
+    const cx = M + logoSize / 2;
+    const cy = 50;
+    doc.setFillColor(255, 255, 255);
+    doc.circle(cx, cy, logoSize / 2 + 3, "F");
+    try {
+      doc.addImage(logo, "PNG", M, cy - logoSize / 2, logoSize, logoSize, undefined, "FAST");
+    } catch {
+      /* noop */
+    }
+  }
+
+  const textX = logo ? M + 76 : M;
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text(d.empresa?.nome ?? "Spa de Pet Tia Jessica", M, 40);
+  doc.setFontSize(17);
+  doc.text(d.empresa?.nome ?? "Spa de Pet Tia Jessica", textX, 40);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   const sub = [d.empresa?.cnpj, d.empresa?.telefone, d.empresa?.endereco]
     .filter(Boolean)
     .join(" · ");
-  if (sub) doc.text(sub, M, 58);
+  if (sub) doc.text(sub, textX, 56);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(8);
+  doc.setTextColor(220, 210, 180);
+  doc.text("Cuidado premium para o seu melhor amigo", textX, 72);
 
+  doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text(titulo, W - M, 40, { align: "right" });
@@ -83,8 +126,8 @@ export function generateReciboPDF(d: ReciboData, returnBlob = false) {
   doc.text(`Nº ${d.numero}`, W - M, 58, { align: "right" });
   doc.text(fmtDate(d.data), W - M, 72, { align: "right" });
 
-  // Valor destacado
-  let y = 130;
+  // ===== Valor destacado =====
+  let y = 140;
   doc.setFillColor(...C.cream);
   doc.rect(M, y, W - M * 2, 60, "F");
   doc.setDrawColor(...C.gold);
@@ -108,24 +151,19 @@ export function generateReciboPDF(d: ReciboData, returnBlob = false) {
 
   y += 90;
 
-  // Corpo
+  // ===== Corpo =====
   doc.setTextColor(...C.ink);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
 
-  const declInicio = isReceita
-    ? `Recebemos de `
-    : `Pagamos a `;
-  const declFim = isReceita
-    ? ` a importância acima, referente a:`
-    : ` a importância acima, referente a:`;
-
+  const declInicio = isReceita ? `Recebemos de ` : `Pagamos a `;
+  const declFim = ` a importância acima, referente a:`;
   const parag = `${declInicio}${d.contraparte}${declFim}`;
   const lines = doc.splitTextToSize(parag, W - M * 2);
   doc.text(lines, M, y);
   y += lines.length * 14 + 8;
 
-  // Descrição destacada
+  // Descrição
   doc.setFillColor(248, 246, 240);
   const descLines = doc.splitTextToSize(d.descricao || "—", W - M * 2 - 16);
   const descH = descLines.length * 14 + 20;
@@ -174,7 +212,7 @@ export function generateReciboPDF(d: ReciboData, returnBlob = false) {
   }
 
   // Assinatura
-  y = Math.max(y + 40, H - 140);
+  y = Math.max(y + 40, H - 170);
   doc.setDrawColor(...C.line);
   doc.line(M, y, M + 240, y);
   doc.setFontSize(9);
@@ -182,14 +220,41 @@ export function generateReciboPDF(d: ReciboData, returnBlob = false) {
   doc.text(d.empresa?.nome ?? "Spa de Pet Tia Jessica", M, y + 14);
   doc.text("Emitente", M, y + 26);
 
-  // Rodapé
-  doc.setDrawColor(...C.line);
-  doc.line(M, H - 40, W - M, H - 40);
+  // ===== Rodapé com logo =====
+  const footerTop = H - 60;
+  doc.setFillColor(...C.forest);
+  doc.rect(0, footerTop, W, 60, "F");
+  doc.setFillColor(...C.gold);
+  doc.rect(0, footerTop, W, 2, "F");
+
+  if (logo) {
+    const s = 30;
+    try {
+      doc.addImage(logo, "PNG", M, footerTop + (60 - s) / 2, s, s, undefined, "FAST");
+    } catch {
+      /* noop */
+    }
+  }
+
+  const fx = logo ? M + 42 : M;
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(d.empresa?.nome ?? "Spa de Pet Tia Jessica", fx, footerTop + 24);
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.setTextColor(...C.mute);
+  doc.setTextColor(220, 210, 180);
+  const footSub = [d.empresa?.telefone, d.empresa?.endereco]
+    .filter(Boolean)
+    .join(" · ");
+  if (footSub) doc.text(footSub, fx, footerTop + 38);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
   const gerado = new Date().toLocaleString("pt-BR");
-  doc.text(`Documento gerado em ${gerado}`, M, H - 24);
-  doc.text(`Nº ${d.numero}`, W - M, H - 24, { align: "right" });
+  doc.text(`Nº ${d.numero}`, W - M, footerTop + 24, { align: "right" });
+  doc.setTextColor(220, 210, 180);
+  doc.text(`Emitido em ${gerado}`, W - M, footerTop + 38, { align: "right" });
 
   const fileName = `${isReceita ? "recibo" : "comprovante"}-${d.numero}.pdf`;
   if (returnBlob) return { blob: doc.output("blob") as Blob, fileName };
