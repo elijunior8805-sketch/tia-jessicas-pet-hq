@@ -162,12 +162,18 @@ function ReativacaoPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => {
-            lista.refetch();
-            kpis.refetch();
+          disabled={lista.isFetching || kpis.isFetching}
+          onClick={async () => {
+            await Promise.all([lista.refetch(), kpis.refetch()]);
+            toast.success("Lista atualizada");
           }}
         >
-          <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar
+          {lista.isFetching || kpis.isFetching ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCcw className="mr-2 h-4 w-4" />
+          )}
+          Atualizar
         </Button>
       </div>
 
