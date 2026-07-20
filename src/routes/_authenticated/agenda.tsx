@@ -1089,6 +1089,35 @@ function AgendamentoRow({
 
 // ---------- Novo agendamento ----------
 
+function EnderecoInputs({
+  value,
+  onChange,
+}: {
+  value: { rua?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string; referencia?: string };
+  onChange: (v: any) => void;
+}) {
+  const set = (patch: any) => onChange({ ...value, ...patch });
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+      <Input className="col-span-2 sm:col-span-4" placeholder="Rua/Avenida"
+        value={value.rua ?? ""} onChange={(e) => set({ rua: e.target.value })} />
+      <Input placeholder="Número" value={value.numero ?? ""} onChange={(e) => set({ numero: e.target.value })} />
+      <Input placeholder="CEP" value={value.cep ?? ""} onChange={(e) => set({ cep: e.target.value })} />
+      <Input className="col-span-2 sm:col-span-3" placeholder="Complemento"
+        value={value.complemento ?? ""} onChange={(e) => set({ complemento: e.target.value })} />
+      <Input className="col-span-2 sm:col-span-3" placeholder="Bairro"
+        value={value.bairro ?? ""} onChange={(e) => set({ bairro: e.target.value })} />
+      <Input className="col-span-2 sm:col-span-3" placeholder="Cidade"
+        value={value.cidade ?? ""} onChange={(e) => set({ cidade: e.target.value })} />
+      <Input placeholder="UF" maxLength={2} value={value.estado ?? ""}
+        onChange={(e) => set({ estado: e.target.value.toUpperCase() })} />
+      <Input className="col-span-2 sm:col-span-6" placeholder="Ponto de referência"
+        value={value.referencia ?? ""} onChange={(e) => set({ referencia: e.target.value })} />
+    </div>
+  );
+}
+
+
 type ItemServico = {
   servico_id: string;
   nome: string;
