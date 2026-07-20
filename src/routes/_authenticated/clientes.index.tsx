@@ -255,11 +255,39 @@ function ClientesPage() {
                 </button>
               )}
             </div>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: undefined }), replace: true })}
+                className={cn(
+                  "flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
+                  !onlyVip ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border text-foreground",
+                )}
+              >
+                Todos {totalClientes != null && <span className="opacity-70">({totalClientes})</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: "1" }), replace: true })}
+                className={cn(
+                  "flex-1 px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors inline-flex items-center justify-center gap-1",
+                  onlyVip
+                    ? "bg-[var(--color-gold)] text-primary border-[var(--color-gold)]"
+                    : "bg-background hover:bg-[var(--color-gold)]/10 border-[var(--color-gold)]/40 text-foreground",
+                )}
+                title="Mostrar somente clientes marcados como VIP"
+              >
+                <Star className={cn("h-3.5 w-3.5", onlyVip && "fill-current")} />
+                VIP {totalVip != null && <span className="opacity-80">({totalVip})</span>}
+              </button>
+            </div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center justify-between">
               <span>
                 {searching
-                  ? `${lista.length} resultado${lista.length === 1 ? "" : "s"}`
-                  : "Cadastrados recentemente"}
+                  ? `${lista.length} resultado${lista.length === 1 ? "" : "s"}${onlyVip ? " VIP" : ""}`
+                  : onlyVip
+                    ? "Clientes VIP"
+                    : "Cadastrados recentemente"}
               </span>
               {buscando && searching && <span className="text-primary">Buscando…</span>}
             </div>
