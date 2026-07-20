@@ -442,7 +442,7 @@ export const listarHistoricoMensagens = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     let q = context.supabase
       .from("mensagens")
-      .select("*, clientes(id, nome), profiles!mensagens_autor_id_fkey(id, nome, email)")
+      .select("*, clientes(id, nome)")
       .eq("direcao", "out")
       .order("created_at", { ascending: false })
       .limit(300);
@@ -453,5 +453,16 @@ export const listarHistoricoMensagens = createServerFn({ method: "GET" })
     if (data.ate) q = q.lte("created_at", data.ate);
     const { data: rows, error } = await q;
     if (error) throw error;
-    return rows ?? [];
+
+    // Enriquecer com autor a partir de profiles
+    const autorIds = [...new Set((rows ?? []).map((r: any) => r.autor_id).filter(Boolean))];
+    let autores: Record<string, { nome: string | null; email: string | null }> = {};
+    if (autorIds.length) {
+      const { data: profs } = await context.supabase
+        .from("profiles")
+        .select("id, nome, email")
+        .in("id", autorIds);
+      for (const p of profs ?? []) autores[p.id] = { nome: p.nome, email: p.email };
+    }
+    return (rows ?? []).map((r: any) => ({ ...r, autor: r.autor_id ? autores[r.autor_id] ?? null : null }));
   });
