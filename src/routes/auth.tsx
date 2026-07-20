@@ -164,8 +164,8 @@ function AuthPage() {
     <div className="min-h-screen w-full flex items-center justify-center px-4 py-8 bg-gradient-to-br from-background via-secondary/30 to-accent/40">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-elegant mb-4">
-            <PawPrint className="h-8 w-8" />
+          <div className="inline-flex h-24 w-24 items-center justify-center rounded-2xl bg-white shadow-elegant ring-1 ring-border mb-4 overflow-hidden">
+            <img src={logoAsset.url} alt="Spa de Pet Tia Jéssica" className="h-20 w-20 object-contain" />
           </div>
           <h1 className="font-display text-3xl font-semibold text-primary">Spa de Pet Tia Jéssica</h1>
           <p className="text-sm text-muted-foreground mt-1">Gestão premium para banho e tosa</p>
