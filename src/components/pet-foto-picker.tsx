@@ -13,8 +13,8 @@ type Props = {
   size?: "md" | "lg";
 };
 
-const MAX_MB = 8;
-const ACCEPT = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const MAX_MB = 10;
+const ACCEPT = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
 
 export function PetFotoPicker({ currentPath, onFileChange, onRemoveExisting, size = "lg" }: Props) {
   const [file, setFile] = useState<File | null>(null);
@@ -33,12 +33,14 @@ export function PetFotoPicker({ currentPath, onFileChange, onRemoveExisting, siz
 
   function pick(f: File | null) {
     if (!f) return;
-    if (!ACCEPT.includes(f.type)) {
-      alert("Formato inválido. Use JPG, PNG ou WEBP.");
+    const nameLower = f.name.toLowerCase();
+    const extOk = /\.(jpe?g|png|webp|heic|heif)$/i.test(nameLower);
+    if (!ACCEPT.includes(f.type) && !extOk) {
+      alert("Formato de imagem não aceito. Escolha uma foto JPG, PNG, WEBP ou HEIC.");
       return;
     }
     if (f.size > MAX_MB * 1024 * 1024) {
-      alert(`Imagem muito grande (máx ${MAX_MB} MB).`);
+      alert(`A imagem excede o limite permitido (${MAX_MB} MB). Escolha outra foto ou reduza o tamanho.`);
       return;
     }
     if (preview) URL.revokeObjectURL(preview);
@@ -80,7 +82,7 @@ export function PetFotoPicker({ currentPath, onFileChange, onRemoveExisting, siz
       <input
         ref={fileInput}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
         className="hidden"
         onChange={(e) => pick(e.target.files?.[0] ?? null)}
       />
@@ -94,12 +96,12 @@ export function PetFotoPicker({ currentPath, onFileChange, onRemoveExisting, siz
       />
 
       <div className="flex flex-wrap justify-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => camInput.current?.click()} className="gap-1">
+          <Camera className="h-3.5 w-3.5" /> Tirar foto
+        </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()} className="gap-1">
           {showUrl ? <RefreshCw className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-          {showUrl ? "Substituir" : "Enviar"}
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => camInput.current?.click()} className="gap-1">
-          <Camera className="h-3.5 w-3.5" /> Câmera
+          {showUrl ? "Substituir" : "Da galeria"}
         </Button>
         {(showUrl || file) && (
           <Button
@@ -113,7 +115,7 @@ export function PetFotoPicker({ currentPath, onFileChange, onRemoveExisting, siz
           </Button>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground text-center">JPG, PNG ou WEBP · até {MAX_MB} MB</p>
+      <p className="text-[11px] text-muted-foreground text-center">JPG, PNG, WEBP ou HEIC · até {MAX_MB} MB</p>
     </div>
   );
 }
