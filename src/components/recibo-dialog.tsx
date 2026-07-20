@@ -414,7 +414,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             className="text-sm font-normal resize-none"
           />
           <p className="text-[11px] text-muted-foreground">
-            Variáveis: {"{contraparte}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}, {"{link}"}.
+            Variáveis: {"{contraparte}"}, {"{pet}"}, {"{valor}"}, {"{numero}"}, {"{descricao}"}, {"{data}"}, {"{forma}"}, {"{assinatura}"}, {"{link}"}.
           </p>
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
