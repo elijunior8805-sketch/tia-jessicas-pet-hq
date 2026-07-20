@@ -18,7 +18,7 @@ import {
   overviewSeguranca,
   listarAuditoria,
 } from "@/lib/users.functions";
-import { PageShell } from "@/components/page-shell";
+import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,12 +146,13 @@ function UsuariosPage() {
   }, [users.data, busca]);
 
   return (
-    <PageShell
-      title="Usuários e Acessos"
-      description="Central de segurança, permissões e histórico de atividades."
-      icon={<Shield className="h-6 w-6" />}
-      actions={<ConvidarDialog onDone={() => { qc.invalidateQueries({ queryKey: ["users.list"] }); qc.invalidateQueries({ queryKey: ["users.invites"] }); }} />}
-    >
+    <PageShell>
+      <PageHeader
+        title="Usuários e Acessos"
+        description="Central de segurança, permissões e histórico de atividades."
+        icon={Shield}
+        actions={<ConvidarDialog onDone={() => { qc.invalidateQueries({ queryKey: ["users.list"] }); qc.invalidateQueries({ queryKey: ["users.invites"] }); }} />}
+      />
       <Tabs defaultValue="visao">
         <TabsList className="mb-4">
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
