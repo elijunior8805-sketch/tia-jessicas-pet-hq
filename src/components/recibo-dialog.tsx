@@ -484,6 +484,15 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             </Button>
           )}
           <Button
+            variant="secondary"
+            onClick={baixarEAbrirWhats}
+            disabled={!numero || !confirmado}
+            className="w-full sm:w-auto"
+            title="Baixa o PDF e abre a conversa do cliente com orientação para anexar"
+          >
+            <FileDown className="h-4 w-4 mr-1" /> Baixar PDF e abrir WhatsApp
+          </Button>
+          <Button
             onClick={enviarWhats}
             disabled={!numero || enviando || !confirmado}
             className="w-full sm:w-auto"
