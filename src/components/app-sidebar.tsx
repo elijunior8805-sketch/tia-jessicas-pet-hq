@@ -23,6 +23,7 @@ import {
   PawPrint,
   Cake,
 } from "lucide-react";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import { useMyAccess } from "@/hooks/use-my-permissions";
 import {
   Sidebar,
