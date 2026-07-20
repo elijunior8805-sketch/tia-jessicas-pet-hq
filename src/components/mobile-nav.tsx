@@ -127,8 +127,8 @@ export function MobileNav() {
               >
                 <SheetHeader className="px-5 pt-5 pb-4 border-b border-sidebar-border">
                   <SheetTitle className="flex items-center gap-3 text-sidebar-foreground">
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                      <PawPrint className="h-5 w-5" />
+                    <span className="grid h-10 w-10 place-items-center rounded-lg bg-white shadow-sm ring-1 ring-sidebar-border overflow-hidden">
+                      <img src={logoAsset.url} alt="Spa de Pet Tia Jéssica" className="h-8 w-8 object-contain" />
                     </span>
                     <span className="flex flex-col text-left">
                       <span className="font-display text-base font-semibold">Tia Jéssica</span>
