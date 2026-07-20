@@ -72,6 +72,7 @@ export type Database = {
           busca_hora: string | null
           cliente_id: string
           created_at: string
+          created_by: string | null
           data: string
           duracao_min: number
           entrega_data: string | null
@@ -93,7 +94,9 @@ export type Database = {
           status: Database["public"]["Enums"]["agendamento_status"]
           taxa_leva_traz: number
           updated_at: string
+          updated_by: string | null
           valor_previsto: number
+          version: number
         }
         Insert: {
           busca_data?: string | null
@@ -101,6 +104,7 @@ export type Database = {
           busca_hora?: string | null
           cliente_id: string
           created_at?: string
+          created_by?: string | null
           data: string
           duracao_min?: number
           entrega_data?: string | null
@@ -122,7 +126,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["agendamento_status"]
           taxa_leva_traz?: number
           updated_at?: string
+          updated_by?: string | null
           valor_previsto?: number
+          version?: number
         }
         Update: {
           busca_data?: string | null
@@ -130,6 +136,7 @@ export type Database = {
           busca_hora?: string | null
           cliente_id?: string
           created_at?: string
+          created_by?: string | null
           data?: string
           duracao_min?: number
           entrega_data?: string | null
@@ -151,7 +158,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["agendamento_status"]
           taxa_leva_traz?: number
           updated_at?: string
+          updated_by?: string | null
           valor_previsto?: number
+          version?: number
         }
         Relationships: [
           {
@@ -207,6 +216,7 @@ export type Database = {
           cliente_id: string
           comportamentos: string[] | null
           created_at: string
+          created_by: string | null
           data_fim: string | null
           data_inicio: string
           desconto: number
@@ -238,10 +248,12 @@ export type Database = {
           servicos_solicitados: Json
           taxa_leva_traz: number
           updated_at: string
+          updated_by: string | null
           usou_focinheira: boolean
           valor_executado: number
           valor_pago: number
           valor_planejado: number
+          version: number
         }
         Insert: {
           agendamento_id?: string | null
@@ -251,6 +263,7 @@ export type Database = {
           cliente_id: string
           comportamentos?: string[] | null
           created_at?: string
+          created_by?: string | null
           data_fim?: string | null
           data_inicio?: string
           desconto?: number
@@ -282,10 +295,12 @@ export type Database = {
           servicos_solicitados?: Json
           taxa_leva_traz?: number
           updated_at?: string
+          updated_by?: string | null
           usou_focinheira?: boolean
           valor_executado?: number
           valor_pago?: number
           valor_planejado?: number
+          version?: number
         }
         Update: {
           agendamento_id?: string | null
@@ -295,6 +310,7 @@ export type Database = {
           cliente_id?: string
           comportamentos?: string[] | null
           created_at?: string
+          created_by?: string | null
           data_fim?: string | null
           data_inicio?: string
           desconto?: number
@@ -326,10 +342,12 @@ export type Database = {
           servicos_solicitados?: Json
           taxa_leva_traz?: number
           updated_at?: string
+          updated_by?: string | null
           usou_focinheira?: boolean
           valor_executado?: number
           valor_pago?: number
           valor_planejado?: number
+          version?: number
         }
         Relationships: [
           {
@@ -605,6 +623,7 @@ export type Database = {
           complemento: string | null
           cpf: string | null
           created_at: string
+          created_by: string | null
           email: string | null
           estado: string | null
           foto_url: string | null
@@ -617,6 +636,8 @@ export type Database = {
           rua: string | null
           telefone: string | null
           updated_at: string
+          updated_by: string | null
+          version: number
           vip: boolean
           whatsapp: string | null
         }
@@ -628,6 +649,7 @@ export type Database = {
           complemento?: string | null
           cpf?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string | null
           estado?: string | null
           foto_url?: string | null
@@ -640,6 +662,8 @@ export type Database = {
           rua?: string | null
           telefone?: string | null
           updated_at?: string
+          updated_by?: string | null
+          version?: number
           vip?: boolean
           whatsapp?: string | null
         }
@@ -651,6 +675,7 @@ export type Database = {
           complemento?: string | null
           cpf?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string | null
           estado?: string | null
           foto_url?: string | null
@@ -663,6 +688,8 @@ export type Database = {
           rua?: string | null
           telefone?: string | null
           updated_at?: string
+          updated_by?: string | null
+          version?: number
           vip?: boolean
           whatsapp?: string | null
         }
@@ -673,6 +700,7 @@ export type Database = {
           atendimento_id: string | null
           cliente_id: string
           created_at: string
+          created_by: string | null
           id: string
           pagamento_id: string
           pausada: boolean
@@ -683,14 +711,17 @@ export type Database = {
           tentativas: number
           ultima_cobranca_em: string | null
           updated_at: string
+          updated_by: string | null
           valor_original: number
           valor_pago: number
           vencimento: string
+          version: number
         }
         Insert: {
           atendimento_id?: string | null
           cliente_id: string
           created_at?: string
+          created_by?: string | null
           id?: string
           pagamento_id: string
           pausada?: boolean
@@ -701,14 +732,17 @@ export type Database = {
           tentativas?: number
           ultima_cobranca_em?: string | null
           updated_at?: string
+          updated_by?: string | null
           valor_original: number
           valor_pago?: number
           vencimento: string
+          version?: number
         }
         Update: {
           atendimento_id?: string | null
           cliente_id?: string
           created_at?: string
+          created_by?: string | null
           id?: string
           pagamento_id?: string
           pausada?: boolean
@@ -719,9 +753,11 @@ export type Database = {
           tentativas?: number
           ultima_cobranca_em?: string | null
           updated_at?: string
+          updated_by?: string | null
           valor_original?: number
           valor_pago?: number
           vencimento?: string
+          version?: number
         }
         Relationships: [
           {
@@ -1402,6 +1438,7 @@ export type Database = {
           alergias_snapshot: string | null
           cliente_id: string
           created_at: string
+          created_by: string | null
           data: string
           endereco: Json
           hora_prevista: string
@@ -1414,13 +1451,16 @@ export type Database = {
           temperamento_snapshot: string | null
           tipo: Database["public"]["Enums"]["leva_traz_tipo"]
           updated_at: string
+          updated_by: string | null
           valor_rateado: number
+          version: number
         }
         Insert: {
           agendamento_id: string
           alergias_snapshot?: string | null
           cliente_id: string
           created_at?: string
+          created_by?: string | null
           data: string
           endereco: Json
           hora_prevista: string
@@ -1433,13 +1473,16 @@ export type Database = {
           temperamento_snapshot?: string | null
           tipo: Database["public"]["Enums"]["leva_traz_tipo"]
           updated_at?: string
+          updated_by?: string | null
           valor_rateado?: number
+          version?: number
         }
         Update: {
           agendamento_id?: string
           alergias_snapshot?: string | null
           cliente_id?: string
           created_at?: string
+          created_by?: string | null
           data?: string
           endereco?: Json
           hora_prevista?: string
@@ -1452,7 +1495,9 @@ export type Database = {
           temperamento_snapshot?: string | null
           tipo?: Database["public"]["Enums"]["leva_traz_tipo"]
           updated_at?: string
+          updated_by?: string | null
           valor_rateado?: number
+          version?: number
         }
         Relationships: [
           {
@@ -1774,6 +1819,7 @@ export type Database = {
           categoria_receita: string | null
           cliente_id: string | null
           created_at: string
+          created_by: string | null
           data_pagamento: string | null
           descricao: string | null
           forma: Database["public"]["Enums"]["pagamento_forma"]
@@ -1783,15 +1829,18 @@ export type Database = {
           responsavel_id: string | null
           status: Database["public"]["Enums"]["pagamento_status"]
           updated_at: string
+          updated_by: string | null
           valor_pago: number
           valor_total: number
           vencimento: string | null
+          version: number
         }
         Insert: {
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
           created_at?: string
+          created_by?: string | null
           data_pagamento?: string | null
           descricao?: string | null
           forma?: Database["public"]["Enums"]["pagamento_forma"]
@@ -1801,15 +1850,18 @@ export type Database = {
           responsavel_id?: string | null
           status?: Database["public"]["Enums"]["pagamento_status"]
           updated_at?: string
+          updated_by?: string | null
           valor_pago?: number
           valor_total: number
           vencimento?: string | null
+          version?: number
         }
         Update: {
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
           created_at?: string
+          created_by?: string | null
           data_pagamento?: string | null
           descricao?: string | null
           forma?: Database["public"]["Enums"]["pagamento_forma"]
@@ -1819,9 +1871,11 @@ export type Database = {
           responsavel_id?: string | null
           status?: Database["public"]["Enums"]["pagamento_status"]
           updated_at?: string
+          updated_by?: string | null
           valor_pago?: number
           valor_total?: number
           vencimento?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -1907,6 +1961,7 @@ export type Database = {
           cliente_id: string
           cor: string | null
           created_at: string
+          created_by: string | null
           cuidados_saude: string | null
           foto_url: string | null
           id: string
@@ -1924,6 +1979,8 @@ export type Database = {
           ultima_tosa: string | null
           ultimo_banho: string | null
           updated_at: string
+          updated_by: string | null
+          version: number
         }
         Insert: {
           alergias?: string | null
@@ -1932,6 +1989,7 @@ export type Database = {
           cliente_id: string
           cor?: string | null
           created_at?: string
+          created_by?: string | null
           cuidados_saude?: string | null
           foto_url?: string | null
           id?: string
@@ -1949,6 +2007,8 @@ export type Database = {
           ultima_tosa?: string | null
           ultimo_banho?: string | null
           updated_at?: string
+          updated_by?: string | null
+          version?: number
         }
         Update: {
           alergias?: string | null
@@ -1957,6 +2017,7 @@ export type Database = {
           cliente_id?: string
           cor?: string | null
           created_at?: string
+          created_by?: string | null
           cuidados_saude?: string | null
           foto_url?: string | null
           id?: string
@@ -1974,6 +2035,8 @@ export type Database = {
           ultima_tosa?: string | null
           ultimo_banho?: string | null
           updated_at?: string
+          updated_by?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -2609,6 +2672,10 @@ export type Database = {
       }
     }
     Functions: {
+      atualizar_agendamento_seguro: {
+        Args: { _id: string; _payload: Json; _version: number }
+        Returns: number
+      }
       claim_lembretes_pendentes: {
         Args: { _limit?: number }
         Returns: {
@@ -2641,6 +2708,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      criar_agendamento_seguro: { Args: { _payload: Json }; Returns: string }
       endereco_cliente_jsonb: { Args: { _cliente_id: string }; Returns: Json }
       enfileirar_lembretes: { Args: never; Returns: Json }
       excluir_atendimento: {
@@ -2690,6 +2758,16 @@ export type Database = {
           _tutor: string
         }
         Returns: string
+      }
+      verificar_conflito_agendamento: {
+        Args: {
+          _data: string
+          _duracao_min: number
+          _hora: string
+          _ignorar_id?: string
+          _profissional_id: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

@@ -10,6 +10,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 import { NotificationBell } from "@/components/notification-bell";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { SyncStatusBadge } from "@/components/sync-status";
 
 
 
@@ -28,6 +30,7 @@ function AuthenticatedLayout() {
   const queryClient = useQueryClient();
   const { data: profile } = useMyProfile();
   const name = displayName(profile);
+  const syncStatus = useRealtimeSync();
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
@@ -50,6 +53,7 @@ function AuthenticatedLayout() {
               </span>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              <SyncStatusBadge status={syncStatus} />
               <NotificationBell />
 
               <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-border/60">
