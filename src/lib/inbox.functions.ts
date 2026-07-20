@@ -148,7 +148,7 @@ export const getThread = createServerFn({ method: "GET" })
         .maybeSingle(),
       context.supabase
         .from("pets")
-        .select("id, nome, especie, porte")
+        .select("id, nome, porte")
         .eq("cliente_id", data.cliente_id)
         .eq("ativo", true)
         .order("created_at"),
