@@ -1523,7 +1523,7 @@ function NovoAgendamentoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">Novo agendamento</DialogTitle>
+          <DialogTitle className="font-display">{isEdit ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
           <DialogDescription>
             Adicione um ou mais serviços — o valor e a duração totais são calculados automaticamente.
           </DialogDescription>
