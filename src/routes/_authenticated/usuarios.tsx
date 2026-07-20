@@ -495,19 +495,51 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
 }
 
 // ============ PERMISSÕES ============
-function PermissoesDialog({ userId, nome }: { userId: string; nome: string }) {
+
+const GRUPOS_MODULOS: Array<{ titulo: string; modulos: string[] }> = [
+  { titulo: "Operação", modulos: ["dashboard", "agenda", "clientes", "pets", "atendimentos", "servicos", "leva_traz"] },
+  { titulo: "Financeiro", modulos: ["financeiro", "cobrancas", "compras", "fornecedores", "estoque"] },
+  { titulo: "Comunicação e Relatórios", modulos: ["comunicacao", "inbox", "campanhas", "lembretes", "aniversarios", "reativacao", "relatorios"] },
+  { titulo: "Configurações e Segurança", modulos: ["usuarios", "configuracoes", "auditoria"] },
+];
+
+const ACOES_SENSIVEIS = new Set(["excluir", "valores", "confidencial"]);
+
+const PRESETS = [
+  { key: "none", label: "Nenhum acesso", acoes: [] as string[] },
+  { key: "view", label: "Somente visualizar", acoes: ["visualizar"] },
+  { key: "edit", label: "Editar", acoes: ["visualizar", "criar", "editar"] },
+  { key: "full", label: "Acesso total", acoes: ACOES.map((a) => a.key) },
+] as const;
+
+function detectarPreset(rowState: Record<string, boolean>): string {
+  const marcadas = ACOES.filter((a) => rowState[a.key]).map((a) => a.key).sort();
+  for (const p of PRESETS) {
+    const ref = [...p.acoes].sort();
+    if (marcadas.length === ref.length && marcadas.every((k, i) => k === ref[i])) return p.key;
+  }
+  return "custom";
+}
+
+function moduloNome(m: string) {
+  return m.replace(/_/g, " ");
+}
+
+function PermissoesDialog({ userId, nome, perfil }: { userId: string; nome: string; perfil: string }) {
   const [open, setOpen] = useState(false);
   const listar = useServerFn(listarPermissoes);
   const salvar = useServerFn(salvarPermissoes);
   const { data, refetch } = useQuery({
     queryKey: ["users.perms", userId],
-    enabled: open,
+    enabled: open && perfil !== "proprietario",
     queryFn: () => listar({ data: { userId } }),
   });
-  const [grid, setGrid] = useState<Record<string, Record<string, boolean>>>({});
+
+  const isOwner = perfil === "proprietario";
 
   const initGrid = useMemo(() => {
     const g: Record<string, Record<string, boolean>> = {};
+    MODULOS.forEach((m) => { g[m] = {}; ACOES.forEach((a) => { g[m][a.key] = false; }); });
     (data ?? []).forEach((p: any) => {
       g[p.modulo] = g[p.modulo] ?? {};
       g[p.modulo][p.acao] = !!p.permitido;
@@ -515,68 +547,352 @@ function PermissoesDialog({ userId, nome }: { userId: string; nome: string }) {
     return g;
   }, [data]);
 
+  const [grid, setGrid] = useState<Record<string, Record<string, boolean>>>({});
+  const [busca, setBusca] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Sincroniza grid quando dados chegam
+  useMemo(() => {
+    if (Object.keys(grid).length === 0 && Object.keys(initGrid).length > 0) {
+      setGrid(initGrid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initGrid]);
+
   const current = Object.keys(grid).length ? grid : initGrid;
+
+  function setModuloPreset(modulo: string, presetKey: string) {
+    const preset = PRESETS.find((p) => p.key === presetKey);
+    if (!preset) return;
+    setGrid((prev) => {
+      const base = Object.keys(prev).length ? prev : initGrid;
+      const g = { ...base, [modulo]: { ...(base[modulo] ?? {}) } };
+      ACOES.forEach((a) => { g[modulo][a.key] = preset.acoes.includes(a.key); });
+      return g;
+    });
+  }
+
+  function toggleCell(modulo: string, acao: string) {
+    setGrid((prev) => {
+      const base = Object.keys(prev).length ? prev : initGrid;
+      const g = { ...base, [modulo]: { ...(base[modulo] ?? {}) } };
+      g[modulo][acao] = !g[modulo][acao];
+      return g;
+    });
+  }
+
+  function toggleColuna(acao: string, ativar: boolean) {
+    setGrid((prev) => {
+      const base = Object.keys(prev).length ? prev : initGrid;
+      const g: Record<string, Record<string, boolean>> = { ...base };
+      MODULOS.forEach((m) => { g[m] = { ...(g[m] ?? {}) }; g[m][acao] = ativar; });
+      return g;
+    });
+  }
+
+  const modulosFiltrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return null;
+    return new Set(MODULOS.filter((m) => moduloNome(m).toLowerCase().includes(q)));
+  }, [busca]);
+
+  const diff = useMemo(() => {
+    let adicionadas = 0;
+    let removidas = 0;
+    const detalhes: Array<{ modulo: string; acao: string; op: "add" | "del" }> = [];
+    MODULOS.forEach((m) => {
+      ACOES.forEach((a) => {
+        const before = !!initGrid[m]?.[a.key];
+        const after = !!current[m]?.[a.key];
+        if (before !== after) {
+          if (after) { adicionadas++; detalhes.push({ modulo: m, acao: a.key, op: "add" }); }
+          else { removidas++; detalhes.push({ modulo: m, acao: a.key, op: "del" }); }
+        }
+      });
+    });
+    return { adicionadas, removidas, detalhes };
+  }, [current, initGrid]);
 
   const m = useMutation({
     mutationFn: async () => {
       const rows: Array<{ modulo: string; acao: string; permitido: boolean }> = [];
       Object.entries(current).forEach(([modulo, acoes]) => {
         Object.entries(acoes).forEach(([acao, permitido]) => {
-          if (permitido) rows.push({ modulo, acao, permitido });
+          if (permitido) rows.push({ modulo, acao, permitido: true });
         });
       });
       return salvar({ data: { userId, permissoes: rows } });
     },
-    onSuccess: () => { toast.success("Permissões salvas"); setOpen(false); refetch(); },
-    onError: (e: any) => toast.error(e?.message ?? "Falha"),
+    onSuccess: () => {
+      toast.success("Permissões salvas");
+      setConfirmOpen(false);
+      setOpen(false);
+      setGrid({});
+      refetch();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao salvar"),
   });
 
-  function toggle(m: string, a: string) {
-    setGrid((prev) => {
-      const g = { ...(Object.keys(prev).length ? prev : initGrid) };
-      g[m] = { ...(g[m] ?? {}) };
-      g[m][a] = !g[m][a];
-      return g;
-    });
-  }
+  const colunaMasterEstado = (acao: string): boolean | "indeterminate" => {
+    const vals = MODULOS.map((mm) => !!current[mm]?.[acao]);
+    if (vals.every(Boolean)) return true;
+    if (vals.every((v) => !v)) return false;
+    return "indeterminate";
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setGrid({}); }}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setGrid({}); setBusca(""); } }}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">Permissões</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader><DialogTitle>Permissões — {nome}</DialogTitle></DialogHeader>
-        <div className="overflow-auto flex-1 -mx-6 px-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 bg-background">Módulo</TableHead>
-                {ACOES.map((a) => <TableHead key={a.key} className="text-center text-xs">{a.label}</TableHead>)}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {MODULOS.map((m) => (
-                <TableRow key={m}>
-                  <TableCell className="sticky left-0 bg-background font-medium capitalize">{m.replace(/_/g, " ")}</TableCell>
-                  {ACOES.map((a) => (
-                    <TableCell key={a.key} className="text-center">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-4 w-4" /> Permissões — {nome}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isOwner ? (
+          <div className="flex-1 flex items-center justify-center py-10">
+            <div className="max-w-md text-center space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-6">
+              <Shield className="h-10 w-10 mx-auto text-amber-500" />
+              <div className="text-base font-semibold">Este usuário é Proprietário</div>
+              <p className="text-sm text-muted-foreground">
+                Proprietários têm acesso completo ao sistema e não podem ser editados por aqui.
+                Alterações de escopo devem ser feitas ajustando o perfil na linha do usuário.
+              </p>
+              <Button variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar módulo…"
+                  className="pl-8"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Colunas destacadas (<span className="text-red-600 font-medium">Excluir</span>,{" "}
+                <span className="text-red-600 font-medium">Ver valores</span>,{" "}
+                <span className="text-red-600 font-medium">Confidenciais</span>) são permissões sensíveis.
+              </div>
+            </div>
+
+            <div className="overflow-auto flex-1 -mx-6 px-6 py-2 space-y-4">
+              {/* Cabeçalho de colunas com master */}
+              <div className="hidden md:grid gap-2 items-end sticky top-0 bg-background z-10 pb-2 border-b"
+                   style={{ gridTemplateColumns: "minmax(180px,1.4fr) 200px repeat(8, minmax(0,1fr))" }}>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Módulo</div>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preset rápido</div>
+                {ACOES.map((a) => {
+                  const sens = ACOES_SENSIVEIS.has(a.key);
+                  const st = colunaMasterEstado(a.key);
+                  return (
+                    <div key={a.key} className={"flex flex-col items-center gap-1 text-xs " + (sens ? "text-red-600" : "text-muted-foreground")}>
+                      <span className="font-medium text-center leading-tight">{a.label}</span>
                       <Checkbox
-                        checked={!!current[m]?.[a.key]}
-                        onCheckedChange={() => toggle(m, a.key)}
+                        checked={st === true ? true : st === "indeterminate" ? "indeterminate" as any : false}
+                        onCheckedChange={(v) => toggleColuna(a.key, !!v)}
+                        aria-label={`Marcar ${a.label} em todos os módulos`}
                       />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? "Salvando…" : "Salvar permissões"}</Button>
-        </DialogFooter>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {GRUPOS_MODULOS.map((grupo) => {
+                const modulosVisiveis = grupo.modulos.filter((mm) => !modulosFiltrados || modulosFiltrados.has(mm));
+                if (modulosVisiveis.length === 0) return null;
+                return (
+                  <GrupoModulos
+                    key={grupo.titulo}
+                    titulo={grupo.titulo}
+                    modulos={modulosVisiveis}
+                    current={current}
+                    onPreset={setModuloPreset}
+                    onToggleCell={toggleCell}
+                  />
+                );
+              })}
+            </div>
+
+            <DialogFooter className="border-t pt-3 flex-col sm:flex-row gap-2">
+              <div className="text-xs text-muted-foreground sm:mr-auto">
+                {diff.adicionadas + diff.removidas === 0
+                  ? "Nenhuma alteração pendente."
+                  : <>Pendente: <b className="text-emerald-700">+{diff.adicionadas}</b> adicionadas, <b className="text-red-600">−{diff.removidas}</b> removidas.</>}
+              </div>
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button
+                onClick={() => setConfirmOpen(true)}
+                disabled={m.isPending || (diff.adicionadas + diff.removidas === 0)}
+              >
+                Salvar permissões
+              </Button>
+            </DialogFooter>
+
+            {/* Resumo de mudanças */}
+            <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar alterações</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 text-sm">
+                  <div className="flex gap-4">
+                    <div className="rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 flex-1 text-center">
+                      <div className="text-2xl font-semibold">{diff.adicionadas}</div>
+                      <div className="text-xs uppercase tracking-wider">Adicionadas</div>
+                    </div>
+                    <div className="rounded-lg bg-red-50 text-red-800 px-3 py-2 flex-1 text-center">
+                      <div className="text-2xl font-semibold">{diff.removidas}</div>
+                      <div className="text-xs uppercase tracking-wider">Removidas</div>
+                    </div>
+                  </div>
+                  <div className="max-h-60 overflow-auto border rounded-md divide-y text-xs">
+                    {diff.detalhes.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-1.5">
+                        <span className="capitalize">
+                          <span className={d.op === "add" ? "text-emerald-700 font-semibold mr-1" : "text-red-600 font-semibold mr-1"}>
+                            {d.op === "add" ? "+" : "−"}
+                          </span>
+                          {moduloNome(d.modulo)}
+                        </span>
+                        <span className={"text-muted-foreground " + (ACOES_SENSIVEIS.has(d.acao) ? "text-red-600" : "")}>
+                          {ACOES.find((a) => a.key === d.acao)?.label ?? d.acao}
+                        </span>
+                      </div>
+                    ))}
+                    {diff.detalhes.length === 0 && (
+                      <div className="p-3 text-center text-muted-foreground">Sem alterações.</div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    A alteração será registrada na auditoria com data, autor e conteúdo modificado.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmOpen(false)}>Revisar</Button>
+                  <Button onClick={() => m.mutate()} disabled={m.isPending}>
+                    {m.isPending ? "Salvando…" : "Confirmar e salvar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function GrupoModulos({
+  titulo, modulos, current, onPreset, onToggleCell,
+}: {
+  titulo: string;
+  modulos: string[];
+  current: Record<string, Record<string, boolean>>;
+  onPreset: (modulo: string, preset: string) => void;
+  onToggleCell: (modulo: string, acao: string) => void;
+}) {
+  const [aberto, setAberto] = useState(true);
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/60 text-sm font-semibold"
+      >
+        <span>{titulo}</span>
+        <span className="text-xs text-muted-foreground">{aberto ? "Recolher" : "Expandir"} ({modulos.length})</span>
+      </button>
+      {aberto && (
+        <div className="divide-y">
+          {modulos.map((mm) => {
+            const rowState = current[mm] ?? {};
+            const presetAtual = detectarPreset(rowState);
+            return (
+              <div key={mm}>
+                {/* Desktop: linha em grid */}
+                <div className="hidden md:grid gap-2 items-center px-3 py-2"
+                     style={{ gridTemplateColumns: "minmax(180px,1.4fr) 200px repeat(8, minmax(0,1fr))" }}>
+                  <div className="font-medium capitalize">{moduloNome(mm)}</div>
+                  <Select
+                    value={presetAtual === "custom" ? "" : presetAtual}
+                    onValueChange={(v) => onPreset(mm, v)}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder={presetAtual === "custom" ? "Personalizado" : "Preset"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRESETS.map((p) => (
+                        <SelectItem key={p.key} value={p.key} className="text-xs">{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {ACOES.map((a) => {
+                    const sens = ACOES_SENSIVEIS.has(a.key);
+                    const on = !!rowState[a.key];
+                    return (
+                      <div key={a.key} className="flex justify-center">
+                        <Checkbox
+                          checked={on}
+                          onCheckedChange={() => onToggleCell(mm, a.key)}
+                          className={sens && on ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
+                          aria-label={`${a.label} em ${mm}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Mobile: empilhado */}
+                <div className="md:hidden px-3 py-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium capitalize">{moduloNome(mm)}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {presetAtual === "custom" ? "Personalizado" : PRESETS.find((p) => p.key === presetAtual)?.label}
+                    </div>
+                  </div>
+                  <Select
+                    value={presetAtual === "custom" ? "" : presetAtual}
+                    onValueChange={(v) => onPreset(mm, v)}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Preset rápido" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRESETS.map((p) => (
+                        <SelectItem key={p.key} value={p.key} className="text-xs">{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ACOES.map((a) => {
+                      const sens = ACOES_SENSIVEIS.has(a.key);
+                      const on = !!rowState[a.key];
+                      return (
+                        <label key={a.key} className={"flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs " + (sens ? "border-red-200" : "")}>
+                          <Checkbox
+                            checked={on}
+                            onCheckedChange={() => onToggleCell(mm, a.key)}
+                            className={sens && on ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
+                          />
+                          <span className={sens ? "text-red-700" : ""}>{a.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
