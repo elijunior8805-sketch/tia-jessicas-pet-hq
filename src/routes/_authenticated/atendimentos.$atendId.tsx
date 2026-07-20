@@ -315,7 +315,7 @@ function UploadButton({
         <Camera className="h-4 w-4" /> {busy ? "Enviando…" : "Tirar foto"}
       </button>
       <button type="button" onClick={() => fileRef.current?.click()} className={btnCls} disabled={disabled || busy}>
-        <Upload className="h-4 w-4" /> {label === "Adicionar foto" ? "Da galeria" : label}
+        <Upload className="h-4 w-4" /> {label === "Adicionar foto" ? "Carregar arquivo" : label}
       </button>
     </div>
   );

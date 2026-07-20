@@ -101,7 +101,7 @@ export function PetFotoPicker({ currentPath, onFileChange, onRemoveExisting, siz
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()} className="gap-1">
           {showUrl ? <RefreshCw className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-          {showUrl ? "Substituir" : "Da galeria"}
+          {showUrl ? "Substituir" : "Carregar arquivo"}
         </Button>
         {(showUrl || file) && (
           <Button
