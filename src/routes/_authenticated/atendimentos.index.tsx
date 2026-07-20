@@ -9,12 +9,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   Clock, PawPrint, User, PlayCircle, ArrowRight, ClipboardCheck,
-  AlertTriangle, Sparkles, ListChecks,
+  AlertTriangle, Sparkles, ListChecks, Star,
 } from "lucide-react";
 import { brl, itemFromServico } from "@/lib/atendimento-utils";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { cn } from "@/lib/utils";
+import { z } from "zod";
+
+const searchSchema = z.object({
+  vip: z.enum(["1"]).optional(),
+});
 
 export const Route = createFileRoute("/_authenticated/atendimentos/")({
+  validateSearch: (s) => searchSchema.parse(s),
   component: AtendimentosPainel,
 });
 
