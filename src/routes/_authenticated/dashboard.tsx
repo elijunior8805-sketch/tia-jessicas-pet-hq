@@ -69,7 +69,7 @@ function DashboardPage() {
       const [pagRes, comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
         supabase.from("pagamentos").select("valor_pago,data_pagamento,valor_total,status").gte("data_pagamento", from).lte("data_pagamento", to),
         supabase.from("compras_parcelas").select("valor_pago,data_pagamento").gte("data_pagamento", from).lte("data_pagamento", to),
-        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio").gte("data_inicio", `${from}T00:00:00`).lte("data_inicio", `${to}T23:59:59`),
+        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio,encerrado_em,finalizado").gte("data_inicio", `${from}T00:00:00`).lte("data_inicio", `${to}T23:59:59`),
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
           .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
@@ -89,14 +89,14 @@ function DashboardPage() {
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const lucro = faturamento - despesas;
       const atendCount = atendimentos.length;
-      const somaAtend = atendimentos.reduce((s, a) => {
+      // Ticket Médio: apenas atendimentos efetivamente executados (encerrados/finalizados
+      // com valor_executado > 0). Sem execução real, retorna 0 -> exibe "—".
+      const executados = atendimentos.filter((a) => {
         const exec = Number(a.valor_executado ?? 0);
-        const plan = Number((a as any).valor_planejado ?? 0);
-        return s + (exec > 0 ? exec : plan);
-      }, 0);
-      const bilhete = atendCount > 0
-        ? (somaAtend > 0 ? somaAtend / atendCount : faturamento / atendCount)
-        : 0;
+        return exec > 0 && (a.encerrado_em || (a as any).finalizado);
+      });
+      const somaExec = executados.reduce((s, a) => s + Number(a.valor_executado ?? 0), 0);
+      const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
 
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
       const serie = dias.map((d) => {
