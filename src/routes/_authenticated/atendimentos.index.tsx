@@ -153,7 +153,26 @@ function AtendimentosPainel() {
       <PageHeader
         title="Atendimentos"
         description="Check-in, execução e check-out dos pets do dia."
-      />
+        actions={
+          <Button
+            variant={onlyVip ? "default" : "outline"}
+            className={cn(
+              "gap-1.5",
+              onlyVip && "bg-[var(--color-gold)] text-primary hover:bg-[var(--color-gold)]/90 border-[var(--color-gold)]",
+            )}
+            onClick={() =>
+              navigate({
+                to: "/atendimentos",
+                search: (prev: any) => ({ ...prev, vip: onlyVip ? undefined : "1" }),
+                replace: true,
+              })
+            }
+            title="Mostrar somente pets de clientes VIP"
+          >
+            <Star className={cn("h-4 w-4", onlyVip && "fill-current")} />
+            {onlyVip ? "Somente VIP" : "Filtrar VIP"}
+          </Button>
+        }
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Coluna
