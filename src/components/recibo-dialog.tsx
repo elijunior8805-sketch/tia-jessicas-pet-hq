@@ -151,6 +151,8 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     }
   }, [open, envioAnterior, codigo]);
 
+  const petNome = (data.petNome ?? "").trim();
+
   const vars = useMemo(() => ({
     contraparte: data.contraparte,
     valor: brl(data.valor),
@@ -159,18 +161,24 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     forma: (data.forma || "").replace(/_/g, " "),
     data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
     assinatura: config?.whatsapp_assinatura ?? "Spa de Pet Tia Jéssica",
+    pet: petNome || "seu pet",
     link: publicUrl,
-  }), [data, config, publicUrl]);
+  }), [data, config, publicUrl, petNome]);
 
   useEffect(() => {
     if (!open) return;
+    const fallbackKey: keyof typeof FALLBACK_TEMPLATES = isReceita
+      ? petNome
+        ? "receita_com_pet"
+        : "receita_sem_pet"
+      : "despesa";
     const rawTpl =
       (isReceita ? config?.whatsapp_template_receber : config?.whatsapp_template_pagar) ||
-      FALLBACK_TEMPLATES[isReceita ? "receita" : "despesa"];
-    // Bloqueia links inseguros (Supabase signed URLs, tokens, etc.)
-    const safeTpl = sanitizeTemplate(rawTpl, publicUrl);
+      FALLBACK_TEMPLATES[fallbackKey];
+    // Bloqueia links inseguros (Supabase signed URLs, tokens, etc.) e caracteres quebrados
+    const safeTpl = sanitizeTemplate(rawTpl, publicUrl).replace(/\uFFFD/g, "");
     setMensagem(applyVars(safeTpl, vars));
-  }, [open, config, isReceita, vars, publicUrl]);
+  }, [open, config, isReceita, vars, publicUrl, petNome]);
 
   // Prévia do PDF
   useEffect(() => {
