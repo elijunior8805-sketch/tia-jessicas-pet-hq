@@ -641,6 +641,7 @@ function AgendamentoRow({
   const [novaHora, setNovaHora] = useState<string>(normalizarHora(row.hora));
   const [cancelarOpen, setCancelarOpen] = useState(false);
   const [motivoCancel, setMotivoCancel] = useState("");
+  const [excluirOpen, setExcluirOpen] = useState(false);
 
   const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
   const podeReagendar = ["agendado", "confirmado", "aguardando"].includes(row.status);
@@ -686,6 +687,22 @@ function AgendamentoRow({
       setMotivoCancel("");
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao cancelar"),
+  });
+
+  const excluirMut = useMutation({
+    mutationFn: async () => {
+      // Remove serviços vinculados (caso não haja cascade)
+      await supabase.from("agendamento_servicos").delete().eq("agendamento_id", row.id);
+      const { error } = await supabase.from("agendamentos").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Agendamento excluído");
+      setExcluirOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao excluir"),
   });
 
   const openFinalizadoPreview = () => {
@@ -940,6 +957,12 @@ function AgendamentoRow({
                     <Trash2 className="h-3.5 w-3.5 mr-2" /> Cancelar agendamento
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  onClick={() => setExcluirOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir definitivamente
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
                 {STATUS.map((s) => (
@@ -1079,6 +1102,31 @@ function AgendamentoRow({
               disabled={cancelarMut.isPending}
             >
               {cancelarMut.isPending ? "Cancelando…" : "Cancelar agendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={excluirOpen} onOpenChange={setExcluirOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir agendamento</DialogTitle>
+            <DialogDescription>
+              Esta ação remove permanentemente o agendamento de{" "}
+              <strong>{row.pets?.nome ?? "pet"}</strong> em{" "}
+              <strong>{row.data}</strong> às{" "}
+              <strong>{row.hora ? String(row.hora).slice(0, 5) : "—"}</strong>.
+              Não é possível desfazer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirOpen(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => excluirMut.mutate()}
+              disabled={excluirMut.isPending}
+            >
+              {excluirMut.isPending ? "Excluindo…" : "Excluir definitivamente"}
             </Button>
           </DialogFooter>
         </DialogContent>
