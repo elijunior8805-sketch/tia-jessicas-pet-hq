@@ -74,24 +74,32 @@ function applyVars(template: string, vars: Record<string, string>) {
 }
 
 /**
- * Remove QUALQUER URL insegura de um template (links assinados do Supabase,
- * domínios técnicos de storage, tokens) e garante que só reste {link} — que
- * será substituído pelo link curto /recibo/{codigo}. Templates antigos, salvos
- * antes da correção, podem ainda conter URLs cruas: essa função neutraliza.
+ * Remove QUALQUER conteúdo sensível ou inseguro do template:
+ *  - URLs http(s) que não sejam o link público seguro do recibo
+ *  - E-mails, CPF/CNPJ, UUIDs, tokens JWT-like
+ *  - Caracteres quebrados (\uFFFD)
+ * Garante que somente informações públicas cheguem ao cliente.
  */
 function sanitizeTemplate(tpl: string, safeLink: string): string {
   if (!tpl) return tpl;
   let out = tpl;
-  // 1) Remove URLs http(s) que não sejam o link seguro (ex.: *.supabase.co,
-  //    storage/v1/object/sign, tokens, presigned URLs de qualquer origem).
-  out = out.replace(/https?:\/\/\S+/gi, (match) => {
-    if (safeLink && match === safeLink) return match;
-    return "{link}";
-  });
-  // 2) Colapsa múltiplos {link} consecutivos que possam ter surgido.
+  // 1) URLs — só o link público é permitido
+  out = out.replace(/https?:\/\/\S+/gi, (m) => (safeLink && m === safeLink ? m : "{link}"));
+  // 2) E-mails
+  out = out.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/gi, "");
+  // 3) CPF (000.000.000-00 ou 11 dígitos) e CNPJ (14 dígitos)
+  out = out.replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "");
+  out = out.replace(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g, "");
+  // 4) UUIDs e tokens longos (JWT / signed url tokens)
+  out = out.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "");
+  out = out.replace(/\b[A-Za-z0-9_-]{40,}\b/g, "");
+  // 5) Caracteres inválidos e {link} duplicado
+  out = out.replace(/\uFFFD/g, "");
   out = out.replace(/(\{link\}[\s]*){2,}/g, "{link}\n");
   return out;
 }
+
+
 
 
 
