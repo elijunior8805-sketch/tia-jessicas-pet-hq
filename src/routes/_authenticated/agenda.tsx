@@ -1475,10 +1475,12 @@ function NovoAgendamentoDialog({
 
       let agendamentoId: string;
       if (isEdit && editId) {
-        const { error: errUpd } = await supabase
-          .from("agendamentos")
-          .update(payload as any)
-          .eq("id", editId);
+        const currentVersion = Number(editData?.version ?? 1);
+        const { error: errUpd } = await supabase.rpc("atualizar_agendamento_seguro", {
+          _id: editId,
+          _version: currentVersion,
+          _payload: payload as any,
+        });
         if (errUpd) throw errUpd;
         agendamentoId = editId;
         // Substitui itens vinculados
@@ -1486,11 +1488,13 @@ function NovoAgendamentoDialog({
           .from("agendamento_servicos").delete().eq("agendamento_id", editId);
         if (errDel) throw errDel;
       } else {
-        const { data: novo, error } = await supabase
-          .from("agendamentos").insert(payload as any).select("id").single();
+        const { data: novoId, error } = await supabase.rpc("criar_agendamento_seguro", {
+          _payload: payload as any,
+        });
         if (error) throw error;
-        agendamentoId = novo.id;
+        agendamentoId = novoId as unknown as string;
       }
+
 
       // Insere todos os itens (inclusive o principal) para simetria
       const rowsItens = parsed.itens.map((it, i) => ({
@@ -1512,9 +1516,20 @@ function NovoAgendamentoDialog({
       onOpenChange(false);
     },
     onError: (e: any) => {
-      const msg = e?.issues?.[0]?.message ?? e?.message ?? "Erro ao salvar";
+      const raw = e?.message ?? "";
+      let msg = e?.issues?.[0]?.message ?? raw ?? "Erro ao salvar";
+      if (raw.includes("HORARIO_OCUPADO")) {
+        msg = "Este horário acabou de ser ocupado por outro usuário. Escolha um novo horário.";
+      } else if (raw.includes("VERSAO_DESATUALIZADA")) {
+        msg = "Este agendamento foi atualizado por outro usuário. Recarregue as informações antes de salvar.";
+        qc.invalidateQueries({ queryKey: ["agendamento-edit", editId] });
+        qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      } else if (raw.includes("AGENDAMENTO_NAO_ENCONTRADO")) {
+        msg = "Agendamento não encontrado. Ele pode ter sido excluído.";
+      }
       toast.error(msg);
     },
+
   });
 
   const servicosDisponiveis = (servicos ?? []).filter((s) => !itens.some((it) => it.servico_id === s.id));
