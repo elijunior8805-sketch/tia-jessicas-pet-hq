@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 
-import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye, FileDown } from "lucide-react";
+import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye, FileDown, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateReciboPDF, type ReciboData } from "@/lib/recibo-pdf";
+import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import { toast } from "sonner";
+
 
 type Props = {
   open: boolean;
@@ -72,24 +74,32 @@ function applyVars(template: string, vars: Record<string, string>) {
 }
 
 /**
- * Remove QUALQUER URL insegura de um template (links assinados do Supabase,
- * domínios técnicos de storage, tokens) e garante que só reste {link} — que
- * será substituído pelo link curto /recibo/{codigo}. Templates antigos, salvos
- * antes da correção, podem ainda conter URLs cruas: essa função neutraliza.
+ * Remove QUALQUER conteúdo sensível ou inseguro do template:
+ *  - URLs http(s) que não sejam o link público seguro do recibo
+ *  - E-mails, CPF/CNPJ, UUIDs, tokens JWT-like
+ *  - Caracteres quebrados (\uFFFD)
+ * Garante que somente informações públicas cheguem ao cliente.
  */
 function sanitizeTemplate(tpl: string, safeLink: string): string {
   if (!tpl) return tpl;
   let out = tpl;
-  // 1) Remove URLs http(s) que não sejam o link seguro (ex.: *.supabase.co,
-  //    storage/v1/object/sign, tokens, presigned URLs de qualquer origem).
-  out = out.replace(/https?:\/\/\S+/gi, (match) => {
-    if (safeLink && match === safeLink) return match;
-    return "{link}";
-  });
-  // 2) Colapsa múltiplos {link} consecutivos que possam ter surgido.
+  // 1) URLs — só o link público é permitido
+  out = out.replace(/https?:\/\/\S+/gi, (m) => (safeLink && m === safeLink ? m : "{link}"));
+  // 2) E-mails
+  out = out.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/gi, "");
+  // 3) CPF (000.000.000-00 ou 11 dígitos) e CNPJ (14 dígitos)
+  out = out.replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "");
+  out = out.replace(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g, "");
+  // 4) UUIDs e tokens longos (JWT / signed url tokens)
+  out = out.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "");
+  out = out.replace(/\b[A-Za-z0-9_-]{40,}\b/g, "");
+  // 5) Caracteres inválidos e {link} duplicado
+  out = out.replace(/\uFFFD/g, "");
   out = out.replace(/(\{link\}[\s]*){2,}/g, "{link}\n");
   return out;
 }
+
+
 
 
 
@@ -439,28 +449,55 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
                 Como o cliente vai ver
               </Badge>
             </div>
-            <div className="rounded-md bg-white border p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
-              {mensagemFinal || <span className="text-muted-foreground italic">Mensagem vazia</span>}
+            <div className="rounded-md bg-white border overflow-hidden">
+              {/* Cabeçalho branded — reforça marca e confiabilidade */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#123F2A] text-white">
+                <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center overflow-hidden ring-2 ring-[#C99845]/60 shrink-0">
+                  <img
+                    src={logoAsset.url}
+                    alt="Spa de Pet Tia Jéssica"
+                    className="h-7 w-7 object-contain"
+                  />
+                </div>
+                <div className="leading-tight">
+                  <div className="text-[11px] font-semibold">Spa de Pet Tia Jéssica</div>
+                  <div className="text-[9px] text-emerald-100/80">Recibo oficial</div>
+                </div>
+              </div>
+              <div className="p-3 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
+                {mensagemFinal || (
+                  <span className="text-muted-foreground italic">Mensagem vazia</span>
+                )}
+              </div>
+              {publicUrl && (
+                <div className="border-t bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900 flex items-start gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-700" />
+                  <div>
+                    Link público seguro do recibo:{" "}
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline break-all font-medium"
+                    >
+                      {publicUrl}
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
-            {publicUrl && (
-              <p className="text-[11px] text-emerald-800">
-                Link seguro do recibo:{" "}
-                <a
-                  href={publicUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline break-all"
-                >
-                  {publicUrl}
-                </a>
-              </p>
-            )}
+            <p className="text-[10px] text-emerald-900/70 leading-relaxed">
+              Somente dados públicos (nome, valor, pet, serviço e data) são
+              enviados. Nada de tokens, links internos ou identificadores
+              sensíveis.
+            </p>
             {variaveisRestantes.length > 0 && (
               <p className="text-[11px] text-amber-700">
                 Atenção: variáveis não substituídas — {variaveisRestantes.join(", ")}
               </p>
             )}
           </div>
+
         </div>
 
           {!numero && (
