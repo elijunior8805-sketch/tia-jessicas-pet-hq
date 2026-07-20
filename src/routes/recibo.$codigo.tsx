@@ -59,6 +59,31 @@ function ReciboPublicoPage() {
   const { codigo } = Route.useParams();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [gerandoPreview, setGerandoPreview] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  const publicUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/recibo/${codigo}`
+      : `https://tia-jessicas-pet-hq.lovable.app/recibo/${codigo}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(publicUrl, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 320,
+      color: { dark: "#123F2A", light: "#FFFFFF" },
+    })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [publicUrl]);
+
+
 
 
   const { data, isLoading, error } = useQuery({
