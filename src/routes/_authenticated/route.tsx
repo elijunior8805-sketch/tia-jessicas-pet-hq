@@ -30,6 +30,7 @@ function AuthenticatedLayout() {
   const queryClient = useQueryClient();
   const { data: profile } = useMyProfile();
   const name = displayName(profile);
+  const syncStatus = useRealtimeSync();
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
