@@ -455,7 +455,7 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center gap-2 justify-end">
-          <PermissoesDialog userId={user.id} nome={user.nome ?? user.email} />
+          <PermissoesDialog userId={user.id} nome={user.nome ?? user.email} perfil={user.perfil} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
