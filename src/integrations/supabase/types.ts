@@ -67,12 +67,25 @@ export type Database = {
       }
       agendamentos: {
         Row: {
+          busca_data: string | null
+          busca_endereco: Json | null
+          busca_hora: string | null
           cliente_id: string
           created_at: string
           data: string
           duracao_min: number
+          entrega_data: string | null
+          entrega_endereco: Json | null
+          entrega_hora: string | null
           hora: string
           id: string
+          leva_traz_isencao_motivo: string | null
+          leva_traz_isencao_por: string | null
+          leva_traz_isento: boolean
+          leva_traz_modalidade: Database["public"]["Enums"]["leva_traz_modalidade"]
+          leva_traz_obs: string | null
+          leva_traz_responsavel_id: string | null
+          leva_traz_telefone: string | null
           observacoes: string | null
           pet_id: string
           profissional_id: string | null
@@ -83,12 +96,25 @@ export type Database = {
           valor_previsto: number
         }
         Insert: {
+          busca_data?: string | null
+          busca_endereco?: Json | null
+          busca_hora?: string | null
           cliente_id: string
           created_at?: string
           data: string
           duracao_min?: number
+          entrega_data?: string | null
+          entrega_endereco?: Json | null
+          entrega_hora?: string | null
           hora: string
           id?: string
+          leva_traz_isencao_motivo?: string | null
+          leva_traz_isencao_por?: string | null
+          leva_traz_isento?: boolean
+          leva_traz_modalidade?: Database["public"]["Enums"]["leva_traz_modalidade"]
+          leva_traz_obs?: string | null
+          leva_traz_responsavel_id?: string | null
+          leva_traz_telefone?: string | null
           observacoes?: string | null
           pet_id: string
           profissional_id?: string | null
@@ -99,12 +125,25 @@ export type Database = {
           valor_previsto?: number
         }
         Update: {
+          busca_data?: string | null
+          busca_endereco?: Json | null
+          busca_hora?: string | null
           cliente_id?: string
           created_at?: string
           data?: string
           duracao_min?: number
+          entrega_data?: string | null
+          entrega_endereco?: Json | null
+          entrega_hora?: string | null
           hora?: string
           id?: string
+          leva_traz_isencao_motivo?: string | null
+          leva_traz_isencao_por?: string | null
+          leva_traz_isento?: boolean
+          leva_traz_modalidade?: Database["public"]["Enums"]["leva_traz_modalidade"]
+          leva_traz_obs?: string | null
+          leva_traz_responsavel_id?: string | null
+          leva_traz_telefone?: string | null
           observacoes?: string | null
           pet_id?: string
           profissional_id?: string | null
@@ -1309,6 +1348,157 @@ export type Database = {
           },
         ]
       }
+      leva_traz_eventos: {
+        Row: {
+          agendamento_id: string | null
+          created_at: string
+          id: string
+          payload: Json | null
+          tarefa_id: string | null
+          tipo: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          agendamento_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json | null
+          tarefa_id?: string | null
+          tipo: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          agendamento_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json | null
+          tarefa_id?: string | null
+          tipo?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leva_traz_eventos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leva_traz_eventos_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "leva_traz_tarefas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leva_traz_tarefas: {
+        Row: {
+          agendamento_id: string
+          alergias_snapshot: string | null
+          cliente_id: string
+          created_at: string
+          data: string
+          endereco: Json
+          hora_prevista: string
+          id: string
+          observacoes: string | null
+          pet_id: string
+          responsavel_id: string | null
+          status: Database["public"]["Enums"]["leva_traz_status"]
+          telefone: string | null
+          temperamento_snapshot: string | null
+          tipo: Database["public"]["Enums"]["leva_traz_tipo"]
+          updated_at: string
+          valor_rateado: number
+        }
+        Insert: {
+          agendamento_id: string
+          alergias_snapshot?: string | null
+          cliente_id: string
+          created_at?: string
+          data: string
+          endereco: Json
+          hora_prevista: string
+          id?: string
+          observacoes?: string | null
+          pet_id: string
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["leva_traz_status"]
+          telefone?: string | null
+          temperamento_snapshot?: string | null
+          tipo: Database["public"]["Enums"]["leva_traz_tipo"]
+          updated_at?: string
+          valor_rateado?: number
+        }
+        Update: {
+          agendamento_id?: string
+          alergias_snapshot?: string | null
+          cliente_id?: string
+          created_at?: string
+          data?: string
+          endereco?: Json
+          hora_prevista?: string
+          id?: string
+          observacoes?: string | null
+          pet_id?: string
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["leva_traz_status"]
+          telefone?: string | null
+          temperamento_snapshot?: string | null
+          tipo?: Database["public"]["Enums"]["leva_traz_tipo"]
+          updated_at?: string
+          valor_rateado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leva_traz_tarefas_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leva_traz_tarefas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leva_traz_tarefas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "leva_traz_tarefas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "leva_traz_tarefas_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leva_traz_tarefas_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
+      }
       mensagens: {
         Row: {
           atendimento_id: string | null
@@ -1453,6 +1643,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notificacoes: {
+        Row: {
+          created_at: string
+          id: string
+          idempotency_key: string | null
+          lida: boolean
+          link: string | null
+          mensagem: string | null
+          payload: Json | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          lida?: boolean
+          link?: string | null
+          mensagem?: string | null
+          payload?: Json | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          lida?: boolean
+          link?: string | null
+          mensagem?: string | null
+          payload?: Json | null
+          tipo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       ocorrencias: {
         Row: {
@@ -2367,6 +2596,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      endereco_cliente_jsonb: { Args: { _cliente_id: string }; Returns: Json }
       enfileirar_lembretes: { Args: never; Returns: Json }
       excluir_atendimento: {
         Args: { _atendimento_id: string }
@@ -2426,7 +2656,7 @@ export type Database = {
         | "finalizado"
         | "cancelado"
         | "nao_compareceu"
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "transportador"
       cobranca_evento_tipo:
         | "criada"
         | "envio_manual"
@@ -2468,6 +2698,23 @@ export type Database = {
         | "agressivo"
         | "necessitou_focinheira"
         | "necessitou_pausa"
+      leva_traz_modalidade:
+        | "nao_utilizar"
+        | "somente_buscar"
+        | "somente_entregar"
+        | "buscar_entregar"
+      leva_traz_status:
+        | "aguardando_responsavel"
+        | "agendado"
+        | "a_caminho_busca"
+        | "pet_coletado"
+        | "chegou_spa"
+        | "aguardando_entrega"
+        | "a_caminho_entrega"
+        | "pet_entregue"
+        | "cancelado"
+        | "nao_realizado"
+      leva_traz_tipo: "busca" | "entrega"
       ocorrencia_tipo:
         | "machucado"
         | "irritacao"
@@ -2626,7 +2873,7 @@ export const Constants = {
         "cancelado",
         "nao_compareceu",
       ],
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "transportador"],
       cobranca_evento_tipo: [
         "criada",
         "envio_manual",
@@ -2672,6 +2919,25 @@ export const Constants = {
         "necessitou_focinheira",
         "necessitou_pausa",
       ],
+      leva_traz_modalidade: [
+        "nao_utilizar",
+        "somente_buscar",
+        "somente_entregar",
+        "buscar_entregar",
+      ],
+      leva_traz_status: [
+        "aguardando_responsavel",
+        "agendado",
+        "a_caminho_busca",
+        "pet_coletado",
+        "chegou_spa",
+        "aguardando_entrega",
+        "a_caminho_entrega",
+        "pet_entregue",
+        "cancelado",
+        "nao_realizado",
+      ],
+      leva_traz_tipo: ["busca", "entrega"],
       ocorrencia_tipo: [
         "machucado",
         "irritacao",
