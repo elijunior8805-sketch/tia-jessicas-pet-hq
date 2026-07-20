@@ -137,11 +137,13 @@ function ClientesPage() {
         const alreadyIds = new Set((byCliente ?? []).map((c: any) => c.id));
         const missing = clienteIds.filter((id) => !alreadyIds.has(id));
         if (missing.length > 0) {
-          const { data } = await supabase
+          let q2 = supabase
             .from("clientes")
             .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url)")
             .in("id", missing)
             .limit(20);
+          if (onlyVip) q2 = q2.eq("vip", true);
+          const { data } = await q2;
           byPet = data ?? [];
         }
       }
