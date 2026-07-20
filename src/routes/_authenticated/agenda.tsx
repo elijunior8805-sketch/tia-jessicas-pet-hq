@@ -957,6 +957,12 @@ function AgendamentoRow({
                     <Trash2 className="h-3.5 w-3.5 mr-2" /> Cancelar agendamento
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  onClick={() => setExcluirOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir definitivamente
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
                 {STATUS.map((s) => (
