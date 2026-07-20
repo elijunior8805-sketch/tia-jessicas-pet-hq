@@ -199,6 +199,25 @@ export const salvarPermissoes = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCanManage(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Bloqueio server-side: proprietários têm acesso total e não podem ter
+    // suas permissões editadas por essa via, independentemente da UI.
+    const { data: alvo } = await supabaseAdmin
+      .from("profiles")
+      .select("perfil")
+      .eq("id", data.userId)
+      .maybeSingle();
+    if (!alvo) throw new Error("Usuário não encontrado");
+    if (alvo.perfil === "proprietario") {
+      throw new Error("Proprietários têm acesso completo e não podem ter permissões editadas.");
+    }
+
+    // Snapshot anterior para registrar diff em auditoria
+    const { data: antes } = await supabaseAdmin
+      .from("user_permissions")
+      .select("modulo,acao,permitido")
+      .eq("user_id", data.userId);
+
     await supabaseAdmin.from("user_permissions").delete().eq("user_id", data.userId);
     if (data.permissoes.length > 0) {
       const rows = data.permissoes.map((p) => ({
@@ -211,6 +230,16 @@ export const salvarPermissoes = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin.from("user_permissions").insert(rows);
       if (error) throw new Error(error.message);
     }
+
+    await supabaseAdmin.from("audit_log").insert({
+      user_id: context.userId,
+      table_name: "user_permissions",
+      record_id: data.userId,
+      action: "UPDATE_PERMISSOES",
+      old_data: { permissoes: antes ?? [] } as any,
+      new_data: { permissoes: data.permissoes } as any,
+    } as any).then(() => {}, () => {});
+
     return { ok: true };
   });
 
