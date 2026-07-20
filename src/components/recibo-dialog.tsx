@@ -62,6 +62,27 @@ function applyVars(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 
+/**
+ * Remove QUALQUER URL insegura de um template (links assinados do Supabase,
+ * domínios técnicos de storage, tokens) e garante que só reste {link} — que
+ * será substituído pelo link curto /recibo/{codigo}. Templates antigos, salvos
+ * antes da correção, podem ainda conter URLs cruas: essa função neutraliza.
+ */
+function sanitizeTemplate(tpl: string, safeLink: string): string {
+  if (!tpl) return tpl;
+  let out = tpl;
+  // 1) Remove URLs http(s) que não sejam o link seguro (ex.: *.supabase.co,
+  //    storage/v1/object/sign, tokens, presigned URLs de qualquer origem).
+  out = out.replace(/https?:\/\/\S+/gi, (match) => {
+    if (safeLink && match === safeLink) return match;
+    return "{link}";
+  });
+  // 2) Colapsa múltiplos {link} consecutivos que possam ter surgido.
+  out = out.replace(/(\{link\}[\s]*){2,}/g, "{link}\n");
+  return out;
+}
+
+
 
 export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId }: Props) {
   const qc = useQueryClient();
@@ -134,11 +155,13 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
 
   useEffect(() => {
     if (!open) return;
-    const tpl =
+    const rawTpl =
       (isReceita ? config?.whatsapp_template_receber : config?.whatsapp_template_pagar) ||
       FALLBACK_TEMPLATES[isReceita ? "receita" : "despesa"];
-    setMensagem(applyVars(tpl, vars));
-  }, [open, config, isReceita, vars]);
+    // Bloqueia links inseguros (Supabase signed URLs, tokens, etc.)
+    const safeTpl = sanitizeTemplate(rawTpl, publicUrl);
+    setMensagem(applyVars(safeTpl, vars));
+  }, [open, config, isReceita, vars, publicUrl]);
 
   // Prévia do PDF
   useEffect(() => {
@@ -217,7 +240,10 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
           ? window.location.origin
           : "";
       const link = `${origin}/recibo/${cod}`;
-      const textoFinal = applyVars(mensagem, { ...vars, link });
+      // Sanitiza a mensagem editada pelo usuário antes de aplicar as variáveis:
+      // qualquer URL crua (incl. Supabase signed URLs) vira {link} seguro.
+      const safeMensagem = sanitizeTemplate(mensagem, link);
+      const textoFinal = applyVars(safeMensagem, { ...vars, link });
       window.open(
         `https://wa.me/${numero}?text=${encodeURIComponent(textoFinal)}`,
         "_blank",
