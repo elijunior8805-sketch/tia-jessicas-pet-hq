@@ -932,8 +932,8 @@ function FinanceiroPage() {
     );
     const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    // "Serviço" recebido para ticket médio (exclui aportes/ajustes)
-    const recServico = recebidosRows.filter((p) => p.categoria_receita === "servico");
+    // "Serviço" recebido para ticket médio (exclui aportes/ajustes; apenas com valor_pago > 0)
+    const recServico = recebidosRows.filter((p) => p.categoria_receita === "servico" && Number(p.valor_pago || 0) > 0);
     const ticketMedio = recServico.length ? recServico.reduce((s, p) => s + Number(p.valor_pago || 0), 0) / recServico.length : 0;
 
     // Aportes / Ajustes separados
