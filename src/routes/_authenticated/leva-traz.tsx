@@ -172,8 +172,10 @@ function TarefaCard({ tarefa }: { tarefa: Tarefa }) {
             <span className="inline-flex items-center gap-1 text-sm font-semibold">
               <Clock className="h-3.5 w-3.5" /> {tarefa.hora_prevista?.slice(0, 5)}
             </span>
-            {tarefa.cliente?.vip && (
-              <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">VIP</Badge>
+            {tarefa.cliente?.vip === true && (
+              <span title="Cliente marcado como VIP no cadastro" className="inline-flex">
+                <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">VIP</Badge>
+              </span>
             )}
             {atrasada && (
               <Badge className="bg-rose-500 text-white gap-1">
