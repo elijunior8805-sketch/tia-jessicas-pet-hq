@@ -65,7 +65,7 @@ function DossieConfig() {
       if (ate) q = q.lte("data_inicio", ate + "T23:59:59");
       const { data } = await q;
       const rows = data ?? [];
-      const totalFotos = rows.reduce((s, r) => s + ((r.fotos_antes ?? []).length + (r.fotos_depois ?? []).length), 0);
+      const totalFotos = rows.reduce((s, r: any) => s + ((r.fotos_antes ?? []) as any[]).length + ((r.fotos_depois ?? []) as any[]).length, 0);
       return { total: rows.length, concluidos: rows.filter(r => r.encerrado_em).length, totalFotos };
     },
   });
