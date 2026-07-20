@@ -166,12 +166,18 @@ function InboxPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              threads.refetch();
-              kpis.refetch();
+            disabled={threads.isFetching || kpis.isFetching}
+            onClick={async () => {
+              await Promise.all([threads.refetch(), kpis.refetch()]);
+              toast.success("Conversas atualizadas");
             }}
           >
-            <RefreshCcw className="h-4 w-4 mr-2" /> Atualizar
+            {threads.isFetching || kpis.isFetching ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCcw className="h-4 w-4 mr-2" />
+            )}
+            Atualizar
           </Button>
         </header>
 
