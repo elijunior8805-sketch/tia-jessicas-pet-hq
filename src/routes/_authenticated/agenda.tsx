@@ -1562,7 +1562,7 @@ function NovoAgendamentoDialog({
               <SelectContent>
                 {(clientes ?? []).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.nome} {c.vip ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
+                    {c.nome} {c.vip === true ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
