@@ -471,7 +471,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
               </div>
               {publicUrl && (
                 <div className="border-t bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900 flex items-start gap-2">
-                  <ShieldCheckSmall />
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-700" />
                   <div>
                     Link público seguro do recibo:{" "}
                     <a
