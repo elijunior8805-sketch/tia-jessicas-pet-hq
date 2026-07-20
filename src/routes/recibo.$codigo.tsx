@@ -271,7 +271,10 @@ export const Route = createFileRoute("/recibo/$codigo")({
   head: ({ params }) => {
     const title = `Recibo ${params.codigo} — Spa de Pet Tia Jéssica`;
     const description =
-      "Consulte com segurança o recibo de pagamento emitido pelo Spa de Pet Tia Jéssica.";
+      "Consulte com segurança o recibo oficial emitido pelo Spa de Pet Tia Jéssica.";
+    const url = `https://tia-jessicas-pet-hq.lovable.app/recibo/${params.codigo}`;
+    const image =
+      "https://tia-jessicas-pet-hq.lovable.app/__l5e/assets-v1/5bd8ece7-a30e-4637-988d-0b03ab54ffed/spa-de-pet-logo.png";
     return {
       meta: [
         { title },
@@ -281,11 +284,17 @@ export const Route = createFileRoute("/recibo/$codigo")({
         { property: "og:description", content: description },
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Spa de Pet Tia Jéssica" },
+        { property: "og:url", content: url },
+        { property: "og:image", content: image },
+        { property: "og:image:alt", content: "Spa de Pet Tia Jéssica" },
         { name: "twitter:card", content: "summary" },
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
+        { name: "twitter:image", content: image },
       ],
+      links: [{ rel: "canonical", href: url }],
     };
   },
   component: ReciboPublicoPage,
 });
+
