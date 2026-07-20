@@ -76,7 +76,7 @@ export type FinPdfData = {
   saidas: FinPdfSaida[];
 };
 
-export function generateFinanceiroPDF(d: FinPdfData) {
+export async function generateFinanceiroPDF(d: FinPdfData) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
