@@ -84,14 +84,15 @@ function AtendimentosPainel() {
   );
 
   const aguardando = useMemo(
-    () => agendamentos.filter((a: any) => !iniciados.has(a.id)),
-    [agendamentos, iniciados],
+    () => filterVip(agendamentos.filter((a: any) => !iniciados.has(a.id))),
+    [agendamentos, iniciados, onlyVip],
   );
 
-  const emAndamento = atendimentos.filter((a: any) => !a.finalizado);
-  const finalizadosHoje = atendimentos.filter(
-    (a: any) => a.finalizado && a.data_fim && a.data_fim.slice(0, 10) === hoje,
+  const emAndamento = filterVip(atendimentos.filter((a: any) => !a.finalizado));
+  const finalizadosHoje = filterVip(
+    atendimentos.filter((a: any) => a.finalizado && a.data_fim && a.data_fim.slice(0, 10) === hoje),
   );
+
 
   const iniciar = useMutation({
     mutationFn: async (ag: any) => {
