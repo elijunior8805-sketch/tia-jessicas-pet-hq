@@ -122,7 +122,7 @@ export const listarThreads = createServerFn({ method: "GET" })
       }
       rows = Array.from(map.values()).sort((a, b) =>
         (b.ultima_em ?? "").localeCompare(a.ultima_em ?? "")
-      );
+      ) as any[];
     } else {
       const { data: r, error } = await q;
       if (error) throw new Error(error.message);
