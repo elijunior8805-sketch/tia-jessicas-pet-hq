@@ -380,8 +380,14 @@ function ClienteRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="font-display font-semibold text-sm text-primary truncate">{c.nome}</div>
-          {c.vip && (
-            <Star className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)] fill-[var(--color-gold)]" />
+          {c.vip === true && (
+            <span
+              title="Cliente marcado como VIP no cadastro"
+              aria-label="Cliente VIP"
+              className="inline-flex"
+            >
+              <Star className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)] fill-[var(--color-gold)]" />
+            </span>
           )}
           {c.ativo === false && <Badge variant="secondary" className="text-[10px] px-1 py-0">Arquivado</Badge>}
         </div>
@@ -550,7 +556,11 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               <h2 className="font-display text-2xl sm:text-3xl font-semibold text-primary truncate">
                 {data.nome}
               </h2>
-              {data.vip && <StatusBadge tone="gold"><Star className="h-3 w-3" /> VIP</StatusBadge>}
+              {data.vip === true && (
+                <span title="Cliente marcado como VIP no cadastro" className="inline-flex">
+                  <StatusBadge tone="gold"><Star className="h-3 w-3" /> VIP</StatusBadge>
+                </span>
+              )}
               {data.ativo === false ? (
                 <StatusBadge tone="muted">Arquivado</StatusBadge>
               ) : (

@@ -120,9 +120,15 @@ export function ClienteFormFields({
           <div className="flex items-center justify-between gap-3 rounded-md border p-3 bg-gold/5">
             <div>
               <div className="font-medium text-sm">Cliente VIP</div>
-              <div className="text-xs text-muted-foreground">Destacado no sistema</div>
+              <div className="text-xs text-muted-foreground">
+                Marque manualmente para destacar. Novos clientes começam sem VIP.
+              </div>
             </div>
-            <Switch checked={value.vip} onCheckedChange={(b) => onChange({ vip: b })} />
+            <Switch
+              checked={value.vip === true}
+              onCheckedChange={(b) => onChange({ vip: b === true })}
+              aria-label="Marcar cliente como VIP"
+            />
           </div>
         </div>
       </Card>

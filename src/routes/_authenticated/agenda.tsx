@@ -785,7 +785,11 @@ function AgendamentoRow({
             <span className={`px-2 py-0.5 rounded-full text-[11px] border ${meta.tone}`}>
               {meta.label}
             </span>
-            {row.clientes?.vip && <Badge className="badge-gold text-[10px]">VIP</Badge>}
+            {row.clientes?.vip === true && (
+              <span title="Cliente marcado como VIP no cadastro" className="inline-flex">
+                <Badge className="badge-gold text-[10px]">VIP</Badge>
+              </span>
+            )}
             <span
               className="font-display font-semibold text-primary truncate"
               title={itensServicos.map((it) => it.nome).join(" + ")}
@@ -1558,7 +1562,7 @@ function NovoAgendamentoDialog({
               <SelectContent>
                 {(clientes ?? []).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.nome} {c.vip ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
+                    {c.nome} {c.vip === true ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>

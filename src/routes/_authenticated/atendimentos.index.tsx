@@ -255,7 +255,11 @@ function CardHeader({ pet, cliente }: { pet: any; cliente: any }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-display font-semibold text-primary truncate">{pet?.nome ?? "—"}</span>
-          {cliente?.vip && <Badge className="badge-gold text-[10px]">VIP</Badge>}
+          {cliente?.vip === true && (
+            <span title="Cliente marcado como VIP no cadastro" className="inline-flex">
+              <Badge className="badge-gold text-[10px]">VIP</Badge>
+            </span>
+          )}
         </div>
         <div className="text-xs text-muted-foreground truncate">
           {[pet?.porte, pet?.raca].filter(Boolean).join(" · ")}
