@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { deliverPdf } from "./pdf-open";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],
@@ -191,6 +192,6 @@ export function generateReciboPDF(d: ReciboData, returnBlob = false) {
 
   const fileName = `${isReceita ? "recibo" : "comprovante"}-${d.numero}.pdf`;
   if (returnBlob) return { blob: doc.output("blob") as Blob, fileName };
-  doc.save(fileName);
+  deliverPdf(doc, fileName);
   return { fileName };
 }

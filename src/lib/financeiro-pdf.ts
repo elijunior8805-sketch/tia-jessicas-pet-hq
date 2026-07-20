@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { deliverPdf } from "./pdf-open";
 
 const C = {
   forest: [26, 61, 45] as [number, number, number],
@@ -277,7 +278,7 @@ export function generateFinanceiroPDF(d: FinPdfData) {
   addFooter();
 
   const fileName = `financeiro_${d.periodo.de}_a_${d.periodo.ate}.pdf`;
-  doc.save(fileName);
+  deliverPdf(doc, fileName);
   return { fileName };
 }
 
