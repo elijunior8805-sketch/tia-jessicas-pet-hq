@@ -642,6 +642,7 @@ function AgendamentoRow({
   const [cancelarOpen, setCancelarOpen] = useState(false);
   const [motivoCancel, setMotivoCancel] = useState("");
   const [excluirOpen, setExcluirOpen] = useState(false);
+  const [editarOpen, setEditarOpen] = useState(false);
 
   const podeEditarServicos = ["agendado", "confirmado", "aguardando"].includes(row.status);
   const podeReagendar = ["agendado", "confirmado", "aguardando"].includes(row.status);
@@ -928,6 +929,9 @@ function AgendamentoRow({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Ações rápidas</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setEditarOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5 mr-2" /> Editar agendamento…
+                </DropdownMenuItem>
                 {podeReagendar && (
                   <DropdownMenuItem
                     onClick={() => {
@@ -1038,6 +1042,14 @@ function AgendamentoRow({
         onOpenChange={setEditServicosOpen}
         agendamento={row}
       />
+
+      <NovoAgendamentoDialog
+        open={editarOpen}
+        onOpenChange={setEditarOpen}
+        defaultDate={row.data}
+        editId={row.id}
+      />
+
 
       <Dialog open={reagendarOpen} onOpenChange={setReagendarOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1198,12 +1210,14 @@ type EnderecoLT = {
 };
 
 function NovoAgendamentoDialog({
-  open, onOpenChange, defaultDate, defaultClienteId, defaultPetId,
+  open, onOpenChange, defaultDate, defaultClienteId, defaultPetId, editId,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void; defaultDate: string;
   defaultClienteId?: string; defaultPetId?: string;
+  editId?: string;
 }) {
   const qc = useQueryClient();
+  const isEdit = !!editId;
   const [clienteId, setClienteId] = useState<string>("");
   const [petId, setPetId] = useState<string>("");
   const [itens, setItens] = useState<ItemServico[]>([]);
@@ -1231,20 +1245,73 @@ function NovoAgendamentoDialog({
   const [buscaEnd, setBuscaEnd] = useState<EnderecoLT>({});
   const [entregaEnd, setEntregaEnd] = useState<EnderecoLT>({});
 
-  // reset ao abrir
-  useMemoReset(open, () => {
-    setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
-    setItens([]); setServicoAdd("");
-    setData(defaultDate); setHora("09:00");
-    setTaxa("0");
-    setStatus("agendado"); setObs(""); setClienteSearch("");
-    setLtModalidade("nao_utilizar");
-    setLtResponsavel(""); setLtTelefone(""); setLtObs("");
-    setLtIsento(false); setLtIsencaoMotivo("");
-    setBuscaData(""); setBuscaHora(""); setEntregaData(""); setEntregaHora("");
-    setBuscaUsaClienteEnd(true); setEntregaUsaClienteEnd(true);
-    setBuscaEnd({}); setEntregaEnd({});
+  // Carrega dados do agendamento existente ao editar
+  const { data: editData } = useQuery({
+    queryKey: ["agendamento-edit", editId],
+    enabled: open && !!editId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("*, agendamento_servicos(id, servico_id, nome, valor_unit, duracao_min, ordem)")
+        .eq("id", editId!)
+        .single();
+      if (error) throw error;
+      return data as any;
+    },
   });
+
+  // reset ao abrir (novo) ou quando editData chega (edição)
+  useEffect(() => {
+    if (!open) return;
+    if (isEdit) {
+      if (!editData) return;
+      setClienteId(editData.cliente_id ?? "");
+      setPetId(editData.pet_id ?? "");
+      const itensRaw = Array.isArray(editData.agendamento_servicos) ? editData.agendamento_servicos : [];
+      const itensSorted = [...itensRaw].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0));
+      setItens(itensSorted.map((it: any) => ({
+        servico_id: it.servico_id,
+        nome: it.nome,
+        valor_unit: Number(it.valor_unit ?? 0),
+        duracao_min: it.duracao_min ?? null,
+      })));
+      setServicoAdd("");
+      setData(editData.data ?? defaultDate);
+      setHora(normalizarHora(editData.hora));
+      setTaxa(String(editData.taxa_leva_traz ?? 0));
+      setStatus((editData.status ?? "agendado") as Status);
+      setObs(editData.observacoes ?? "");
+      setClienteSearch("");
+      setLtModalidade((editData.leva_traz_modalidade ?? "nao_utilizar") as LTModalidade);
+      setLtResponsavel(editData.leva_traz_responsavel_id ?? "");
+      setLtTelefone(editData.leva_traz_telefone ?? "");
+      setLtObs(editData.leva_traz_obs ?? "");
+      setLtIsento(!!editData.leva_traz_isento);
+      setLtIsencaoMotivo(editData.leva_traz_isencao_motivo ?? "");
+      setBuscaData(editData.busca_data ?? "");
+      setBuscaHora(editData.busca_hora ? normalizarHora(editData.busca_hora) : "");
+      setEntregaData(editData.entrega_data ?? "");
+      setEntregaHora(editData.entrega_hora ? normalizarHora(editData.entrega_hora) : "");
+      setBuscaUsaClienteEnd(!editData.busca_endereco);
+      setEntregaUsaClienteEnd(!editData.entrega_endereco);
+      setBuscaEnd(editData.busca_endereco ?? {});
+      setEntregaEnd(editData.entrega_endereco ?? {});
+    } else {
+      setClienteId(defaultClienteId ?? ""); setPetId(defaultPetId ?? "");
+      setItens([]); setServicoAdd("");
+      setData(defaultDate); setHora("09:00");
+      setTaxa("0");
+      setStatus("agendado"); setObs(""); setClienteSearch("");
+      setLtModalidade("nao_utilizar");
+      setLtResponsavel(""); setLtTelefone(""); setLtObs("");
+      setLtIsento(false); setLtIsencaoMotivo("");
+      setBuscaData(""); setBuscaHora(""); setEntregaData(""); setEntregaHora("");
+      setBuscaUsaClienteEnd(true); setEntregaUsaClienteEnd(true);
+      setBuscaEnd({}); setEntregaEnd({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, editData?.id]);
+
 
   // Carrega responsáveis (admin + transportador)
   const { data: responsaveis = [] } = useQuery({
@@ -1381,13 +1448,13 @@ function NovoAgendamentoDialog({
         ? (entregaUsaClienteEnd ? null : entregaEnd)
         : null;
 
-      const { data: novo, error } = await supabase.from("agendamentos").insert({
+      const payload = {
         cliente_id: parsed.cliente_id,
         pet_id: parsed.pet_id,
         servico_id: principal.servico_id,
         data: parsed.data,
         hora: parsed.hora,
-        duracao_min: totalDuracao > 0 ? totalDuracao : undefined,
+        duracao_min: totalDuracao > 0 ? totalDuracao : null,
         valor_previsto: totalValor,
         taxa_leva_traz: valorLT,
         status: parsed.status,
@@ -1404,12 +1471,30 @@ function NovoAgendamentoDialog({
         entrega_hora: entregaHora || null,
         busca_endereco: buscaEndFinal as any,
         entrega_endereco: entregaEndFinal as any,
-      } as any).select("id").single();
-      if (error) throw error;
+      };
+
+      let agendamentoId: string;
+      if (isEdit && editId) {
+        const { error: errUpd } = await supabase
+          .from("agendamentos")
+          .update(payload as any)
+          .eq("id", editId);
+        if (errUpd) throw errUpd;
+        agendamentoId = editId;
+        // Substitui itens vinculados
+        const { error: errDel } = await supabase
+          .from("agendamento_servicos").delete().eq("agendamento_id", editId);
+        if (errDel) throw errDel;
+      } else {
+        const { data: novo, error } = await supabase
+          .from("agendamentos").insert(payload as any).select("id").single();
+        if (error) throw error;
+        agendamentoId = novo.id;
+      }
 
       // Insere todos os itens (inclusive o principal) para simetria
       const rowsItens = parsed.itens.map((it, i) => ({
-        agendamento_id: novo.id,
+        agendamento_id: agendamentoId,
         servico_id: it.servico_id,
         nome: it.nome,
         valor_unit: it.valor_unit,
@@ -1420,8 +1505,9 @@ function NovoAgendamentoDialog({
       if (errItens) throw errItens;
     },
     onSuccess: () => {
-      toast.success("Agendamento criado");
+      toast.success(isEdit ? "Agendamento atualizado" : "Agendamento criado");
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["agendamento-edit", editId] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       onOpenChange(false);
     },
@@ -1437,7 +1523,7 @@ function NovoAgendamentoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">Novo agendamento</DialogTitle>
+          <DialogTitle className="font-display">{isEdit ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
           <DialogDescription>
             Adicione um ou mais serviços — o valor e a duração totais são calculados automaticamente.
           </DialogDescription>
@@ -1704,7 +1790,7 @@ function NovoAgendamentoDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || itens.length === 0}>
-            {mutation.isPending ? "Salvando…" : `Criar agendamento${itens.length > 1 ? ` (${itens.length} serviços)` : ""}`}
+            {mutation.isPending ? "Salvando…" : isEdit ? "Salvar alterações" : `Criar agendamento${itens.length > 1 ? ` (${itens.length} serviços)` : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>
