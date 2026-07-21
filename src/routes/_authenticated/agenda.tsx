@@ -1658,6 +1658,12 @@ function NovoAgendamentoDialog({
               search={clienteSearch}
               onSearchChange={setClienteSearch}
               options={clientes ?? []}
+              loading={clientesLoading}
+              error={clientesError}
+              onCreateNew={() => {
+                onOpenChange(false);
+                navigate({ to: "/clientes/novo" });
+              }}
             />
           </div>
 
