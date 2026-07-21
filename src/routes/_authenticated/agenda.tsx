@@ -1228,6 +1228,7 @@ function NovoAgendamentoDialog({
   editId?: string;
 }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const isEdit = !!editId;
   const [clienteId, setClienteId] = useState<string>("");
   const [petId, setPetId] = useState<string>("");
