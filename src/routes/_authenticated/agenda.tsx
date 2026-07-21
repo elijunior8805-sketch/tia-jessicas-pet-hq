@@ -2211,16 +2211,21 @@ type ClienteOption = ClienteRow & {
 };
 
 function ClientePicker({
-  value, onChange, search, onSearchChange, options,
+  value, onChange, search, onSearchChange, options, loading, error, onCreateNew,
 }: {
   value: string;
   onChange: (v: string) => void;
   search: string;
   onSearchChange: (v: string) => void;
   options: ClienteOption[];
+  loading?: boolean;
+  error?: boolean;
+  onCreateNew?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((c) => c.id === value);
+  const trimmed = search.trim();
+  const canShowEmpty = !loading && !error && trimmed.length >= 2 && options.length === 0;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -2233,8 +2238,8 @@ function ClientePicker({
         >
           <span className="truncate text-left">
             {selected
-              ? <>{selected.nome} {selected.vip === true ? "★" : ""} {selected.whatsapp ? `· ${selected.whatsapp}` : ""}</>
-              : <span className="text-muted-foreground">Buscar cliente por nome, telefone ou WhatsApp…</span>}
+              ? <>{selected.nome}{selected.vip === true ? " ★" : ""}{selected.whatsapp || selected.telefone ? ` · ${selected.whatsapp ?? selected.telefone}` : ""}</>
+              : <span className="text-muted-foreground">Buscar cliente por nome, telefone, e-mail, bairro ou pet…</span>}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -2242,26 +2247,98 @@ function ClientePicker({
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Digite nome, telefone ou WhatsApp…"
+            placeholder="Digite nome, CPF, telefone, e-mail, bairro ou nome do pet…"
             value={search}
             onValueChange={onSearchChange}
           />
           <CommandList>
-            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-            <CommandGroup>
-              {options.map((c) => (
-                <CommandItem
-                  key={c.id}
-                  value={c.id}
-                  onSelect={() => { onChange(c.id); setOpen(false); }}
-                >
-                  <Check className={`mr-2 h-4 w-4 ${value === c.id ? "opacity-100" : "opacity-0"}`} />
-                  <span className="truncate">
-                    {c.nome} {c.vip === true ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {trimmed.length > 0 && trimmed.length < 2 && (
+              <div className="px-3 py-4 text-xs text-muted-foreground">
+                Digite pelo menos 2 caracteres para buscar.
+              </div>
+            )}
+            {loading && (
+              <div className="px-3 py-4 text-xs text-muted-foreground">Buscando clientes…</div>
+            )}
+            {error && (
+              <div className="px-3 py-4 text-xs text-destructive">
+                Não foi possível buscar os clientes. Tente novamente.
+              </div>
+            )}
+            {canShowEmpty && (
+              <CommandEmpty>
+                <div className="px-2 py-3 space-y-2">
+                  <div className="text-sm">Cliente não encontrado.</div>
+                  {onCreateNew && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setOpen(false); onCreateNew(); }}
+                    >
+                      Cadastrar novo cliente
+                    </Button>
+                  )}
+                </div>
+              </CommandEmpty>
+            )}
+            {!loading && !error && options.length > 0 && (
+              <CommandGroup>
+                {options.map((c) => {
+                  const contato = c.whatsapp ?? c.telefone ?? "";
+                  const isSel = value === c.id;
+                  return (
+                    <CommandItem
+                      key={c.id}
+                      value={c.id}
+                      onSelect={() => { onChange(c.id); setOpen(false); }}
+                      className="items-start gap-2 py-2"
+                    >
+                      <Check className={`mt-1 h-4 w-4 shrink-0 ${isSel ? "opacity-100" : "opacity-0"}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate font-medium">{c.nome}</span>
+                          {c.vip === true ? (
+                            <span title="Cliente VIP" aria-label="VIP" className="text-gold">★</span>
+                          ) : (
+                            <span className="text-muted-foreground" aria-label="Não VIP">–</span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                          {contato && <span>{contato}</span>}
+                          {c.bairro && <span>· {c.bairro}</span>}
+                        </div>
+                        {c.pets.length > 0 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {c.pets.slice(0, 5).map((p) => (
+                              <span
+                                key={p.id}
+                                className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px]"
+                              >
+                                {p.foto_url ? (
+                                  <img
+                                    src={p.foto_url}
+                                    alt=""
+                                    className="h-4 w-4 rounded-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <PawPrint className="h-3 w-3 text-muted-foreground" />
+                                )}
+                                <span className="truncate max-w-[7rem]">{p.nome}</span>
+                              </span>
+                            ))}
+                            {c.pets.length > 5 && (
+                              <span className="text-[10px] text-muted-foreground">+{c.pets.length - 5}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
