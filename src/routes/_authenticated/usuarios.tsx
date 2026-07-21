@@ -404,6 +404,7 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
   const setPerfil = useServerFn(setPerfilUsuario);
   const setStatus = useServerFn(setStatusUsuario);
   const resetSenha = useServerFn(enviarResetSenha);
+  const setSenhaManual = useServerFn(definirSenhaManual);
   const encerrar = useServerFn(encerrarSessoes);
 
   const doPerfil = useMutation({
