@@ -1341,42 +1341,118 @@ function NovoAgendamentoDialog({
     },
   });
 
-  const { data: clientes } = useQuery({
-    queryKey: ["clientes-select", clienteSearch, defaultClienteId ?? ""],
+  const debouncedClienteSearch = useDebouncedValue(clienteSearch, 300);
+
+  const CLIENTE_COLS = "id, nome, whatsapp, telefone, bairro, email, cpf, vip";
+  const {
+    data: clientes,
+    isFetching: clientesLoading,
+    isError: clientesError,
+  } = useQuery({
+    queryKey: ["clientes-select", debouncedClienteSearch, defaultClienteId ?? ""],
     enabled: open,
     queryFn: async () => {
-      const raw = clienteSearch.trim();
-      // Sanitiza: remove caracteres que quebram PostgREST .or() (vírgula, parênteses)
-      const safe = raw.replace(/[(),]/g, " ").replace(/\s+/g, " ").trim();
+      const raw = debouncedClienteSearch.trim();
+      const termAcc = raw.toLowerCase();
+      const termNoAcc = stripAccents(termAcc);
       const digits = raw.replace(/\D+/g, "");
-      let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(50);
-      if (safe || digits) {
+      const hasText = termNoAcc.length >= 2;
+      const hasDigits = digits.length >= 2;
+
+      let rows: ClienteRow[] = [];
+
+      if (hasText || hasDigits) {
+        const sanitize = (s: string) =>
+          s.replace(/[(),*]/g, " ").replace(/\s+/g, " ").trim();
+        const t1 = sanitize(termNoAcc);
+        const t2 = sanitize(termAcc);
         const parts: string[] = [];
-        if (safe) parts.push(`nome.ilike.%${safe}%`);
-        if (digits) {
+        if (hasText) {
+          for (const t of [t1, t2].filter((x, i, a) => x && a.indexOf(x) === i)) {
+            parts.push(`nome.ilike.%${t}%`);
+            parts.push(`email.ilike.%${t}%`);
+            parts.push(`bairro.ilike.%${t}%`);
+          }
+        }
+        if (hasDigits) {
           parts.push(`whatsapp.ilike.%${digits}%`);
           parts.push(`telefone.ilike.%${digits}%`);
-        } else if (safe) {
-          parts.push(`whatsapp.ilike.%${safe}%`);
-          parts.push(`telefone.ilike.%${safe}%`);
+          parts.push(`cpf.ilike.%${digits}%`);
         }
-        q = q.or(parts.join(","));
+
+        const clientesPromise = supabase
+          .from("clientes")
+          .select(CLIENTE_COLS)
+          .or(parts.join(","))
+          .order("nome")
+          .limit(20);
+
+        const petsPromise = hasText
+          ? supabase
+              .from("pets")
+              .select("cliente_id")
+              .ilike("nome", `%${t1}%`)
+              .eq("ativo", true)
+              .limit(20)
+          : Promise.resolve({ data: [] as { cliente_id: string }[], error: null });
+
+        const [clientesRes, petsRes] = await Promise.all([clientesPromise, petsPromise]);
+
+        if (clientesRes.error) {
+          console.error("[agenda] busca de clientes falhou", clientesRes.error);
+          throw clientesRes.error;
+        }
+        rows = ((clientesRes.data ?? []) as unknown) as ClienteRow[];
+
+        const petIds = Array.from(
+          new Set(
+            (((petsRes as any).data ?? []) as { cliente_id: string | null }[])
+              .map((p) => p.cliente_id)
+              .filter((v): v is string => !!v),
+          ),
+        ).filter((id) => !rows.some((r) => r.id === id));
+
+        if (petIds.length > 0) {
+          const { data: extras, error: extrasErr } = await supabase
+            .from("clientes")
+            .select(CLIENTE_COLS)
+            .in("id", petIds);
+          if (extrasErr) throw extrasErr;
+          rows = [...rows, ...(((extras ?? []) as unknown) as ClienteRow[])];
+        }
       }
-      const { data, error } = await q;
-      if (error) {
-        console.error("[agenda] busca de clientes falhou", error);
-        return [] as { id: string; nome: string; whatsapp: string | null; vip: boolean | null }[];
-      }
-      let rows = data ?? [];
+
       if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
         const { data: extra } = await supabase
           .from("clientes")
-          .select("id, nome, whatsapp, vip")
+          .select(CLIENTE_COLS)
           .eq("id", defaultClienteId)
           .maybeSingle();
-        if (extra) rows = [extra, ...rows];
+        if (extra) rows = [((extra as unknown) as ClienteRow), ...rows];
       }
-      return rows;
+
+      rows = rows.slice(0, 10);
+
+      const ids = rows.map((r) => r.id);
+      const petsByClient = new Map<string, { id: string; nome: string; foto_url: string | null }[]>();
+      if (ids.length > 0) {
+        const { data: pets } = await supabase
+          .from("pets")
+          .select("id, cliente_id, nome, foto_url, ativo")
+          .in("cliente_id", ids)
+          .eq("ativo", true)
+          .order("nome");
+        for (const p of ((pets ?? []) as any[])) {
+          const list = petsByClient.get(p.cliente_id) ?? [];
+          list.push({ id: p.id, nome: p.nome, foto_url: p.foto_url });
+          petsByClient.set(p.cliente_id, list);
+        }
+      }
+
+      return rows.map<ClienteOption>((r) => ({
+        ...r,
+        pets: petsByClient.get(r.id) ?? [],
+      }));
     },
   });
 
