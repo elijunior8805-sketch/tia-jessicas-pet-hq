@@ -1472,6 +1472,12 @@ function NovoAgendamentoDialog({
     },
   });
 
+  // Se o cliente possuir só um pet e ainda não houver seleção, auto-selecionar.
+  useEffect(() => {
+    if (!clienteId || petId) return;
+    if (pets && pets.length === 1) setPetId(pets[0].id);
+  }, [clienteId, petId, pets]);
+
   const { data: servicos } = useQuery({
     queryKey: ["servicos-ativos"],
     enabled: open,
