@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
@@ -7,12 +8,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle,
+  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useMyProfile, firstName } from "@/hooks/use-my-profile";
+import { recalcularAgregados } from "@/lib/agregados.functions";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -61,6 +65,26 @@ function DashboardPage() {
   }, [period, customFrom, customTo]);
 
   const { data: profile } = useMyProfile();
+  const queryClient = useQueryClient();
+  const recalcFn = useServerFn(recalcularAgregados);
+  const recalc = useMutation({
+    mutationFn: () => recalcFn({ data: undefined as any }),
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries();
+      const parts = [
+        res.atendimentos_resetados ? `${res.atendimentos_resetados} atendimento(s) reabertos` : null,
+        res.agendamentos_reabertos ? `${res.agendamentos_reabertos} agendamento(s) reabertos` : null,
+        res.pets_recalculados ? `${res.pets_recalculados} pet(s) com histórico atualizado` : null,
+      ].filter(Boolean);
+      toast.success(
+        parts.length
+          ? `Agregados recalculados — ${parts.join(", ")}.`
+          : "Tudo em dia — nenhum ajuste necessário."
+      );
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao recalcular agregados."),
+  });
+
 
 
   const { data } = useQuery({
@@ -231,16 +255,30 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Filtro segmentado */}
-      <PeriodTabs
-        period={period}
-        onChange={setPeriod}
-        periodos={periodos}
-        customFrom={customFrom}
-        customTo={customTo}
-        setCustomFrom={setCustomFrom}
-        setCustomTo={setCustomTo}
-      />
+      {/* Filtro segmentado + Recalcular */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <PeriodTabs
+          period={period}
+          onChange={setPeriod}
+          periodos={periodos}
+          customFrom={customFrom}
+          customTo={customTo}
+          setCustomFrom={setCustomFrom}
+          setCustomTo={setCustomTo}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full gap-2 border-[oklch(0.85_0.05_155)] hover:bg-[oklch(0.94_0.03_155)]"
+          onClick={() => recalc.mutate()}
+          disabled={recalc.isPending}
+          title="Recalcula históricos e agregados a partir dos lançamentos atuais (admin)"
+        >
+          <RefreshCw className={`h-4 w-4 ${recalc.isPending ? "animate-spin" : ""}`} />
+          {recalc.isPending ? "Recalculando…" : "Recalcular KPIs"}
+        </Button>
+      </div>
+
 
       {/* ============ KPI CARDS PREMIUM ============ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 mb-6">

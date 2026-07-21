@@ -3273,6 +3273,7 @@ export type Database = {
       is_staff: { Args: never; Returns: boolean }
       limpar_dados_teste_financeiro: { Args: never; Returns: Json }
       pode_gerenciar_usuarios: { Args: { _user_id: string }; Returns: boolean }
+      recalcular_agregados: { Args: never; Returns: Json }
       render_lembrete: {
         Args: {
           _data: string
