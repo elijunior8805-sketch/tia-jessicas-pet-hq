@@ -77,10 +77,11 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .returns<any[]>();
 
     const rows = atendRows ?? [];
-    // Faturamento/ticket usam SOMENTE valor efetivamente executado (encerrado/finalizado).
-    // Valor planejado não entra no faturamento nem no ticket médio.
+    // Faturamento/ticket/contagem usam SOMENTE atendimentos efetivamente
+    // encerrados (finalizado=true E encerrado_em preenchido) com valor_executado > 0.
+    // Valor planejado e atendimentos abertos nunca entram no faturamento nem no ticket médio.
     const isExecutado = (r: any) =>
-      Number(r.valor_executado ?? 0) > 0 && (r.encerrado_em || r.finalizado);
+      Number(r.valor_executado ?? 0) > 0 && !!r.encerrado_em && r.finalizado === true;
     const valorRow = (r: any) => (isExecutado(r) ? Number(r.valor_executado ?? 0) : 0);
     const rowsExecutados = rows.filter(isExecutado);
     const faturamento = rowsExecutados.reduce((s, r) => s + Number(r.valor_executado ?? 0), 0);
@@ -146,13 +147,12 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .sort((a, b) => b.qtd - a.qtd)
       .slice(0, 10);
 
-    const finalizadosCount = rows.filter((r) => r.encerrado_em || r.finalizado).length;
-    const totalAtend = rows.length || 1;
+    const finalizadosCount = rowsExecutados.length;
     const indicadores: IndicadoresDTO = {
       periodo: { de: data.de, ate: data.ate },
       faturamento,
       faturamento_planejado: faturamentoPlan,
-      ticket_medio: rows.length ? faturamento / totalAtend : 0,
+      ticket_medio: rowsExecutados.length ? faturamento / rowsExecutados.length : 0,
       atendimentos_finalizados: finalizadosCount,
       atendimentos_cancelados: (agRows ?? []).length,
       clientes_atendidos: clientesSet.size,

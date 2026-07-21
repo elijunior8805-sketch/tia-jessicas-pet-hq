@@ -88,14 +88,16 @@ function DashboardPage() {
       const faturamento = pagamentos.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const lucro = faturamento - despesas;
-      // Atendimentos e Ticket Médio: apenas os efetivamente executados
-      // (encerrados/finalizados com valor_executado > 0).
-      const executados = atendimentos.filter((a) => {
+      // Atendimentos e Ticket Médio: apenas os efetivamente encerrados
+      // (finalizado=true E encerrado_em preenchido E valor_executado > 0).
+      // Atendimentos abertos/em andamento nunca entram na contagem, mesmo
+      // que tenham valor_planejado ou valor_executado herdado.
+      const executados = atendimentos.filter((a: any) => {
         const exec = Number(a.valor_executado ?? 0);
-        return exec > 0 && (a.encerrado_em || (a as any).finalizado);
+        return exec > 0 && !!a.encerrado_em && a.finalizado === true;
       });
       const atendCount = executados.length;
-      const somaExec = executados.reduce((s, a) => s + Number(a.valor_executado ?? 0), 0);
+      const somaExec = executados.reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
       const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
 
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
