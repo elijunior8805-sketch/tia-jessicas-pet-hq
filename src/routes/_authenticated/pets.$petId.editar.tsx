@@ -21,7 +21,7 @@ function EditarPetPage() {
   const qc = useQueryClient();
 
   const [form, setForm] = useState<PetFormState>(emptyPetForm);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [foto, setFoto] = useState<File | null>(null);
   const [removeFoto, setRemoveFoto] = useState(false);
   const dirtyRef = useRef(false);
@@ -32,14 +32,23 @@ function EditarPetPage() {
       (await supabase.from("pets").select("*, clientes(id, nome)").eq("id", petId).maybeSingle()).data,
   });
 
+  // Reset form when navigating between different pets (component may not remount)
   useEffect(() => {
-    if (pet && !loaded) {
+    setForm(emptyPetForm);
+    setFoto(null);
+    setRemoveFoto(false);
+    setLoadedFor(null);
+    dirtyRef.current = false;
+  }, [petId]);
+
+  useEffect(() => {
+    if (pet && pet.id === petId && loadedFor !== petId) {
       setForm(petFormFromRow(pet));
-      setLoaded(true);
+      setLoadedFor(petId);
       setTimeout(() => { dirtyRef.current = false; }, 0);
     }
-  }, [pet, loaded]);
-  useEffect(() => { if (loaded) dirtyRef.current = true; }, [form, foto, removeFoto, loaded]);
+  }, [pet, petId, loadedFor]);
+  useEffect(() => { if (loadedFor === petId) dirtyRef.current = true; }, [form, foto, removeFoto, loadedFor, petId]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {

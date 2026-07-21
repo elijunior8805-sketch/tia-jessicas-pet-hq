@@ -24,7 +24,7 @@ function EditarClientePage() {
   const qc = useQueryClient();
 
   const [form, setForm] = useState<ClienteFormState>(emptyClienteForm);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoRemoved, setFotoRemoved] = useState(false);
   const dirtyRef = useRef(false);
@@ -38,16 +38,24 @@ function EditarClientePage() {
     },
   });
 
+  // Reset form when navigating between different clients (component may not remount)
   useEffect(() => {
-    if (cliente && !loaded) {
+    setForm(emptyClienteForm);
+    setFotoFile(null);
+    setFotoRemoved(false);
+    setLoadedFor(null);
+    dirtyRef.current = false;
+  }, [id]);
+
+  useEffect(() => {
+    if (cliente && (cliente as any).id === id && loadedFor !== id) {
       setForm(clienteFormFromRow(cliente));
-      setLoaded(true);
-      // reset dirty after initial fill on next tick
+      setLoadedFor(id);
       setTimeout(() => { dirtyRef.current = false; }, 0);
     }
-  }, [cliente, loaded]);
+  }, [cliente, id, loadedFor]);
 
-  useEffect(() => { if (loaded) dirtyRef.current = true; }, [form, loaded, fotoFile, fotoRemoved]);
+  useEffect(() => { if (loadedFor === id) dirtyRef.current = true; }, [form, loadedFor, fotoFile, fotoRemoved, id]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
