@@ -2182,7 +2182,33 @@ function EditarServicosDialog({
   );
 }
 
-type ClienteOption = { id: string; nome: string; whatsapp: string | null; vip: boolean | null };
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function useDebouncedValue<T>(value: T, delay = 300): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+}
+
+type ClienteRow = {
+  id: string;
+  nome: string;
+  whatsapp: string | null;
+  telefone: string | null;
+  bairro: string | null;
+  email: string | null;
+  cpf: string | null;
+  vip: boolean | null;
+};
+
+type ClienteOption = ClienteRow & {
+  pets: { id: string; nome: string; foto_url: string | null }[];
+};
 
 function ClientePicker({
   value, onChange, search, onSearchChange, options,
