@@ -487,7 +487,22 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
                 <LogOut className="h-4 w-4 mr-2" /> Encerrar sessões
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => doReset.mutate()}>
-                <KeyRound className="h-4 w-4 mr-2" /> Redefinir senha
+                <KeyRound className="h-4 w-4 mr-2" /> Enviar link de redefinição
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const p = window.prompt(
+                    `Defina uma nova senha para ${user.nome ?? user.email}\n(mínimo 8 caracteres):`
+                  );
+                  if (!p) return;
+                  if (p.length < 8) {
+                    toast.error("A senha deve ter no mínimo 8 caracteres");
+                    return;
+                  }
+                  doSenhaManual.mutate(p);
+                }}
+              >
+                <KeyRound className="h-4 w-4 mr-2" /> Definir senha manual
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => doStatus.mutate("desativado")} className="text-red-600">
