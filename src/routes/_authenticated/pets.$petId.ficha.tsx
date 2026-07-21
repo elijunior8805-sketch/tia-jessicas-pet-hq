@@ -84,29 +84,29 @@ function FichaOperacional() {
         actions={
           <>
             <Button
-              className="gap-2"
+              className="gap-2 bg-white text-primary hover:bg-white/90"
               onClick={() => navigate({ to: "/pets/$petId/historico", params: { petId } })}
             >
               <History className="h-4 w-4"/> Consultar histórico
             </Button>
             <Button
               variant="outline"
-              className="gap-2"
+              className="gap-2 bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"
               onClick={() => navigate({ to: "/pets/$petId/dossie", params: { petId } })}
             >
               <FileText className="h-4 w-4"/> Gerar PDF do pet
             </Button>
             <Link to="/pets/$petId/editar" params={{ petId }}>
-              <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar pet</Button>
+              <Button variant="outline" className="gap-2 bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"><Pencil className="h-4 w-4"/> Editar pet</Button>
             </Link>
             <Link
               to="/agenda"
               search={{ cliente: pet.cliente_id, pet: pet.id }}
             >
-              <Button variant="outline" className="gap-2"><CalendarPlus className="h-4 w-4"/> Novo agendamento</Button>
+              <Button variant="outline" className="gap-2 bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"><CalendarPlus className="h-4 w-4"/> Novo agendamento</Button>
             </Link>
             <Link to="/clientes/$id" params={{ id: pet.cliente_id }}>
-              <Button variant="ghost" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar</Button>
+              <Button variant="ghost" className="gap-2 text-white hover:bg-white/15 hover:text-white"><ArrowLeft className="h-4 w-4"/> Voltar</Button>
             </Link>
           </>
         }
