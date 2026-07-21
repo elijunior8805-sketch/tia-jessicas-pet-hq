@@ -65,6 +65,26 @@ function DashboardPage() {
   }, [period, customFrom, customTo]);
 
   const { data: profile } = useMyProfile();
+  const queryClient = useQueryClient();
+  const recalcFn = useServerFn(recalcularAgregados);
+  const recalc = useMutation({
+    mutationFn: () => recalcFn({ data: undefined as any }),
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries();
+      const parts = [
+        res.atendimentos_resetados ? `${res.atendimentos_resetados} atendimento(s) reabertos` : null,
+        res.agendamentos_reabertos ? `${res.agendamentos_reabertos} agendamento(s) reabertos` : null,
+        res.pets_recalculados ? `${res.pets_recalculados} pet(s) com histórico atualizado` : null,
+      ].filter(Boolean);
+      toast.success(
+        parts.length
+          ? `Agregados recalculados — ${parts.join(", ")}.`
+          : "Tudo em dia — nenhum ajuste necessário."
+      );
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao recalcular agregados."),
+  });
+
 
 
   const { data } = useQuery({
