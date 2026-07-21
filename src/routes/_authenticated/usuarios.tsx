@@ -422,6 +422,11 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
     onSuccess: () => toast.success("Link de redefinição gerado — enviado por e-mail"),
     onError: (e: any) => toast.error(e?.message ?? "Falha"),
   });
+  const doSenhaManual = useMutation({
+    mutationFn: (password: string) => setSenhaManual({ data: { userId: user.id, password } }),
+    onSuccess: () => toast.success("Senha definida com sucesso"),
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao definir senha"),
+  });
   const doEncerrar = useMutation({
     mutationFn: () => encerrar({ data: { userId: user.id } }),
     onSuccess: () => toast.success("Sessões encerradas"),
