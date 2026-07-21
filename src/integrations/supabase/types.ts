@@ -3194,6 +3194,19 @@ export type Database = {
         Args: { _id: string; _payload: Json; _version: number }
         Returns: number
       }
+      buscar_clientes_inteligente: {
+        Args: { max_rows?: number; termo: string }
+        Returns: {
+          bairro: string
+          cpf: string
+          email: string
+          id: string
+          nome: string
+          telefone: string
+          vip: boolean
+          whatsapp: string
+        }[]
+      }
       claim_lembretes_pendentes: {
         Args: { _limit?: number }
         Returns: {
@@ -3284,6 +3297,7 @@ export type Database = {
         }
         Returns: string
       }
+      unaccent: { Args: { "": string }; Returns: string }
       verificar_conflito_agendamento: {
         Args: {
           _data: string
