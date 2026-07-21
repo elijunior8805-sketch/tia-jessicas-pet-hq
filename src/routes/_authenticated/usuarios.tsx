@@ -12,6 +12,7 @@ import {
   listarPermissoes,
   salvarPermissoes,
   enviarResetSenha,
+  definirSenhaManual,
   encerrarSessoes,
   listarConvites,
   cancelarConvite,
