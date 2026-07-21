@@ -255,16 +255,30 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Filtro segmentado */}
-      <PeriodTabs
-        period={period}
-        onChange={setPeriod}
-        periodos={periodos}
-        customFrom={customFrom}
-        customTo={customTo}
-        setCustomFrom={setCustomFrom}
-        setCustomTo={setCustomTo}
-      />
+      {/* Filtro segmentado + Recalcular */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <PeriodTabs
+          period={period}
+          onChange={setPeriod}
+          periodos={periodos}
+          customFrom={customFrom}
+          customTo={customTo}
+          setCustomFrom={setCustomFrom}
+          setCustomTo={setCustomTo}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full gap-2 border-[oklch(0.85_0.05_155)] hover:bg-[oklch(0.94_0.03_155)]"
+          onClick={() => recalc.mutate()}
+          disabled={recalc.isPending}
+          title="Recalcula históricos e agregados a partir dos lançamentos atuais (admin)"
+        >
+          <RefreshCw className={`h-4 w-4 ${recalc.isPending ? "animate-spin" : ""}`} />
+          {recalc.isPending ? "Recalculando…" : "Recalcular KPIs"}
+        </Button>
+      </div>
+
 
       {/* ============ KPI CARDS PREMIUM ============ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 mb-6">
