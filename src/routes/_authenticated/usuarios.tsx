@@ -12,6 +12,7 @@ import {
   listarPermissoes,
   salvarPermissoes,
   enviarResetSenha,
+  definirSenhaManual,
   encerrarSessoes,
   listarConvites,
   cancelarConvite,
@@ -403,6 +404,7 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
   const setPerfil = useServerFn(setPerfilUsuario);
   const setStatus = useServerFn(setStatusUsuario);
   const resetSenha = useServerFn(enviarResetSenha);
+  const setSenhaManual = useServerFn(definirSenhaManual);
   const encerrar = useServerFn(encerrarSessoes);
 
   const doPerfil = useMutation({
@@ -419,6 +421,11 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
     mutationFn: () => resetSenha({ data: { email: user.email } }),
     onSuccess: () => toast.success("Link de redefinição gerado — enviado por e-mail"),
     onError: (e: any) => toast.error(e?.message ?? "Falha"),
+  });
+  const doSenhaManual = useMutation({
+    mutationFn: (password: string) => setSenhaManual({ data: { userId: user.id, password } }),
+    onSuccess: () => toast.success("Senha definida com sucesso"),
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao definir senha"),
   });
   const doEncerrar = useMutation({
     mutationFn: () => encerrar({ data: { userId: user.id } }),
@@ -480,7 +487,22 @@ function UsuarioRow({ user, onChange }: { user: any; onChange: () => void }) {
                 <LogOut className="h-4 w-4 mr-2" /> Encerrar sessões
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => doReset.mutate()}>
-                <KeyRound className="h-4 w-4 mr-2" /> Redefinir senha
+                <KeyRound className="h-4 w-4 mr-2" /> Enviar link de redefinição
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const p = window.prompt(
+                    `Defina uma nova senha para ${user.nome ?? user.email}\n(mínimo 8 caracteres):`
+                  );
+                  if (!p) return;
+                  if (p.length < 8) {
+                    toast.error("A senha deve ter no mínimo 8 caracteres");
+                    return;
+                  }
+                  doSenhaManual.mutate(p);
+                }}
+              >
+                <KeyRound className="h-4 w-4 mr-2" /> Definir senha manual
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => doStatus.mutate("desativado")} className="text-red-600">

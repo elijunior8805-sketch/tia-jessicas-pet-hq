@@ -258,6 +258,25 @@ export const enviarResetSenha = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const definirSenhaManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      userId: z.string().uuid(),
+      password: z.string().min(8).max(72),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertCanManage(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.password,
+      email_confirm: true,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const encerrarSessoes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ userId: z.string().uuid() }).parse(d))
