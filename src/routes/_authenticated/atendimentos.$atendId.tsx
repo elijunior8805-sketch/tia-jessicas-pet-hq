@@ -520,6 +520,7 @@ function AtendimentoDetalhe() {
       qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      navigate({ to: "/atendimentos" });
     },
     onError: (e: any) => toast.error(e.message ?? "Erro ao encerrar"),
   });
