@@ -13,16 +13,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import { toast } from "sonner";
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
   ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
+  Check, ChevronsUpDown,
 } from "lucide-react";
+
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
@@ -1338,12 +1345,28 @@ function NovoAgendamentoDialog({
     queryKey: ["clientes-select", clienteSearch, defaultClienteId ?? ""],
     enabled: open,
     queryFn: async () => {
-      let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(30);
-      if (clienteSearch.trim()) {
-        const like = `%${clienteSearch.trim()}%`;
-        q = q.or(`nome.ilike.${like},whatsapp.ilike.${like},telefone.ilike.${like}`);
+      const raw = clienteSearch.trim();
+      // Sanitiza: remove caracteres que quebram PostgREST .or() (vírgula, parênteses)
+      const safe = raw.replace(/[(),]/g, " ").replace(/\s+/g, " ").trim();
+      const digits = raw.replace(/\D+/g, "");
+      let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(50);
+      if (safe || digits) {
+        const parts: string[] = [];
+        if (safe) parts.push(`nome.ilike.%${safe}%`);
+        if (digits) {
+          parts.push(`whatsapp.ilike.%${digits}%`);
+          parts.push(`telefone.ilike.%${digits}%`);
+        } else if (safe) {
+          parts.push(`whatsapp.ilike.%${safe}%`);
+          parts.push(`telefone.ilike.%${safe}%`);
+        }
+        q = q.or(parts.join(","));
       }
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) {
+        console.error("[agenda] busca de clientes falhou", error);
+        return [] as { id: string; nome: string; whatsapp: string | null; vip: boolean | null }[];
+      }
       let rows = data ?? [];
       if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
         const { data: extra } = await supabase
@@ -1356,6 +1379,7 @@ function NovoAgendamentoDialog({
       return rows;
     },
   });
+
 
   const { data: pets } = useQuery({
     queryKey: ["pets-of-cliente", clienteId],
@@ -1551,23 +1575,15 @@ function NovoAgendamentoDialog({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <Label>Cliente *</Label>
-            <Input
-              placeholder="Buscar por nome, telefone ou WhatsApp…"
-              value={clienteSearch}
-              onChange={(e) => setClienteSearch(e.target.value)}
-              className="mb-2"
+            <ClientePicker
+              value={clienteId}
+              onChange={(v) => { setClienteId(v); setPetId(""); }}
+              search={clienteSearch}
+              onSearchChange={setClienteSearch}
+              options={clientes ?? []}
             />
-            <Select value={clienteId || undefined} onValueChange={(v) => { setClienteId(v); setPetId(""); }}>
-              <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-              <SelectContent>
-                {(clientes ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome} {c.vip === true ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
+
 
           <div className="sm:col-span-2">
             <Label>Pet *</Label>
@@ -2089,3 +2105,65 @@ function EditarServicosDialog({
     </Dialog>
   );
 }
+
+type ClienteOption = { id: string; nome: string; whatsapp: string | null; vip: boolean | null };
+
+function ClientePicker({
+  value, onChange, search, onSearchChange, options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  search: string;
+  onSearchChange: (v: string) => void;
+  options: ClienteOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((c) => c.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate text-left">
+            {selected
+              ? <>{selected.nome} {selected.vip === true ? "★" : ""} {selected.whatsapp ? `· ${selected.whatsapp}` : ""}</>
+              : <span className="text-muted-foreground">Buscar cliente por nome, telefone ou WhatsApp…</span>}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Digite nome, telefone ou WhatsApp…"
+            value={search}
+            onValueChange={onSearchChange}
+          />
+          <CommandList>
+            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+            <CommandGroup>
+              {options.map((c) => (
+                <CommandItem
+                  key={c.id}
+                  value={c.id}
+                  onSelect={() => { onChange(c.id); setOpen(false); }}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${value === c.id ? "opacity-100" : "opacity-0"}`} />
+                  <span className="truncate">
+                    {c.nome} {c.vip === true ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
