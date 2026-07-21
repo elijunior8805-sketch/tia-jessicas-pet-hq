@@ -147,13 +147,12 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .sort((a, b) => b.qtd - a.qtd)
       .slice(0, 10);
 
-    const finalizadosCount = rows.filter((r) => r.encerrado_em || r.finalizado).length;
-    const totalAtend = rows.length || 1;
+    const finalizadosCount = rowsExecutados.length;
     const indicadores: IndicadoresDTO = {
       periodo: { de: data.de, ate: data.ate },
       faturamento,
       faturamento_planejado: faturamentoPlan,
-      ticket_medio: rows.length ? faturamento / totalAtend : 0,
+      ticket_medio: rowsExecutados.length ? faturamento / rowsExecutados.length : 0,
       atendimentos_finalizados: finalizadosCount,
       atendimentos_cancelados: (agRows ?? []).length,
       clientes_atendidos: clientesSet.size,
