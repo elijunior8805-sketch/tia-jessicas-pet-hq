@@ -1575,23 +1575,15 @@ function NovoAgendamentoDialog({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <Label>Cliente *</Label>
-            <Input
-              placeholder="Buscar por nome, telefone ou WhatsApp…"
-              value={clienteSearch}
-              onChange={(e) => setClienteSearch(e.target.value)}
-              className="mb-2"
+            <ClientePicker
+              value={clienteId}
+              onChange={(v) => { setClienteId(v); setPetId(""); }}
+              search={clienteSearch}
+              onSearchChange={setClienteSearch}
+              options={clientes ?? []}
             />
-            <Select value={clienteId || undefined} onValueChange={(v) => { setClienteId(v); setPetId(""); }}>
-              <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-              <SelectContent>
-                {(clientes ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome} {c.vip === true ? "★" : ""} {c.whatsapp ? `· ${c.whatsapp}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
+
 
           <div className="sm:col-span-2">
             <Label>Pet *</Label>
