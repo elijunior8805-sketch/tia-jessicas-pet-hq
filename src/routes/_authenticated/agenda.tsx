@@ -1345,12 +1345,28 @@ function NovoAgendamentoDialog({
     queryKey: ["clientes-select", clienteSearch, defaultClienteId ?? ""],
     enabled: open,
     queryFn: async () => {
-      let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(30);
-      if (clienteSearch.trim()) {
-        const like = `%${clienteSearch.trim()}%`;
-        q = q.or(`nome.ilike.${like},whatsapp.ilike.${like},telefone.ilike.${like}`);
+      const raw = clienteSearch.trim();
+      // Sanitiza: remove caracteres que quebram PostgREST .or() (vírgula, parênteses)
+      const safe = raw.replace(/[(),]/g, " ").replace(/\s+/g, " ").trim();
+      const digits = raw.replace(/\D+/g, "");
+      let q = supabase.from("clientes").select("id, nome, whatsapp, vip").order("nome").limit(50);
+      if (safe || digits) {
+        const parts: string[] = [];
+        if (safe) parts.push(`nome.ilike.%${safe}%`);
+        if (digits) {
+          parts.push(`whatsapp.ilike.%${digits}%`);
+          parts.push(`telefone.ilike.%${digits}%`);
+        } else if (safe) {
+          parts.push(`whatsapp.ilike.%${safe}%`);
+          parts.push(`telefone.ilike.%${safe}%`);
+        }
+        q = q.or(parts.join(","));
       }
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) {
+        console.error("[agenda] busca de clientes falhou", error);
+        return [] as { id: string; nome: string; whatsapp: string | null; vip: boolean | null }[];
+      }
       let rows = data ?? [];
       if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
         const { data: extra } = await supabase
@@ -1363,6 +1379,7 @@ function NovoAgendamentoDialog({
       return rows;
     },
   });
+
 
   const { data: pets } = useQuery({
     queryKey: ["pets-of-cliente", clienteId],
