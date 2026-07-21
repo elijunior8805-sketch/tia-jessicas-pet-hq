@@ -3,13 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 
 // Cron público: chamado por pg_cron a cada hora. Idempotente por dia via
 // UNIQUE(agendamento_id, destinatario_whatsapp, periodo_de).
+// Autentica via header `x-cron-secret` = CRON_WEBHOOK_SECRET (server-only).
 export const Route = createFileRoute("/api/public/hooks/relatorios-diarios")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const auth = request.headers.get("apikey") ?? "";
-        const anon = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
-        if (!auth || auth !== anon) {
+        const provided =
+          request.headers.get("x-cron-secret") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          "";
+        const expected = process.env.CRON_WEBHOOK_SECRET ?? "";
+        if (!expected || !provided || provided !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
 
