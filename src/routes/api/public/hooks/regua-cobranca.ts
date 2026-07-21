@@ -1,22 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
-// Régua diária de cobrança. Chamada pelo pg_cron; header `apikey` = anon.
-// Não envia mensagens direto (o negócio usa wa.me), apenas:
-//  - transiciona status conforme dias (a_vencer -> vencido)
-//  - marca clientes que casam gatilhos (D-1, D0, D+3, D+7, D+15) como pendentes
-//    de aprovação, quando o modo é "manual"; ou registra envio automático,
-//    quando o modo é "auto".
-// Nunca duplica no mesmo dia se `nao_repetir_no_dia` estiver ativo.
+// Régua diária de cobrança. Chamada pelo pg_cron via header `x-cron-secret`.
+// Autenticação usa CRON_WEBHOOK_SECRET (segredo dedicado do servidor) — nunca
+// a chave anon/publishable, que é pública no bundle do frontend.
 
 export const Route = createFileRoute("/api/public/hooks/regua-cobranca")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth simples via apikey do publishable
-        const apikey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!apikey || !expected || apikey !== expected) {
+        const provided =
+          request.headers.get("x-cron-secret") ||
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+        const expected = process.env.CRON_WEBHOOK_SECRET;
+        if (!expected || !provided || provided !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
 
