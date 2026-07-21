@@ -1354,73 +1354,22 @@ function NovoAgendamentoDialog({
     enabled: open,
     queryFn: async () => {
       const raw = debouncedClienteSearch.trim();
-      const termAcc = raw.toLowerCase();
-      const termNoAcc = stripAccents(termAcc);
       const digits = raw.replace(/\D+/g, "");
-      const hasText = termNoAcc.length >= 2;
+      const hasText = raw.length >= 2;
       const hasDigits = digits.length >= 2;
 
       let rows: ClienteRow[] = [];
 
       if (hasText || hasDigits) {
-        const sanitize = (s: string) =>
-          s.replace(/[(),*]/g, " ").replace(/\s+/g, " ").trim();
-        const t1 = sanitize(termNoAcc);
-        const t2 = sanitize(termAcc);
-        const parts: string[] = [];
-        if (hasText) {
-          for (const t of [t1, t2].filter((x, i, a) => x && a.indexOf(x) === i)) {
-            parts.push(`nome.ilike.%${t}%`);
-            parts.push(`email.ilike.%${t}%`);
-            parts.push(`bairro.ilike.%${t}%`);
-          }
+        const { data, error } = await supabase.rpc("buscar_clientes_inteligente", {
+          termo: raw,
+          max_rows: 10,
+        });
+        if (error) {
+          console.error("[agenda] busca inteligente falhou", error);
+          throw error;
         }
-        if (hasDigits) {
-          parts.push(`whatsapp.ilike.%${digits}%`);
-          parts.push(`telefone.ilike.%${digits}%`);
-          parts.push(`cpf.ilike.%${digits}%`);
-        }
-
-        const clientesPromise = supabase
-          .from("clientes")
-          .select(CLIENTE_COLS)
-          .or(parts.join(","))
-          .order("nome")
-          .limit(20);
-
-        const petsPromise = hasText
-          ? supabase
-              .from("pets")
-              .select("cliente_id")
-              .ilike("nome", `%${t1}%`)
-              .eq("ativo", true)
-              .limit(20)
-          : Promise.resolve({ data: [] as { cliente_id: string }[], error: null });
-
-        const [clientesRes, petsRes] = await Promise.all([clientesPromise, petsPromise]);
-
-        if (clientesRes.error) {
-          console.error("[agenda] busca de clientes falhou", clientesRes.error);
-          throw clientesRes.error;
-        }
-        rows = ((clientesRes.data ?? []) as unknown) as ClienteRow[];
-
-        const petIds = Array.from(
-          new Set(
-            (((petsRes as any).data ?? []) as { cliente_id: string | null }[])
-              .map((p) => p.cliente_id)
-              .filter((v): v is string => !!v),
-          ),
-        ).filter((id) => !rows.some((r) => r.id === id));
-
-        if (petIds.length > 0) {
-          const { data: extras, error: extrasErr } = await supabase
-            .from("clientes")
-            .select(CLIENTE_COLS)
-            .in("id", petIds);
-          if (extrasErr) throw extrasErr;
-          rows = [...rows, ...(((extras ?? []) as unknown) as ClienteRow[])];
-        }
+        rows = ((data ?? []) as unknown) as ClienteRow[];
       }
 
       if (defaultClienteId && !rows.some((c) => c.id === defaultClienteId)) {
