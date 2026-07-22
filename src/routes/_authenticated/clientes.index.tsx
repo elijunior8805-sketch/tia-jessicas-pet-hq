@@ -507,11 +507,12 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
       if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("atendimentos")
-        .select("id, pet_id, data_execucao, valor_final, status, relatorio_pdf_path, pets(nome), servicos_executados, servicos_planejados")
+        .select("id, pet_id, data_inicio, data_fim, encerrado_em, finalizado, valor_executado, pets(nome), servicos_executados, servicos_planejados")
         .in("pet_id", petIds)
-        .order("data_execucao", { ascending: false, nullsFirst: false })
+        .order("encerrado_em", { ascending: false, nullsFirst: false })
         .limit(30);
       return rows ?? [];
+
     },
   });
 
