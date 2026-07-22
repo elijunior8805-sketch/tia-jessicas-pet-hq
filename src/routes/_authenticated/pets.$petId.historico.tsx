@@ -248,23 +248,46 @@ function HistoricoPet() {
       />
 
 
-      <Card className="p-4 mb-4">
+      <Card className="p-4 mb-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+            <Input
+              className="pl-8"
+              placeholder="Busca rápida — serviço, observação, recomendação, comportamento…"
+              value={busca}
+              onChange={e => { setBusca(e.target.value); setPage(0); }}
+            />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(7)}>7d</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(30)}>30d</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(90)}>90d</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(365)}>1 ano</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(null)}>Tudo</Button>
+          </div>
+          {filtrosAtivos > 0 && (
+            <Button variant="ghost" size="sm" className="gap-1" onClick={limparFiltros}>
+              <X className="h-3.5 w-3.5"/> Limpar ({filtrosAtivos})
+            </Button>
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
           <div>
             <Label className="text-xs">De</Label>
-            <Input type="date" value={de} onChange={e => setDe(e.target.value)} />
+            <Input type="date" value={de} onChange={e => { setDe(e.target.value); setPage(0); }} />
           </div>
           <div>
             <Label className="text-xs">Até</Label>
-            <Input type="date" value={ate} onChange={e => setAte(e.target.value)} />
+            <Input type="date" value={ate} onChange={e => { setAte(e.target.value); setPage(0); }} />
           </div>
           <div>
             <Label className="text-xs">Serviço</Label>
-            <Input placeholder="Ex.: banho, tosa" value={servico} onChange={e => setServico(e.target.value)} />
+            <Input placeholder="Ex.: banho, tosa" value={servico} onChange={e => { setServico(e.target.value); setPage(0); }} />
           </div>
           <div>
             <Label className="text-xs">Profissional</Label>
-            <Select value={profissional} onValueChange={setProfissional}>
+            <Select value={profissional} onValueChange={(v) => { setProfissional(v); setPage(0); }}>
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
@@ -276,7 +299,7 @@ function HistoricoPet() {
           </div>
           <div>
             <Label className="text-xs">Status</Label>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={(v) => { setStatus(v); setPage(0); }}>
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
@@ -285,19 +308,44 @@ function HistoricoPet() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col justify-end gap-1.5">
+          <div>
+            <Label className="text-xs">Pagamento</Label>
+            <Select value={pagamento} onValueChange={(v) => { setPagamento(v); setPage(0); }}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                <SelectItem value="parcial">Parcial</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Leva e Traz</Label>
+            <Select value={levaTraz} onValueChange={(v) => { setLevaTraz(v); setPage(0); }}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="com">Com transporte</SelectItem>
+                <SelectItem value="sem">Sem transporte</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 md:col-span-5 flex flex-wrap items-end gap-4">
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={comFotos} onCheckedChange={(v) => setComFotos(!!v)} /> Com fotos
+              <Checkbox checked={comFotos} onCheckedChange={(v) => { setComFotos(!!v); setPage(0); }} /> Com fotos
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={comOcorrencia} onCheckedChange={(v) => setComOcorrencia(!!v)} /> Com ocorrência
+              <Checkbox checked={comOcorrencia} onCheckedChange={(v) => { setComOcorrencia(!!v); setPage(0); }} /> Com ocorrência
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={comRecomendacao} onCheckedChange={(v) => setComRecomendacao(!!v)} /> Com recomendação
+              <Checkbox checked={comRecomendacao} onCheckedChange={(v) => { setComRecomendacao(!!v); setPage(0); }} /> Com recomendação
             </label>
           </div>
         </div>
       </Card>
+
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Carregando…</div>
