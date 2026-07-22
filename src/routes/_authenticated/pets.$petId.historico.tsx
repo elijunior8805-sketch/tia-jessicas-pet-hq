@@ -47,24 +47,60 @@ const fmtD = (d?: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") 
 
 function HistoricoPet() {
   const { petId } = Route.useParams();
-  const [busca, setBusca] = useState<string>("");
-  const [de, setDe] = useState<string>("");
-  const [ate, setAte] = useState<string>("");
-  const [servico, setServico] = useState<string>("");
-  const [profissional, setProfissional] = useState<string>("todos");
-  const [status, setStatus] = useState<string>("todos");
-  const [pagamento, setPagamento] = useState<string>("todos");
-  const [levaTraz, setLevaTraz] = useState<string>("todos");
-  const [comFotos, setComFotos] = useState(false);
-  const [comOcorrencia, setComOcorrencia] = useState(false);
-  const [comRecomendacao, setComRecomendacao] = useState(false);
-  const [ordem, setOrdem] = useState<string>("data_desc");
-  const [page, setPage] = useState(0);
+  const sp = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const [busca, setBusca] = useState<string>(sp.q ?? "");
+  const [de, setDe] = useState<string>(sp.de ?? "");
+  const [ate, setAte] = useState<string>(sp.ate ?? "");
+  const [servico, setServico] = useState<string>(sp.svc ?? "");
+  const [profissional, setProfissional] = useState<string>(sp.prof ?? "todos");
+  const [status, setStatus] = useState<string>(sp.st ?? "todos");
+  const [pagamento, setPagamento] = useState<string>(sp.pg ?? "todos");
+  const [levaTraz, setLevaTraz] = useState<string>(sp.lt ?? "todos");
+  const [comFotos, setComFotos] = useState<boolean>(!!sp.fotos);
+  const [comOcorrencia, setComOcorrencia] = useState<boolean>(!!sp.ocor);
+  const [comRecomendacao, setComRecomendacao] = useState<boolean>(!!sp.rec);
+  const [ordem, setOrdem] = useState<string>(sp.ord ?? "data_desc");
+  const [page, setPage] = useState<number>(sp.p ?? 0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandAll, setExpandAll] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [gerandoCsv, setGerandoCsv] = useState(false);
+  const [copiado, setCopiado] = useState(false);
   const pageSize = 20;
+
+  // Sincroniza estado -> URL (replace, sem empilhar histórico)
+  const firstSync = useRef(true);
+  useEffect(() => {
+    const next: Record<string, unknown> = {
+      q: busca || undefined,
+      de: de || undefined,
+      ate: ate || undefined,
+      svc: servico || undefined,
+      prof: profissional !== "todos" ? profissional : undefined,
+      st: status !== "todos" ? status : undefined,
+      pg: pagamento !== "todos" ? pagamento : undefined,
+      lt: levaTraz !== "todos" ? levaTraz : undefined,
+      fotos: comFotos || undefined,
+      ocor: comOcorrencia || undefined,
+      rec: comRecomendacao || undefined,
+      ord: ordem !== "data_desc" ? ordem : undefined,
+      p: page > 0 ? page : undefined,
+    };
+    if (firstSync.current) { firstSync.current = false; }
+    navigate({ search: next as any, replace: true, resetScroll: false });
+  }, [busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, ordem, page, navigate]);
+
+  async function copiarLinkVisualizacao() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiado(true);
+      toast.success("Link copiado — abra em outro dispositivo para ver a mesma visualização.");
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  }
 
   function aplicarPreset(dias: number | null) {
     if (dias === null) { setDe(""); setAte(""); return; }
