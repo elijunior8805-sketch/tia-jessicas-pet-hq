@@ -358,7 +358,7 @@ function AtendimentoDetalhe() {
   const { data: myProfile } = useMyProfile();
   const composer = useWhatsAppComposer();
 
-  const { data: isAdmin } = useQuery({
+  const { data: isAdminRpc } = useQuery({
     queryKey: ["is-admin", myProfile?.id],
     enabled: !!myProfile?.id,
     queryFn: async () => {
@@ -366,6 +366,9 @@ function AtendimentoDetalhe() {
       return !!data;
     },
   });
+  const perfil = (myProfile as any)?.perfil as string | undefined;
+  const isAdmin = isAdminRpc || perfil === "proprietario" || perfil === "admin" || perfil === "gerente";
+
 
   const { data: empresa } = useQuery({
     queryKey: ["empresa-config"],
