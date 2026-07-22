@@ -40,6 +40,7 @@ function HistoricoPet() {
   const [comFotos, setComFotos] = useState(false);
   const [comOcorrencia, setComOcorrencia] = useState(false);
   const [comRecomendacao, setComRecomendacao] = useState(false);
+  const [ordem, setOrdem] = useState<string>("data_desc");
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandAll, setExpandAll] = useState(true);
@@ -104,8 +105,15 @@ function HistoricoPet() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["pet-historico", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, page }],
+    queryKey: ["pet-historico", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, ordem, page }],
     queryFn: async () => {
+      const orderMap: Record<string, { col: string; asc: boolean }> = {
+        data_desc: { col: "data_inicio", asc: false },
+        data_asc: { col: "data_inicio", asc: true },
+        valor_desc: { col: "valor_executado", asc: false },
+        valor_asc: { col: "valor_executado", asc: true },
+      };
+      const ord = orderMap[ordem] ?? orderMap.data_desc;
       let q = supabase
         .from("atendimentos")
         .select(
@@ -113,6 +121,7 @@ function HistoricoPet() {
           { count: "exact" }
         )
         .eq("pet_id", petId)
+        .order(ord.col, { ascending: ord.asc, nullsFirst: false })
         .order("data_inicio", { ascending: false })
         .range(page * pageSize, page * pageSize + pageSize - 1);
       if (de) q = q.gte("data_inicio", de);
@@ -332,7 +341,19 @@ function HistoricoPet() {
               </SelectContent>
             </Select>
           </div>
-          <div className="col-span-2 md:col-span-5 flex flex-wrap items-end gap-4">
+          <div>
+            <Label className="text-xs">Ordenar por</Label>
+            <Select value={ordem} onValueChange={(v) => { setOrdem(v); setPage(0); }}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="data_desc">Data (mais recentes)</SelectItem>
+                <SelectItem value="data_asc">Data (mais antigas)</SelectItem>
+                <SelectItem value="valor_desc">Valor (maior → menor)</SelectItem>
+                <SelectItem value="valor_asc">Valor (menor → maior)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 md:col-span-4 flex flex-wrap items-end gap-4">
             <label className="flex items-center gap-2 text-xs">
               <Checkbox checked={comFotos} onCheckedChange={(v) => { setComFotos(!!v); setPage(0); }} /> Com fotos
             </label>
