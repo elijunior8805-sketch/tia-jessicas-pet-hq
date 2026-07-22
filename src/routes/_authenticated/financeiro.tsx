@@ -867,23 +867,31 @@ function FinanceiroPage() {
     },
   });
 
-  // Faturamento por competência (data_inicio do atendimento)
+  // Faturamento por competência — mesma regra do Painel Principal:
+  // apenas atendimentos EFETIVAMENTE encerrados (finalizado=true,
+  // encerrado_em preenchido e valor_executado > 0). Valor planejado
+  // de atendimentos abertos NÃO entra no faturamento.
+  // Considera o período por encerrado_em (fallback data_inicio).
   const { data: faturamentoCompetencia = 0 } = useQuery<number>({
     queryKey: ["fin-fat-competencia", inicio, fim],
     queryFn: async () => {
       const { data } = await supabase
         .from("atendimentos")
-        .select("valor_planejado, valor_executado, encerrado_em, data_inicio")
-        .gte("data_inicio", `${inicio}T00:00:00.000Z`)
-        .lte("data_inicio", `${fim}T23:59:59.999Z`);
+        .select("valor_executado, encerrado_em, data_inicio, finalizado")
+        .or(
+          `and(data_inicio.gte.${inicio}T00:00:00.000Z,data_inicio.lte.${fim}T23:59:59.999Z),and(encerrado_em.gte.${inicio}T00:00:00.000Z,encerrado_em.lte.${fim}T23:59:59.999Z)`,
+        );
       const rows = (data as any[]) || [];
       return rows.reduce((s, r) => {
         const exec = Number(r.valor_executado ?? 0);
-        const plan = Number(r.valor_planejado ?? 0);
-        return s + (exec > 0 ? exec : plan);
+        if (!(exec > 0 && !!r.encerrado_em && r.finalizado === true)) return s;
+        const ref = String(r.encerrado_em ?? r.data_inicio ?? "").slice(0, 10);
+        if (ref < inicio || ref > fim) return s;
+        return s + exec;
       }, 0);
     },
   });
+
 
   const clientesUnicos = useMemo(() => {
     const map = new Map<string, string>();
