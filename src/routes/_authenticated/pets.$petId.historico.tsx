@@ -260,8 +260,23 @@ function HistoricoPet() {
         <Card className="p-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado com esses filtros.</Card>
       ) : (
         <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => { setExpandAll(v => !v); setExpanded({}); }}
+            >
+              {expandAll ? <><ChevronsDownUp className="h-4 w-4"/> Recolher tudo</> : <><ChevronsUpDown className="h-4 w-4"/> Expandir tudo</>}
+            </Button>
+          </div>
           {rows.map((a: any) => {
-            const isOpen = !!expanded[a.id];
+            const override = expanded[a.id];
+            const isOpen = override === undefined ? expandAll : override;
+            const execs = ((a.servicos_executados ?? []) as any[]).map((s: any) => s?.nome).filter(Boolean);
+            const totalVal = Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0);
+            const ocs = ocorrenciasPorAtend.get(a.id) ?? [];
+            const totalFotos = (a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length;
             const execs = ((a.servicos_executados ?? []) as any[]).map((s: any) => s?.nome).filter(Boolean);
             const totalVal = Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0);
             const ocs = ocorrenciasPorAtend.get(a.id) ?? [];
