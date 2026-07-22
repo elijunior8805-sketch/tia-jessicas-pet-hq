@@ -105,8 +105,15 @@ function HistoricoPet() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["pet-historico", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, page }],
+    queryKey: ["pet-historico", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, ordem, page }],
     queryFn: async () => {
+      const orderMap: Record<string, { col: string; asc: boolean }> = {
+        data_desc: { col: "data_inicio", asc: false },
+        data_asc: { col: "data_inicio", asc: true },
+        valor_desc: { col: "valor_executado", asc: false },
+        valor_asc: { col: "valor_executado", asc: true },
+      };
+      const ord = orderMap[ordem] ?? orderMap.data_desc;
       let q = supabase
         .from("atendimentos")
         .select(
@@ -114,6 +121,7 @@ function HistoricoPet() {
           { count: "exact" }
         )
         .eq("pet_id", petId)
+        .order(ord.col, { ascending: ord.asc, nullsFirst: false })
         .order("data_inicio", { ascending: false })
         .range(page * pageSize, page * pageSize + pageSize - 1);
       if (de) q = q.gte("data_inicio", de);
