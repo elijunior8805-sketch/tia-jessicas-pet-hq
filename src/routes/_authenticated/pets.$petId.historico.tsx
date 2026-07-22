@@ -341,7 +341,19 @@ function HistoricoPet() {
               </SelectContent>
             </Select>
           </div>
-          <div className="col-span-2 md:col-span-5 flex flex-wrap items-end gap-4">
+          <div>
+            <Label className="text-xs">Ordenar por</Label>
+            <Select value={ordem} onValueChange={(v) => { setOrdem(v); setPage(0); }}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="data_desc">Data (mais recentes)</SelectItem>
+                <SelectItem value="data_asc">Data (mais antigas)</SelectItem>
+                <SelectItem value="valor_desc">Valor (maior → menor)</SelectItem>
+                <SelectItem value="valor_asc">Valor (menor → maior)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 md:col-span-4 flex flex-wrap items-end gap-4">
             <label className="flex items-center gap-2 text-xs">
               <Checkbox checked={comFotos} onCheckedChange={(v) => { setComFotos(!!v); setPage(0); }} /> Com fotos
             </label>
