@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logAccessDenial } from "@/lib/log-access-denial";
 
 export type MyAccess = {
   userId: string | null;
@@ -50,5 +51,9 @@ export function useMyAccess() {
 export function hasPermission(access: MyAccess | undefined, modulo: string, acao: string): boolean {
   if (!access) return false;
   if (access.isProprietario) return true;
-  return !!access.permissoes[modulo]?.[acao];
+  const ok = !!access.permissoes[modulo]?.[acao];
+  if (!ok && access.userId) {
+    void logAccessDenial({ motivo: "permission_check", modulo, acao });
+  }
+  return ok;
 }
