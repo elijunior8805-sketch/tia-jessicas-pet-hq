@@ -1501,6 +1501,27 @@ function NovoAgendamentoDialog({
                     : ltIsento ? 0
                     : Number(taxa || 0);
 
+      // Aviso (não bloqueia) quando já existe outro pet no mesmo horário
+      try {
+        const { data: temConflito } = await supabase.rpc("verificar_conflito_agendamento", {
+          _data: parsed.data,
+          _hora: parsed.hora,
+          _duracao_min: totalDuracao > 0 ? totalDuracao : 60,
+          _profissional_id: null,
+          _ignorar_id: isEdit && editId ? editId : null,
+        });
+        if (temConflito) {
+          const ok = typeof window !== "undefined"
+            ? window.confirm("Já existe outro agendamento nesse horário. Deseja salvar mesmo assim?")
+            : true;
+          if (!ok) throw new Error("__CANCELADO_CONFLITO__");
+        }
+      } catch (err: any) {
+        if (err?.message === "__CANCELADO_CONFLITO__") throw err;
+        // se a checagem falhar por qualquer motivo, seguimos normalmente
+      }
+
+
       const buscaEndFinal = ltModalidade === "somente_buscar" || ltModalidade === "buscar_entregar"
         ? (buscaUsaClienteEnd ? null : buscaEnd)
         : null;
