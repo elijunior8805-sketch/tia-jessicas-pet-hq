@@ -104,7 +104,7 @@ function HistoricoPet() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["pet-historico", petId, { de, ate, servico, profissional, status, comFotos, comOcorrencia, comRecomendacao, page }],
+    queryKey: ["pet-historico", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, page }],
     queryFn: async () => {
       let q = supabase
         .from("atendimentos")
@@ -120,6 +120,7 @@ function HistoricoPet() {
       if (status === "concluido") q = q.not("encerrado_em", "is", null);
       if (status === "cancelado") q = q.is("encerrado_em", null);
       if (profissional !== "todos") q = q.eq("profissional_id", profissional);
+      if (pagamento !== "todos") q = q.eq("pagamento_status", pagamento);
       const { data, count } = await q;
       let rows = data ?? [];
       if (servico.trim()) {
@@ -128,6 +129,23 @@ function HistoricoPet() {
           [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
             .some((x: any) => String(x?.nome ?? "").toLowerCase().includes(s))
         );
+      }
+      if (busca.trim()) {
+        const b = busca.trim().toLowerCase();
+        rows = rows.filter((a: any) => {
+          const servs = [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+            .map((x: any) => String(x?.nome ?? "")).join(" ");
+          const hay = [
+            servs, a.observacoes, a.recomendacoes, a.alergia_observada,
+            (a.comportamentos ?? []).join(" "), a.pagamento_forma, a.pagamento_status,
+          ].filter(Boolean).join(" ").toLowerCase();
+          return hay.includes(b);
+        });
+      }
+      if (levaTraz === "com") {
+        rows = rows.filter((a: any) => a.agendamentos?.leva_traz_modalidade && a.agendamentos.leva_traz_modalidade !== "nao_utilizar");
+      } else if (levaTraz === "sem") {
+        rows = rows.filter((a: any) => !a.agendamentos?.leva_traz_modalidade || a.agendamentos.leva_traz_modalidade === "nao_utilizar");
       }
       if (comFotos) rows = rows.filter((a: any) => ((a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length) > 0);
       if (comRecomendacao) rows = rows.filter((a: any) => !!a.recomendacoes);
