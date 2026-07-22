@@ -26,8 +26,13 @@ export const Route = createFileRoute("/_authenticated/atendimentos/")({
 });
 
 function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Data local em America/Sao_Paulo (evita drift de UTC ao virar a noite).
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+function toLocalDay(iso: string | null | undefined) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
 function AtendimentosPainel() {
