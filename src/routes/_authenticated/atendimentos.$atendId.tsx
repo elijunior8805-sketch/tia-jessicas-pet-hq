@@ -1416,3 +1416,41 @@ function ZoomImage({ path }: { path: string }) {
   if (!url) return <div className="w-full h-96 bg-muted animate-pulse" />;
   return <img src={url} alt="foto ampliada" className="w-full max-h-[80vh] object-contain rounded-lg" />;
 }
+
+function ExtraNumberInput({
+  value, onCommit, disabled, className, min, step,
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  disabled?: boolean;
+  className?: string;
+  min?: number;
+  step?: number;
+}) {
+  const [draft, setDraft] = useState<string>(String(value ?? 0));
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (!focusedRef.current) setDraft(String(value ?? 0));
+  }, [value]);
+  return (
+    <Input
+      type="number"
+      min={min}
+      step={step}
+      value={draft}
+      disabled={disabled}
+      onFocus={(e) => { focusedRef.current = true; e.target.select(); }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        focusedRef.current = false;
+        const n = Number(draft);
+        if (Number.isFinite(n) && n !== Number(value)) onCommit(n);
+        else setDraft(String(value ?? 0));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      className={className}
+    />
+  );
+}
