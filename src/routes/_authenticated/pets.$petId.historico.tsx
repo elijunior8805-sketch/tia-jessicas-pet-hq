@@ -454,23 +454,23 @@ function HistoricoPet() {
         description={pet?.clientes?.nome ?? ""}
         actions={
           <>
-            <Button className="gap-2" onClick={gerarHistoricoPdf} disabled={gerandoPdf || !pet}>
+            <Button className="gap-2 bg-white text-primary hover:bg-white/90" onClick={gerarHistoricoPdf} disabled={gerandoPdf || !pet}>
               {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
               Gerar histórico (PDF)
             </Button>
-            <Button variant="outline" className="gap-2" onClick={exportarCsv} disabled={gerandoCsv || !pet}>
+            <Button variant="outline" className="gap-2 bg-white/10 text-white border-white/40 hover:bg-white/20 hover:text-white" onClick={exportarCsv} disabled={gerandoCsv || !pet}>
               {gerandoCsv ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
               Exportar CSV
             </Button>
-            <Button variant="outline" className="gap-2" onClick={copiarLinkVisualizacao}>
+            <Button variant="outline" className="gap-2 bg-white/10 text-white border-white/40 hover:bg-white/20 hover:text-white" onClick={copiarLinkVisualizacao}>
               {copiado ? <Check className="h-4 w-4"/> : <Link2 className="h-4 w-4"/>}
               {copiado ? "Link copiado" : "Copiar link da visualização"}
             </Button>
             <Link to="/pets/$petId/dossie" params={{ petId }}>
-              <Button variant="outline" className="gap-2"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
+              <Button variant="outline" className="gap-2 bg-white/10 text-white border-white/40 hover:bg-white/20 hover:text-white"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
             </Link>
             <Link to="/pets/$petId/ficha" params={{ petId }}>
-              <Button variant="ghost" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar à ficha</Button>
+              <Button variant="ghost" className="gap-2 text-white hover:bg-white/10 hover:text-white"><ArrowLeft className="h-4 w-4"/> Voltar à ficha</Button>
             </Link>
           </>
         }
