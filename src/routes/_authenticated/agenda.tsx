@@ -1507,8 +1507,9 @@ function NovoAgendamentoDialog({
           _data: parsed.data,
           _hora: parsed.hora,
           _duracao_min: totalDuracao > 0 ? totalDuracao : 60,
-          _profissional_id: null,
-          _ignorar_id: isEdit && editId ? editId : null,
+          _profissional_id: undefined as any,
+          _ignorar_id: (isEdit && editId ? editId : undefined) as any,
+
         });
         if (temConflito) {
           const ok = typeof window !== "undefined"
