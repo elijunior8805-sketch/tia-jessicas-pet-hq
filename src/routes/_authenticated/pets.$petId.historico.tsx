@@ -233,7 +233,10 @@ function HistoricoPet() {
       toast.error(e?.message ?? "Falha ao gerar histórico");
     } finally {
       setGerandoPdf(false);
+    }
   }
+
+
 
   async function exportarCsv() {
     if (!pet) return;
