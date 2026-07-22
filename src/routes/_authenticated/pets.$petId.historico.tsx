@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronRight, Image as ImageIcon,
   AlertTriangle, DollarSign, Truck, MessageSquare, FileText, Loader2,
-  ChevronsDownUp, ChevronsUpDown, Search, X,
+  ChevronsDownUp, ChevronsUpDown, Search, X, Download,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
@@ -45,6 +45,7 @@ function HistoricoPet() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandAll, setExpandAll] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [gerandoCsv, setGerandoCsv] = useState(false);
   const pageSize = 20;
 
   function aplicarPreset(dias: number | null) {
@@ -235,6 +236,113 @@ function HistoricoPet() {
     }
   }
 
+
+
+  async function exportarCsv() {
+    if (!pet) return;
+    setGerandoCsv(true);
+    try {
+      const orderMap: Record<string, { col: string; asc: boolean }> = {
+        data_desc: { col: "data_inicio", asc: false },
+        data_asc: { col: "data_inicio", asc: true },
+        valor_desc: { col: "valor_executado", asc: false },
+        valor_asc: { col: "valor_executado", asc: true },
+      };
+      const ord = orderMap[ordem] ?? orderMap.data_desc;
+      let q = supabase
+        .from("atendimentos")
+        .select("id, data_inicio, data_fim, encerrado_em, servicos_planejados, servicos_executados, servicos_extras, valor_executado, taxa_leva_traz, comportamentos, observacoes, recomendacoes, pagamento_status, pagamento_forma, valor_pago, fotos_antes, fotos_depois, profissional_id, alergia_observada, agendamentos(status, leva_traz_modalidade)")
+        .eq("pet_id", petId)
+        .order(ord.col, { ascending: ord.asc, nullsFirst: false })
+        .order("data_inicio", { ascending: false });
+      if (de) q = q.gte("data_inicio", de);
+      if (ate) q = q.lte("data_inicio", ate + "T23:59:59");
+      if (status === "concluido") q = q.not("encerrado_em", "is", null);
+      if (status === "cancelado") q = q.is("encerrado_em", null);
+      if (profissional !== "todos") q = q.eq("profissional_id", profissional);
+      if (pagamento !== "todos") q = q.eq("pagamento_status", pagamento);
+      const { data: allRows } = await q;
+      let list: any[] = allRows ?? [];
+
+      if (servico.trim()) {
+        const s = servico.trim().toLowerCase();
+        list = list.filter((a) =>
+          [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+            .some((x: any) => String(x?.nome ?? "").toLowerCase().includes(s))
+        );
+      }
+      if (busca.trim()) {
+        const b = busca.trim().toLowerCase();
+        list = list.filter((a) => {
+          const servs = [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+            .map((x: any) => String(x?.nome ?? "")).join(" ");
+          const hay = [servs, a.observacoes, a.recomendacoes, a.alergia_observada,
+            (a.comportamentos ?? []).join(" "), a.pagamento_forma, a.pagamento_status]
+            .filter(Boolean).join(" ").toLowerCase();
+          return hay.includes(b);
+        });
+      }
+      if (levaTraz === "com") list = list.filter((a) => a.agendamentos?.leva_traz_modalidade && a.agendamentos.leva_traz_modalidade !== "nao_utilizar");
+      else if (levaTraz === "sem") list = list.filter((a) => !a.agendamentos?.leva_traz_modalidade || a.agendamentos.leva_traz_modalidade === "nao_utilizar");
+      if (comFotos) list = list.filter((a) => ((a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length) > 0);
+      if (comRecomendacao) list = list.filter((a) => !!a.recomendacoes);
+      if (comOcorrencia) list = list.filter((a) => (ocorrenciasPorAtend.get(a.id) ?? []).length > 0);
+
+      const profIds = Array.from(new Set(list.map((a) => a.profissional_id).filter(Boolean)));
+      const nomePorId = new Map<string, string>();
+      if (profIds.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", profIds);
+        (profs ?? []).forEach((p: any) => nomePorId.set(p.id, p.nome));
+      }
+
+      const esc = (v: any) => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return /[";,\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = ["Data", "Hora", "Serviços", "Status", "Pagamento", "Forma pagto.", "Valor executado", "Valor pago", "Taxa leva e traz", "Responsável", "Observações", "Recomendações"];
+      const linhas = list.map((a) => {
+        const dt = a.encerrado_em || a.data_fim || a.data_inicio;
+        const d = dt ? new Date(dt) : null;
+        const data = d ? d.toLocaleDateString("pt-BR") : "";
+        const hora = d ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+        const servs = [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+          .map((x: any) => x?.nome).filter(Boolean).join(" | ");
+        const st = a.encerrado_em ? "Concluído" : (a.agendamentos?.status ?? "Em aberto");
+        return [
+          data, hora, servs, st,
+          a.pagamento_status ?? "", a.pagamento_forma ?? "",
+          Number(a.valor_executado ?? 0).toFixed(2).replace(".", ","),
+          Number(a.valor_pago ?? 0).toFixed(2).replace(".", ","),
+          Number(a.taxa_leva_traz ?? 0).toFixed(2).replace(".", ","),
+          nomePorId.get(a.profissional_id) ?? "",
+          a.observacoes ?? "", a.recomendacoes ?? "",
+        ].map(esc).join(";");
+      });
+      const csv = "\uFEFF" + [header.join(";"), ...linhas].join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const nome = (pet.nome ?? "pet").replace(/[^\w\-]+/g, "_");
+      a.href = url;
+      a.download = `historico_${nome}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+
+      const { data: u } = await supabase.auth.getUser();
+      await supabase.from("pet_acessos_log").insert({
+        pet_id: petId, user_id: u.user?.id ?? null, user_email: u.user?.email ?? null,
+        acao: "exportou_csv", escopo: { origem: "historico", total: list.length, filtros: { de, ate, servico, profissional, status, pagamento, levaTraz, busca } },
+      });
+      toast.success(`CSV gerado (${list.length} registros).`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao exportar CSV");
+    } finally {
+      setGerandoCsv(false);
+    }
+  }
+
+
+
   return (
     <PageShell>
       <PageHeader
@@ -245,6 +353,10 @@ function HistoricoPet() {
             <Button className="gap-2" onClick={gerarHistoricoPdf} disabled={gerandoPdf || !pet}>
               {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
               Gerar histórico (PDF)
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={exportarCsv} disabled={gerandoCsv || !pet}>
+              {gerandoCsv ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+              Exportar CSV
             </Button>
             <Link to="/pets/$petId/dossie" params={{ petId }}>
               <Button variant="outline" className="gap-2"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
