@@ -350,6 +350,10 @@ function HistoricoPet() {
               {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
               Gerar histórico (PDF)
             </Button>
+            <Button variant="outline" className="gap-2" onClick={exportarCsv} disabled={gerandoCsv || !pet}>
+              {gerandoCsv ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+              Exportar CSV
+            </Button>
             <Link to="/pets/$petId/dossie" params={{ petId }}>
               <Button variant="outline" className="gap-2"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
             </Link>
