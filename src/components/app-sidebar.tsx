@@ -20,6 +20,7 @@ import {
   Megaphone,
   Settings,
   Shield,
+  ShieldAlert,
   PawPrint,
   Cake,
 } from "lucide-react";
@@ -80,6 +81,7 @@ const adminGroup = {
   label: "Segurança",
   items: [
     { title: "Usuários e Acessos", url: "/usuarios", icon: Shield },
+    { title: "Auditoria de Acessos", url: "/auditoria-acessos", icon: ShieldAlert },
   ],
 };
 
