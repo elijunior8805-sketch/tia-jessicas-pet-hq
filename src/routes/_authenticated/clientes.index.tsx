@@ -530,7 +530,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
     },
   });
 
-  const { data: pagamentos } = useQuery({
+  const { data: pagamentos, refetch: refetchPagamentos, isFetching: fetchingPagamentos } = useQuery({
     queryKey: ["cliente-ficha-pagamentos-v2", id],
     enabled: !!id,
     queryFn: async () => {
@@ -543,6 +543,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
       return (rows ?? []).map((r: any) => ({ ...r, valor: r.valor_total }));
     },
   });
+
 
   const { data: mensagens } = useQuery({
     queryKey: ["cliente-ficha-mensagens", id],
