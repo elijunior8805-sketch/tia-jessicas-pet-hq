@@ -894,7 +894,7 @@ function FinanceiroPage() {
       };
       const { data } = await supabase
         .from("atendimentos")
-        .select("valor_executado, encerrado_em, data_inicio, finalizado")
+        .select("valor_executado, taxa_leva_traz, desconto, encerrado_em, data_inicio, finalizado")
         .or(
           `and(data_inicio.gte.${iniWide}T00:00:00.000Z,data_inicio.lte.${fimWide}T23:59:59.999Z),and(encerrado_em.gte.${iniWide}T00:00:00.000Z,encerrado_em.lte.${fimWide}T23:59:59.999Z)`,
         );
@@ -904,7 +904,7 @@ function FinanceiroPage() {
         if (!(exec > 0 && !!r.encerrado_em && r.finalizado === true)) return s;
         const ref = toLocalDay(r.encerrado_em ?? r.data_inicio);
         if (ref < inicio || ref > fim) return s;
-        return s + exec;
+        return s + Math.max(0, exec + Number(r.taxa_leva_traz ?? 0) - Number(r.desconto ?? 0));
       }, 0);
     },
   });
