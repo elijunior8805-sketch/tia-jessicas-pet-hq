@@ -173,10 +173,11 @@ function AtendimentosPainel() {
         description="Check-in, execução e check-out dos pets do dia."
         actions={
           <Button
-            variant={onlyVip ? "default" : "outline"}
             className={cn(
-              "gap-1.5",
-              onlyVip && "bg-[var(--color-gold)] text-primary hover:bg-[var(--color-gold)]/90 border-[var(--color-gold)]",
+              "gap-1.5 border",
+              onlyVip
+                ? "bg-[var(--color-gold)] text-primary hover:bg-[var(--color-gold)]/90 border-[var(--color-gold)]"
+                : "bg-white/10 text-white border-white/40 hover:bg-white/20 hover:text-white",
             )}
             onClick={() =>
               navigate({
