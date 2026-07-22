@@ -92,7 +92,6 @@ function DossieConfig() {
 
       const { data: empresa } = await supabase.from("empresa_config").select("*").maybeSingle();
       const { data: u } = await supabase.auth.getUser();
-      const { data: prof } = u.user ? await supabase.from("profiles").select("nome").eq("id", u.user.id).maybeSingle() : { data: null };
 
       // Ocorrências: por padrão só inclui as marcadas como não-internas.
       // Sem sinalizador dedicado no schema, incluímos tudo apenas se o admin confirmar.
@@ -105,7 +104,7 @@ function DossieConfig() {
         atendimentos: atendimentos ?? [],
         ocorrencias: secoes.ocorrencias ? ocs : [],
         empresa,
-        operador: prof?.nome ?? u.user?.email ?? null,
+        operador: "Jéssica Xavier",
         secoes,
         periodo: { de: de || null, ate: ate || null },
       });
