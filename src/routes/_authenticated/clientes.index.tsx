@@ -532,16 +532,15 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
 
   const { data: pagamentos } = useQuery({
     queryKey: ["cliente-ficha-pagamentos", id],
-    enabled: !!data,
+    enabled: !!id,
     queryFn: async () => {
-      const petIds = (data?.pets ?? []).map((p: any) => p.id);
-      if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("pagamentos")
-        .select("id, atendimento_id, valor, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id)")
+        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id)")
+        .eq("cliente_id", id)
         .order("data_pagamento", { ascending: false, nullsFirst: false })
-        .limit(60);
-      return (rows ?? []).filter((r: any) => petIds.includes(r.atendimentos?.pet_id));
+        .limit(200);
+      return (rows ?? []).map((r: any) => ({ ...r, valor: r.valor_total }));
     },
   });
 
