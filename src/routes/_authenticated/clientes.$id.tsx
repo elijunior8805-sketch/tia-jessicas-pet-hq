@@ -22,6 +22,12 @@ function ClienteDetalhe() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  useRealtimeFinanceiro([
+    ["cliente-pagamentos", id],
+    ["cliente-atends", id],
+    ["cliente", id],
+  ]);
+
   const { data, isLoading } = useQuery({
     queryKey: ["cliente", id],
     queryFn: async () => {
