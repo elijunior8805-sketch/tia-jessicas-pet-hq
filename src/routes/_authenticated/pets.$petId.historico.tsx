@@ -12,9 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronRight, Image as ImageIcon,
-  AlertTriangle, DollarSign, Truck, MessageSquare, FileText,
+  AlertTriangle, DollarSign, Truck, MessageSquare, FileText, Loader2,
+  ChevronsDownUp, ChevronsUpDown,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/historico")({
   component: HistoricoPet,
