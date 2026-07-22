@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronRight, Image as ImageIcon,
   AlertTriangle, DollarSign, Truck, MessageSquare, FileText, Loader2,
-  ChevronsDownUp, ChevronsUpDown,
+  ChevronsDownUp, ChevronsUpDown, Search, X,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
@@ -29,11 +29,14 @@ const fmtD = (d?: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") 
 
 function HistoricoPet() {
   const { petId } = Route.useParams();
+  const [busca, setBusca] = useState<string>("");
   const [de, setDe] = useState<string>("");
   const [ate, setAte] = useState<string>("");
   const [servico, setServico] = useState<string>("");
   const [profissional, setProfissional] = useState<string>("todos");
   const [status, setStatus] = useState<string>("todos");
+  const [pagamento, setPagamento] = useState<string>("todos");
+  const [levaTraz, setLevaTraz] = useState<string>("todos");
   const [comFotos, setComFotos] = useState(false);
   const [comOcorrencia, setComOcorrencia] = useState(false);
   const [comRecomendacao, setComRecomendacao] = useState(false);
@@ -42,6 +45,30 @@ function HistoricoPet() {
   const [expandAll, setExpandAll] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const pageSize = 20;
+
+  function aplicarPreset(dias: number | null) {
+    if (dias === null) { setDe(""); setAte(""); return; }
+    const hoje = new Date();
+    const inicio = new Date();
+    inicio.setDate(hoje.getDate() - dias);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    setDe(iso(inicio));
+    setAte(iso(hoje));
+    setPage(0);
+  }
+
+  function limparFiltros() {
+    setBusca(""); setDe(""); setAte(""); setServico("");
+    setProfissional("todos"); setStatus("todos"); setPagamento("todos");
+    setLevaTraz("todos"); setComFotos(false); setComOcorrencia(false);
+    setComRecomendacao(false); setPage(0);
+  }
+
+  const filtrosAtivos =
+    (busca ? 1 : 0) + (de ? 1 : 0) + (ate ? 1 : 0) + (servico ? 1 : 0) +
+    (profissional !== "todos" ? 1 : 0) + (status !== "todos" ? 1 : 0) +
+    (pagamento !== "todos" ? 1 : 0) + (levaTraz !== "todos" ? 1 : 0) +
+    (comFotos ? 1 : 0) + (comOcorrencia ? 1 : 0) + (comRecomendacao ? 1 : 0);
 
   // Registra o acesso uma vez ao entrar
   useEffect(() => {
@@ -77,7 +104,7 @@ function HistoricoPet() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["pet-historico", petId, { de, ate, servico, profissional, status, comFotos, comOcorrencia, comRecomendacao, page }],
+    queryKey: ["pet-historico", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, page }],
     queryFn: async () => {
       let q = supabase
         .from("atendimentos")
@@ -93,6 +120,7 @@ function HistoricoPet() {
       if (status === "concluido") q = q.not("encerrado_em", "is", null);
       if (status === "cancelado") q = q.is("encerrado_em", null);
       if (profissional !== "todos") q = q.eq("profissional_id", profissional);
+      if (pagamento !== "todos") q = q.eq("pagamento_status", pagamento);
       const { data, count } = await q;
       let rows = data ?? [];
       if (servico.trim()) {
@@ -101,6 +129,23 @@ function HistoricoPet() {
           [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
             .some((x: any) => String(x?.nome ?? "").toLowerCase().includes(s))
         );
+      }
+      if (busca.trim()) {
+        const b = busca.trim().toLowerCase();
+        rows = rows.filter((a: any) => {
+          const servs = [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+            .map((x: any) => String(x?.nome ?? "")).join(" ");
+          const hay = [
+            servs, a.observacoes, a.recomendacoes, a.alergia_observada,
+            (a.comportamentos ?? []).join(" "), a.pagamento_forma, a.pagamento_status,
+          ].filter(Boolean).join(" ").toLowerCase();
+          return hay.includes(b);
+        });
+      }
+      if (levaTraz === "com") {
+        rows = rows.filter((a: any) => a.agendamentos?.leva_traz_modalidade && a.agendamentos.leva_traz_modalidade !== "nao_utilizar");
+      } else if (levaTraz === "sem") {
+        rows = rows.filter((a: any) => !a.agendamentos?.leva_traz_modalidade || a.agendamentos.leva_traz_modalidade === "nao_utilizar");
       }
       if (comFotos) rows = rows.filter((a: any) => ((a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length) > 0);
       if (comRecomendacao) rows = rows.filter((a: any) => !!a.recomendacoes);
@@ -203,23 +248,46 @@ function HistoricoPet() {
       />
 
 
-      <Card className="p-4 mb-4">
+      <Card className="p-4 mb-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+            <Input
+              className="pl-8"
+              placeholder="Busca rápida — serviço, observação, recomendação, comportamento…"
+              value={busca}
+              onChange={e => { setBusca(e.target.value); setPage(0); }}
+            />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(7)}>7d</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(30)}>30d</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(90)}>90d</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(365)}>1 ano</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset(null)}>Tudo</Button>
+          </div>
+          {filtrosAtivos > 0 && (
+            <Button variant="ghost" size="sm" className="gap-1" onClick={limparFiltros}>
+              <X className="h-3.5 w-3.5"/> Limpar ({filtrosAtivos})
+            </Button>
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
           <div>
             <Label className="text-xs">De</Label>
-            <Input type="date" value={de} onChange={e => setDe(e.target.value)} />
+            <Input type="date" value={de} onChange={e => { setDe(e.target.value); setPage(0); }} />
           </div>
           <div>
             <Label className="text-xs">Até</Label>
-            <Input type="date" value={ate} onChange={e => setAte(e.target.value)} />
+            <Input type="date" value={ate} onChange={e => { setAte(e.target.value); setPage(0); }} />
           </div>
           <div>
             <Label className="text-xs">Serviço</Label>
-            <Input placeholder="Ex.: banho, tosa" value={servico} onChange={e => setServico(e.target.value)} />
+            <Input placeholder="Ex.: banho, tosa" value={servico} onChange={e => { setServico(e.target.value); setPage(0); }} />
           </div>
           <div>
             <Label className="text-xs">Profissional</Label>
-            <Select value={profissional} onValueChange={setProfissional}>
+            <Select value={profissional} onValueChange={(v) => { setProfissional(v); setPage(0); }}>
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
@@ -231,7 +299,7 @@ function HistoricoPet() {
           </div>
           <div>
             <Label className="text-xs">Status</Label>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={(v) => { setStatus(v); setPage(0); }}>
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
@@ -240,19 +308,44 @@ function HistoricoPet() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col justify-end gap-1.5">
+          <div>
+            <Label className="text-xs">Pagamento</Label>
+            <Select value={pagamento} onValueChange={(v) => { setPagamento(v); setPage(0); }}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                <SelectItem value="parcial">Parcial</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Leva e Traz</Label>
+            <Select value={levaTraz} onValueChange={(v) => { setLevaTraz(v); setPage(0); }}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="com">Com transporte</SelectItem>
+                <SelectItem value="sem">Sem transporte</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 md:col-span-5 flex flex-wrap items-end gap-4">
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={comFotos} onCheckedChange={(v) => setComFotos(!!v)} /> Com fotos
+              <Checkbox checked={comFotos} onCheckedChange={(v) => { setComFotos(!!v); setPage(0); }} /> Com fotos
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={comOcorrencia} onCheckedChange={(v) => setComOcorrencia(!!v)} /> Com ocorrência
+              <Checkbox checked={comOcorrencia} onCheckedChange={(v) => { setComOcorrencia(!!v); setPage(0); }} /> Com ocorrência
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={comRecomendacao} onCheckedChange={(v) => setComRecomendacao(!!v)} /> Com recomendação
+              <Checkbox checked={comRecomendacao} onCheckedChange={(v) => { setComRecomendacao(!!v); setPage(0); }} /> Com recomendação
             </label>
           </div>
         </div>
       </Card>
+
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Carregando…</div>
