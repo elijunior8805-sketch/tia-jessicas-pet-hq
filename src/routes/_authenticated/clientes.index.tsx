@@ -507,11 +507,12 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
       if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("atendimentos")
-        .select("id, pet_id, data_execucao, valor_final, status, relatorio_pdf_path, pets(nome), servicos_executados, servicos_planejados")
+        .select("id, pet_id, data_inicio, data_fim, encerrado_em, finalizado, valor_executado, pets(nome), servicos_executados, servicos_planejados")
         .in("pet_id", petIds)
-        .order("data_execucao", { ascending: false, nullsFirst: false })
+        .order("encerrado_em", { ascending: false, nullsFirst: false })
         .limit(30);
       return rows ?? [];
+
     },
   });
 
@@ -569,9 +570,14 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
     );
   }
 
-  const totalAtend = atends?.length ?? 0;
-  const datasExec = (atends ?? []).map((a: any) => a.data_execucao).filter(Boolean).sort();
+  const atendsFinalizados = (atends ?? []).filter((a: any) => a.finalizado === true && a.encerrado_em);
+  const totalAtend = atendsFinalizados.length;
+  const datasExec = atendsFinalizados
+    .map((a: any) => (a.encerrado_em ?? a.data_fim ?? "").toString().slice(0, 10))
+    .filter(Boolean)
+    .sort();
   const ultimaVisita = datasExec[datasExec.length - 1] as string | undefined;
+
   const proximas = (data.pets ?? []).map((p: any) => p.proxima_visita).filter(Boolean).sort();
   const proximaVisita = proximas[0] as string | undefined;
 
@@ -982,15 +988,17 @@ function TimelineHistorico({
   }
 
   atends.forEach((a) => {
-    if (!a.data_execucao) return;
+    const when = a.encerrado_em ?? a.data_fim ?? a.data_inicio;
+    if (!when || a.finalizado !== true) return;
     eventos.push({
-      when: a.data_execucao,
+      when,
       tipo: "atendimento",
       titulo: `Atendimento · ${a.pets?.nome ?? ""}`,
-      descricao: a.valor_final ? fmtBRL(Number(a.valor_final)) : undefined,
+      descricao: a.valor_executado ? fmtBRL(Number(a.valor_executado)) : undefined,
       icon: ClipboardList, tone: "success",
     });
   });
+
 
   agendamentos.forEach((a) => {
     if (!a.data) return;
