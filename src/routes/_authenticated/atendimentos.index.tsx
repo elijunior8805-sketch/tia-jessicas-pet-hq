@@ -66,17 +66,26 @@ function AtendimentosPainel() {
 
   const { data: atendimentos = [] } = useQuery({
     queryKey: ["atendimentos-painel", "atendimentos", hoje],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
+      // Alarga a janela ±1 dia para capturar bordas de fuso.
+      const ontem = new Date(hoje + "T00:00:00");
+      ontem.setDate(ontem.getDate() - 1);
+      const amanha = new Date(hoje + "T00:00:00");
+      amanha.setDate(amanha.getDate() + 2);
+      const from = ontem.toISOString();
+      const to = amanha.toISOString();
       const { data, error } = await supabase
         .from("atendimentos")
         .select(`
-          id, agendamento_id, data_inicio, data_fim, finalizado,
+          id, agendamento_id, data_inicio, data_fim, encerrado_em, finalizado,
           valor_planejado, valor_executado, taxa_leva_traz,
           clientes(id, nome, whatsapp, vip),
           pets(id, nome, porte, raca, foto_url, alergias, temperamento, necessita_focinheira, cuidados_saude),
           agendamentos(hora, servicos(nome))
         `)
-        .or(`finalizado.eq.false,data_fim.gte.${hoje}T00:00:00Z`)
+        .or(`finalizado.eq.false,and(data_fim.gte.${from},data_fim.lte.${to}),and(encerrado_em.gte.${from},encerrado_em.lte.${to})`)
         .order("data_inicio", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -95,7 +104,11 @@ function AtendimentosPainel() {
 
   const emAndamento = filterVip(atendimentos.filter((a: any) => !a.finalizado));
   const finalizadosHoje = filterVip(
-    atendimentos.filter((a: any) => a.finalizado && a.data_fim && a.data_fim.slice(0, 10) === hoje),
+    atendimentos.filter((a: any) => {
+      if (!a.finalizado) return false;
+      const ref = a.encerrado_em ?? a.data_fim;
+      return toLocalDay(ref) === hoje;
+    }),
   );
 
 
