@@ -613,7 +613,7 @@ function AgendaPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-baseline">
                 <span className="text-muted-foreground">Agendamentos</span>
-                <span className="font-semibold">{agendamentos?.length ?? 0}</span>
+                <span className="font-semibold">{validos.length}</span>
               </div>
               <div className="flex justify-between items-baseline pb-3 border-b border-border/60">
                 <span className="text-muted-foreground">Faturamento previsto</span>
