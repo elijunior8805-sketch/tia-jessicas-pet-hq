@@ -45,6 +45,7 @@ function HistoricoPet() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandAll, setExpandAll] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [gerandoCsv, setGerandoCsv] = useState(false);
   const pageSize = 20;
 
   function aplicarPreset(dias: number | null) {
