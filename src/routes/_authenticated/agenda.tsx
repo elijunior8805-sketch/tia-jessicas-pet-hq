@@ -501,11 +501,22 @@ function AgendaPage() {
   }, [agendamentos, busca]);
 
   const proximo = useMemo(() => {
-    const pend = (agendamentos ?? []).filter((a: any) =>
-      !["finalizado","cancelado","nao_compareceu"].includes(a.status),
+    const pend = (agendamentos ?? []).filter(
+      (a: any) =>
+        !["finalizado", "cancelado", "nao_compareceu"].includes(a.status),
     );
+    // Se estamos vendo hoje, priorizar o próximo horário a partir de agora
+    const hoje = todayISO();
+    if (date === hoje) {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const futuros = pend.filter(
+        (a: any) => String(a.hora ?? "").slice(0, 5) >= hhmm,
+      );
+      return futuros[0] ?? pend[0];
+    }
     return pend[0];
-  }, [agendamentos]);
+  }, [agendamentos, date]);
 
   return (
     <PageShell>
