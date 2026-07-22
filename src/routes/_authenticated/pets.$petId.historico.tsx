@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
@@ -13,13 +14,30 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronRight, Image as ImageIcon,
   AlertTriangle, DollarSign, Truck, MessageSquare, FileText, Loader2,
-  ChevronsDownUp, ChevronsUpDown, Search, X, Download,
+  ChevronsDownUp, ChevronsUpDown, Search, X, Download, Link2, Check,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
 import { toast } from "sonner";
 
+const historicoSearchSchema = z.object({
+  q: z.string().optional().catch(undefined),
+  de: z.string().optional().catch(undefined),
+  ate: z.string().optional().catch(undefined),
+  svc: z.string().optional().catch(undefined),
+  prof: z.string().optional().catch(undefined),
+  st: z.string().optional().catch(undefined),
+  pg: z.string().optional().catch(undefined),
+  lt: z.string().optional().catch(undefined),
+  fotos: z.coerce.boolean().optional().catch(undefined),
+  ocor: z.coerce.boolean().optional().catch(undefined),
+  rec: z.coerce.boolean().optional().catch(undefined),
+  ord: z.string().optional().catch(undefined),
+  p: z.coerce.number().int().optional().catch(undefined),
+}).partial();
+
 export const Route = createFileRoute("/_authenticated/pets/$petId/historico")({
+  validateSearch: (s) => historicoSearchSchema.parse(s),
   component: HistoricoPet,
 });
 
