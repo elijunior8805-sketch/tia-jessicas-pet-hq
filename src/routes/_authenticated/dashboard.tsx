@@ -65,7 +65,7 @@ const STATUS_STYLE: Record<string, { label: string; className: string }> = {
 };
 
 function DashboardPage() {
-  const [period, setPeriod] = useState<Period>("hoje");
+  const [period, setPeriod] = useState<Period>("mes");
   const [customFrom, setCustomFrom] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState<string>(format(new Date(), "yyyy-MM-dd"));
 
@@ -127,7 +127,16 @@ function DashboardPage() {
       };
 
       const [comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
-        supabase.from("compras_parcelas").select("valor_pago,data_pagamento").gte("data_pagamento", from).lte("data_pagamento", to),
+        // Despesas do painel: considera parcelas pagas pela data de pagamento
+        // e parcelas ainda em aberto pela data de vencimento. Assim o card não
+        // some quando a compra foi lançada mas ainda não foi baixada/paga.
+        supabase
+          .from("compras_parcelas")
+          .select("valor,valor_pago,vencimento,data_pagamento,status,is_teste")
+          .or(
+            `and(data_pagamento.gte.${from},data_pagamento.lte.${to}),and(vencimento.gte.${from},vencimento.lte.${to})`,
+          )
+          .or("is_teste.is.false,is_teste.is.null"),
         // Fonte única de faturamento: atendimentos finalizados com
         // encerrado_em no período. Não usa `pagamentos` nem `valor_planejado`.
         supabase
@@ -147,11 +156,25 @@ function DashboardPage() {
           .limit(6),
       ]);
 
+      if (comprasRes.error) {
+        console.error("[dashboard] Falha ao carregar despesas", comprasRes.error);
+      }
+
       const compras = comprasRes.data ?? [];
       const atendimentos = atendRes.data ?? [];
       const novosClientes = novosClientesRes.data ?? [];
 
-      const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
+      const despesas = compras.reduce((s, r: any) => {
+        if (r.status === "cancelado") return s;
+        const pagaNoPeriodo = r.data_pagamento && r.data_pagamento >= from && r.data_pagamento <= to;
+        const venceNoPeriodo = r.vencimento && r.vencimento >= from && r.vencimento <= to;
+
+        if (pagaNoPeriodo) return s + Number(r.valor_pago || r.valor || 0);
+        if (venceNoPeriodo && r.status !== "pago") {
+          return s + Math.max(0, Number(r.valor || 0) - Number(r.valor_pago || 0));
+        }
+        return s;
+      }, 0);
       // Faturamento / Atendimentos / Ticket Médio: somente atendimentos
       // finalizados (finalizado=true), com encerrado_em preenchido e
       // valor_executado > 0, cuja data local (America/Sao_Paulo) de
