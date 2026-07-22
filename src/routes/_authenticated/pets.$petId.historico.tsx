@@ -217,6 +217,49 @@ function HistoricoPet() {
     },
   });
 
+  const { data: resumo } = useQuery({
+    queryKey: ["pet-historico-resumo", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comRecomendacao }],
+    queryFn: async () => {
+      let q = supabase
+        .from("atendimentos")
+        .select("id, data_inicio, servicos_planejados, servicos_executados, servicos_extras, valor_executado, valor_pago, pagamento_status, pagamento_forma, encerrado_em, recomendacoes, alergia_observada, comportamentos, observacoes, profissional_id, fotos_antes, fotos_depois, agendamentos(leva_traz_modalidade)")
+        .eq("pet_id", petId);
+      if (de) q = q.gte("data_inicio", de);
+      if (ate) q = q.lte("data_inicio", ate + "T23:59:59");
+      if (status === "concluido") q = q.not("encerrado_em", "is", null);
+      if (status === "cancelado") q = q.is("encerrado_em", null);
+      if (profissional !== "todos") q = q.eq("profissional_id", profissional);
+      if (pagamento !== "todos") q = q.eq("pagamento_status", pagamento);
+      const { data } = await q;
+      let rows = data ?? [];
+      if (servico.trim()) {
+        const s = servico.trim().toLowerCase();
+        rows = rows.filter((a: any) =>
+          [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+            .some((x: any) => String(x?.nome ?? "").toLowerCase().includes(s))
+        );
+      }
+      if (busca.trim()) {
+        const b = busca.trim().toLowerCase();
+        rows = rows.filter((a: any) => {
+          const servs = [...(a.servicos_executados ?? []), ...(a.servicos_planejados ?? []), ...(a.servicos_extras ?? [])]
+            .map((x: any) => String(x?.nome ?? "")).join(" ");
+          const hay = [servs, a.observacoes, a.recomendacoes, a.alergia_observada, (a.comportamentos ?? []).join(" "), a.pagamento_forma, a.pagamento_status].filter(Boolean).join(" ").toLowerCase();
+          return hay.includes(b);
+        });
+      }
+      if (levaTraz === "com") rows = rows.filter((a: any) => a.agendamentos?.leva_traz_modalidade && a.agendamentos.leva_traz_modalidade !== "nao_utilizar");
+      else if (levaTraz === "sem") rows = rows.filter((a: any) => !a.agendamentos?.leva_traz_modalidade || a.agendamentos.leva_traz_modalidade === "nao_utilizar");
+      if (comFotos) rows = rows.filter((a: any) => ((a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length) > 0);
+      if (comRecomendacao) rows = rows.filter((a: any) => !!a.recomendacoes);
+
+      const totalExecutado = rows.reduce((s: number, a: any) => s + Number(a.valor_executado ?? 0), 0);
+      const totalPago = rows.reduce((s: number, a: any) => s + Number(a.valor_pago ?? 0), 0);
+      const totalPendente = Math.max(0, totalExecutado - totalPago);
+      return { totalExecutado, totalPago, totalPendente, atendimentos: rows.length };
+    },
+  });
+
   const { data: ocorrencias } = useQuery({
     queryKey: ["pet-ocorrencias-hist", petId],
     queryFn: async () => (await supabase.from("ocorrencias").select("id, atendimento_id, tipo, descricao, gravidade, data_ocorrencia").eq("pet_id", petId)).data ?? [],
