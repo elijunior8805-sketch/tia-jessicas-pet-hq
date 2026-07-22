@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import {
   Users, Plus, Search, Star, MessageCircle, MapPin, Phone, Mail,
   PawPrint, X, ArrowLeft, ChevronRight, CalendarPlus, Pencil,
