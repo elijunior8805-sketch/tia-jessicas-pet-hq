@@ -951,10 +951,14 @@ function AtendimentoDetalhe() {
                         onClick={() => updateExtra(i, { quantidade: Math.max(1, (it.quantidade || 1) - 1) })}>
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <Input type="number" min={1} step={1} value={it.quantidade}
+                      <ExtraNumberInput
+                        value={it.quantidade}
                         disabled={readOnly}
-                        onChange={(e) => updateExtra(i, { quantidade: Number(e.target.value || 1) })}
-                        className="w-14 h-8 text-center" />
+                        onCommit={(v) => updateExtra(i, { quantidade: Math.max(1, Math.floor(v || 1)) })}
+                        className="w-14 h-8 text-center"
+                        min={1}
+                        step={1}
+                      />
                       <Button variant="outline" size="icon" className="h-8 w-8"
                         disabled={readOnly}
                         onClick={() => updateExtra(i, { quantidade: (it.quantidade || 1) + 1 })}>
@@ -963,10 +967,14 @@ function AtendimentoDetalhe() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Label className="text-xs text-muted-foreground">Valor</Label>
-                      <Input type="number" min={0} step="0.01" value={it.valor_unit}
+                      <ExtraNumberInput
+                        value={it.valor_unit}
                         disabled={readOnly}
-                        onChange={(e) => updateExtra(i, { valor_unit: Number(e.target.value || 0) })}
-                        className="w-24 h-8" />
+                        onCommit={(v) => updateExtra(i, { valor_unit: Number(v || 0) })}
+                        className="w-24 h-8"
+                        min={0}
+                        step={0.01}
+                      />
                     </div>
                     <div className="w-24 text-right font-medium tabular-nums">{brl(it.valor_total)}</div>
                     {!readOnly && (
@@ -1407,4 +1415,42 @@ function ZoomImage({ path }: { path: string }) {
   const { data: url } = useSignedUrl(path);
   if (!url) return <div className="w-full h-96 bg-muted animate-pulse" />;
   return <img src={url} alt="foto ampliada" className="w-full max-h-[80vh] object-contain rounded-lg" />;
+}
+
+function ExtraNumberInput({
+  value, onCommit, disabled, className, min, step,
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  disabled?: boolean;
+  className?: string;
+  min?: number;
+  step?: number;
+}) {
+  const [draft, setDraft] = useState<string>(String(value ?? 0));
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (!focusedRef.current) setDraft(String(value ?? 0));
+  }, [value]);
+  return (
+    <Input
+      type="number"
+      min={min}
+      step={step}
+      value={draft}
+      disabled={disabled}
+      onFocus={(e) => { focusedRef.current = true; e.target.select(); }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        focusedRef.current = false;
+        const n = Number(draft);
+        if (Number.isFinite(n) && n !== Number(value)) onCommit(n);
+        else setDraft(String(value ?? 0));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      className={className}
+    />
+  );
 }
