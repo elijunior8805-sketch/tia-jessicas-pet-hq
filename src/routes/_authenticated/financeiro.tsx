@@ -966,13 +966,21 @@ function FinanceiroPage() {
       .filter((p) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    // A receber (saldo em aberto no período pelo vencimento)
-    const emAberto = pagamentos.filter((p) => p.status !== "pago" && p.status !== "cancelado");
-    const totalAReceber = emAberto.reduce((s, p) => s + (Number(p.valor_total) - Number(p.valor_pago || 0)), 0);
+    // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
+    const emAberto = receitasFiltradas.filter((p) => {
+      if (p.status === "pago" || p.status === "cancelado") return false;
+      if (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste") return false;
+      if (!p.vencimento) return false;
+      if (p.vencimento < inicio || p.vencimento > fim) return false;
+      const saldo = Number(p.valor_total || 0) - Number(p.valor_pago || 0);
+      return saldo > 0.005;
+    });
+    const totalAReceber = emAberto.reduce((s, p) => s + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
     const totalVencidos = emAberto
       .filter((p) => p.vencimento && p.vencimento < hojeStr)
-      .reduce((s, p) => s + (Number(p.valor_total) - Number(p.valor_pago || 0)), 0);
+      .reduce((s, p) => s + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
     const qtdPendentes = emAberto.length;
+
 
     // Despesas pagas no período
     const despesasPagas = despesasFiltradas
