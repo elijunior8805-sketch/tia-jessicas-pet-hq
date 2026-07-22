@@ -469,6 +469,35 @@ function HistoricoPet() {
         }
       />
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Atendimentos no período</div>
+          <div className="text-2xl font-semibold mt-1">{resumo?.atendimentos ?? 0}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">
+            {de || ate ? `${de ? fmtD(de) : "—"} → ${ate ? fmtD(ate) : "hoje"}` : "Todo o período"}
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Total executado</div>
+          <div className="text-2xl font-semibold mt-1 text-emerald-700">{brl(resumo?.totalExecutado ?? 0)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Soma dos valores executados</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Total pago</div>
+          <div className="text-2xl font-semibold mt-1 text-emerald-600">{brl(resumo?.totalPago ?? 0)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Recebido dos atendimentos filtrados</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Total pendente</div>
+          <div className={`text-2xl font-semibold mt-1 ${(resumo?.totalPendente ?? 0) > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
+            {brl(resumo?.totalPendente ?? 0)}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-1">Executado − pago</div>
+        </Card>
+      </div>
+
+
+
 
 
 
