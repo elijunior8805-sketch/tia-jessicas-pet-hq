@@ -1599,10 +1599,9 @@ function NovoAgendamentoDialog({
     },
     onError: (e: any) => {
       const raw = e?.message ?? "";
+      if (raw === "__CANCELADO_CONFLITO__") return; // usuário cancelou no aviso de conflito
       let msg = e?.issues?.[0]?.message ?? raw ?? "Erro ao salvar";
-      if (raw.includes("HORARIO_OCUPADO")) {
-        msg = "Este horário acabou de ser ocupado por outro usuário. Escolha um novo horário.";
-      } else if (raw.includes("VERSAO_DESATUALIZADA")) {
+      if (raw.includes("VERSAO_DESATUALIZADA")) {
         msg = "Este agendamento foi atualizado por outro usuário. Recarregue as informações antes de salvar.";
         qc.invalidateQueries({ queryKey: ["agendamento-edit", editId] });
         qc.invalidateQueries({ queryKey: ["agendamentos"] });
@@ -1611,6 +1610,7 @@ function NovoAgendamentoDialog({
       }
       toast.error(msg);
     },
+
 
   });
 
