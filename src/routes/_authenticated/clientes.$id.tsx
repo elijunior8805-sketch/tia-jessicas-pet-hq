@@ -346,33 +346,38 @@ function Kpi({ label, value, variant = "default" }: { label: string; value: stri
 function PetCard({ pet }: { pet: any }) {
   const { data: fotoUrl } = useSignedUrl(pet.foto_url);
   return (
-    <Link to="/pets/$petId/ficha" params={{ petId: pet.id }}>
-      <div className="rounded-lg border p-4 hover:shadow-elegant hover:-translate-y-0.5 transition h-full">
-        <div className="flex items-center gap-3 mb-2">
-          {fotoUrl ? (
-            <img src={fotoUrl} alt={pet.nome} className="h-12 w-12 rounded-full object-cover border" />
-          ) : (
-            <div className="h-12 w-12 rounded-full bg-primary/10 grid place-items-center">
-              <PawPrint className="h-6 w-6 text-primary"/>
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="font-display font-semibold text-primary truncate">{pet.nome}</div>
-            <div className="text-xs text-muted-foreground truncate">
-              {[pet.raca, pet.porte].filter(Boolean).join(" · ")}
-            </div>
+    <div className="rounded-lg border p-4 hover:shadow-elegant transition h-full flex flex-col">
+      <Link to="/pets/$petId/ficha" params={{ petId: pet.id }} className="flex items-center gap-3 mb-3">
+        {fotoUrl ? (
+          <img src={fotoUrl} alt={pet.nome} className="h-12 w-12 rounded-full object-cover border" />
+        ) : (
+          <div className="h-12 w-12 rounded-full bg-primary/10 grid place-items-center">
+            <PawPrint className="h-6 w-6 text-primary"/>
           </div>
-          {pet.necessita_focinheira && <AlertTriangle className="h-4 w-4 text-warning shrink-0" />}
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="font-display font-semibold text-primary truncate">{pet.nome}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {[pet.raca, pet.porte].filter(Boolean).join(" · ")}
+          </div>
         </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
-            {pet.proxima_visita ? `Próx: ${new Date(pet.proxima_visita).toLocaleDateString("pt-BR")}` : "Sem próxima visita"}
-          </span>
-          <span className="text-primary inline-flex items-center gap-1">
-            <FileText className="h-3 w-3"/> ficha
-          </span>
-        </div>
+        {pet.necessita_focinheira && <AlertTriangle className="h-4 w-4 text-warning shrink-0" />}
+      </Link>
+      <div className="text-xs text-muted-foreground mb-3">
+        {pet.proxima_visita ? `Próx: ${new Date(pet.proxima_visita).toLocaleDateString("pt-BR")}` : "Sem próxima visita"}
       </div>
-    </Link>
+      <div className="mt-auto grid grid-cols-2 gap-2">
+        <Link to="/pets/$petId/ficha" params={{ petId: pet.id }}>
+          <Button size="sm" variant="outline" className="w-full gap-1">
+            <FileText className="h-3.5 w-3.5"/> Ficha
+          </Button>
+        </Link>
+        <Link to="/pets/$petId/historico" params={{ petId: pet.id }}>
+          <Button size="sm" className="w-full gap-1">
+            <ClipboardList className="h-3.5 w-3.5"/> Histórico
+          </Button>
+        </Link>
+      </div>
+    </div>
   );
 }
