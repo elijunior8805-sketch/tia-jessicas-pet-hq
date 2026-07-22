@@ -113,10 +113,17 @@ function DashboardPage() {
         return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       };
 
-      const [, comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
-        supabase.from("pagamentos").select("valor_pago,data_pagamento,valor_total,status").gte("data_pagamento", from).lte("data_pagamento", to),
+      const [comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
         supabase.from("compras_parcelas").select("valor_pago,data_pagamento").gte("data_pagamento", from).lte("data_pagamento", to),
-        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio,encerrado_em,finalizado").or(`and(data_inicio.gte.${fromWide}T00:00:00,data_inicio.lte.${toWide}T23:59:59),and(encerrado_em.gte.${fromWide}T00:00:00,encerrado_em.lte.${toWide}T23:59:59)`),
+        // Fonte única de faturamento: atendimentos finalizados com
+        // encerrado_em no período. Não usa `pagamentos` nem `valor_planejado`.
+        supabase
+          .from("atendimentos")
+          .select("id,valor_executado,encerrado_em,finalizado")
+          .eq("finalizado", true)
+          .not("encerrado_em", "is", null)
+          .gte("encerrado_em", `${fromWide}T00:00:00`)
+          .lte("encerrado_em", `${toWide}T23:59:59`),
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
           .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
@@ -132,17 +139,15 @@ function DashboardPage() {
       const novosClientes = novosClientesRes.data ?? [];
 
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
-      // Faturamento / Atendimentos / Ticket Médio: apenas os efetivamente
-      // encerrados (finalizado=true, encerrado_em preenchido e
-      // valor_executado > 0). Data de referência = encerrado_em em fuso
-      // local (America/Sao_Paulo), para casar com a percepção do usuário.
-      const inRange = (a: any) => {
-        const ref = toLocalDay(a.encerrado_em ?? a.data_inicio);
-        return ref >= from && ref <= to;
-      };
+      // Faturamento / Atendimentos / Ticket Médio: somente atendimentos
+      // finalizados (finalizado=true), com encerrado_em preenchido e
+      // valor_executado > 0, cuja data local (America/Sao_Paulo) de
+      // `encerrado_em` cai dentro do período selecionado.
       const executados = atendimentos.filter((a: any) => {
-        const exec = Number(a.valor_executado ?? 0);
-        return exec > 0 && !!a.encerrado_em && a.finalizado === true && inRange(a);
+        if (a.finalizado !== true || !a.encerrado_em) return false;
+        if (Number(a.valor_executado ?? 0) <= 0) return false;
+        const ref = toLocalDay(a.encerrado_em);
+        return ref >= from && ref <= to;
       });
       const atendCount = executados.length;
       const somaExec = executados.reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
@@ -154,7 +159,7 @@ function DashboardPage() {
       const serie = dias.map((d) => {
         const key = format(d, "yyyy-MM-dd");
         const val = executados
-          .filter((a: any) => toLocalDay(a.encerrado_em ?? a.data_inicio) === key)
+          .filter((a: any) => toLocalDay(a.encerrado_em) === key)
           .reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
         return { dia: format(d, "dd/MM"), valor: val };
       });
