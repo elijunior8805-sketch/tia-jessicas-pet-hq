@@ -589,6 +589,31 @@ function AtendimentoDetalhe() {
 
   // ---- Handlers ----
 
+  const persistSolicitados = (next: ServicoItem[]) => {
+    const patch: any = { servicos_solicitados: next as any };
+    if ((atendimento as any).servicos_planejados !== undefined) {
+      patch.servicos_planejados = next as any;
+    }
+    patch.valor_planejado = sumItens(next);
+    patchMut.mutate(patch);
+  };
+
+  const updateSolicitado = (idx: number, patch: Partial<ServicoItem>) => {
+    if (readOnly) return;
+    const next = solicitados.map((it, i) => {
+      if (i !== idx) return it;
+      const merged = { ...it, ...patch };
+      merged.valor_total = Number(merged.quantidade || 0) * Number(merged.valor_unit || 0);
+      return merged;
+    });
+    persistSolicitados(next);
+  };
+
+  const removeSolicitado = (idx: number) => {
+    if (readOnly) return;
+    persistSolicitados(solicitados.filter((_, i) => i !== idx));
+  };
+
   const addExtra = (id: string) => {
     if (readOnly) return;
     const s = servicos.find((x: any) => x.id === id);
@@ -875,11 +900,53 @@ function AtendimentoDetalhe() {
                   <div key={i} className="py-3 flex items-center justify-between gap-3 flex-wrap">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{it.nome}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Quantidade: {it.quantidade} · Registro original do agendamento
-                      </div>
+                      <div className="text-xs text-muted-foreground">Registro original do agendamento</div>
+                      {!readOnly && (
+                        <div className="mt-2 flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">Qtd</Label>
+                            <ExtraNumberInput
+                              value={it.quantidade}
+                              disabled={readOnly}
+                              onCommit={(v) => updateSolicitado(i, { quantidade: Math.max(1, Math.floor(v || 1)) })}
+                              className="w-16 h-8 text-center"
+                              min={1}
+                              step={1}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">Valor</Label>
+                            <ExtraNumberInput
+                              value={it.valor_unit}
+                              disabled={readOnly}
+                              onCommit={(v) => updateSolicitado(i, { valor_unit: Number(v || 0) })}
+                              className="w-24 h-8"
+                              min={0}
+                              step={0.01}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {readOnly && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Quantidade: {it.quantidade}
+                        </div>
+                      )}
                     </div>
-                    <div className="font-medium tabular-nums">{brl(it.valor_total)}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium tabular-nums">{brl(it.valor_total)}</div>
+                      {!readOnly && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => removeSolicitado(i)}
+                          title="Remover serviço"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
