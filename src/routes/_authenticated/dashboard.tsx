@@ -33,14 +33,6 @@ function greeting(d = new Date()) {
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function somaItensValor(itens: any[] | null | undefined) {
-  return (Array.isArray(itens) ? itens : []).reduce((acc, item) => {
-    const total = Number(item?.valor_total ?? 0);
-    if (Number.isFinite(total) && total > 0) return acc + total;
-    return acc + Number(item?.quantidade ?? 0) * Number(item?.valor_unit ?? 0);
-  }, 0);
-}
-
 function valorRealExecutado(atendimento: any) {
   // O painel precisa bater com o total exibido nos atendimentos concluídos:
   // valor realizado + taxa de Leva e Traz, descontando abatimentos quando houver.
