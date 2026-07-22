@@ -14,7 +14,7 @@ import {
   Users, Plus, Search, Star, MessageCircle, MapPin, Phone, Mail,
   PawPrint, X, ArrowLeft, ChevronRight, CalendarPlus, Pencil,
   ExternalLink, AlertTriangle, DollarSign, ClipboardList, FileText,
-  Cake, History, MessageSquare, UserPlus,
+  Cake, History, MessageSquare, UserPlus, RefreshCw,
 } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -530,7 +530,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
     },
   });
 
-  const { data: pagamentos } = useQuery({
+  const { data: pagamentos, refetch: refetchPagamentos, isFetching: fetchingPagamentos } = useQuery({
     queryKey: ["cliente-ficha-pagamentos-v2", id],
     enabled: !!id,
     queryFn: async () => {
@@ -543,6 +543,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
       return (rows ?? []).map((r: any) => ({ ...r, valor: r.valor_total }));
     },
   });
+
 
   const { data: mensagens } = useQuery({
     queryKey: ["cliente-ficha-mensagens", id],
@@ -779,6 +780,20 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
 
           {/* FINANCEIRO */}
           <TabsContent value="financeiro" className="mt-0 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">
+                {fetchingPagamentos ? "Atualizando..." : `${(pagamentos ?? []).length} lançamento(s)`}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetchPagamentos()}
+                disabled={fetchingPagamentos}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-1.5", fetchingPagamentos && "animate-spin")} />
+                Atualizar totais
+              </Button>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <MiniKpi label="Recebido" value={fmtBRL(totalRecebido)} />
               <MiniKpi label="Pendente" value={fmtBRL(totalPendente)} tone={totalPendente > 0 ? "warn" : "default"} />
@@ -786,6 +801,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               <MiniKpi label="Lançamentos" value={String((pagamentos ?? []).length)} />
             </div>
             {(pagamentos ?? []).length === 0 ? (
+
               <div className="text-sm text-muted-foreground text-center py-8">
                 Sem lançamentos financeiros.
               </div>
