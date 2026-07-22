@@ -17,6 +17,7 @@ import {
   ChevronsDownUp, ChevronsUpDown, Search, X, Download, Link2, Check,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
 import { toast } from "sonner";
 
@@ -139,6 +140,12 @@ function HistoricoPet() {
       });
     })().catch(() => {});
   }, [petId]);
+
+  useRealtimeFinanceiro([
+    ["pet-historico", petId],
+    ["pet-historico-resumo", petId],
+    ["pet-header", petId],
+  ]);
 
   const { data: pet } = useQuery({
     queryKey: ["pet-header", petId],

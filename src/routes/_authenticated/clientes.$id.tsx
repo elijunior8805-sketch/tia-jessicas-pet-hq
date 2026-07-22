@@ -10,6 +10,7 @@ import {
   Pencil, Archive, CalendarPlus, ExternalLink, ClipboardList, DollarSign, AlertTriangle,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
@@ -20,6 +21,12 @@ function ClienteDetalhe() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+
+  useRealtimeFinanceiro([
+    ["cliente-pagamentos", id],
+    ["cliente-atends", id],
+    ["cliente", id],
+  ]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["cliente", id],

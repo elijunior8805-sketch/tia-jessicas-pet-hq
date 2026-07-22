@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import {
   Users, Plus, Search, Star, MessageCircle, MapPin, Phone, Mail,
   PawPrint, X, ArrowLeft, ChevronRight, CalendarPlus, Pencil,
@@ -487,6 +488,12 @@ function ClienteRow({
    Ficha completa (painel direito)
    ===================================================================== */
 function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
+  useRealtimeFinanceiro([
+    ["cliente-ficha-pagamentos-v2", id],
+    ["cliente-ficha-atends", id],
+    ["cliente-ficha-agendamentos", id],
+  ]);
+
   const { data, isLoading } = useQuery({
     queryKey: ["cliente-ficha", id],
     queryFn: async () => {
