@@ -589,6 +589,31 @@ function AtendimentoDetalhe() {
 
   // ---- Handlers ----
 
+  const persistSolicitados = (next: ServicoItem[]) => {
+    const patch: any = { servicos_solicitados: next as any };
+    if ((atendimento as any).servicos_planejados !== undefined) {
+      patch.servicos_planejados = next as any;
+    }
+    patch.valor_planejado = sumItens(next);
+    patchMut.mutate(patch);
+  };
+
+  const updateSolicitado = (idx: number, patch: Partial<ServicoItem>) => {
+    if (readOnly) return;
+    const next = solicitados.map((it, i) => {
+      if (i !== idx) return it;
+      const merged = { ...it, ...patch };
+      merged.valor_total = Number(merged.quantidade || 0) * Number(merged.valor_unit || 0);
+      return merged;
+    });
+    persistSolicitados(next);
+  };
+
+  const removeSolicitado = (idx: number) => {
+    if (readOnly) return;
+    persistSolicitados(solicitados.filter((_, i) => i !== idx));
+  };
+
   const addExtra = (id: string) => {
     if (readOnly) return;
     const s = servicos.find((x: any) => x.id === id);
