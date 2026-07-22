@@ -208,7 +208,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     ["Nome", cliente.nome ?? "—"],
     ["WhatsApp", cliente.whatsapp ?? "—"],
     ["VIP", cliente.vip === true ? "Sim" : "—"],
-    ["Operador", operador ?? "—"],
+    ["Operador", "Jessica Xavier"],
   ]);
   drawBox(M + boxW + 12, "Pet", [
     ["Nome", pet.nome ?? "—"],
