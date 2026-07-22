@@ -412,6 +412,10 @@ function HistoricoPet() {
               {gerandoCsv ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
               Exportar CSV
             </Button>
+            <Button variant="outline" className="gap-2" onClick={copiarLinkVisualizacao}>
+              {copiado ? <Check className="h-4 w-4"/> : <Link2 className="h-4 w-4"/>}
+              {copiado ? "Link copiado" : "Copiar link da visualização"}
+            </Button>
             <Link to="/pets/$petId/dossie" params={{ petId }}>
               <Button variant="outline" className="gap-2"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
             </Link>
@@ -421,10 +425,8 @@ function HistoricoPet() {
           </>
         }
       />
-            <Button variant="outline" className="gap-2" onClick={copiarLinkVisualizacao}>
-              {copiado ? <Check className="h-4 w-4"/> : <Link2 className="h-4 w-4"/>}
-              {copiado ? "Link copiado" : "Copiar link da visualização"}
-            </Button>
+
+
 
 
       <Card className="p-4 mb-4 space-y-3">
