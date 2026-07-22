@@ -38,6 +38,23 @@ export type PagamentosResumo = {
   vence_7d: number;
 };
 
+function valorTotalReceita(row: any) {
+  const atendimento = row.atendimentos;
+
+  // Mantém a Central de Pagamentos em Aberto com a mesma regra do Financeiro:
+  // atendimento finalizado usa valor realizado + taxa de Leva e Traz - desconto.
+  if (atendimento?.finalizado === true && Number(atendimento?.valor_executado ?? 0) > 0) {
+    return Math.max(
+      0,
+      Number(atendimento.valor_executado ?? 0) +
+        Number(atendimento.taxa_leva_traz ?? 0) -
+        Number(atendimento.desconto ?? 0),
+    );
+  }
+
+  return Number(row.valor_total ?? 0);
+}
+
 export const listarPagamentosAbertos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => ListInputSchema.parse(data ?? {}))
@@ -51,7 +68,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     let query = supabase
       .from("pagamentos")
       .select(
-        "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(pets:pet_id(nome))"
+        "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))"
       )
       .in("status", [...statusFiltro])
       .order("vencimento", { ascending: true, nullsFirst: false })
@@ -72,7 +89,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     const hojeMs = hoje.getTime();
 
     const itens: PagamentoAbertoDTO[] = (rows ?? []).map((r: any) => {
-      const valorTotal = Number(r.valor_total ?? 0);
+      const valorTotal = valorTotalReceita(r);
       const valorPago = Number(r.valor_pago ?? 0);
       const saldo = Math.max(0, valorTotal - valorPago);
       let diasAtraso = 0;
@@ -195,7 +212,7 @@ export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabase
       .from("pagamentos")
       .select(
-        "id, status, observacoes, valor_total, valor_pago, vencimento, cliente_id, atendimento_id, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(pets:pet_id(nome))"
+        "id, status, observacoes, valor_total, valor_pago, vencimento, cliente_id, atendimento_id, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))"
       )
       .in("id", data.pagamentoIds);
     if (error) {
@@ -238,7 +255,7 @@ export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
         continue;
       }
 
-      const valorTotal = Number(r.valor_total ?? 0);
+      const valorTotal = valorTotalReceita(r);
       const valorPago = Number(r.valor_pago ?? 0);
       const saldo = Math.max(0, valorTotal - valorPago);
       let diasAtraso = 0;

@@ -115,7 +115,15 @@ type Pag = {
   categoria_receita: string | null;
   is_teste: boolean;
   cliente: { nome: string; telefone: string | null; whatsapp: string | null } | null;
-  atendimento: { data_inicio: string | null; pet: { nome: string } | null } | null;
+  atendimento: {
+    data_inicio: string | null;
+    encerrado_em?: string | null;
+    finalizado?: boolean | null;
+    valor_executado?: number | null;
+    taxa_leva_traz?: number | null;
+    desconto?: number | null;
+    pet: { nome: string } | null;
+  } | null;
 };
 
 type Parc = {
@@ -148,6 +156,26 @@ type ReciboState = {
 
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const valorTotalReceita = (p: Pag) => {
+  const atendimento = p.atendimento as any;
+
+  // Quando a receita veio de um atendimento finalizado, o Financeiro deve usar
+  // a mesma base do card de Faturamento: valor realizado + Leva e Traz - desconto.
+  // Isso evita divergência quando o pagamento foi criado antes de ajustes no atendimento.
+  if (atendimento?.finalizado === true && Number(atendimento?.valor_executado ?? 0) > 0) {
+    return Math.max(
+      0,
+      Number(atendimento.valor_executado ?? 0) +
+        Number(atendimento.taxa_leva_traz ?? 0) -
+        Number(atendimento.desconto ?? 0),
+    );
+  }
+
+  return Number(p.valor_total || 0);
+};
+
+const saldoReceita = (p: Pag) => Math.max(0, valorTotalReceita(p) - Number(p.valor_pago || 0));
 
 const pct = (v: number) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 
@@ -778,7 +806,7 @@ function FinanceiroPage() {
           p.descricao ||
           p.observacoes ||
           `Pagamento de serviços do spa · vencimento ${p.vencimento ? format(parseISO(p.vencimento), "dd/MM/yyyy") : "—"}`,
-        valor: Number(p.valor_total),
+        valor: valorTotalReceita(p),
         forma: p.forma,
         petNome: p.atendimento?.pet?.nome ?? null,
         empresa: empresaInfo,
@@ -819,7 +847,7 @@ function FinanceiroPage() {
       let q = supabase
         .from("pagamentos")
         .select(
-          "id, atendimento_id, valor_total, valor_pago, forma, status, vencimento, data_pagamento, observacoes, descricao, categoria_receita, is_teste, cliente:clientes(nome, telefone, whatsapp), atendimento:atendimentos(data_inicio, pet:pets(nome))",
+          "id, atendimento_id, valor_total, valor_pago, forma, status, vencimento, data_pagamento, observacoes, descricao, categoria_receita, is_teste, cliente:clientes(nome, telefone, whatsapp), atendimento:atendimentos(data_inicio, encerrado_em, finalizado, valor_executado, taxa_leva_traz, desconto, pet:pets(nome))",
         )
         .or(
           `and(data_pagamento.gte.${inicio},data_pagamento.lte.${fim}),and(vencimento.gte.${inicio},vencimento.lte.${fim})`,
@@ -972,13 +1000,13 @@ function FinanceiroPage() {
       if (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste") return false;
       if (!p.vencimento) return false;
       if (p.vencimento < inicio || p.vencimento > fim) return false;
-      const saldo = Number(p.valor_total || 0) - Number(p.valor_pago || 0);
+      const saldo = saldoReceita(p);
       return saldo > 0.005;
     });
-    const totalAReceber = emAberto.reduce((s, p) => s + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
+    const totalAReceber = emAberto.reduce((s, p) => s + saldoReceita(p), 0);
     const totalVencidos = emAberto
       .filter((p) => p.vencimento && p.vencimento < hojeStr)
-      .reduce((s, p) => s + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
+      .reduce((s, p) => s + saldoReceita(p), 0);
     const qtdPendentes = emAberto.length;
 
 
@@ -1106,7 +1134,7 @@ function FinanceiroPage() {
       const { error } = await supabase
         .from("pagamentos")
         .update({
-          valor_pago: p.valor_total,
+          valor_pago: valorTotalReceita(p),
           data_pagamento: format(new Date(), "yyyy-MM-dd"),
           status: "pago",
         })
@@ -1154,7 +1182,7 @@ function FinanceiroPage() {
           (p.atendimento?.pet?.nome ? `Atendimento · ${p.atendimento.pet.nome}` : "Recebimento"),
         forma: FORMA_META[p.forma]?.label ?? p.forma,
         status: p.status,
-        valor: Number(p.valor_total || 0),
+        valor: valorTotalReceita(p),
         valor_pago: Number(p.valor_pago || 0),
       }));
       const saidas = despesasFiltradas.map((p) => ({
@@ -1639,6 +1667,7 @@ function FinanceiroPage() {
                     ) : (
                       receitasFiltradas.map((p) => {
                         const meta = FORMA_META[p.forma] ?? FORMA_META.pendente;
+                        const totalReceita = valorTotalReceita(p);
                         const cat =
                           p.categoria_receita === "servico"
                             ? "Serviço"
@@ -1675,10 +1704,10 @@ function FinanceiroPage() {
                               {p.status === "parcial" ? (
                                 <span>
                                   {brl(Number(p.valor_pago))}{" "}
-                                  <span className="text-xs text-muted-foreground">/ {brl(Number(p.valor_total))}</span>
+                                  <span className="text-xs text-muted-foreground">/ {brl(totalReceita)}</span>
                                 </span>
                               ) : (
-                                brl(Number(p.valor_total))
+                                brl(totalReceita)
                               )}
                             </TableCell>
                             <TableCell className="text-right">
@@ -1726,6 +1755,7 @@ function FinanceiroPage() {
                 ) : (
                   receitasFiltradas.map((p) => {
                     const meta = FORMA_META[p.forma] ?? FORMA_META.pendente;
+                    const totalReceita = valorTotalReceita(p);
                     return (
                       <div key={p.id} className={cn("rounded-xl border border-border bg-card p-3", p.is_teste && "bg-amber-50/40")}>
                         <div className="flex items-start justify-between gap-2">
@@ -1740,7 +1770,7 @@ function FinanceiroPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-mono text-sm font-semibold">{brl(Number(p.valor_total))}</div>
+                            <div className="font-mono text-sm font-semibold">{brl(totalReceita)}</div>
                             <StatusChip status={p.status} />
                           </div>
                         </div>
