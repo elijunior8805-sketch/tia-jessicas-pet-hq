@@ -570,9 +570,14 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
     );
   }
 
-  const totalAtend = atends?.length ?? 0;
-  const datasExec = (atends ?? []).map((a: any) => a.data_execucao).filter(Boolean).sort();
+  const atendsFinalizados = (atends ?? []).filter((a: any) => a.finalizado === true && a.encerrado_em);
+  const totalAtend = atendsFinalizados.length;
+  const datasExec = atendsFinalizados
+    .map((a: any) => (a.encerrado_em ?? a.data_fim ?? "").toString().slice(0, 10))
+    .filter(Boolean)
+    .sort();
   const ultimaVisita = datasExec[datasExec.length - 1] as string | undefined;
+
   const proximas = (data.pets ?? []).map((p: any) => p.proxima_visita).filter(Boolean).sort();
   const proximaVisita = proximas[0] as string | undefined;
 
