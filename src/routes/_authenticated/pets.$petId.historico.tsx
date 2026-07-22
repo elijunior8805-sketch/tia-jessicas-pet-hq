@@ -141,6 +141,12 @@ function HistoricoPet() {
     })().catch(() => {});
   }, [petId]);
 
+  useRealtimeFinanceiro([
+    ["pet-historico", petId],
+    ["pet-historico-resumo", petId],
+    ["pet-header", petId],
+  ]);
+
   const { data: pet } = useQuery({
     queryKey: ["pet-header", petId],
     queryFn: async () => {
