@@ -29,11 +29,14 @@ const fmtD = (d?: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") 
 
 function HistoricoPet() {
   const { petId } = Route.useParams();
+  const [busca, setBusca] = useState<string>("");
   const [de, setDe] = useState<string>("");
   const [ate, setAte] = useState<string>("");
   const [servico, setServico] = useState<string>("");
   const [profissional, setProfissional] = useState<string>("todos");
   const [status, setStatus] = useState<string>("todos");
+  const [pagamento, setPagamento] = useState<string>("todos");
+  const [levaTraz, setLevaTraz] = useState<string>("todos");
   const [comFotos, setComFotos] = useState(false);
   const [comOcorrencia, setComOcorrencia] = useState(false);
   const [comRecomendacao, setComRecomendacao] = useState(false);
@@ -42,6 +45,30 @@ function HistoricoPet() {
   const [expandAll, setExpandAll] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const pageSize = 20;
+
+  function aplicarPreset(dias: number | null) {
+    if (dias === null) { setDe(""); setAte(""); return; }
+    const hoje = new Date();
+    const inicio = new Date();
+    inicio.setDate(hoje.getDate() - dias);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    setDe(iso(inicio));
+    setAte(iso(hoje));
+    setPage(0);
+  }
+
+  function limparFiltros() {
+    setBusca(""); setDe(""); setAte(""); setServico("");
+    setProfissional("todos"); setStatus("todos"); setPagamento("todos");
+    setLevaTraz("todos"); setComFotos(false); setComOcorrencia(false);
+    setComRecomendacao(false); setPage(0);
+  }
+
+  const filtrosAtivos =
+    (busca ? 1 : 0) + (de ? 1 : 0) + (ate ? 1 : 0) + (servico ? 1 : 0) +
+    (profissional !== "todos" ? 1 : 0) + (status !== "todos" ? 1 : 0) +
+    (pagamento !== "todos" ? 1 : 0) + (levaTraz !== "todos" ? 1 : 0) +
+    (comFotos ? 1 : 0) + (comOcorrencia ? 1 : 0) + (comRecomendacao ? 1 : 0);
 
   // Registra o acesso uma vez ao entrar
   useEffect(() => {
