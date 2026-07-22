@@ -104,32 +104,39 @@ function DashboardPage() {
           .limit(6),
       ]);
 
-      const pagamentos = pagRes.data ?? [];
       const compras = comprasRes.data ?? [];
       const atendimentos = atendRes.data ?? [];
       const novosClientes = novosClientesRes.data ?? [];
 
-      const faturamento = pagamentos.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
-      const lucro = faturamento - despesas;
       // Atendimentos e Ticket Médio: apenas os efetivamente encerrados
       // (finalizado=true E encerrado_em preenchido E valor_executado > 0).
-      // Atendimentos abertos/em andamento nunca entram na contagem, mesmo
-      // que tenham valor_planejado ou valor_executado herdado.
+      // O período considera encerrado_em quando disponível (senão data_inicio),
+      // para que a data do faturamento acompanhe o encerramento do serviço —
+      // atendimentos iniciados na véspera e finalizados hoje contam em "Hoje".
+      const inRange = (a: any) => {
+        const ref = String(a.encerrado_em ?? a.data_inicio ?? "").slice(0, 10);
+        return ref >= from && ref <= to;
+      };
       const executados = atendimentos.filter((a: any) => {
         const exec = Number(a.valor_executado ?? 0);
-        return exec > 0 && !!a.encerrado_em && a.finalizado === true;
+        return exec > 0 && !!a.encerrado_em && a.finalizado === true && inRange(a);
       });
       const atendCount = executados.length;
       const somaExec = executados.reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
       const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
+      // Faturamento = soma dos atendimentos executados no período (mesma
+      // base do contador e do ticket médio), garantindo consistência entre
+      // os três KPIs mesmo quando o pagamento cai em outro dia.
+      const faturamento = somaExec;
+      const lucro = faturamento - despesas;
 
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
       const serie = dias.map((d) => {
         const key = format(d, "yyyy-MM-dd");
-        const val = pagamentos
-          .filter((p) => (p.data_pagamento ?? "").slice(0, 10) === key)
-          .reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
+        const val = executados
+          .filter((a: any) => String(a.encerrado_em ?? a.data_inicio ?? "").slice(0, 10) === key)
+          .reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
         return { dia: format(d, "dd/MM"), valor: val };
       });
 
