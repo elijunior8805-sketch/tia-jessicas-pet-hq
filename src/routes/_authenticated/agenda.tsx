@@ -315,20 +315,70 @@ function AgendaPage() {
     },
   });
 
+  // Busca valores realizados dos atendimentos do dia (para finalizados)
+  const { data: atendimentosDia } = useQuery({
+    queryKey: ["agenda-atendimentos-dia", date],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("id, agendamento_id, valor_executado, taxa_leva_traz, desconto, finalizado")
+        .not("agendamento_id", "is", null)
+        .in(
+          "agendamento_id",
+          (agendamentos ?? []).map((a: any) => a.id),
+        );
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!agendamentos && agendamentos.length > 0,
+  });
+
+  const atendPorAgend = useMemo(() => {
+    const m = new Map<string, any>();
+    (atendimentosDia ?? []).forEach((a: any) => {
+      if (a.agendamento_id) m.set(a.agendamento_id, a);
+    });
+    return m;
+  }, [atendimentosDia]);
+
+  // Considera válidos apenas os agendamentos que efetivamente aconteceram
+  // (ou vão acontecer). Cancelado / não compareceu não entram no resumo.
+  const validos = useMemo(
+    () =>
+      (agendamentos ?? []).filter(
+        (a: any) => !["cancelado", "nao_compareceu"].includes(a.status),
+      ),
+    [agendamentos],
+  );
+
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
-    (agendamentos ?? []).forEach((a: any) => {
+    validos.forEach((a: any) => {
       map[a.status] = (map[a.status] ?? 0) + 1;
     });
     return map;
-  }, [agendamentos]);
+  }, [validos]);
 
+  // Faturamento previsto: para finalizados usa o valor realmente executado
+  // (valor_executado + taxa - desconto); para os demais usa o valor previsto
+  // do agendamento + taxa. Cancelados e não compareceu ficam de fora.
   const totalPrevisto = useMemo(
-    () => (agendamentos ?? []).reduce(
-      (s: number, a: any) => s + Number(a.valor_previsto ?? 0) + Number(a.taxa_leva_traz ?? 0),
-      0,
-    ),
-    [agendamentos],
+    () =>
+      validos.reduce((s: number, a: any) => {
+        const at = atendPorAgend.get(a.id);
+        if (a.status === "finalizado" && at) {
+          return (
+            s +
+            Number(at.valor_executado ?? 0) +
+            Number(at.taxa_leva_traz ?? a.taxa_leva_traz ?? 0) -
+            Number(at.desconto ?? 0)
+          );
+        }
+        return (
+          s + Number(a.valor_previsto ?? 0) + Number(a.taxa_leva_traz ?? 0)
+        );
+      }, 0),
+    [validos, atendPorAgend],
   );
 
   const navigate = useNavigate();
@@ -451,11 +501,22 @@ function AgendaPage() {
   }, [agendamentos, busca]);
 
   const proximo = useMemo(() => {
-    const pend = (agendamentos ?? []).filter((a: any) =>
-      !["finalizado","cancelado","nao_compareceu"].includes(a.status),
+    const pend = (agendamentos ?? []).filter(
+      (a: any) =>
+        !["finalizado", "cancelado", "nao_compareceu"].includes(a.status),
     );
+    // Se estamos vendo hoje, priorizar o próximo horário a partir de agora
+    const hoje = todayISO();
+    if (date === hoje) {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const futuros = pend.filter(
+        (a: any) => String(a.hora ?? "").slice(0, 5) >= hhmm,
+      );
+      return futuros[0] ?? pend[0];
+    }
     return pend[0];
-  }, [agendamentos]);
+  }, [agendamentos, date]);
 
   return (
     <PageShell>
@@ -563,7 +624,7 @@ function AgendaPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-baseline">
                 <span className="text-muted-foreground">Agendamentos</span>
-                <span className="font-semibold">{agendamentos?.length ?? 0}</span>
+                <span className="font-semibold">{validos.length}</span>
               </div>
               <div className="flex justify-between items-baseline pb-3 border-b border-border/60">
                 <span className="text-muted-foreground">Faturamento previsto</span>
