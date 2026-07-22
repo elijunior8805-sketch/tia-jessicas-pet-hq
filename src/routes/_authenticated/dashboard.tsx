@@ -136,7 +136,7 @@ function DashboardPage() {
           .or(
             `and(data_pagamento.gte.${from},data_pagamento.lte.${to}),and(vencimento.gte.${from},vencimento.lte.${to})`,
           )
-          .eq("is_teste", false),
+          .or("is_teste.is.false,is_teste.is.null"),
         // Fonte única de faturamento: atendimentos finalizados com
         // encerrado_em no período. Não usa `pagamentos` nem `valor_planejado`.
         supabase
