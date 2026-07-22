@@ -1501,6 +1501,28 @@ function NovoAgendamentoDialog({
                     : ltIsento ? 0
                     : Number(taxa || 0);
 
+      // Aviso (não bloqueia) quando já existe outro pet no mesmo horário
+      try {
+        const { data: temConflito } = await supabase.rpc("verificar_conflito_agendamento", {
+          _data: parsed.data,
+          _hora: parsed.hora,
+          _duracao_min: totalDuracao > 0 ? totalDuracao : 60,
+          _profissional_id: undefined as any,
+          _ignorar_id: (isEdit && editId ? editId : undefined) as any,
+
+        });
+        if (temConflito) {
+          const ok = typeof window !== "undefined"
+            ? window.confirm("Já existe outro agendamento nesse horário. Deseja salvar mesmo assim?")
+            : true;
+          if (!ok) throw new Error("__CANCELADO_CONFLITO__");
+        }
+      } catch (err: any) {
+        if (err?.message === "__CANCELADO_CONFLITO__") throw err;
+        // se a checagem falhar por qualquer motivo, seguimos normalmente
+      }
+
+
       const buscaEndFinal = ltModalidade === "somente_buscar" || ltModalidade === "buscar_entregar"
         ? (buscaUsaClienteEnd ? null : buscaEnd)
         : null;
@@ -1577,10 +1599,9 @@ function NovoAgendamentoDialog({
     },
     onError: (e: any) => {
       const raw = e?.message ?? "";
+      if (raw === "__CANCELADO_CONFLITO__") return; // usuário cancelou no aviso de conflito
       let msg = e?.issues?.[0]?.message ?? raw ?? "Erro ao salvar";
-      if (raw.includes("HORARIO_OCUPADO")) {
-        msg = "Este horário acabou de ser ocupado por outro usuário. Escolha um novo horário.";
-      } else if (raw.includes("VERSAO_DESATUALIZADA")) {
+      if (raw.includes("VERSAO_DESATUALIZADA")) {
         msg = "Este agendamento foi atualizado por outro usuário. Recarregue as informações antes de salvar.";
         qc.invalidateQueries({ queryKey: ["agendamento-edit", editId] });
         qc.invalidateQueries({ queryKey: ["agendamentos"] });
@@ -1589,6 +1610,7 @@ function NovoAgendamentoDialog({
       }
       toast.error(msg);
     },
+
 
   });
 
