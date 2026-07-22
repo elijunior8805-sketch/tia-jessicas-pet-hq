@@ -988,15 +988,17 @@ function TimelineHistorico({
   }
 
   atends.forEach((a) => {
-    if (!a.data_execucao) return;
+    const when = a.encerrado_em ?? a.data_fim ?? a.data_inicio;
+    if (!when || a.finalizado !== true) return;
     eventos.push({
-      when: a.data_execucao,
+      when,
       tipo: "atendimento",
       titulo: `Atendimento · ${a.pets?.nome ?? ""}`,
-      descricao: a.valor_final ? fmtBRL(Number(a.valor_final)) : undefined,
+      descricao: a.valor_executado ? fmtBRL(Number(a.valor_executado)) : undefined,
       icon: ClipboardList, tone: "success",
     });
   });
+
 
   agendamentos.forEach((a) => {
     if (!a.data) return;
