@@ -592,12 +592,30 @@ function AtendimentoDetalhe() {
 
   // ---- Handlers ----
 
+  // Se o atendimento já foi encerrado, edições de valores/quantidades
+  // precisam atualizar também `valor_executado` e `servicos_executados`
+  // — caso contrário, Painel/Financeiro (que somam valor_executado)
+  // continuam mostrando o valor antigo mesmo após ajuste.
+  const recomputeExecutado = (
+    nextSolic: ServicoItem[],
+    nextExtras: ServicoItem[],
+  ) => {
+    const executados = [...nextSolic, ...nextExtras];
+    const subtotalCalc =
+      sumItens(executados) + Number(taxa || 0) - Number(desc || 0);
+    return {
+      servicos_executados: executados as any,
+      valor_executado: Math.max(0, subtotalCalc),
+    };
+  };
+
   const persistSolicitados = (next: ServicoItem[]) => {
     const patch: any = { servicos_solicitados: next as any };
     if ((atendimento as any).servicos_planejados !== undefined) {
       patch.servicos_planejados = next as any;
     }
     patch.valor_planejado = sumItens(next);
+    if (encerrado) Object.assign(patch, recomputeExecutado(next, extras));
     patchMut.mutate(patch);
   };
 
@@ -625,7 +643,10 @@ function AtendimentoDetalhe() {
     novo.adicionado_por = myProfile?.id ?? null;
     novo.adicionado_por_nome = myProfile?.nome ?? null;
     novo.adicionado_em = new Date().toISOString();
-    patchMut.mutate({ servicos_extras: [...extras, novo] as any });
+    const nextExtras = [...extras, novo];
+    const patch: any = { servicos_extras: nextExtras as any };
+    if (encerrado) Object.assign(patch, recomputeExecutado(solicitados, nextExtras));
+    patchMut.mutate(patch);
   };
 
   const updateExtra = (idx: number, patch: Partial<ServicoItem>) => {
@@ -636,13 +657,19 @@ function AtendimentoDetalhe() {
       merged.valor_total = Number(merged.quantidade || 0) * Number(merged.valor_unit || 0);
       return merged;
     });
-    patchMut.mutate({ servicos_extras: next as any });
+    const p: any = { servicos_extras: next as any };
+    if (encerrado) Object.assign(p, recomputeExecutado(solicitados, next));
+    patchMut.mutate(p);
   };
 
   const removeExtra = (idx: number) => {
     if (readOnly) return;
-    patchMut.mutate({ servicos_extras: extras.filter((_, i) => i !== idx) as any });
+    const next = extras.filter((_, i) => i !== idx);
+    const p: any = { servicos_extras: next as any };
+    if (encerrado) Object.assign(p, recomputeExecutado(solicitados, next));
+    patchMut.mutate(p);
   };
+
 
   const addFoto = async (tipo: "antes" | "depois", file: File) => {
     if (readOnly) return;
