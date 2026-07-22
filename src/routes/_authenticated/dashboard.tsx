@@ -42,24 +42,15 @@ function somaItensValor(itens: any[] | null | undefined) {
 }
 
 function valorRealExecutado(atendimento: any) {
-  const solicitados = Array.isArray(atendimento?.servicos_solicitados)
-    ? atendimento.servicos_solicitados
-    : [];
-  const planejados = Array.isArray(atendimento?.servicos_planejados)
-    ? atendimento.servicos_planejados
-    : [];
-  const extras = Array.isArray(atendimento?.servicos_extras)
-    ? atendimento.servicos_extras
-    : [];
-  const executados = Array.isArray(atendimento?.servicos_executados)
-    ? atendimento.servicos_executados
-    : [];
-  const principal = solicitados.length ? solicitados : planejados;
-  const fonte = principal.length || extras.length ? [...principal, ...extras] : executados;
-  if (!fonte.length) return Number(atendimento?.valor_executado ?? 0);
+  // O painel precisa bater com o total exibido nos atendimentos concluídos:
+  // valor realizado + taxa de Leva e Traz, descontando abatimentos quando houver.
+  // Antes ele somava apenas `valor_executado`, por isso faltavam R$ 20,00
+  // quando havia dois atendimentos com taxa de R$ 10,00.
   return Math.max(
     0,
-    somaItensValor(fonte) + Number(atendimento?.taxa_leva_traz ?? 0) - Number(atendimento?.desconto ?? 0),
+    Number(atendimento?.valor_executado ?? 0) +
+      Number(atendimento?.taxa_leva_traz ?? 0) -
+      Number(atendimento?.desconto ?? 0),
   );
 }
 
