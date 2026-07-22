@@ -40,6 +40,7 @@ function HistoricoPet() {
   const [comFotos, setComFotos] = useState(false);
   const [comOcorrencia, setComOcorrencia] = useState(false);
   const [comRecomendacao, setComRecomendacao] = useState(false);
+  const [ordem, setOrdem] = useState<string>("data_desc");
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandAll, setExpandAll] = useState(true);
