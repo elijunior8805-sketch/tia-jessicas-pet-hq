@@ -780,6 +780,20 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
 
           {/* FINANCEIRO */}
           <TabsContent value="financeiro" className="mt-0 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">
+                {fetchingPagamentos ? "Atualizando..." : `${(pagamentos ?? []).length} lançamento(s)`}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetchPagamentos()}
+                disabled={fetchingPagamentos}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-1.5", fetchingPagamentos && "animate-spin")} />
+                Atualizar totais
+              </Button>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <MiniKpi label="Recebido" value={fmtBRL(totalRecebido)} />
               <MiniKpi label="Pendente" value={fmtBRL(totalPendente)} tone={totalPendente > 0 ? "warn" : "default"} />
@@ -787,6 +801,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               <MiniKpi label="Lançamentos" value={String((pagamentos ?? []).length)} />
             </div>
             {(pagamentos ?? []).length === 0 ? (
+
               <div className="text-sm text-muted-foreground text-center py-8">
                 Sem lançamentos financeiros.
               </div>
