@@ -915,8 +915,8 @@ function FichaAvatar({ path, nome, initials }: { path?: string | null; nome: str
 function PetCard({ pet }: { pet: any }) {
   const { data: fotoUrl } = useSignedUrl(pet.foto_url);
   return (
-    <Link to="/pets/$petId/ficha" params={{ petId: pet.id }}>
-      <div className="rounded-lg border border-border p-4 hover:shadow-elegant hover:-translate-y-0.5 transition h-full bg-background">
+    <div className="rounded-lg border border-border p-4 hover:shadow-elegant hover:-translate-y-0.5 transition h-full bg-background flex flex-col">
+      <Link to="/pets/$petId/ficha" params={{ petId: pet.id }} className="flex-1">
         <div className="flex items-center gap-3 mb-2">
           {fotoUrl ? (
             <img src={fotoUrl} alt={pet.nome} className="h-12 w-12 rounded-full object-cover border" />
@@ -953,11 +953,18 @@ function PetCard({ pet }: { pet: any }) {
             )}
           </div>
         )}
-        <div className="mt-2 text-[11px] text-primary inline-flex items-center gap-1">
+      </Link>
+      <div className="mt-3 pt-2 border-t border-border/60 flex items-center justify-between gap-2">
+        <Link to="/pets/$petId/ficha" params={{ petId: pet.id }} className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline">
           <FileText className="h-3 w-3" /> Abrir ficha
-        </div>
+        </Link>
+        <Link to="/pets/$petId/historico" params={{ petId: pet.id }}>
+          <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] px-2">
+            <History className="h-3 w-3" /> Histórico
+          </Button>
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }
 
