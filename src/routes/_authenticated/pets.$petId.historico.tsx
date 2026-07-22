@@ -306,9 +306,6 @@ function HistoricoPet() {
 
       const { data: empresa } = await supabase.from("empresa_config").select("*").maybeSingle();
       const { data: u } = await supabase.auth.getUser();
-      const { data: prof } = u.user
-        ? await supabase.from("profiles").select("nome").eq("id", u.user.id).maybeSingle()
-        : { data: null };
 
       await generateDossiePDF({
         pet,
@@ -316,7 +313,7 @@ function HistoricoPet() {
         atendimentos: atendimentos ?? [],
         ocorrencias: ocs ?? [],
         empresa,
-        operador: prof?.nome ?? u.user?.email ?? null,
+        operador: "Jéssica Xavier",
         secoes: {
           identificacao: true, saude: true, tutor: true, resumo: true,
           atendimentos: true, fotos: true, valores: true,
