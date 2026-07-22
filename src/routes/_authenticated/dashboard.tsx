@@ -93,7 +93,7 @@ function DashboardPage() {
       const [pagRes, comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
         supabase.from("pagamentos").select("valor_pago,data_pagamento,valor_total,status").gte("data_pagamento", from).lte("data_pagamento", to),
         supabase.from("compras_parcelas").select("valor_pago,data_pagamento").gte("data_pagamento", from).lte("data_pagamento", to),
-        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio,encerrado_em,finalizado").gte("data_inicio", `${from}T00:00:00`).lte("data_inicio", `${to}T23:59:59`),
+        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio,encerrado_em,finalizado").or(`and(data_inicio.gte.${from}T00:00:00,data_inicio.lte.${to}T23:59:59),and(encerrado_em.gte.${from}T00:00:00,encerrado_em.lte.${to}T23:59:59)`),
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
           .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
