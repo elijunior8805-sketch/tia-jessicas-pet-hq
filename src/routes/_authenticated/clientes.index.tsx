@@ -531,7 +531,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
   });
 
   const { data: pagamentos } = useQuery({
-    queryKey: ["cliente-ficha-pagamentos", id],
+    queryKey: ["cliente-ficha-pagamentos-v2", id],
     enabled: !!id,
     queryFn: async () => {
       const { data: rows } = await supabase
