@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
@@ -13,13 +14,30 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronRight, Image as ImageIcon,
   AlertTriangle, DollarSign, Truck, MessageSquare, FileText, Loader2,
-  ChevronsDownUp, ChevronsUpDown, Search, X, Download,
+  ChevronsDownUp, ChevronsUpDown, Search, X, Download, Link2, Check,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
 import { toast } from "sonner";
 
+const historicoSearchSchema = z.object({
+  q: z.string().optional().catch(undefined),
+  de: z.string().optional().catch(undefined),
+  ate: z.string().optional().catch(undefined),
+  svc: z.string().optional().catch(undefined),
+  prof: z.string().optional().catch(undefined),
+  st: z.string().optional().catch(undefined),
+  pg: z.string().optional().catch(undefined),
+  lt: z.string().optional().catch(undefined),
+  fotos: z.coerce.boolean().optional().catch(undefined),
+  ocor: z.coerce.boolean().optional().catch(undefined),
+  rec: z.coerce.boolean().optional().catch(undefined),
+  ord: z.string().optional().catch(undefined),
+  p: z.coerce.number().int().optional().catch(undefined),
+}).partial();
+
 export const Route = createFileRoute("/_authenticated/pets/$petId/historico")({
+  validateSearch: (s) => historicoSearchSchema.parse(s),
   component: HistoricoPet,
 });
 
@@ -29,24 +47,60 @@ const fmtD = (d?: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") 
 
 function HistoricoPet() {
   const { petId } = Route.useParams();
-  const [busca, setBusca] = useState<string>("");
-  const [de, setDe] = useState<string>("");
-  const [ate, setAte] = useState<string>("");
-  const [servico, setServico] = useState<string>("");
-  const [profissional, setProfissional] = useState<string>("todos");
-  const [status, setStatus] = useState<string>("todos");
-  const [pagamento, setPagamento] = useState<string>("todos");
-  const [levaTraz, setLevaTraz] = useState<string>("todos");
-  const [comFotos, setComFotos] = useState(false);
-  const [comOcorrencia, setComOcorrencia] = useState(false);
-  const [comRecomendacao, setComRecomendacao] = useState(false);
-  const [ordem, setOrdem] = useState<string>("data_desc");
-  const [page, setPage] = useState(0);
+  const sp = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const [busca, setBusca] = useState<string>(sp.q ?? "");
+  const [de, setDe] = useState<string>(sp.de ?? "");
+  const [ate, setAte] = useState<string>(sp.ate ?? "");
+  const [servico, setServico] = useState<string>(sp.svc ?? "");
+  const [profissional, setProfissional] = useState<string>(sp.prof ?? "todos");
+  const [status, setStatus] = useState<string>(sp.st ?? "todos");
+  const [pagamento, setPagamento] = useState<string>(sp.pg ?? "todos");
+  const [levaTraz, setLevaTraz] = useState<string>(sp.lt ?? "todos");
+  const [comFotos, setComFotos] = useState<boolean>(!!sp.fotos);
+  const [comOcorrencia, setComOcorrencia] = useState<boolean>(!!sp.ocor);
+  const [comRecomendacao, setComRecomendacao] = useState<boolean>(!!sp.rec);
+  const [ordem, setOrdem] = useState<string>(sp.ord ?? "data_desc");
+  const [page, setPage] = useState<number>(sp.p ?? 0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandAll, setExpandAll] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [gerandoCsv, setGerandoCsv] = useState(false);
+  const [copiado, setCopiado] = useState(false);
   const pageSize = 20;
+
+  // Sincroniza estado -> URL (replace, sem empilhar histórico)
+  const firstSync = useRef(true);
+  useEffect(() => {
+    const next: Record<string, unknown> = {
+      q: busca || undefined,
+      de: de || undefined,
+      ate: ate || undefined,
+      svc: servico || undefined,
+      prof: profissional !== "todos" ? profissional : undefined,
+      st: status !== "todos" ? status : undefined,
+      pg: pagamento !== "todos" ? pagamento : undefined,
+      lt: levaTraz !== "todos" ? levaTraz : undefined,
+      fotos: comFotos || undefined,
+      ocor: comOcorrencia || undefined,
+      rec: comRecomendacao || undefined,
+      ord: ordem !== "data_desc" ? ordem : undefined,
+      p: page > 0 ? page : undefined,
+    };
+    if (firstSync.current) { firstSync.current = false; }
+    navigate({ search: next as any, replace: true, resetScroll: false });
+  }, [busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comOcorrencia, comRecomendacao, ordem, page, navigate]);
+
+  async function copiarLinkVisualizacao() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiado(true);
+      toast.success("Link copiado — abra em outro dispositivo para ver a mesma visualização.");
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  }
 
   function aplicarPreset(dias: number | null) {
     if (dias === null) { setDe(""); setAte(""); return; }
@@ -358,6 +412,10 @@ function HistoricoPet() {
               {gerandoCsv ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
               Exportar CSV
             </Button>
+            <Button variant="outline" className="gap-2" onClick={copiarLinkVisualizacao}>
+              {copiado ? <Check className="h-4 w-4"/> : <Link2 className="h-4 w-4"/>}
+              {copiado ? "Link copiado" : "Copiar link da visualização"}
+            </Button>
             <Link to="/pets/$petId/dossie" params={{ petId }}>
               <Button variant="outline" className="gap-2"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
             </Link>
@@ -367,6 +425,8 @@ function HistoricoPet() {
           </>
         }
       />
+
+
 
 
       <Card className="p-4 mb-4 space-y-3">
