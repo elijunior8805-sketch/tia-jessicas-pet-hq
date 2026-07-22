@@ -128,6 +128,59 @@ function HistoricoPet() {
 
   const totalPag = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
 
+  async function gerarHistoricoPdf() {
+    if (!pet) return;
+    setGerandoPdf(true);
+    try {
+      let q = supabase
+        .from("atendimentos")
+        .select("*")
+        .eq("pet_id", petId)
+        .order("data_inicio", { ascending: false });
+      if (de) q = q.gte("data_inicio", de);
+      if (ate) q = q.lte("data_inicio", ate + "T23:59:59");
+      const { data: atendimentos } = await q;
+
+      const { data: ocs } = await supabase
+        .from("ocorrencias").select("*").eq("pet_id", petId)
+        .order("data_ocorrencia", { ascending: false });
+
+      const { data: empresa } = await supabase.from("empresa_config").select("*").maybeSingle();
+      const { data: u } = await supabase.auth.getUser();
+      const { data: prof } = u.user
+        ? await supabase.from("profiles").select("nome").eq("id", u.user.id).maybeSingle()
+        : { data: null };
+
+      await generateDossiePDF({
+        pet,
+        cliente: (pet as any).clientes ?? null,
+        atendimentos: atendimentos ?? [],
+        ocorrencias: ocs ?? [],
+        empresa,
+        operador: prof?.nome ?? u.user?.email ?? null,
+        secoes: {
+          identificacao: true, saude: true, tutor: true, resumo: true,
+          atendimentos: true, fotos: true, valores: true,
+          recomendacoes: true, ocorrencias: true, peso: true,
+        },
+        periodo: { de: de || null, ate: ate || null },
+      });
+
+      await supabase.from("pet_acessos_log").insert({
+        pet_id: petId,
+        user_id: u.user?.id ?? null,
+        user_email: u.user?.email ?? null,
+        acao: "gerou_pdf",
+        escopo: { origem: "historico", periodo: { de, ate } },
+      });
+      toast.success("Histórico gerado.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao gerar histórico");
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
+
   return (
     <PageShell>
       <PageHeader
@@ -135,15 +188,20 @@ function HistoricoPet() {
         description={pet?.clientes?.nome ?? ""}
         actions={
           <>
+            <Button className="gap-2" onClick={gerarHistoricoPdf} disabled={gerandoPdf || !pet}>
+              {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
+              Gerar histórico (PDF)
+            </Button>
             <Link to="/pets/$petId/dossie" params={{ petId }}>
-              <Button className="gap-2"><FileText className="h-4 w-4"/> Gerar PDF do pet</Button>
+              <Button variant="outline" className="gap-2"><FileText className="h-4 w-4"/> Dossiê personalizado</Button>
             </Link>
             <Link to="/pets/$petId/ficha" params={{ petId }}>
-              <Button variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar à ficha</Button>
+              <Button variant="ghost" className="gap-2"><ArrowLeft className="h-4 w-4"/> Voltar à ficha</Button>
             </Link>
           </>
         }
       />
+
 
       <Card className="p-4 mb-4">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
