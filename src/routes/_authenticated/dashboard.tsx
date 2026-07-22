@@ -89,11 +89,34 @@ function DashboardPage() {
 
   const { data } = useQuery({
     queryKey: ["dashboard-metrics", from, to],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
-      const [pagRes, comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
+      // Alarga a janela em ±1 dia no filtro do servidor para não perder
+      // atendimentos cuja data local (America/Sao_Paulo, UTC-3) cai no
+      // período, mas cujo timestamp UTC (encerrado_em/data_inicio) fica
+      // fora dele. O filtro definitivo é feito em JS usando o fuso local.
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const shiftDay = (iso: string, delta: number) => {
+        const d = parseISO(iso);
+        d.setDate(d.getDate() + delta);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+      const fromWide = shiftDay(from, -1);
+      const toWide = shiftDay(to, 1);
+      const toLocalDay = (v: any): string => {
+        if (!v) return "";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return String(v).slice(0, 10);
+        // yyyy-mm-dd em America/Sao_Paulo
+        return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      };
+
+      const [, comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
         supabase.from("pagamentos").select("valor_pago,data_pagamento,valor_total,status").gte("data_pagamento", from).lte("data_pagamento", to),
         supabase.from("compras_parcelas").select("valor_pago,data_pagamento").gte("data_pagamento", from).lte("data_pagamento", to),
-        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio,encerrado_em,finalizado").or(`and(data_inicio.gte.${from}T00:00:00,data_inicio.lte.${to}T23:59:59),and(encerrado_em.gte.${from}T00:00:00,encerrado_em.lte.${to}T23:59:59)`),
+        supabase.from("atendimentos").select("id,valor_executado,valor_planejado,data_inicio,encerrado_em,finalizado").or(`and(data_inicio.gte.${fromWide}T00:00:00,data_inicio.lte.${toWide}T23:59:59),and(encerrado_em.gte.${fromWide}T00:00:00,encerrado_em.lte.${toWide}T23:59:59)`),
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
           .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
@@ -109,13 +132,12 @@ function DashboardPage() {
       const novosClientes = novosClientesRes.data ?? [];
 
       const despesas = compras.reduce((s, r) => s + Number(r.valor_pago ?? 0), 0);
-      // Atendimentos e Ticket Médio: apenas os efetivamente encerrados
-      // (finalizado=true E encerrado_em preenchido E valor_executado > 0).
-      // O período considera encerrado_em quando disponível (senão data_inicio),
-      // para que a data do faturamento acompanhe o encerramento do serviço —
-      // atendimentos iniciados na véspera e finalizados hoje contam em "Hoje".
+      // Faturamento / Atendimentos / Ticket Médio: apenas os efetivamente
+      // encerrados (finalizado=true, encerrado_em preenchido e
+      // valor_executado > 0). Data de referência = encerrado_em em fuso
+      // local (America/Sao_Paulo), para casar com a percepção do usuário.
       const inRange = (a: any) => {
-        const ref = String(a.encerrado_em ?? a.data_inicio ?? "").slice(0, 10);
+        const ref = toLocalDay(a.encerrado_em ?? a.data_inicio);
         return ref >= from && ref <= to;
       };
       const executados = atendimentos.filter((a: any) => {
@@ -125,9 +147,6 @@ function DashboardPage() {
       const atendCount = executados.length;
       const somaExec = executados.reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
       const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
-      // Faturamento = soma dos atendimentos executados no período (mesma
-      // base do contador e do ticket médio), garantindo consistência entre
-      // os três KPIs mesmo quando o pagamento cai em outro dia.
       const faturamento = somaExec;
       const lucro = faturamento - despesas;
 
@@ -135,7 +154,7 @@ function DashboardPage() {
       const serie = dias.map((d) => {
         const key = format(d, "yyyy-MM-dd");
         const val = executados
-          .filter((a: any) => String(a.encerrado_em ?? a.data_inicio ?? "").slice(0, 10) === key)
+          .filter((a: any) => toLocalDay(a.encerrado_em ?? a.data_inicio) === key)
           .reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
         return { dia: format(d, "dd/MM"), valor: val };
       });
