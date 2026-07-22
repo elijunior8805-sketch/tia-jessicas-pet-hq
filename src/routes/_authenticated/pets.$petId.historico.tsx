@@ -39,6 +39,8 @@ function HistoricoPet() {
   const [comRecomendacao, setComRecomendacao] = useState(false);
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expandAll, setExpandAll] = useState(true);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const pageSize = 20;
 
   // Registra o acesso uma vez ao entrar
