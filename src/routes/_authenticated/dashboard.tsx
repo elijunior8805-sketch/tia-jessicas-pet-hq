@@ -33,6 +33,36 @@ function greeting(d = new Date()) {
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+function somaItensValor(itens: any[] | null | undefined) {
+  return (Array.isArray(itens) ? itens : []).reduce((acc, item) => {
+    const total = Number(item?.valor_total ?? 0);
+    if (Number.isFinite(total) && total > 0) return acc + total;
+    return acc + Number(item?.quantidade ?? 0) * Number(item?.valor_unit ?? 0);
+  }, 0);
+}
+
+function valorRealExecutado(atendimento: any) {
+  const solicitados = Array.isArray(atendimento?.servicos_solicitados)
+    ? atendimento.servicos_solicitados
+    : [];
+  const planejados = Array.isArray(atendimento?.servicos_planejados)
+    ? atendimento.servicos_planejados
+    : [];
+  const extras = Array.isArray(atendimento?.servicos_extras)
+    ? atendimento.servicos_extras
+    : [];
+  const executados = Array.isArray(atendimento?.servicos_executados)
+    ? atendimento.servicos_executados
+    : [];
+  const principal = solicitados.length ? solicitados : planejados;
+  const fonte = principal.length || extras.length ? [...principal, ...extras] : executados;
+  if (!fonte.length) return Number(atendimento?.valor_executado ?? 0);
+  return Math.max(
+    0,
+    somaItensValor(fonte) + Number(atendimento?.taxa_leva_traz ?? 0) - Number(atendimento?.desconto ?? 0),
+  );
+}
+
 // Paleta sofisticada por indicador (oklch inline — escopo visual)
 const KPI_TONES = {
   esmeralda:  { chip: "oklch(0.55 0.13 155)", soft: "oklch(0.55 0.13 155 / 0.12)", bar: "oklch(0.45 0.11 155)" },
@@ -119,7 +149,7 @@ function DashboardPage() {
         // encerrado_em no período. Não usa `pagamentos` nem `valor_planejado`.
         supabase
           .from("atendimentos")
-          .select("id,valor_executado,encerrado_em,finalizado")
+          .select("id,valor_executado,encerrado_em,finalizado,servicos_solicitados,servicos_planejados,servicos_extras,servicos_executados,taxa_leva_traz,desconto")
           .eq("finalizado", true)
           .not("encerrado_em", "is", null)
           .gte("encerrado_em", `${fromWide}T00:00:00`)
@@ -145,12 +175,12 @@ function DashboardPage() {
       // `encerrado_em` cai dentro do período selecionado.
       const executados = atendimentos.filter((a: any) => {
         if (a.finalizado !== true || !a.encerrado_em) return false;
-        if (Number(a.valor_executado ?? 0) <= 0) return false;
+        if (valorRealExecutado(a) <= 0) return false;
         const ref = toLocalDay(a.encerrado_em);
         return ref >= from && ref <= to;
       });
       const atendCount = executados.length;
-      const somaExec = executados.reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
+      const somaExec = executados.reduce((s, a: any) => s + valorRealExecutado(a), 0);
       const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
       const faturamento = somaExec;
       const lucro = faturamento - despesas;
@@ -160,7 +190,7 @@ function DashboardPage() {
         const key = format(d, "yyyy-MM-dd");
         const val = executados
           .filter((a: any) => toLocalDay(a.encerrado_em) === key)
-          .reduce((s, a: any) => s + Number(a.valor_executado ?? 0), 0);
+          .reduce((s, a: any) => s + valorRealExecutado(a), 0);
         return { dia: format(d, "dd/MM"), valor: val };
       });
 
