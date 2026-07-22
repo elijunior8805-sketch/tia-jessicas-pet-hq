@@ -727,11 +727,19 @@ function AtendimentoDetalhe() {
       encerrado_em: (atendimento as any).encerrado_em ?? new Date().toISOString(),
       data_fim: (atendimento as any).data_fim ?? new Date().toISOString(),
     };
+    // Regra: o nome exibido no PDF é sempre o do profissional responsável pelo
+    // atendimento (não o do usuário logado). Sem profissional -> Jéssica Xavier.
+    let profissionalNome: string | null = null;
+    const profId = (atendimento as any)?.profissional_id as string | null | undefined;
+    if (profId) {
+      const { data: prof } = await supabase.from("profiles").select("nome").eq("id", profId).maybeSingle();
+      profissionalNome = prof?.nome ?? null;
+    }
     return generateAtendimentoPDF({
       atendimento: enriched,
       ocorrencias,
       empresa: empresa ?? null,
-      operador: myProfile?.nome ?? null,
+      operador: profissionalNome,
       returnBlob,
       fotosAntesPaths: fotosAntes.map((f) => f.path).filter(Boolean) as string[],
       fotosDepoisPaths: fotosDepois.map((f) => f.path).filter(Boolean) as string[],
