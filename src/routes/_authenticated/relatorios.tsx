@@ -7,7 +7,6 @@ import {
   listarLinhasExport,
   type LinhaExport,
 } from "@/lib/relatorios.functions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,30 +16,51 @@ import {
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
 } from "recharts";
-import { Download, TrendingUp, Users, Wallet, AlertCircle, Sparkles, PawPrint, CircleDollarSign } from "lucide-react";
+import {
+  Download, TrendingUp, Users, Wallet, AlertCircle, Sparkles, PawPrint,
+  CircleDollarSign, BarChart3, RefreshCw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { RelatoriosAgendamentos } from "@/components/relatorios-agendamentos";
+import { PageShell, PageHeader, KpiCard, SectionCard } from "@/components/page-shell";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
+  head: () => ({
+    meta: [
+      { title: "Relatórios — Spa de Pet Tia Jéssica" },
+      { name: "description", content: "Indicadores gerenciais, gráficos e exportações do Spa de Pet Tia Jéssica." },
+      { property: "og:title", content: "Relatórios — Spa de Pet Tia Jéssica" },
+      { property: "og:description", content: "Painel de indicadores financeiros, ranking de clientes e serviços." },
+    ],
+  }),
 });
 
 const brl = (n: number) =>
   Number(n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function iso(d: Date) {
-  return d.toISOString().slice(0, 10);
+function toLocalDay(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value ?? "";
+  const m = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  return `${y}-${m}-${day}`;
 }
 function firstOfMonth() {
   const d = new Date();
   d.setDate(1);
-  return iso(d);
+  return toLocalDay(d);
 }
 function today() {
-  return iso(new Date());
+  return toLocalDay(new Date());
 }
 
-// Proteção contra CSV Injection: prefixa células iniciadas por = + - @ com apóstrofo
+// Proteção contra CSV Injection
 function safeCsvCell(v: unknown): string {
   const raw = v === null || v === undefined ? "" : String(v);
   const escaped = raw.replace(/"/g, '""');
@@ -91,6 +111,7 @@ function RelatoriosPage() {
   const query = useQuery({
     queryKey: ["relatorios", de, ate],
     queryFn: () => carregar({ data: { de, ate } }),
+    staleTime: 0,
   });
 
   const ind = query.data?.indicadores;
@@ -98,12 +119,26 @@ function RelatoriosPage() {
   const ranking = query.data?.rankingClientes ?? [];
   const servicos = query.data?.servicos ?? [];
 
-  const preset = (dias: number) => {
+  const presetDias = (dias: number) => {
     const a = new Date();
     const d = new Date();
     d.setDate(a.getDate() - dias + 1);
-    setDe(iso(d));
-    setAte(iso(a));
+    setDe(toLocalDay(d));
+    setAte(toLocalDay(a));
+  };
+  const presetHoje = () => {
+    const h = today();
+    setDe(h);
+    setAte(h);
+  };
+  const presetMes = () => {
+    setDe(firstOfMonth());
+    setAte(today());
+  };
+  const presetAno = () => {
+    const y = new Date().getFullYear();
+    setDe(`${y}-01-01`);
+    setAte(today());
   };
 
   const exportarCsv = async () => {
@@ -122,160 +157,272 @@ function RelatoriosPage() {
 
   const chartData = useMemo(
     () => serie.map((s) => ({ ...s, label: s.dia.slice(5) })),
-    [serie]
+    [serie],
   );
 
-  return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
-      <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl md:text-4xl text-primary">Relatórios</h1>
-          <p className="text-muted-foreground">Indicadores gerenciais e exportações</p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <Label className="text-xs">De</Label>
-            <Input type="date" value={de} max={ate} onChange={(e) => setDe(e.target.value)} className="w-[150px]" />
-          </div>
-          <div>
-            <Label className="text-xs">Até</Label>
-            <Input type="date" value={ate} min={de} onChange={(e) => setAte(e.target.value)} className="w-[150px]" />
-          </div>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" onClick={() => preset(7)}>7d</Button>
-            <Button size="sm" variant="outline" onClick={() => preset(30)}>30d</Button>
-            <Button size="sm" variant="outline" onClick={() => { setDe(firstOfMonth()); setAte(today()); }}>Mês</Button>
-          </div>
-          <Button onClick={exportarCsv} className="gap-2">
-            <Download className="w-4 h-4" /> Exportar CSV
-          </Button>
-        </div>
-      </header>
+  const conversao = ind && ind.faturamento_planejado > 0
+    ? `${((ind.faturamento / ind.faturamento_planejado) * 100).toFixed(1)}%`
+    : "—";
 
+  return (
+    <PageShell>
+      <PageHeader
+        title="Relatórios"
+        description="Indicadores gerenciais, ranking e exportações do período selecionado."
+        icon={BarChart3}
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              className="bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"
+            >
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${query.isFetching ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+            <Button
+              size="sm"
+              onClick={exportarCsv}
+              className="bg-[var(--color-gold)] text-primary hover:bg-[var(--color-gold)]/90"
+            >
+              <Download className="w-4 h-4 mr-1.5" /> Exportar CSV
+            </Button>
+          </>
+        }
+      />
+
+      {/* Filtros de período */}
+      <SectionCard>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">De</Label>
+            <Input
+              type="date"
+              value={de}
+              max={ate}
+              onChange={(e) => setDe(e.target.value)}
+              className="w-[160px]"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Até</Label>
+            <Input
+              type="date"
+              value={ate}
+              min={de}
+              onChange={(e) => setAte(e.target.value)}
+              className="w-[160px]"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="sm" variant="outline" onClick={presetHoje}>Hoje</Button>
+            <Button size="sm" variant="outline" onClick={() => presetDias(7)}>7d</Button>
+            <Button size="sm" variant="outline" onClick={() => presetDias(30)}>30d</Button>
+            <Button size="sm" variant="outline" onClick={() => presetDias(90)}>90d</Button>
+            <Button size="sm" variant="outline" onClick={presetMes}>Mês</Button>
+            <Button size="sm" variant="outline" onClick={presetAno}>Ano</Button>
+          </div>
+          {query.isFetching && (
+            <div className="text-xs text-muted-foreground ml-auto flex items-center gap-1.5">
+              <RefreshCw className="h-3 w-3 animate-spin" /> Atualizando indicadores…
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi icon={<CircleDollarSign className="w-4 h-4" />} label="Faturamento" value={brl(ind?.faturamento ?? 0)} sub={`Planejado ${brl(ind?.faturamento_planejado ?? 0)}`} />
-        <Kpi icon={<TrendingUp className="w-4 h-4" />} label="Ticket médio" value={brl(ind?.ticket_medio ?? 0)} sub={`${ind?.atendimentos_finalizados ?? 0} atendimentos`} />
-        <Kpi icon={<Users className="w-4 h-4" />} label="Clientes atendidos" value={String(ind?.clientes_atendidos ?? 0)} sub={`${ind?.novos_clientes ?? 0} novos no período`} />
-        <Kpi icon={<Wallet className="w-4 h-4" />} label="A receber" value={brl(ind?.a_receber ?? 0)} sub={`${brl(ind?.em_atraso ?? 0)} em atraso`} destaque={(ind?.em_atraso ?? 0) > 0} />
-        <Kpi icon={<Sparkles className="w-4 h-4" />} label="Leva e traz" value={brl(ind?.taxa_leva_traz_total ?? 0)} />
-        <Kpi icon={<AlertCircle className="w-4 h-4" />} label="Descontos concedidos" value={brl(ind?.descontos_total ?? 0)} />
-        <Kpi icon={<PawPrint className="w-4 h-4" />} label="Cancelados / Não compareceu" value={String(ind?.atendimentos_cancelados ?? 0)} />
-        <Kpi icon={<TrendingUp className="w-4 h-4" />} label="Conversão executado" value={
-          ind && ind.faturamento_planejado > 0
-            ? `${((ind.faturamento / ind.faturamento_planejado) * 100).toFixed(1)}%`
-            : "—"
-        } />
+        <KpiCard
+          icon={CircleDollarSign}
+          label="Faturamento"
+          value={brl(ind?.faturamento ?? 0)}
+          hint={`Planejado ${brl(ind?.faturamento_planejado ?? 0)}`}
+          accent="forest"
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="Ticket médio"
+          value={brl(ind?.ticket_medio ?? 0)}
+          hint={`${ind?.atendimentos_finalizados ?? 0} finalizados`}
+          accent="gold"
+        />
+        <KpiCard
+          icon={Users}
+          label="Clientes atendidos"
+          value={String(ind?.clientes_atendidos ?? 0)}
+          hint={`${ind?.novos_clientes ?? 0} novos no período`}
+          accent="petrol"
+        />
+        <KpiCard
+          icon={Wallet}
+          label="A receber"
+          value={brl(ind?.a_receber ?? 0)}
+          hint={`${brl(ind?.em_atraso ?? 0)} em atraso · snapshot atual`}
+          accent={(ind?.em_atraso ?? 0) > 0 ? "terracotta" : "sage"}
+        />
+        <KpiCard
+          icon={Sparkles}
+          label="Leva e traz"
+          value={brl(ind?.taxa_leva_traz_total ?? 0)}
+          hint="Taxas cobradas nos executados"
+          accent="emerald"
+        />
+        <KpiCard
+          icon={AlertCircle}
+          label="Descontos concedidos"
+          value={brl(ind?.descontos_total ?? 0)}
+          hint="Somente em atendimentos executados"
+          accent="terracotta"
+        />
+        <KpiCard
+          icon={PawPrint}
+          label="Cancelados / não compareceu"
+          value={String(ind?.atendimentos_cancelados ?? 0)}
+          hint="Agendamentos do período"
+          accent="sage"
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="Conversão executado"
+          value={conversao}
+          hint="Faturado ÷ planejado"
+          accent="gold"
+        />
       </div>
 
+      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
-        <Card>
-          <CardHeader><CardTitle className="font-serif">Faturamento por dia</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
+        <SectionCard title="Faturamento por dia" icon={CircleDollarSign}>
+          <div className="h-[300px]">
+            {chartData.length === 0 ? (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                Sem dados no período selecionado
+              </div>
+            ) : (
               <ResponsiveContainer>
-                <LineChart data={chartData}>
+                <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="label" fontSize={12} />
-                  <YAxis fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "").trim()} />
-                  <Tooltip formatter={(v: any) => brl(Number(v))} labelFormatter={(l) => `Dia ${l}`} />
-                  <Line type="monotone" dataKey="faturamento" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                  <XAxis dataKey="label" fontSize={12} stroke="currentColor" opacity={0.6} />
+                  <YAxis
+                    fontSize={12}
+                    stroke="currentColor"
+                    opacity={0.6}
+                    tickFormatter={(v) => brl(v).replace("R$", "").trim()}
+                  />
+                  <Tooltip
+                    formatter={(v: any) => brl(Number(v))}
+                    labelFormatter={(l) => `Dia ${l}`}
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="faturamento"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: "var(--color-gold)" }}
+                    activeDot={{ r: 5 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="font-serif">Atendimentos por dia</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
+            )}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Atendimentos por dia" icon={BarChart3}>
+          <div className="h-[300px]">
+            {chartData.length === 0 ? (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                Sem dados no período selecionado
+              </div>
+            ) : (
               <ResponsiveContainer>
-                <BarChart data={chartData}>
+                <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="label" fontSize={12} />
-                  <YAxis fontSize={12} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="atendimentos" fill="hsl(var(--primary))" />
+                  <XAxis dataKey="label" fontSize={12} stroke="currentColor" opacity={0.6} />
+                  <YAxis fontSize={12} stroke="currentColor" opacity={0.6} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="atendimentos" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+            )}
+          </div>
+        </SectionCard>
       </div>
 
+      {/* Tabelas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle className="font-serif">Top clientes</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
+        <SectionCard title="Top clientes" icon={Users} description="Ranking pelo total executado no período">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Atend.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ranking.length === 0 && (
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Atend.</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                    Sem dados no período
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ranking.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Sem dados</TableCell></TableRow>
-                )}
-                {ranking.map((r) => (
-                  <TableRow key={r.nome}>
-                    <TableCell className="font-medium">{r.nome}</TableCell>
-                    <TableCell className="text-right">{r.qtd}</TableCell>
-                    <TableCell className="text-right">{brl(r.total)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="font-serif">Serviços mais executados</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
+              )}
+              {ranking.map((r, i) => (
+                <TableRow key={`${r.nome}-${i}`}>
+                  <TableCell className="font-medium truncate max-w-[220px]">{r.nome}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.qtd}</TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">{brl(r.total)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+
+        <SectionCard title="Serviços mais executados" icon={PawPrint} description="Ordenado por quantidade">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Serviço</TableHead>
+                <TableHead className="text-right">Qtd</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {servicos.length === 0 && (
                 <TableRow>
-                  <TableHead>Serviço</TableHead>
-                  <TableHead className="text-right">Qtd</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                    Sem dados no período
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {servicos.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Sem dados</TableCell></TableRow>
-                )}
-                {servicos.map((s) => (
-                  <TableRow key={s.nome}>
-                    <TableCell className="font-medium">{s.nome}</TableCell>
-                    <TableCell className="text-right">{s.qtd}</TableCell>
-                    <TableCell className="text-right">{brl(s.total)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              )}
+              {servicos.map((s, i) => (
+                <TableRow key={`${s.nome}-${i}`}>
+                  <TableCell className="font-medium truncate max-w-[220px]">{s.nome}</TableCell>
+                  <TableCell className="text-right tabular-nums">{s.qtd}</TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">{brl(s.total)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
       </div>
 
       <RelatoriosAgendamentos />
-    </div>
-  );
-}
-
-function Kpi({ icon, label, value, sub, destaque }: {
-  icon: React.ReactNode; label: string; value: string; sub?: string; destaque?: boolean;
-}) {
-  return (
-    <Card className={destaque ? "border-destructive/40" : undefined}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {icon}<Label className="text-xs">{label}</Label>
-        </div>
-        <div className={`text-xl md:text-2xl font-serif font-semibold mt-1 ${destaque ? "text-destructive" : ""}`}>
-          {value}
-        </div>
-        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
-      </CardContent>
-    </Card>
+    </PageShell>
   );
 }
