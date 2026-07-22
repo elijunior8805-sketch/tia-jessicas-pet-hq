@@ -126,14 +126,14 @@ function ClienteDetalhe() {
         description={data.ativo === false ? "Cliente arquivado" : "Ficha do cliente e pets vinculados."}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: "/clientes" })} className="gap-2">
+            <Button variant="outline" onClick={() => navigate({ to: "/clientes" })} className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white">
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
             <Link to="/clientes/$id/editar" params={{ id }}>
-              <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4"/> Editar cliente</Button>
+              <Button variant="outline" className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white"><Pencil className="h-4 w-4"/> Editar cliente</Button>
             </Link>
             <Link to="/pets/novo" search={{ cliente: id }}>
-              <Button variant="outline" className="gap-2"><Plus className="h-4 w-4"/> Novo pet</Button>
+              <Button variant="outline" className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white"><Plus className="h-4 w-4"/> Novo pet</Button>
             </Link>
             <Button
               onClick={() => navigate({ to: "/agenda", search: { cliente: id } })}
@@ -145,7 +145,7 @@ function ClienteDetalhe() {
               variant="outline"
               onClick={() => arquivarMut.mutate()}
               disabled={arquivarMut.isPending}
-              className="gap-2"
+              className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white"
             >
               <Archive className="h-4 w-4"/> {data.ativo === false ? "Reativar" : "Arquivar"}
             </Button>
