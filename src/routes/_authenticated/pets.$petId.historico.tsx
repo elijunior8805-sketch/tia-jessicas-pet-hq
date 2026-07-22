@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronRight, Image as ImageIcon,
   AlertTriangle, DollarSign, Truck, MessageSquare, FileText, Loader2,
-  ChevronsDownUp, ChevronsUpDown, Search, X,
+  ChevronsDownUp, ChevronsUpDown, Search, X, Download,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { generateDossiePDF } from "@/lib/pet-dossie-pdf";
