@@ -277,10 +277,6 @@ function HistoricoPet() {
             const totalVal = Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0);
             const ocs = ocorrenciasPorAtend.get(a.id) ?? [];
             const totalFotos = (a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length;
-            const execs = ((a.servicos_executados ?? []) as any[]).map((s: any) => s?.nome).filter(Boolean);
-            const totalVal = Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0);
-            const ocs = ocorrenciasPorAtend.get(a.id) ?? [];
-            const totalFotos = (a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length;
             return (
               <Card key={a.id} className="overflow-hidden">
                 <button
