@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_denials: {
+        Row: {
+          acao: string | null
+          codigo_erro: string | null
+          created_at: string
+          detalhes: Json | null
+          id: string
+          ip: string | null
+          metodo: string | null
+          modulo: string | null
+          motivo: string
+          rota: string | null
+          tabela_alvo: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          acao?: string | null
+          codigo_erro?: string | null
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          ip?: string | null
+          metodo?: string | null
+          modulo?: string | null
+          motivo: string
+          rota?: string | null
+          tabela_alvo?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string | null
+          codigo_erro?: string | null
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          ip?: string | null
+          metodo?: string | null
+          modulo?: string | null
+          motivo?: string
+          rota?: string | null
+          tabela_alvo?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       agendamento_servicos: {
         Row: {
           agendamento_id: string
