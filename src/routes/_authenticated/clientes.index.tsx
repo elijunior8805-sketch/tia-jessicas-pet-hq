@@ -495,11 +495,13 @@ function ClienteRow({
    Ficha completa (painel direito)
    ===================================================================== */
 function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
+  const navigate = useNavigate();
   useRealtimeFinanceiro([
     ["cliente-ficha-pagamentos-v2", id],
     ["cliente-ficha-atends", id],
     ["cliente-ficha-agendamentos", id],
   ]);
+
 
   const { data, isLoading } = useQuery({
     queryKey: ["cliente-ficha", id],
