@@ -81,8 +81,17 @@ function EditarClientePage() {
         patch.foto_url = null;
         removeFoto((cliente as any).foto_url).catch(() => {});
       }
-      const { error } = await supabase.from("clientes").update(patch).eq("id", id);
+      const { data: updated, error } = await supabase
+        .from("clientes")
+        .update(patch)
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error(
+          "Você não tem permissão para alterar este cliente. Peça a um administrador para conceder acesso ao módulo de Clientes.",
+        );
+      }
     },
     onSuccess: () => {
       dirtyRef.current = false;
