@@ -153,4 +153,33 @@ describe("/clientes/$id/editar", () => {
     expect(toastError.mock.calls[0][0]).toMatch(/permission denied/i);
     expect(toastSuccess).not.toHaveBeenCalled();
   });
+
+  it("bloqueia acesso e renderiza a página 'sem permissão' quando o usuário não tem clientes:editar", async () => {
+    accessState.canEdit = false;
+    renderWithProviders(<EditPage />);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Você não tem permissão para editar clientes/i),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /Salvar alterações/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/clientes:editar/)).toBeInTheDocument();
+  });
+
+  it("botão 'Voltar para a ficha' na página de sem-permissão navega para /clientes/$id", async () => {
+    accessState.canEdit = false;
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    renderWithProviders(<EditPage />);
+    await waitFor(() =>
+      screen.getByText(/Você não tem permissão para editar clientes/i),
+    );
+    await user.click(screen.getByRole("button", { name: /Voltar para a ficha/i }));
+    expect(navigateSpy).toHaveBeenCalledWith({
+      to: "/clientes/$id",
+      params: { id: "cli-1" },
+    });
+  });
 });
