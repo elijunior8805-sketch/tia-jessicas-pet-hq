@@ -155,7 +155,7 @@ function ClienteDetalhe() {
 
             <Button
               onClick={() => navigate({ to: "/agenda", search: { cliente: id } })}
-              className="gap-2"
+              className="gap-2 bg-white text-primary hover:bg-white/90"
             >
               <CalendarPlus className="h-4 w-4"/> Novo agendamento
             </Button>
