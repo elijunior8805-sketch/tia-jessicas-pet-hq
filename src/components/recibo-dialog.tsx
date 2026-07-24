@@ -594,13 +594,18 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
             onClick={enviarWhats}
             disabled={!numero || enviando || !confirmado}
             className="w-full sm:w-auto"
+            title="Compartilha o PDF pelo menu nativo — escolha WhatsApp Business"
           >
             {enviando ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (
-              <MessageCircle className="h-4 w-4 mr-1" />
+              <Share2 className="h-4 w-4 mr-1" />
             )}
-            Enviar por WhatsApp
+            {preparando
+              ? "Preparando documento…"
+              : enviando
+                ? "Compartilhando…"
+                : "Enviar pelo WhatsApp"}
           </Button>
         </DialogFooter>
       </DialogContent>
