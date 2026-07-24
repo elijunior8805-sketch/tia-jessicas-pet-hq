@@ -212,6 +212,8 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
         const url = URL.createObjectURL(res.blob);
         revoked = url;
         setPreviewUrl(url);
+        setPreviewBlob(res.blob);
+        setPreviewFileName(res.fileName);
       } catch (e) {
         console.error(e);
       }
@@ -220,6 +222,8 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       cancelled = true;
       if (revoked) URL.revokeObjectURL(revoked);
       setPreviewUrl(null);
+      setPreviewBlob(null);
+      setPreviewFileName("");
     };
   }, [open, data]);
 
