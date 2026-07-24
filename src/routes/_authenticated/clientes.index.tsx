@@ -176,21 +176,27 @@ function ClientesPage() {
   );
 
   const { data: cobrancasByCliente } = useQuery({
-    queryKey: ["clientes-cobrancas", clienteIdsListados],
+    queryKey: ["clientes-saldos-dinamico", clienteIdsListados],
     enabled: clienteIdsListados.length > 0,
     staleTime: 30_000,
     queryFn: async () => {
+      const hoje = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
-        .from("cobrancas")
-        .select("cliente_id, saldo, status")
+        .from("pagamentos")
+        .select("cliente_id, valor_total, valor_pago, status, vencimento, atendimentos(finalizado, valor_executado, taxa_leva_traz, desconto)")
         .in("cliente_id", clienteIdsListados)
-        .in("status", ["vencido", "a_vencer", "pago_parcial", "enviada", "respondeu", "promessa", "negociado", "sem_retorno", "pausada"]);
+        .in("status", ["pendente", "parcial", "atrasado"]);
       const map: Record<string, { vencido: number; total: number }> = {};
       (data ?? []).forEach((r: any) => {
+        const a = r.atendimentos;
+        const bruto = a?.finalizado
+          ? Math.max(Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0), 0)
+          : Number(r.valor_total || 0);
+        const saldo = Math.max(bruto - Number(r.valor_pago || 0), 0);
+        if (saldo <= 0 || !r.cliente_id) return;
         if (!map[r.cliente_id]) map[r.cliente_id] = { vencido: 0, total: 0 };
-        const s = Number(r.saldo ?? 0);
-        map[r.cliente_id].total += s;
-        if (r.status === "vencido") map[r.cliente_id].vencido += s;
+        map[r.cliente_id].total += saldo;
+        if (r.vencimento && r.vencimento < hoje) map[r.cliente_id].vencido += saldo;
       });
       return map;
     },
