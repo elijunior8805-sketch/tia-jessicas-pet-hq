@@ -13,6 +13,8 @@ import { FotoPicker } from "@/components/foto-picker";
 import { uploadFoto, removeFoto } from "@/lib/foto-upload";
 import { Card } from "@/components/ui/card";
 import { User } from "lucide-react";
+import { useMyAccess, hasPermission } from "@/hooks/use-my-permissions";
+import { AccessDenied } from "@/components/access-denied";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id/editar")({
   component: EditarClientePage,
@@ -23,6 +25,10 @@ function EditarClientePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const { data: access, isLoading: loadingAccess } = useMyAccess();
+  const canEdit = hasPermission(access, "clientes", "editar");
+
+
   const [form, setForm] = useState<ClienteFormState>(emptyClienteForm);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -31,6 +37,7 @@ function EditarClientePage() {
 
   const { data: cliente, isLoading } = useQuery({
     queryKey: ["cliente-editar", id],
+    enabled: canEdit,
     queryFn: async () => {
       const { data, error } = await supabase.from("clientes").select("*").eq("id", id).maybeSingle();
       if (error) throw error;
@@ -110,6 +117,21 @@ function EditarClientePage() {
     navigate({ to: "/clientes/$id", params: { id } });
   }
 
+  if (loadingAccess) {
+    return <PageShell><div className="text-sm text-muted-foreground" aria-busy="true">Verificando permissões…</div></PageShell>;
+  }
+  if (!canEdit) {
+    return (
+      <AccessDenied
+        titulo="Você não tem permissão para editar clientes"
+        descricao="Peça a um administrador para liberar a ação 'Editar' no módulo Clientes."
+        modulo="clientes"
+        acao="editar"
+        backTo={{ to: "/clientes/$id", params: { id } }}
+        backLabel="Voltar para a ficha"
+      />
+    );
+  }
   if (isLoading) return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
   if (!cliente) return <PageShell><div className="text-sm text-muted-foreground">Cliente não encontrado.</div></PageShell>;
 
