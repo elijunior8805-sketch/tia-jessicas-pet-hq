@@ -179,7 +179,7 @@ function HistoricoPet() {
       let q = supabase
         .from("atendimentos")
         .select(
-          "id, data_inicio, data_fim, encerrado_em, servicos_planejados, servicos_executados, servicos_extras, valor_executado, taxa_leva_traz, comportamentos, observacoes, recomendacoes, proxima_visita, pagamento_status, pagamento_forma, valor_pago, fotos_antes, fotos_depois, foto_principal_depois, profissional_id, alergia_observada, usou_focinheira, agendamento_id, agendamentos(status, data, hora, leva_traz_modalidade)",
+          "id, data_inicio, data_fim, encerrado_em, servicos_planejados, servicos_executados, servicos_extras, valor_executado, taxa_leva_traz, desconto, comportamentos, observacoes, recomendacoes, proxima_visita, pagamento_status, pagamento_forma, valor_pago, fotos_antes, fotos_depois, foto_principal_depois, profissional_id, alergia_observada, usou_focinheira, agendamento_id, agendamentos(status, data, hora, leva_traz_modalidade)",
           { count: "exact" }
         )
         .eq("pet_id", petId)
