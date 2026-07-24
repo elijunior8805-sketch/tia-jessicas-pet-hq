@@ -495,11 +495,13 @@ function ClienteRow({
    Ficha completa (painel direito)
    ===================================================================== */
 function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
+  const navigate = useNavigate();
   useRealtimeFinanceiro([
     ["cliente-ficha-pagamentos-v2", id],
     ["cliente-ficha-atends", id],
     ["cliente-ficha-agendamentos", id],
   ]);
+
 
   const { data, isLoading } = useQuery({
     queryKey: ["cliente-ficha", id],
@@ -682,26 +684,18 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               </Button>
             </a>
           )}
-          <Link to="/clientes/$id/editar" params={{ id }}>
-            <Button size="sm" variant="outline" className="gap-1.5">
-              <Pencil className="h-4 w-4" /> Editar
-            </Button>
-          </Link>
-          <Link to="/pets/novo" search={{ cliente: id } as any}>
-            <Button size="sm" variant="outline" className="gap-1.5">
-              <PawPrint className="h-4 w-4" /> Novo pet
-            </Button>
-          </Link>
-          <Link to="/agenda" search={{ cliente: id } as any}>
-            <Button size="sm" className="gap-1.5">
-              <CalendarPlus className="h-4 w-4" /> Novo agendamento
-            </Button>
-          </Link>
-          <Link to="/pagamentos-abertos" search={{ cliente: id } as any}>
-            <Button size="sm" variant="outline" className="gap-1.5">
-              <DollarSign className="h-4 w-4" /> Pagamentos
-            </Button>
-          </Link>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate({ to: "/clientes/$id/editar", params: { id } })}>
+            <Pencil className="h-4 w-4" /> Editar
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate({ to: "/pets/novo", search: { cliente: id } as any })}>
+            <PawPrint className="h-4 w-4" /> Novo pet
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate({ to: "/agenda", search: { cliente: id } as any })}>
+            <CalendarPlus className="h-4 w-4" /> Novo agendamento
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate({ to: "/pagamentos-abertos", search: { cliente: id } as any })}>
+            <DollarSign className="h-4 w-4" /> Pagamentos
+          </Button>
         </div>
       </header>
 

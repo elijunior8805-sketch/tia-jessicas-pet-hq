@@ -96,9 +96,13 @@ function FichaOperacional() {
             >
               <FileText className="h-4 w-4"/> Gerar PDF do pet
             </Button>
-            <Link to="/pets/$petId/editar" params={{ petId }}>
-              <Button variant="outline" className="gap-2 bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"><Pencil className="h-4 w-4"/> Editar pet</Button>
-            </Link>
+            <Button
+              variant="outline"
+              className="gap-2 bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"
+              onClick={() => navigate({ to: "/pets/$petId/editar", params: { petId } })}
+            >
+              <Pencil className="h-4 w-4"/> Editar pet
+            </Button>
             <Link
               to="/agenda"
               search={{ cliente: pet.cliente_id, pet: pet.id }}
