@@ -281,28 +281,68 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
     return applyVars(safeMensagem, { ...vars, link }).replace(/\uFFFD/g, "");
   };
 
+  /**
+   * Envia o recibo por WhatsApp com o PDF anexado.
+   *
+   * Estratégia:
+   *  1) Gera/reaproveita o Blob do PDF já usado na prévia.
+   *  2) No celular (Web Share API nível 2), abre o menu nativo com o PDF
+   *     anexado — o usuário escolhe WhatsApp Business/WhatsApp.
+   *  3) O envio só é registrado no banco APÓS a operação concluir.
+   *  4) Fallback: baixa o PDF e abre a conversa com a mensagem.
+   */
   const enviarWhats = async () => {
     if (!numero) {
       toast.error("Contato sem WhatsApp cadastrado");
       return;
     }
     setEnviando(true);
+    setPreparando(true);
     try {
-      const cod = await registrarEnvio();
-      if (!cod) return;
-      const origin =
-        typeof window !== "undefined" && window.location?.origin
-          ? window.location.origin
-          : "";
-      const link = `${origin}/recibo/${cod}`;
-      const textoFinal = buildTextoFinal(link);
-      window.open(
-        `https://wa.me/${numero}?text=${encodeURIComponent(textoFinal)}`,
-        "_blank",
-        "noopener,noreferrer",
-      );
-      toast.success("WhatsApp aberto — envio registrado");
+      // Garante um Blob atualizado do PDF
+      let blob = previewBlob;
+      let fileName = previewFileName;
+      if (!blob || !fileName) {
+        const res = (await generateReciboPDF(data, true)) as { blob: Blob; fileName: string };
+        blob = res.blob;
+        fileName = res.fileName;
+      }
+      // Nome de arquivo mais claro para o destinatário
+      const nomeSanitizado = (data.contraparte || "cliente")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-").replace(/(^-|-$)/g, "").toLowerCase() || "cliente";
+      const hoje = new Date().toISOString().slice(0, 10);
+      const prettyName = `${isReceita ? "recibo" : "comprovante"}-${nomeSanitizado}-${hoje}.pdf`;
+      const finalName = prettyName || fileName;
+
+      setPreparando(false);
+
+      const textoCurto = "Olá! Segue o documento referente ao seu atendimento. Em caso de dúvida, estamos à disposição.";
+
+      const result = await sharePdfFile({
+        blob,
+        fileName: finalName,
+        title: isReceita ? "Recibo de pagamento" : "Comprovante de despesa",
+        text: textoCurto,
+      });
+
+      if (result === "shared") {
+        const cod = await registrarEnvio();
+        if (cod) toast.success("Documento compartilhado — envio registrado");
+      } else if (result === "cancelled") {
+        toast.info("Compartilhamento cancelado — nada foi registrado");
+      } else {
+        // Fallback (desktop ou sem suporte a compartilhar arquivos):
+        // 1) baixa o PDF; 2) abre conversa com o texto.
+        downloadPdfBlob(blob, finalName);
+        openWhatsAppChat(numero, textoCurto);
+        toast.info("PDF baixado — anexe manualmente na conversa");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao preparar o documento");
     } finally {
+      setPreparando(false);
       setEnviando(false);
     }
   };
