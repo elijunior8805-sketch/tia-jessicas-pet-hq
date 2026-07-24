@@ -40,6 +40,7 @@ import { Route as AuthenticatedPetsNovoRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authenticated/clientes.novo'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
+import { Route as AuthenticatedClientesIdIndexRouteImport } from './routes/_authenticated/clientes.$id.index'
 import { Route as ApiPublicHooksRelatoriosDiariosRouteImport } from './routes/api/public/hooks/relatorios-diarios'
 import { Route as ApiPublicHooksReguaCobrancaRouteImport } from './routes/api/public/hooks/regua-cobranca'
 import { Route as ApiPublicHooksLembretesRouteImport } from './routes/api/public/hooks/lembretes'
@@ -213,6 +214,12 @@ const AuthenticatedAtendimentosAtendIdRoute =
     path: '/atendimentos/$atendId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClientesIdIndexRoute =
+  AuthenticatedClientesIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedClientesIdRoute,
+  } as any)
 const ApiPublicHooksRelatoriosDiariosRoute =
   ApiPublicHooksRelatoriosDiariosRouteImport.update({
     id: '/api/public/hooks/relatorios-diarios',
@@ -300,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/lembretes': typeof ApiPublicHooksLembretesRoute
   '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
+  '/clientes/$id/': typeof AuthenticatedClientesIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -327,7 +335,6 @@ export interface FileRoutesByTo {
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/recibo/$codigo': typeof ReciboCodigoRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
-  '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
   '/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/atendimentos': typeof AuthenticatedAtendimentosIndexRoute
@@ -340,6 +347,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/lembretes': typeof ApiPublicHooksLembretesRoute
   '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -382,6 +390,7 @@ export interface FileRoutesById {
   '/api/public/hooks/lembretes': typeof ApiPublicHooksLembretesRoute
   '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
+  '/_authenticated/clientes/$id/': typeof AuthenticatedClientesIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -424,6 +433,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lembretes'
     | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
+    | '/clientes/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -451,7 +461,6 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/recibo/$codigo'
     | '/atendimentos/$atendId'
-    | '/clientes/$id'
     | '/clientes/novo'
     | '/pets/novo'
     | '/atendimentos'
@@ -464,6 +473,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lembretes'
     | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
+    | '/clientes/$id'
   id:
     | '__root__'
     | '/'
@@ -505,6 +515,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lembretes'
     | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
+    | '/_authenticated/clientes/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -737,6 +748,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAtendimentosAtendIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clientes/$id/': {
+      id: '/_authenticated/clientes/$id/'
+      path: '/'
+      fullPath: '/clientes/$id/'
+      preLoaderRoute: typeof AuthenticatedClientesIdIndexRouteImport
+      parentRoute: typeof AuthenticatedClientesIdRoute
+    }
     '/api/public/hooks/relatorios-diarios': {
       id: '/api/public/hooks/relatorios-diarios'
       path: '/api/public/hooks/relatorios-diarios'
@@ -798,11 +816,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedClientesIdRouteChildren {
   AuthenticatedClientesIdEditarRoute: typeof AuthenticatedClientesIdEditarRoute
+  AuthenticatedClientesIdIndexRoute: typeof AuthenticatedClientesIdIndexRoute
 }
 
 const AuthenticatedClientesIdRouteChildren: AuthenticatedClientesIdRouteChildren =
   {
     AuthenticatedClientesIdEditarRoute: AuthenticatedClientesIdEditarRoute,
+    AuthenticatedClientesIdIndexRoute: AuthenticatedClientesIdIndexRoute,
   }
 
 const AuthenticatedClientesIdRouteWithChildren =
@@ -892,13 +912,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
