@@ -359,11 +359,7 @@ export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId 
       `Olá, ${data.contraparte}! Segue em anexo o recibo do seu pagamento de ${brl(data.valor)}` +
       (petNome ? ` referente ao atendimento do ${petNome}.` : `.`) +
       `\n\n(Anexe o PDF baixado antes de enviar. O WhatsApp não anexa o arquivo automaticamente.)`;
-    window.open(
-      `https://wa.me/${numero}?text=${encodeURIComponent(texto.replace(/\uFFFD/g, ""))}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    openWhatsAppChat(numero, texto.replace(/\uFFFD/g, ""));
     toast.info("PDF baixado — anexe manualmente antes de enviar");
   };
 

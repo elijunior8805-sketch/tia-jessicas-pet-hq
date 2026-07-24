@@ -57,8 +57,10 @@ export function downloadPdfBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-/** Abre uma conversa do WhatsApp (Business preferido) com texto opcional. */
+/** Abre uma conversa preferindo o WhatsApp Business (com.whatsapp.w4b no Android). */
 export function openWhatsAppChat(numeroE164Digits: string, texto?: string) {
-  const t = texto ? `?text=${encodeURIComponent(texto)}` : "";
-  window.open(`https://wa.me/${numeroE164Digits}${t}`, "_blank", "noopener,noreferrer");
+  // Import dinâmico para evitar ciclo com whatsapp.ts.
+  import("./whatsapp").then(({ abrirWhatsAppBusiness }) => {
+    abrirWhatsAppBusiness(numeroE164Digits, texto ?? "");
+  });
 }

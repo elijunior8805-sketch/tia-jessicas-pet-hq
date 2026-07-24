@@ -17,6 +17,7 @@ import {
 import { format, addDays, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMyProfile } from "@/hooks/use-my-profile";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 
 type LTStatus =
   | "aguardando_responsavel" | "agendado" | "a_caminho_busca" | "pet_coletado"
@@ -205,11 +206,10 @@ function TarefaCard({ tarefa }: { tarefa: Tarefa }) {
         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={confirmarMaps}>
           <Navigation className="h-3 w-3 mr-1" /> Rota
         </Button>
-        <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-          <a href={waHref(tarefa.telefone || tarefa.cliente?.whatsapp || tarefa.cliente?.telefone, texto)}
-             target="_blank" rel="noreferrer">
-            <MessageCircle className="h-3 w-3 mr-1" /> WhatsApp
-          </a>
+        <Button size="sm" variant="outline" className="h-7 text-xs"
+          onClick={() => abrirWhatsApp(waHref(tarefa.telefone || tarefa.cliente?.whatsapp || tarefa.cliente?.telefone, texto))}
+        >
+          <MessageCircle className="h-3 w-3 mr-1" /> WhatsApp
         </Button>
         {tarefa.telefone && (
           <Button asChild size="sm" variant="ghost" className="h-7 text-xs">

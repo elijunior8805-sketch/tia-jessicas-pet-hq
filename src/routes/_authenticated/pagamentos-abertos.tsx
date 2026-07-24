@@ -25,6 +25,7 @@ import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Searc
 import { toast } from "sonner";
 import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
 import { renderTemplate } from "@/lib/whatsapp-templates";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 
 
 
@@ -322,7 +323,7 @@ function PagamentosAbertosPage() {
                   size="sm"
                   variant="outline"
                   disabled={!r.wa_url || !r.registrado}
-                  onClick={() => r.wa_url && window.open(r.wa_url, "_blank", "noopener,noreferrer")}
+                  onClick={() => r.wa_url && abrirWhatsApp(r.wa_url)}
                 >
                   <ExternalLink className="w-3 h-3 mr-1" /> WhatsApp
                 </Button>
@@ -341,7 +342,7 @@ function PagamentosAbertosPage() {
                 (loteResultado ?? [])
                   .filter((r) => r.registrado && r.wa_url)
                   .forEach((r) => {
-                    setTimeout(() => window.open(r.wa_url!, "_blank", "noopener,noreferrer"), i * 400);
+                    setTimeout(() => abrirWhatsApp(r.wa_url!), i * 400);
                     i++;
                   });
               }}

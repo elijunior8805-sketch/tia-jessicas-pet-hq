@@ -19,6 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 import { PageShell, PageHeader, KpiCard, Toolbar, EmptyState, StatusBadge } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -291,14 +292,12 @@ function FornecedoresPage() {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {waLink(selected.whatsapp || selected.telefone) && (
-                    <Button asChild size="sm" variant="outline">
-                      <a
-                        href={waLink(selected.whatsapp || selected.telefone)!}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
-                      </a>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => abrirWhatsApp(waLink(selected.whatsapp || selected.telefone)!)}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
                     </Button>
                   )}
                   <Button

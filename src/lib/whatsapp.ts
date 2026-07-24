@@ -107,9 +107,80 @@ export function montarWaUrl(e164: string, texto: string): string {
   return `https://wa.me/${e164}?text=${encodeURIComponent(t)}`;
 }
 
-/** Abre o WhatsApp Web (desktop) ou o app (mobile), sempre em nova aba. */
-export function abrirWhatsApp(url: string) {
+/** Pacote oficial do WhatsApp Business para Android. */
+export const WHATSAPP_BUSINESS_PACKAGE = "com.whatsapp.w4b";
+
+function isAndroid(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent || "");
+}
+
+/** Extrai (e164, texto) de uma URL wa.me/api.whatsapp para reencaminhar ao Business. */
+function parseWaUrl(url: string): { e164: string; texto: string } | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if (host === "wa.me") {
+      const e164 = u.pathname.replace(/\D+/g, "");
+      const texto = u.searchParams.get("text") ?? "";
+      if (!e164) return null;
+      return { e164, texto };
+    }
+    if (host.endsWith("whatsapp.com")) {
+      const e164 = (u.searchParams.get("phone") ?? "").replace(/\D+/g, "");
+      const texto = u.searchParams.get("text") ?? "";
+      if (!e164) return null;
+      return { e164, texto };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Abre uma conversa preferencialmente no WhatsApp Business.
+ *
+ * - Android: intent:// com package=com.whatsapp.w4b e fallback wa.me.
+ * - iOS/Desktop: wa.me em nova aba (o SO/seletor prioriza o Business quando
+ *   ambos estão instalados; no desktop abre o WhatsApp Web já logado).
+ */
+export function abrirWhatsAppBusiness(e164Digits: string, texto: string = ""): void {
   if (typeof window === "undefined") return;
+  const e164 = String(e164Digits).replace(/\D+/g, "");
+  if (!e164) return;
+  const textoTrunc = (texto ?? "").slice(0, WA_MAX_TEXT);
+  const waUrl = `https://wa.me/${e164}${textoTrunc ? `?text=${encodeURIComponent(textoTrunc)}` : ""}`;
+
+  if (isAndroid()) {
+    const encText = encodeURIComponent(textoTrunc);
+    const fallback = encodeURIComponent(waUrl);
+    const intentUrl =
+      `intent://send?phone=${e164}${encText ? `&text=${encText}` : ""}` +
+      `#Intent;scheme=whatsapp;package=${WHATSAPP_BUSINESS_PACKAGE};` +
+      `S.browser_fallback_url=${fallback};end`;
+    try {
+      window.location.href = intentUrl;
+      return;
+    } catch {
+      // se o navegador bloquear intent://, cai no wa.me abaixo
+    }
+  }
+
+  window.open(waUrl, "_blank", "noopener,noreferrer");
+}
+
+/**
+ * Compat: aceita uma URL wa.me/api.whatsapp já montada e redireciona
+ * para o abridor do Business quando possível.
+ */
+export function abrirWhatsApp(url: string): void {
+  if (typeof window === "undefined") return;
+  const parsed = parseWaUrl(url);
+  if (parsed) {
+    abrirWhatsAppBusiness(parsed.e164, parsed.texto);
+    return;
+  }
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
