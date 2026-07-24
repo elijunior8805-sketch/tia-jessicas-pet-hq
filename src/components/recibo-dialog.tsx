@@ -7,12 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 
-import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye, FileDown, ShieldCheck } from "lucide-react";
+import { Download, MessageCircle, Loader2, ExternalLink, CheckCircle2, Eye, FileDown, ShieldCheck, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateReciboPDF, type ReciboData } from "@/lib/recibo-pdf";
 import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import { toast } from "sonner";
+import { sharePdfFile, downloadPdfBlob, openWhatsAppChat } from "@/lib/share-pdf";
 
 
 type Props = {
