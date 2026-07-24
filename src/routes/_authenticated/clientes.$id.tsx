@@ -65,7 +65,7 @@ function ClienteDetalhe() {
       if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("pagamentos")
-        .select("id, atendimento_id, valor, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
+        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
         .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(60);
       return (rows ?? [])
@@ -73,8 +73,8 @@ function ClienteDetalhe() {
         .map((r: any) => {
           const a = r.atendimentos;
           const valorDinamico = a?.finalizado
-            ? Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0)
-            : Number(r.valor || 0);
+            ? Math.max(Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0), 0)
+            : Number(r.valor_total || 0);
           return { ...r, valor: valorDinamico };
         });
     },
