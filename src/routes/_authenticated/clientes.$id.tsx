@@ -65,7 +65,7 @@ function ClienteDetalhe() {
       if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("pagamentos")
-        .select("id, atendimento_id, valor, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
+        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
         .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(60);
       return (rows ?? [])
