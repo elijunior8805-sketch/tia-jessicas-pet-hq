@@ -36,6 +36,25 @@ vi.mock("@/lib/cep", () => ({
   formatCep: (v: string) => v,
 }));
 
+// Permission hook — default: allow. Individual tests can override.
+const accessState = { canEdit: true };
+vi.mock("@/hooks/use-my-permissions", () => ({
+  useMyAccess: () => ({
+    data: {
+      userId: "u1",
+      perfil: "admin",
+      status: "ativo",
+      canManageUsers: true,
+      isProprietario: false,
+      isAdmin: true,
+      permissoes: { clientes: { editar: accessState.canEdit } },
+    },
+    isLoading: false,
+  }),
+  hasPermission: (_a: any, modulo: string, acao: string) =>
+    modulo === "clientes" && acao === "editar" ? accessState.canEdit : false,
+}));
+
 import { Route } from "@/routes/_authenticated/clientes.$id.editar";
 
 const EditPage = Route.options.component as any;
