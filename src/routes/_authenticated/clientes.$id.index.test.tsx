@@ -19,7 +19,7 @@ vi.mock("sonner", () => ({
   toast: { error: (m: string) => toastError(m), success: vi.fn() },
 }));
 
-vi.mock("@/lib/use-signed-url", () => ({ useSignedUrl: () => null }));
+vi.mock("@/lib/use-signed-url", () => ({ useSignedUrl: () => ({ data: undefined }) }));
 vi.mock("@/lib/use-realtime-financeiro", () => ({ useRealtimeFinanceiro: () => {} }));
 vi.mock("@/lib/whatsapp", () => ({ abrirWhatsApp: vi.fn() }));
 

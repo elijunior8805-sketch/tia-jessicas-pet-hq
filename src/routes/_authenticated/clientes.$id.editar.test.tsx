@@ -27,8 +27,8 @@ vi.mock("@/lib/foto-upload", () => ({
   removeFoto: vi.fn(async () => {}),
 }));
 
-// Signed URL hook used inside FotoPicker
-vi.mock("@/lib/use-signed-url", () => ({ useSignedUrl: () => null }));
+// Signed URL hook used inside FotoPicker — must return a react-query-shaped object
+vi.mock("@/lib/use-signed-url", () => ({ useSignedUrl: () => ({ data: undefined }) }));
 
 // Avoid ViaCEP network noise
 vi.mock("@/lib/cep", () => ({
