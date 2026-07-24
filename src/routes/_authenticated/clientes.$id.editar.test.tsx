@@ -85,6 +85,7 @@ beforeEach(() => {
   resetSupabaseMock();
   toastError.mockClear();
   toastSuccess.mockClear();
+  accessState.canEdit = true;
   setRouteParams({ id: "cli-1" });
   setTableResponse("clientes", "select", { data: clienteRow, error: null });
 });
