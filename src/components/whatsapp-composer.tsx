@@ -343,13 +343,13 @@ export function useWhatsAppComposer() {
 const __waComposerListeners = new Set<(p: WhatsAppComposerPayload) => void>();
 export function openWhatsAppComposerGlobal(payload: WhatsAppComposerPayload) {
   if (__waComposerListeners.size === 0) {
-    // Fallback: abre wa.me diretamente se nenhum host montado
+    // Fallback: abre WhatsApp Business diretamente se nenhum host montado
     const tel = normalizarTelefoneBR(payload.telefone);
     if (!tel.ok) {
       toast.error("Telefone inválido");
       return;
     }
-    window.open(montarWaUrl(tel.e164, payload.mensagem), "_blank", "noopener,noreferrer");
+    abrirWhatsApp(montarWaUrl(tel.e164, payload.mensagem));
     return;
   }
   __waComposerListeners.forEach((fn) => fn(payload));

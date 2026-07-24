@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -670,11 +671,9 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
         {/* Ações rápidas */}
         <div className="mt-5 flex flex-wrap gap-2">
           {whatsappUrl && (
-            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <MessageCircle className="h-4 w-4" /> WhatsApp
-              </Button>
-            </a>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => abrirWhatsApp(whatsappUrl)}>
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </Button>
           )}
           {mapsUrl && (
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer">

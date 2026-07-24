@@ -12,6 +12,7 @@ import {
   type AgendamentoDTO,
   type KpiId,
 } from "@/lib/relatorios-agendamentos.functions";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -353,7 +354,7 @@ export function RelatoriosAgendamentos() {
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="outline" onClick={() => window.open(e.wa_url, "_blank", "noopener,noreferrer")}>
+                    <Button size="sm" variant="outline" onClick={() => abrirWhatsApp(e.wa_url)}>
                       <ExternalLink className="w-3 h-3 mr-1" /> WhatsApp
                     </Button>
                     <Button size="sm" onClick={() => mMarcar.mutate(e.id)}>

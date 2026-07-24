@@ -12,6 +12,7 @@ import {
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import { toast } from "sonner";
+import { abrirWhatsApp } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
   component: ClienteDetalhe,
@@ -186,9 +187,13 @@ function ClienteDetalhe() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-muted-foreground"/>{data.whatsapp}</div>
                 {whatsappUrl && (
-                  <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => abrirWhatsApp(whatsappUrl)}
+                    className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+                  >
                     Abrir <ExternalLink className="h-3 w-3"/>
-                  </a>
+                  </button>
                 )}
               </div>
             )}
