@@ -73,8 +73,8 @@ function ClienteDetalhe() {
         .map((r: any) => {
           const a = r.atendimentos;
           const valorDinamico = a?.finalizado
-            ? Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0)
-            : Number(r.valor || 0);
+            ? Math.max(Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0), 0)
+            : Number(r.valor_total || 0);
           return { ...r, valor: valorDinamico };
         });
     },
