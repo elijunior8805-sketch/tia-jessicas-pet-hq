@@ -260,7 +260,11 @@ function HistoricoPet() {
       if (comFotos) rows = rows.filter((a: any) => ((a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length) > 0);
       if (comRecomendacao) rows = rows.filter((a: any) => !!a.recomendacoes);
 
-      const totalExecutado = rows.reduce((s: number, a: any) => s + Number(a.valor_executado ?? 0), 0);
+      const totalExecutado = rows.reduce(
+        (s: number, a: any) =>
+          s + Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0) - Number(a.desconto ?? 0),
+        0,
+      );
       const totalPago = rows.reduce((s: number, a: any) => s + Number(a.valor_pago ?? 0), 0);
       const totalPendente = Math.max(0, totalExecutado - totalPago);
       return { totalExecutado, totalPago, totalPendente, atendimentos: rows.length };
