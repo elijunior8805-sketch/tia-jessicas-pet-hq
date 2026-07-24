@@ -14,10 +14,10 @@ vi.mock("@/integrations/supabase/client", () => import("@/test/supabase-mock"));
 // Import the module AFTER mocks are registered
 import { Route } from "@/routes/_authenticated/clientes.$id";
 
-const Layout = Route.options.component!;
-const ErrorC = Route.options.errorComponent!;
-const NotFoundC = Route.options.notFoundComponent!;
-const PendingC = Route.options.pendingComponent!;
+const Layout = Route.options.component as any;
+const ErrorC = Route.options.errorComponent as any;
+const NotFoundC = Route.options.notFoundComponent as any;
+const PendingC = Route.options.pendingComponent as any;
 
 beforeEach(() => {
   resetRouterMock();

@@ -25,7 +25,7 @@ vi.mock("@/lib/whatsapp", () => ({ abrirWhatsApp: vi.fn() }));
 
 import { Route } from "@/routes/_authenticated/clientes.$id.index";
 
-const FichaPage = Route.options.component!;
+const FichaPage = Route.options.component as any;
 
 beforeEach(() => {
   resetRouterMock();

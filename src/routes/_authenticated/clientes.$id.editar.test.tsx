@@ -38,7 +38,7 @@ vi.mock("@/lib/cep", () => ({
 
 import { Route } from "@/routes/_authenticated/clientes.$id.editar";
 
-const EditPage = Route.options.component!;
+const EditPage = Route.options.component as any;
 
 const clienteRow = {
   id: "cli-1",
