@@ -543,11 +543,17 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
     queryFn: async () => {
       const { data: rows } = await supabase
         .from("pagamentos")
-        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id)")
+        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
         .eq("cliente_id", id)
         .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(200);
-      return (rows ?? []).map((r: any) => ({ ...r, valor: r.valor_total }));
+      return (rows ?? []).map((r: any) => {
+        const a = r.atendimentos;
+        const valorDinamico = a?.finalizado
+          ? Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0)
+          : Number(r.valor_total || 0);
+        return { ...r, valor: valorDinamico };
+      });
     },
   });
 

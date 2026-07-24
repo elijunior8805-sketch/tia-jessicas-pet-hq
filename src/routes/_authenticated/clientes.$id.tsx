@@ -65,10 +65,18 @@ function ClienteDetalhe() {
       if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("pagamentos")
-        .select("id, atendimento_id, valor, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id)")
+        .select("id, atendimento_id, valor, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
         .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(60);
-      return (rows ?? []).filter((r: any) => petIds.includes(r.atendimentos?.pet_id));
+      return (rows ?? [])
+        .filter((r: any) => petIds.includes(r.atendimentos?.pet_id))
+        .map((r: any) => {
+          const a = r.atendimentos;
+          const valorDinamico = a?.finalizado
+            ? Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0)
+            : Number(r.valor || 0);
+          return { ...r, valor: valorDinamico };
+        });
     },
   });
 
