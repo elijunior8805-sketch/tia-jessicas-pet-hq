@@ -138,12 +138,17 @@ function ClienteDetalhe() {
             <Button variant="outline" onClick={() => navigate({ to: "/clientes" })} className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white">
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
-            <Link to="/clientes/$id/editar" params={{ id }}>
-              <Button variant="outline" className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white"><Pencil className="h-4 w-4"/> Editar cliente</Button>
-            </Link>
-            <Link to="/pets/novo" search={{ cliente: id }}>
-              <Button variant="outline" className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white"><Plus className="h-4 w-4"/> Novo pet</Button>
-            </Link>
+            <Button asChild variant="outline" className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white">
+              <Link to="/clientes/$id/editar" params={{ id }}>
+                <Pencil className="h-4 w-4"/> Editar cliente
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white">
+              <Link to="/pets/novo" search={{ cliente: id }}>
+                <Plus className="h-4 w-4"/> Novo pet
+              </Link>
+            </Button>
+
             <Button
               onClick={() => navigate({ to: "/agenda", search: { cliente: id } })}
               className="gap-2"
