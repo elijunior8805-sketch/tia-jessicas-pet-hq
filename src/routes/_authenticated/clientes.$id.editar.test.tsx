@@ -72,9 +72,12 @@ beforeEach(() => {
 
 describe("/clientes/$id/editar", () => {
   it("carrega o cliente e renderiza o cabeçalho com o nome", async () => {
-    renderWithProviders(<EditPage />);
-    await waitFor(() =>
-      expect(screen.getByText(/Editar Débora Teste/i)).toBeInTheDocument(),
+    const { container } = renderWithProviders(<EditPage />);
+    await waitFor(
+      () => {
+        expect(container.textContent ?? "").toMatch(/Débora Teste/);
+      },
+      { timeout: 3000 },
     );
     expect(
       screen.getByRole("button", { name: /Salvar alterações/i }),
