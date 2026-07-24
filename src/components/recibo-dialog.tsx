@@ -107,9 +107,12 @@ function sanitizeTemplate(tpl: string, safeLink: string): string {
 export function ReciboDialog({ open, onOpenChange, data, telefone, referenciaId }: Props) {
   const qc = useQueryClient();
   const [enviando, setEnviando] = useState(false);
+  const [preparando, setPreparando] = useState(false);
   const [codigo, setCodigo] = useState<string>("");
   const [mensagem, setMensagem] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>("");
   const [confirmado, setConfirmado] = useState(false);
 
   const isReceita = data.tipo === "receita";
