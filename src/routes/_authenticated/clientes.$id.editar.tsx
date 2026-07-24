@@ -141,7 +141,7 @@ function EditarClientePage() {
         title={`Editar ${cliente.nome}`}
         description="Atualiza o registro atual — pets, atendimentos e histórico permanecem vinculados."
         actions={
-          <Button variant="outline" onClick={tryBack} className="gap-2">
+          <Button variant="outline" onClick={tryBack} className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white/20 hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Button>
         }
