@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -224,8 +224,26 @@ function HistoricoPet() {
     },
   });
 
+  const queryClient = useQueryClient();
+
+  // Recalcula automaticamente os totais ao abrir/re-focar a tela,
+  // garantindo que taxa_leva_traz e desconto estejam sempre atualizados.
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["pet-historico-resumo", petId] });
+    queryClient.invalidateQueries({ queryKey: ["pet-historico", petId] });
+    const onFocus = () => {
+      queryClient.invalidateQueries({ queryKey: ["pet-historico-resumo", petId] });
+      queryClient.invalidateQueries({ queryKey: ["pet-historico", petId] });
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [petId, queryClient]);
+
   const { data: resumo } = useQuery({
     queryKey: ["pet-historico-resumo", petId, { busca, de, ate, servico, profissional, status, pagamento, levaTraz, comFotos, comRecomendacao }],
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async () => {
       let q = supabase
         .from("atendimentos")
