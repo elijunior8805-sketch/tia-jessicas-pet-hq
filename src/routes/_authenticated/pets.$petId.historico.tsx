@@ -278,14 +278,13 @@ function HistoricoPet() {
       if (comFotos) rows = rows.filter((a: any) => ((a.fotos_antes ?? []).length + (a.fotos_depois ?? []).length) > 0);
       if (comRecomendacao) rows = rows.filter((a: any) => !!a.recomendacoes);
 
-      const totalExecutado = rows.reduce(
-        (s: number, a: any) =>
-          s + Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0) - Number(a.desconto ?? 0),
-        0,
-      );
+      const totalServicos = rows.reduce((s: number, a: any) => s + Number(a.valor_executado ?? 0), 0);
+      const totalTaxa = rows.reduce((s: number, a: any) => s + Number(a.taxa_leva_traz ?? 0), 0);
+      const totalDesconto = rows.reduce((s: number, a: any) => s + Number(a.desconto ?? 0), 0);
+      const totalExecutado = totalServicos + totalTaxa - totalDesconto;
       const totalPago = rows.reduce((s: number, a: any) => s + Number(a.valor_pago ?? 0), 0);
       const totalPendente = Math.max(0, totalExecutado - totalPago);
-      return { totalExecutado, totalPago, totalPendente, atendimentos: rows.length };
+      return { totalExecutado, totalServicos, totalTaxa, totalDesconto, totalPago, totalPendente, atendimentos: rows.length };
     },
   });
 
@@ -506,7 +505,11 @@ function HistoricoPet() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Total executado</div>
           <div className="text-2xl font-semibold mt-1 text-emerald-700">{brl(resumo?.totalExecutado ?? 0)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Soma dos valores executados</div>
+          <div className="text-[11px] text-muted-foreground mt-1 space-y-0.5">
+            <div className="flex justify-between gap-2"><span>Serviços</span><span className="tabular-nums">{brl(resumo?.totalServicos ?? 0)}</span></div>
+            <div className="flex justify-between gap-2"><span>+ Leva e Traz</span><span className="tabular-nums">{brl(resumo?.totalTaxa ?? 0)}</span></div>
+            <div className="flex justify-between gap-2"><span>− Desconto</span><span className="tabular-nums">{brl(resumo?.totalDesconto ?? 0)}</span></div>
+          </div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Total pago</div>
