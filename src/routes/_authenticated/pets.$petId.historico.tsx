@@ -229,7 +229,7 @@ function HistoricoPet() {
     queryFn: async () => {
       let q = supabase
         .from("atendimentos")
-        .select("id, data_inicio, servicos_planejados, servicos_executados, servicos_extras, valor_executado, valor_pago, pagamento_status, pagamento_forma, encerrado_em, recomendacoes, alergia_observada, comportamentos, observacoes, profissional_id, fotos_antes, fotos_depois, agendamentos(leva_traz_modalidade)")
+        .select("id, data_inicio, servicos_planejados, servicos_executados, servicos_extras, valor_executado, taxa_leva_traz, desconto, valor_pago, pagamento_status, pagamento_forma, encerrado_em, recomendacoes, alergia_observada, comportamentos, observacoes, profissional_id, fotos_antes, fotos_depois, agendamentos(leva_traz_modalidade)")
         .eq("pet_id", petId);
       if (de) q = q.gte("data_inicio", de);
       if (ate) q = q.lte("data_inicio", ate + "T23:59:59");
