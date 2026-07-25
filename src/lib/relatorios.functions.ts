@@ -176,7 +176,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       const k = r.cliente_id ?? "—";
       const nome = r.clientes?.nome ?? "—";
       const cur = rankMap.get(k) ?? { nome, total: 0, qtd: 0 };
-      cur.total += Number(r.valor_executado ?? 0);
+      cur.total += totalRow(r);
       cur.qtd += 1;
       rankMap.set(k, cur);
     }
