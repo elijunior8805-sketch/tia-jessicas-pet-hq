@@ -115,14 +115,19 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .returns<any[]>();
 
     // Faturamento/ticket/contagem: SOMENTE finalizados com valor_executado > 0.
-    // Mesmo critério do Dashboard e Financeiro.
+    // Regra única (igual Dashboard/Financeiro/Histórico):
+    //   total = max(0, valor_executado + taxa_leva_traz - desconto)
     const isExecutado = (r: any) =>
       Number(r.valor_executado ?? 0) > 0 && r.__final === true;
     const rowsExecutados = rows.filter(isExecutado);
-    const faturamento = rowsExecutados.reduce(
-      (s, r) => s + Number(r.valor_executado ?? 0),
-      0,
-    );
+    const totalRow = (r: any) =>
+      Math.max(
+        0,
+        Number(r.valor_executado ?? 0) +
+          Number(r.taxa_leva_traz ?? 0) -
+          Number(r.desconto ?? 0),
+      );
+    const faturamento = rowsExecutados.reduce((s, r) => s + totalRow(r), 0);
     const faturamentoPlan = rows.reduce(
       (s, r) => s + Number(r.valor_planejado ?? 0),
       0,
