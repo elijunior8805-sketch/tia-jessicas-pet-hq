@@ -505,7 +505,11 @@ function HistoricoPet() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Total executado</div>
           <div className="text-2xl font-semibold mt-1 text-emerald-700">{brl(resumo?.totalExecutado ?? 0)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Soma dos valores executados</div>
+          <div className="text-[11px] text-muted-foreground mt-1 space-y-0.5">
+            <div className="flex justify-between gap-2"><span>Serviços</span><span className="tabular-nums">{brl(resumo?.totalServicos ?? 0)}</span></div>
+            <div className="flex justify-between gap-2"><span>+ Leva e Traz</span><span className="tabular-nums">{brl(resumo?.totalTaxa ?? 0)}</span></div>
+            <div className="flex justify-between gap-2"><span>− Desconto</span><span className="tabular-nums">{brl(resumo?.totalDesconto ?? 0)}</span></div>
+          </div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Total pago</div>
