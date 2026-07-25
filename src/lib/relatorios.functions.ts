@@ -162,7 +162,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       const dia = r.__dia;
       if (!dia) continue;
       const cur = serieMap.get(dia) ?? { faturamento: 0, atendimentos: 0 };
-      if (isExecutado(r)) cur.faturamento += Number(r.valor_executado ?? 0);
+      if (isExecutado(r)) cur.faturamento += totalRow(r);
       cur.atendimentos += 1;
       serieMap.set(dia, cur);
     }
