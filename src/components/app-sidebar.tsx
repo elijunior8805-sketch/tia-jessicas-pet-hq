@@ -21,6 +21,7 @@ import {
   Settings,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   PawPrint,
   Cake,
 } from "lucide-react";
