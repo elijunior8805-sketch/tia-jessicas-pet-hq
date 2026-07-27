@@ -803,10 +803,11 @@ function FinanceiroPage() {
       const { data: at } = await supabase
         .from("atendimentos")
         .select(
-          "data_inicio, servicos_executados, servicos_planejados, observacoes_checkin, observacoes_internas, comportamentos, usou_focinheira, precisou_pausa, alergia_observada, recomendacoes, proxima_visita, profissional:profiles!atendimentos_profissional_id_fkey(nome), pet:pets(nome)",
+          "data_inicio, servicos_executados, servicos_planejados, observacoes_checkin, observacoes_internas, comportamentos, usou_focinheira, precisou_pausa, alergia_observada, recomendacoes, proxima_visita, profissional_id, pet:pets(nome)",
         )
         .eq("id", p.atendimento_id)
         .maybeSingle();
+
 
       if (at) {
         const src =
