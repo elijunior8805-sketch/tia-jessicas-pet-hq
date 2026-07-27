@@ -306,8 +306,37 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     y += lines.length * 14 + 6;
   };
 
-  section("Observacoes de check-in"); paragraph(atendimento?.observacoes_checkin);
+  // ============ REGISTRO DO CHECK-IN ============
+  section("Registro do check-in");
+  const flags: { label: string; on: boolean }[] = [
+    { label: "Usou focinheira", on: !!(atendimento as any)?.usou_focinheira },
+    { label: "Precisou de pausa", on: !!(atendimento as any)?.precisou_pausa },
+    { label: "Alergia registrada", on: !!(pet?.alergias && String(pet.alergias).trim()) },
+    { label: "Precisa de focinheira (ficha)", on: !!(pet as any)?.necessita_focinheira },
+  ];
+  const activeFlags = flags.filter((f) => f.on);
+  if (activeFlags.length) {
+    ensureSpace(24);
+    let bx = M;
+    activeFlags.forEach((f) => {
+      const tw = doc.getTextWidth(f.label) + 18;
+      if (bx + tw > W - M) { y += 20; bx = M; ensureSpace(24); }
+      doc.setFillColor(255, 244, 214);
+      doc.setDrawColor(...C.gold);
+      doc.roundedRect(bx, y - 10, tw, 16, 4, 4, "FD");
+      doc.setFontSize(9); doc.setTextColor(...C.forest); doc.setFont("helvetica", "bold");
+      doc.text(f.label, bx + 9, y + 1);
+      bx += tw + 6;
+    });
+    y += 18;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...C.ink);
+  } else {
+    paragraph("Sem alertas registrados no check-in.");
+  }
+
+  if (pet?.alergias) { section("Alergias do pet"); paragraph(String(pet.alergias)); }
   if (comportamentos.length) { section("Comportamento observado"); paragraph(comportamentos.join(", ")); }
+  section("Observacoes de check-in"); paragraph(atendimento?.observacoes_checkin);
   section("Observacoes internas"); paragraph(atendimento?.observacoes_internas);
   section("Recomendacoes ao tutor"); paragraph(atendimento?.recomendacoes);
   if (atendimento?.proxima_visita) { section("Proxima visita sugerida"); paragraph(fmtDate(atendimento.proxima_visita)); }
