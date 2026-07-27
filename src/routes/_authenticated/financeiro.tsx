@@ -824,7 +824,7 @@ function FinanceiroPage() {
           data: at.data_inicio ?? null,
           pet: at.pet?.nome ?? null,
           servicos,
-          profissional: at.profissional_id ? null : "Jéssica Xavier",
+          profissional: "Jéssica Xavier",
 
           checkin_obs: at.observacoes_checkin ?? null,
           observacoes_internas: at.observacoes_internas ?? null,
