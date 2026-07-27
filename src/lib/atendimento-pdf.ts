@@ -336,7 +336,8 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
 
   if (pet?.alergias) { section("Alergias do pet"); paragraph(String(pet.alergias)); }
   if (comportamentos.length) { section("Comportamento observado"); paragraph(comportamentos.join(", ")); }
-  section("Observacoes de check-in"); paragraph(atendimento?.observacoes_checkin);
+  const obsCheckin = (atendimento?.observacoes_checkin?.trim?.() || atendimento?.observacoes?.trim?.() || (atendimento as any)?.check_in_obs?.trim?.() || "");
+  section("Observacoes de check-in"); paragraph(obsCheckin);
   section("Observacoes internas"); paragraph(atendimento?.observacoes_internas);
   section("Recomendacoes ao tutor"); paragraph(atendimento?.recomendacoes);
   if (atendimento?.proxima_visita) { section("Proxima visita sugerida"); paragraph(fmtDate(atendimento.proxima_visita)); }
