@@ -11,6 +11,26 @@ const C = {
   cream: [250, 247, 240] as [number, number, number],
 };
 
+export type ReciboAtendimento = {
+  /** Data do atendimento (ISO ou yyyy-mm-dd) */
+  data?: string | null;
+  pet?: string | null;
+  /** Nomes dos serviços executados/planejados */
+  servicos?: string[] | null;
+  profissional?: string | null;
+  /** Observações registradas no check-in */
+  checkin_obs?: string | null;
+  /** Observações internas do atendimento (visíveis no PDF do cliente) */
+  observacoes_internas?: string | null;
+  /** Comportamentos observados */
+  comportamentos?: string[] | null;
+  usou_focinheira?: boolean | null;
+  precisou_pausa?: boolean | null;
+  alergia_observada?: string | null;
+  recomendacoes?: string | null;
+  proxima_visita?: string | null;
+};
+
 export type ReciboData = {
   tipo: "receita" | "despesa";
   numero: string;
@@ -29,7 +49,10 @@ export type ReciboData = {
     endereco?: string | null;
   } | null;
   operador?: string | null;
+  /** Registro do atendimento — check-in, comportamentos, alertas etc. */
+  atendimento?: ReciboAtendimento | null;
 };
+
 
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
