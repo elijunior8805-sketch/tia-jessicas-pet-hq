@@ -61,6 +61,7 @@ const groups = [
       { title: "Compras", url: "/compras", icon: ShoppingCart },
       { title: "Fornecedores", url: "/fornecedores", icon: Building2 },
       { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+      { title: "Verificação de totais", url: "/verificacao", icon: ShieldCheck },
     ],
   },
   {
