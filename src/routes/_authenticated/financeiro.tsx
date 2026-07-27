@@ -794,8 +794,50 @@ function FinanceiroPage() {
     endereco: empresa?.endereco ?? null,
   };
 
-  const abrirReciboReceita = (p: Pag) => {
+  const abrirReciboReceita = async (p: Pag) => {
     const numero = `RC-${format(new Date(), "yyyyMMdd")}-${p.id.slice(0, 6)}`;
+
+    // Busca detalhes do atendimento (check-in etc.) sob demanda
+    let atendimentoInfo: ReciboData["atendimento"] = null;
+    if (p.atendimento_id) {
+      const { data: at } = await supabase
+        .from("atendimentos")
+        .select(
+          "data_inicio, servicos_executados, servicos_planejados, observacoes_checkin, observacoes_internas, comportamentos, usou_focinheira, precisou_pausa, alergia_observada, recomendacoes, proxima_visita, profissional:profiles!atendimentos_profissional_id_fkey(nome), pet:pets(nome)",
+        )
+        .eq("id", p.atendimento_id)
+        .maybeSingle();
+
+      if (at) {
+        const src =
+          Array.isArray(at.servicos_executados) &&
+          at.servicos_executados.length > 0
+            ? at.servicos_executados
+            : Array.isArray(at.servicos_planejados)
+              ? at.servicos_planejados
+              : [];
+        const servicos = (src as Array<Record<string, unknown>>)
+          .map((s) => (s?.nome as string) || "")
+          .filter(Boolean);
+        atendimentoInfo = {
+          data: at.data_inicio ?? null,
+          pet: at.pet?.nome ?? null,
+          servicos,
+          profissional:
+            (at.profissional as { nome?: string } | null)?.nome ??
+            "Jéssica Xavier",
+          checkin_obs: at.observacoes_checkin ?? null,
+          observacoes_internas: at.observacoes_internas ?? null,
+          comportamentos: (at.comportamentos as string[] | null) ?? null,
+          usou_focinheira: at.usou_focinheira ?? null,
+          precisou_pausa: at.precisou_pausa ?? null,
+          alergia_observada: at.alergia_observada ?? null,
+          recomendacoes: at.recomendacoes ?? null,
+          proxima_visita: at.proxima_visita ?? null,
+        };
+      }
+    }
+
     setRecibo({
       data: {
         tipo: "receita",
@@ -810,11 +852,13 @@ function FinanceiroPage() {
         forma: p.forma,
         petNome: p.atendimento?.pet?.nome ?? null,
         empresa: empresaInfo,
+        atendimento: atendimentoInfo,
       },
       telefone: p.cliente?.whatsapp || p.cliente?.telefone || null,
       referenciaId: p.id,
     });
   };
+
 
   const abrirReciboDespesa = (p: Parc) => {
     const numero = `CP-${format(new Date(), "yyyyMMdd")}-${p.id.slice(0, 6)}`;
