@@ -55,10 +55,8 @@ export const revisarMensagemWhatsApp = createServerFn({ method: "POST" })
 
     const prompt = `${instrucaoModo}\n\n${regras}\n\n--- TEXTO ORIGINAL ---\n${data.texto}\n--- FIM ---`;
 
-    // Modelo por tarefa: ortografia usa Gemini Flash (rápido/barato);
-    // "melhorar" usa GPT-5.6 Sol (raciocínio mais forte).
-    const model =
-      data.modo === "ortografia" ? "google/gemini-3.6-flash" : "openai/gpt-5.6-sol";
+    // Modelo econômico da última geração para todas as tarefas (ortografia e melhorar).
+    const model = "google/gemini-3.6-flash";
 
     const body: Record<string, unknown> = {
       model,
@@ -67,10 +65,6 @@ export const revisarMensagemWhatsApp = createServerFn({ method: "POST" })
         { role: "user", content: prompt },
       ],
     };
-    // GPT-5.6 em /chat/completions exige reasoning_effort explícito.
-    if (model.startsWith("openai/gpt-5.6")) {
-      body.reasoning_effort = "none";
-    }
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
