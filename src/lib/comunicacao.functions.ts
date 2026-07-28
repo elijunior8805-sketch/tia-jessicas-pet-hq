@@ -60,7 +60,7 @@ Regras:
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3.6-flash",
         messages: [
           { role: "system", content: "Você redige mensagens curtas, cordiais e humanas para um pet shop premium." },
           { role: "user", content: prompt },
