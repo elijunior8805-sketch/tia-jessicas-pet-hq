@@ -840,7 +840,20 @@ function CobrancaDialog({
           </TabsContent>
         </Tabs>
 
-        <DialogFooter>
+        <DialogFooter className="sm:justify-between gap-2">
+          <Button
+            variant="outline"
+            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => excluirMut.mutate()}
+            disabled={excluirMut.isPending}
+          >
+            {excluirMut.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-1" />
+            )}
+            Excluir cobrança
+          </Button>
           <Button variant="outline" onClick={onClose}>
             Fechar
           </Button>
