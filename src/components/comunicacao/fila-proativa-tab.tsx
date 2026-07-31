@@ -25,7 +25,7 @@ import {
   listarFilaProativa, adiarSugestao, resolverSugestao,
   gerarCobrancaIA, refinarMensagem, registrarComunicacao, salvarPromessa,
 } from "@/lib/comunicacao-central.functions";
-import { abrirWhatsApp } from "@/lib/whatsapp";
+import { abrirWhatsAppBusiness } from "@/lib/whatsapp";
 
 const brl = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -258,7 +258,7 @@ export function GeradorCobrancaDialog({
     },
     onSuccess: () => {
       const fone = sugestao.clientes?.whatsapp ?? "";
-      if (fone) abrirWhatsApp(fone, texto);
+      if (fone) abrirWhatsAppBusiness(fone, texto);
       toast.success("Registrado no histórico do cliente.");
       qc.invalidateQueries({ queryKey: ["comunicacao"] });
       onClose();
