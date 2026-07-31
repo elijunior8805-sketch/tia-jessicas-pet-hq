@@ -543,3 +543,190 @@ Devolva apenas o texto, sem markdown.`,
     };
   }
 }
+
+/* ============================================================
+ * Fila proativa enriquecida
+ * ============================================================ */
+export async function listarFilaEnriquecida(sb: any) {
+  const agora = new Date();
+  const hoje = hojeISO();
+
+  const { data, error } = await sb
+    .from("mensagem_sugestoes")
+    .select(
+      "*, clientes(id, nome, whatsapp, opt_out_comunicacao, tom_preferido, vip), pets(id, nome)",
+    )
+    .eq("status", "pendente")
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (error) throw error;
+
+  const linhas = data ?? [];
+  const cobIds = [...new Set(linhas.map((s: any) => s.cobranca_id).filter(Boolean))];
+  const clienteIds = [...new Set(linhas.map((s: any) => s.cliente_id).filter(Boolean))];
+
+  const [cobsRes, msgsRes, promRes, regras] = await Promise.all([
+    cobIds.length
+      ? sb.from("cobrancas").select("id, saldo, vencimento, tentativas, status").in("id", cobIds)
+      : Promise.resolve({ data: [] }),
+    clienteIds.length
+      ? sb
+          .from("mensagens")
+          .select("cliente_id, direcao, created_at")
+          .in("cliente_id", clienteIds)
+          .order("created_at", { ascending: false })
+          .limit(600)
+      : Promise.resolve({ data: [] }),
+    clienteIds.length
+      ? sb
+          .from("promessas_pagamento")
+          .select("cliente_id, data_prometida, status, valor_prometido")
+          .in("cliente_id", clienteIds)
+          .eq("status", "aguardando")
+      : Promise.resolve({ data: [] }),
+    carregarRegrasTom(sb),
+  ]);
+
+  const cobPorId: Record<string, any> = {};
+  for (const c of cobsRes.data ?? []) cobPorId[c.id] = c;
+
+  const ultSaida: Record<string, string> = {};
+  const ultEntrada: Record<string, string> = {};
+  for (const m of (msgsRes.data ?? []) as any[]) {
+    if (m.direcao === "out" && !ultSaida[m.cliente_id]) ultSaida[m.cliente_id] = m.created_at;
+    if (m.direcao === "in" && !ultEntrada[m.cliente_id]) ultEntrada[m.cliente_id] = m.created_at;
+  }
+
+  const promPorCliente: Record<string, any> = {};
+  for (const p of (promRes.data ?? []) as any[]) {
+    if (!promPorCliente[p.cliente_id]) promPorCliente[p.cliente_id] = p;
+  }
+
+  return linhas.map((s: any) => {
+    const cob = s.cobranca_id ? cobPorId[s.cobranca_id] : null;
+    const prom = promPorCliente[s.cliente_id] ?? null;
+    const dias = cob ? diasAtraso(cob.vencimento) : (s.dias_atraso ?? 0);
+    const valor = cob ? Number(cob.saldo ?? 0) : Number(s.valor_pendente ?? 0);
+    const saida = ultSaida[s.cliente_id] ?? null;
+    const entrada = ultEntrada[s.cliente_id] ?? null;
+
+    const semResposta =
+      !!saida && (!entrada || new Date(entrada) < new Date(saida)) &&
+      agora.getTime() - new Date(saida).getTime() > 48 * 3600 * 1000;
+
+    const promessaVencida = prom ? prom.data_prometida < hoje : false;
+    const promessaProxima = prom ? !promessaVencida && diasAtraso(prom.data_prometida) >= -2 : false;
+
+    let horasAteAtendimento: number | undefined;
+    if (s.prevista_para) {
+      const d = new Date(s.prevista_para).getTime() - agora.getTime();
+      if (d > 0) horasAteAtendimento = d / 3600000;
+    }
+
+    const prio = calcularPrioridade({
+      diasAtraso: dias,
+      valorPendente: valor,
+      tentativas: cob?.tentativas ?? 0,
+      promessaVencida,
+      semResposta,
+      horasAteAtendimento,
+      riscoPerda: s.tipo === "reengajamento",
+    });
+
+    const tom = sugerirTom(regras, {
+      diasAtraso: dias,
+      promessaProxima,
+      promessaVencida,
+      tentativas: cob?.tentativas ?? 0,
+      maxTentativas: 4,
+    });
+
+    const proximaAcao =
+      s.proxima_acao ??
+      (promessaVencida
+        ? "Retomar contato sobre a promessa vencida"
+        : semResposta
+          ? "Cliente não respondeu — tentar novo contato"
+          : s.tipo === "cobranca_pendente"
+            ? "Enviar cobrança e aguardar resposta"
+            : "Revisar e enviar");
+
+    return {
+      ...s,
+      _prioridade_score: prio.score,
+      _prioridade_label: s.prioridade_label ?? prio.label,
+      _dias_atraso: dias,
+      _valor_pendente: valor,
+      _ultima_comunicacao: saida,
+      _ultima_resposta: entrada,
+      _sem_resposta: semResposta,
+      _promessa: prom,
+      _promessa_vencida: promessaVencida,
+      _tom_sugerido: s.tom_sugerido ?? tom.tom,
+      _motivo_do_tom: s.motivo_do_tom ?? tom.motivo,
+      _proxima_acao: proximaAcao,
+      _adiada: s.adiada_para ? new Date(s.adiada_para) > agora : false,
+    };
+  })
+  .sort((a: any, b: any) => {
+    if (a._adiada !== b._adiada) return a._adiada ? 1 : -1;
+    return b._prioridade_score - a._prioridade_score;
+  });
+}
+
+/* ============================================================
+ * Organização inteligente (resumo operacional do dia)
+ * ============================================================ */
+export async function montarPainelOperacional(sb: any) {
+  const hoje = hojeISO();
+  const agora = new Date();
+  const h48 = new Date(agora.getTime() - 48 * 3600 * 1000).toISOString();
+
+  const [semConfirmacao, agendaHoje, retornoAtrasado, aguardandoResposta, conferirPagamento] =
+    await Promise.all([
+      sb
+        .from("agendamentos")
+        .select("id, hora, clientes(nome), pets(nome)")
+        .eq("data", hoje)
+        .eq("status", "agendado")
+        .order("hora"),
+      sb.from("agendamentos").select("hora, duracao_min").eq("data", hoje).neq("status", "cancelado"),
+      sb
+        .from("pets")
+        .select("id, nome, proxima_visita, clientes(nome)")
+        .not("proxima_visita", "is", null)
+        .lt("proxima_visita", hoje)
+        .eq("ativo", true)
+        .limit(30),
+      sb
+        .from("mensagens")
+        .select("cliente_id, created_at, clientes(nome)")
+        .eq("direcao", "out")
+        .lt("created_at", h48)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      sb
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, cliente_id, clientes(nome)")
+        .eq("status", "parcial")
+        .limit(30),
+    ]);
+
+  // Horários vagos (08h–18h, blocos de 1h)
+  const ocupadas = new Set<number>();
+  for (const a of (agendaHoje.data ?? []) as any[]) {
+    const h = Number(String(a.hora ?? "").slice(0, 2));
+    const blocos = Math.max(1, Math.ceil((a.duracao_min ?? 60) / 60));
+    for (let i = 0; i < blocos; i++) ocupadas.add(h + i);
+  }
+  const horariosVagos: string[] = [];
+  for (let h = 8; h <= 17; h++) if (!ocupadas.has(h)) horariosVagos.push(`${String(h).padStart(2, "0")}:00`);
+
+  return {
+    agendamentosSemConfirmacao: semConfirmacao.data ?? [],
+    horariosVagos,
+    retornoAtrasado: retornoAtrasado.data ?? [],
+    aguardandoResposta: aguardandoResposta.data ?? [],
+    conferirPagamento: conferirPagamento.data ?? [],
+  };
+}
