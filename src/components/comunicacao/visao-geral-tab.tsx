@@ -72,19 +72,21 @@ export function VisaoGeralTab({ onIrParaFila }: { onIrParaFila?: () => void }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={Banknote} label="Total em aberto" value={brl(d?.totalEmAberto ?? 0)}
-          hint={`${d?.clientesEmAberto ?? 0} cliente(s)`} tone="alerta" />
-        <Kpi icon={AlertTriangle} label="Vencidos" value={brl(d?.totalVencido ?? 0)}
-          hint={`${d?.qtdVencidos ?? 0} cobrança(s)`} tone={d?.qtdVencidos ? "critico" : "ok"} />
-        <Kpi icon={Clock} label="A vencer (7 dias)" value={brl(d?.totalAVencer7 ?? 0)} />
-        <Kpi icon={CheckCircle2} label="Recebido no mês" value={brl(d?.recebidoMes ?? 0)} tone="ok" />
-        <Kpi icon={MessageSquareWarning} label="Sem resposta há +48h" value={String(d?.semResposta48h ?? 0)}
-          hint="Clientes que não responderam" tone={d?.semResposta48h ? "alerta" : "default"} />
-        <Kpi icon={CalendarClock} label="Promessas para hoje" value={String(d?.promessasHoje ?? 0)} />
-        <Kpi icon={CalendarX2} label="Promessas vencidas" value={String(d?.promessasVencidas ?? 0)}
-          tone={d?.promessasVencidas ? "critico" : "default"} />
-        <Kpi icon={Sparkles} label="Na fila proativa" value={String(d?.filaPendente ?? 0)}
-          hint="Sugestões aguardando revisão" />
+        <Kpi icon={Sparkles} label="Aguardando revisão" value={String(d?.aguardandoRevisao ?? 0)}
+          hint="Mensagens na fila proativa" tone={d?.aguardandoRevisao ? "alerta" : "default"} />
+        <Kpi icon={AlertTriangle} label="Cobranças vencidas" value={String(d?.cobrancasVencidas ?? 0)}
+          hint={brl(d?.valorVencido ?? 0)} tone={d?.cobrancasVencidas ? "critico" : "ok"} />
+        <Kpi icon={CalendarClock} label="Promessas vencendo hoje" value={String(d?.promessasHoje ?? 0)}
+          tone={d?.promessasHoje ? "alerta" : "default"} />
+        <Kpi icon={Clock} label="Mensagens agendadas" value={String(d?.mensagensAgendadas ?? 0)}
+          hint="Adiadas para depois" />
+        <Kpi icon={CheckCircle2} label="Enviadas hoje" value={String(d?.enviadasHoje ?? 0)} tone="ok" />
+        <Kpi icon={Banknote} label="Pagos após cobrança" value={String(d?.pagosAposCobranca ?? 0)}
+          hint="Efetividade de hoje" tone="ok" />
+        <Kpi icon={MessageSquareWarning} label="Sem resposta há +48h" value={String(d?.clientesSemResposta ?? 0)}
+          tone={d?.clientesSemResposta ? "alerta" : "default"} />
+        <Kpi icon={CalendarX2} label="Precisam de atenção humana" value={String(d?.precisamAtencaoHumana ?? 0)}
+          hint="3+ tentativas sem acordo" tone={d?.precisamAtencaoHumana ? "critico" : "default"} />
       </div>
 
       <Card className="p-5 border-primary/20 bg-primary/5">
@@ -106,21 +108,9 @@ export function VisaoGeralTab({ onIrParaFila }: { onIrParaFila?: () => void }) {
         {resumoM.data ? (
           <div className="mt-4 space-y-3">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{(resumoM.data as any).resumo}</p>
-            {((resumoM.data as any).prioridades ?? []).length ? (
-              <ul className="space-y-1.5">
-                {(resumoM.data as any).prioridades.map((p: string, i: number) => (
-                  <li key={i} className="text-sm flex gap-2">
-                    <Badge variant="secondary" className="shrink-0">{i + 1}</Badge>
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {(resumoM.data as any).alerta ? (
-              <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-md p-2">
-                {(resumoM.data as any).alerta}
-              </p>
-            ) : null}
+            <p className="text-[11px] text-muted-foreground">
+              Fonte: {(resumoM.data as any).ia ? `IA (${(resumoM.data as any).modelo})` : "regras locais (IA indisponível)"}
+            </p>
             {onIrParaFila ? (
               <Button size="sm" variant="outline" onClick={onIrParaFila}>Abrir fila proativa</Button>
             ) : null}
