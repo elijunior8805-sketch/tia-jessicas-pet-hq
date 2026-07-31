@@ -447,6 +447,26 @@ function CobrancaDialog({
     onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
+  const excluirMut = useMutation({
+    mutationFn: async () => {
+      if (
+        !window.confirm(
+          `Excluir definitivamente a cobrança de ${cobranca.cliente_nome}? Essa ação não pode ser desfeita.`,
+        )
+      ) {
+        return null;
+      }
+      return excluir({ data: { cobrancaId: cobranca.id } });
+    },
+    onSuccess: (r) => {
+      if (!r) return;
+      toast.success("Cobrança excluída");
+      invalidar();
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao excluir"),
+  });
+
   const gerarIA = async (
     intencao: "cobranca" | "lembrete" | "agradecimento" | "negociacao",
   ) => {
