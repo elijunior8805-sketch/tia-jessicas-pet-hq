@@ -304,10 +304,10 @@ export async function gerarMensagemCobrancaIA(
     `- Dias de atraso: ${ctx.dias}`,
     `- Cobranças anteriores enviadas: ${ctx.tentativas}`,
     ctx.textosAnteriores.length
-      ? `- Textos já enviados (não repita a mesma redação): ${ctx.textosAnteriores.map((t) => `"${t.slice(0, 120)}"`).join(" | ")}`
+      ? `- Textos já enviados (não repita a mesma redação): ${ctx.textosAnteriores.map((t: string) => `"${String(t).slice(0, 120)}"`).join(" | ")}`
       : null,
     ctx.respostasCliente.length
-      ? `- Respostas do cliente: ${ctx.respostasCliente.map((t) => `"${String(t).slice(0, 160)}"`).join(" | ")}`
+      ? `- Respostas do cliente: ${ctx.respostasCliente.map((t: string) => `"${String(t).slice(0, 160)}"`).join(" | ")}`
       : null,
     ctx.promessaAtiva
       ? `- Promessa de pagamento registrada: ${brl(ctx.promessaAtiva.valor_prometido)} para ${new Date(ctx.promessaAtiva.data_prometida + "T12:00:00").toLocaleDateString("pt-BR")} (${ctx.promessaVencida ? "VENCIDA" : "em aberto"})${ctx.promessaAtiva.forma_pagamento ? `, forma: ${ctx.promessaAtiva.forma_pagamento}` : ""}`
