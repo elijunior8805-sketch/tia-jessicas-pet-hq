@@ -19,6 +19,7 @@ import {
   renderTemplate,
   filaDoDia as FILA_FN,
   funilCobrancas as FUNIL_FN,
+  excluirCobranca,
   type CobrancaDTO,
   type CobrancaStatus,
 } from "@/lib/cobrancas.functions";
