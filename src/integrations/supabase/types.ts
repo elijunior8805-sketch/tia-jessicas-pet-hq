@@ -1369,6 +1369,132 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_config: {
+        Row: {
+          assinatura: string
+          created_at: string
+          criatividade: number
+          horario_fim: string
+          horario_inicio: string
+          ia_ativa: boolean
+          id: string
+          instrucoes_empresa: string
+          intervalo_min_horas: number
+          limite_caracteres: number
+          link_pagamento: string | null
+          max_tentativas_contato: number
+          max_tentativas_ia: number
+          modelo_alternativo: string
+          modelo_principal: string
+          palavras_proibidas: string[]
+          permitir_mencao_juridica: boolean
+          pix_chave: string | null
+          provedor: string
+          singleton: boolean
+          timeout_ms: number
+          updated_at: string
+        }
+        Insert: {
+          assinatura?: string
+          created_at?: string
+          criatividade?: number
+          horario_fim?: string
+          horario_inicio?: string
+          ia_ativa?: boolean
+          id?: string
+          instrucoes_empresa?: string
+          intervalo_min_horas?: number
+          limite_caracteres?: number
+          link_pagamento?: string | null
+          max_tentativas_contato?: number
+          max_tentativas_ia?: number
+          modelo_alternativo?: string
+          modelo_principal?: string
+          palavras_proibidas?: string[]
+          permitir_mencao_juridica?: boolean
+          pix_chave?: string | null
+          provedor?: string
+          singleton?: boolean
+          timeout_ms?: number
+          updated_at?: string
+        }
+        Update: {
+          assinatura?: string
+          created_at?: string
+          criatividade?: number
+          horario_fim?: string
+          horario_inicio?: string
+          ia_ativa?: boolean
+          id?: string
+          instrucoes_empresa?: string
+          intervalo_min_horas?: number
+          limite_caracteres?: number
+          link_pagamento?: string | null
+          max_tentativas_contato?: number
+          max_tentativas_ia?: number
+          modelo_alternativo?: string
+          modelo_principal?: string
+          palavras_proibidas?: string[]
+          permitir_mencao_juridica?: boolean
+          pix_chave?: string | null
+          provedor?: string
+          singleton?: boolean
+          timeout_ms?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ia_regras_tom: {
+        Row: {
+          ativo: boolean
+          bloquear_ia: boolean
+          condicao: string
+          created_at: string
+          dias_max: number | null
+          dias_min: number | null
+          id: string
+          nivel_firmeza: number
+          nome: string
+          observacao: string | null
+          ordem: number
+          requer_revisao_humana: boolean
+          tom: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bloquear_ia?: boolean
+          condicao: string
+          created_at?: string
+          dias_max?: number | null
+          dias_min?: number | null
+          id?: string
+          nivel_firmeza?: number
+          nome: string
+          observacao?: string | null
+          ordem?: number
+          requer_revisao_humana?: boolean
+          tom: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bloquear_ia?: boolean
+          condicao?: string
+          created_at?: string
+          dias_max?: number | null
+          dias_min?: number | null
+          id?: string
+          nivel_firmeza?: number
+          nome?: string
+          observacao?: string | null
+          ordem?: number
+          requer_revisao_humana?: boolean
+          tom?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lembretes_config: {
         Row: {
           aniversario_hora: string
@@ -1757,11 +1883,14 @@ export type Database = {
       }
       mensagem_sugestoes: {
         Row: {
+          adiada_para: string | null
           agendamento_id: string | null
           atendimento_id: string | null
+          canal: string
           cliente_id: string | null
           cobranca_id: string | null
           created_at: string
+          dias_atraso: number | null
           feedback: string | null
           feedback_em: string | null
           feedback_por: string | null
@@ -1769,19 +1898,28 @@ export type Database = {
           idempotency_key: string | null
           mensagem_sugerida: string | null
           motivo: string
+          motivo_do_tom: string | null
           pet_id: string | null
+          prazo_proxima_acao_horas: number | null
           prevista_para: string | null
           prioridade: number
+          prioridade_label: string | null
+          proxima_acao: string | null
           status: string
           tipo: string
+          tom_sugerido: string | null
           updated_at: string
+          valor_pendente: number | null
         }
         Insert: {
+          adiada_para?: string | null
           agendamento_id?: string | null
           atendimento_id?: string | null
+          canal?: string
           cliente_id?: string | null
           cobranca_id?: string | null
           created_at?: string
+          dias_atraso?: number | null
           feedback?: string | null
           feedback_em?: string | null
           feedback_por?: string | null
@@ -1789,19 +1927,28 @@ export type Database = {
           idempotency_key?: string | null
           mensagem_sugerida?: string | null
           motivo: string
+          motivo_do_tom?: string | null
           pet_id?: string | null
+          prazo_proxima_acao_horas?: number | null
           prevista_para?: string | null
           prioridade?: number
+          prioridade_label?: string | null
+          proxima_acao?: string | null
           status?: string
           tipo: string
+          tom_sugerido?: string | null
           updated_at?: string
+          valor_pendente?: number | null
         }
         Update: {
+          adiada_para?: string | null
           agendamento_id?: string | null
           atendimento_id?: string | null
+          canal?: string
           cliente_id?: string | null
           cobranca_id?: string | null
           created_at?: string
+          dias_atraso?: number | null
           feedback?: string | null
           feedback_em?: string | null
           feedback_por?: string | null
@@ -1809,12 +1956,18 @@ export type Database = {
           idempotency_key?: string | null
           mensagem_sugerida?: string | null
           motivo?: string
+          motivo_do_tom?: string | null
           pet_id?: string | null
+          prazo_proxima_acao_horas?: number | null
           prevista_para?: string | null
           prioridade?: number
+          prioridade_label?: string | null
+          proxima_acao?: string | null
           status?: string
           tipo?: string
+          tom_sugerido?: string | null
           updated_at?: string
+          valor_pendente?: number | null
         }
         Relationships: [
           {
@@ -1944,14 +2097,21 @@ export type Database = {
           direcao: string
           id: string
           lida_em: string | null
+          mensagem_ia_original: string | null
           mensagem_original: string | null
           metadata: Json
+          modelo_ia: string | null
+          nivel_firmeza: number | null
           pagamento_id: string | null
+          promessa_id: string | null
+          resultado_contato: string | null
           status: string
           sugestao_id: string | null
           tags: Json
           template_id: string | null
           tipo: string | null
+          tom_escolhido: string | null
+          tom_sugerido: string | null
         }
         Insert: {
           atendimento_id?: string | null
@@ -1965,14 +2125,21 @@ export type Database = {
           direcao: string
           id?: string
           lida_em?: string | null
+          mensagem_ia_original?: string | null
           mensagem_original?: string | null
           metadata?: Json
+          modelo_ia?: string | null
+          nivel_firmeza?: number | null
           pagamento_id?: string | null
+          promessa_id?: string | null
+          resultado_contato?: string | null
           status?: string
           sugestao_id?: string | null
           tags?: Json
           template_id?: string | null
           tipo?: string | null
+          tom_escolhido?: string | null
+          tom_sugerido?: string | null
         }
         Update: {
           atendimento_id?: string | null
@@ -1986,14 +2153,21 @@ export type Database = {
           direcao?: string
           id?: string
           lida_em?: string | null
+          mensagem_ia_original?: string | null
           mensagem_original?: string | null
           metadata?: Json
+          modelo_ia?: string | null
+          nivel_firmeza?: number | null
           pagamento_id?: string | null
+          promessa_id?: string | null
+          resultado_contato?: string | null
           status?: string
           sugestao_id?: string | null
           tags?: Json
           template_id?: string | null
           tipo?: string | null
+          tom_escolhido?: string | null
+          tom_sugerido?: string | null
         }
         Relationships: [
           {
@@ -2043,6 +2217,13 @@ export type Database = {
             columns: ["pagamento_id"]
             isOneToOne: false
             referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_promessa_id_fkey"
+            columns: ["promessa_id"]
+            isOneToOne: false
+            referencedRelation: "promessas_pagamento"
             referencedColumns: ["id"]
           },
           {
@@ -2621,6 +2802,93 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      promessas_pagamento: {
+        Row: {
+          cliente_id: string
+          cobranca_id: string | null
+          created_at: string
+          data_prometida: string
+          forma_pagamento: string | null
+          id: string
+          observacoes: string | null
+          registrado_por: string | null
+          registrado_por_email: string | null
+          resolvida_em: string | null
+          status: string
+          updated_at: string
+          valor_prometido: number
+          valor_recebido: number
+        }
+        Insert: {
+          cliente_id: string
+          cobranca_id?: string | null
+          created_at?: string
+          data_prometida: string
+          forma_pagamento?: string | null
+          id?: string
+          observacoes?: string | null
+          registrado_por?: string | null
+          registrado_por_email?: string | null
+          resolvida_em?: string | null
+          status?: string
+          updated_at?: string
+          valor_prometido?: number
+          valor_recebido?: number
+        }
+        Update: {
+          cliente_id?: string
+          cobranca_id?: string | null
+          created_at?: string
+          data_prometida?: string
+          forma_pagamento?: string | null
+          id?: string
+          observacoes?: string | null
+          registrado_por?: string | null
+          registrado_por_email?: string | null
+          resolvida_em?: string | null
+          status?: string
+          updated_at?: string
+          valor_prometido?: number
+          valor_recebido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promessas_pagamento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promessas_pagamento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "promessas_pagamento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "promessas_pagamento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "promessas_pagamento_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       racas: {
         Row: {

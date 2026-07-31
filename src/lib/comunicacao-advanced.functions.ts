@@ -80,9 +80,9 @@ const ComporSchema = z.object({
 export const gerarMensagemIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ComporSchema.parse(d))
-  .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
+  .handler(async ({ data, context }) => {
+    const { chamarIATexto, carregarIaConfig } = await import("./ia-core.server");
+    const config = await carregarIaConfig(context.supabase);
 
     const primeiro = data.clienteNome.trim().split(/\s+/)[0] || data.clienteNome;
     const promptTipo = PROMPT_POR_TIPO[data.tipo];
@@ -97,7 +97,7 @@ Gere UMA mensagem curta de WhatsApp em português do Brasil (máx. 4 linhas):
 - Tom desejado: ${data.tom}
 - Contexto adicional: ${data.contexto?.trim() || "(nenhum)"}
 ${data.templateBase ? `\nUse o template abaixo como base — mantenha a voz do negócio:\n"""${data.templateBase}"""\n` : ""}
-
+${config.instrucoes_empresa ? `\nInstruções da empresa:\n${config.instrucoes_empresa}\n` : ""}
 Regras:
 - Comece com uma saudação usando o primeiro nome do tutor.
 - Cite o nome do pet quando fizer sentido.
@@ -105,26 +105,14 @@ Regras:
 - Não invente datas, valores ou horários que não estejam no contexto/template.
 - Não use markdown, aspas nem prefixos. Devolva SOMENTE o texto puro.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
-        messages: [
-          { role: "system", content: "Você redige mensagens curtas, cordiais e humanas para um pet shop premium." },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const r = await chamarIATexto({
+      system: "Você redige mensagens curtas, cordiais e humanas para um pet shop premium.",
+      prompt,
+      config,
     });
-
-    if (res.status === 429) throw new Error("Limite de uso da IA atingido. Tente novamente em instantes.");
-    if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
-    if (!res.ok) throw new Error(`Falha na IA: ${res.status}`);
-
-    const json = await res.json();
-    const texto: string = json?.choices?.[0]?.message?.content?.trim() ?? "";
+    const texto = r.texto;
     if (!texto) throw new Error("A IA não retornou texto.");
-    return { mensagem: texto };
+    return { mensagem: texto, modelo: r.modelo, usouFallback: r.usouFallback };
   });
 
 /* ============================================================

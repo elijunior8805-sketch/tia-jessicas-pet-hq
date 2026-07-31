@@ -29,10 +29,7 @@ const TOM_INSTRUCAO: Record<z.infer<typeof TomEnum>, string> = {
 export const revisarMensagemWhatsApp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
-  .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
-
+  .handler(async ({ data, context }) => {
     const instrucaoModo =
       data.modo === "ortografia"
         ? "Corrija somente ortografia, acentuação e pontuação. Ajuste a clareza apenas quando estritamente necessário. Mantenha ao máximo a redação e a ordem das frases do autor."
@@ -55,39 +52,11 @@ export const revisarMensagemWhatsApp = createServerFn({ method: "POST" })
 
     const prompt = `${instrucaoModo}\n\n${regras}\n\n--- TEXTO ORIGINAL ---\n${data.texto}\n--- FIM ---`;
 
-    // Modelo econômico da última geração para todas as tarefas (ortografia e melhorar).
-    const model = "google/gemini-3.6-flash";
+    const { chamarIATexto, carregarIaConfig } = await import("./ia-core.server");
+    const config = await carregarIaConfig(context.supabase);
+    const r = await chamarIATexto({ system, prompt, config, temperatura: 0.2 });
 
-    const body: Record<string, unknown> = {
-      model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt },
-      ],
-    };
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (res.status === 429)
-      throw new Error("Limite de uso da IA atingido. Tente novamente em instantes.");
-    if (res.status === 402)
-      throw new Error("Créditos de IA esgotados. Adicione créditos ao workspace.");
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`Falha na revisão: ${res.status} ${t.slice(0, 200)}`);
-    }
-
-    const json = await res.json();
-    let revisado: string = json?.choices?.[0]?.message?.content ?? "";
-    revisado = String(revisado)
-      .replace(/^["'`]+|["'`]+$/g, "")
+    const revisado = r.texto
       .replace(/^\s*(vers[aã]o revisada|texto revisado|revisado)\s*:\s*/i, "")
       .trim();
 
@@ -97,5 +66,6 @@ export const revisarMensagemWhatsApp = createServerFn({ method: "POST" })
       original: data.texto,
       revisado,
       mudou: revisado.trim() !== data.texto.trim(),
+      modelo: r.modelo,
     };
   });
