@@ -1025,3 +1025,23 @@ export const funilCobrancas = createServerFn({ method: "GET" })
     };
     return kpis;
   });
+
+// ============= Excluir =============
+export const excluirCobranca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ cobrancaId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    // Remove eventos vinculados primeiro (evita órfãos caso não haja cascade).
+    await supabase.from("cobrancas_eventos").delete().eq("cobranca_id", data.cobrancaId);
+
+    const { error } = await supabase.from("cobrancas").delete().eq("id", data.cobrancaId);
+    if (error) {
+      console.error("[cobrancas] excluir erro:", error.message);
+      throw new Error("Não foi possível excluir a cobrança");
+    }
+    return { ok: true };
+  });
