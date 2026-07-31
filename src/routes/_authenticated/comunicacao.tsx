@@ -33,6 +33,11 @@ import {
   gerarSugestoesProativas, listarSugestoes, atualizarStatusSugestao, feedbackSugestao,
   listarHistoricoMensagens,
 } from "@/lib/comunicacao-advanced.functions";
+import { VisaoGeralTab } from "@/components/comunicacao/visao-geral-tab";
+import { FilaProativaTab } from "@/components/comunicacao/fila-proativa-tab";
+import { IaConfigTab } from "@/components/comunicacao/ia-config-tab";
+import { useMyPermissions } from "@/hooks/use-my-permissions";
+import { LayoutDashboard, ListChecks, Settings2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
   component: ComunicacaoPage,
@@ -47,6 +52,8 @@ function primeiroNome(v: string | null | undefined) {
 
 function ComunicacaoPage() {
   const qc = useQueryClient();
+  const perms = useMyPermissions();
+  const [aba, setAba] = useState("visao");
 
   // -------- shared data --------
   const clientesQ = useQuery({
@@ -90,13 +97,19 @@ function ComunicacaoPage() {
         </AlertDescription>
       </Alert>
 
-      <Tabs defaultValue="sugestoes" className="space-y-6">
+      <Tabs value={aba} onValueChange={setAba} className="space-y-6">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="visao"><LayoutDashboard className="h-4 w-4 mr-2" /> Visão geral</TabsTrigger>
+          <TabsTrigger value="fila"><ListChecks className="h-4 w-4 mr-2" /> Fila proativa</TabsTrigger>
           <TabsTrigger value="sugestoes"><Sparkles className="h-4 w-4 mr-2" /> Sugestões</TabsTrigger>
           <TabsTrigger value="compor"><Wand2 className="h-4 w-4 mr-2" /> Compor</TabsTrigger>
           <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-2" /> Templates</TabsTrigger>
           <TabsTrigger value="historico"><History className="h-4 w-4 mr-2" /> Histórico</TabsTrigger>
+          <TabsTrigger value="config"><Settings2 className="h-4 w-4 mr-2" /> Configurações</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
+        <TabsContent value="fila"><FilaProativaTab /></TabsContent>
 
         <TabsContent value="sugestoes"><SugestoesTab /></TabsContent>
         <TabsContent value="compor">
@@ -105,6 +118,9 @@ function ComunicacaoPage() {
         <TabsContent value="templates"><TemplatesTab /></TabsContent>
         <TabsContent value="historico">
           <HistoricoTab clientes={clientesQ.data ?? []} />
+        </TabsContent>
+        <TabsContent value="config">
+          <IaConfigTab isAdmin={!!perms.data?.isAdmin} />
         </TabsContent>
       </Tabs>
     </PageShell>
