@@ -36,7 +36,7 @@ import {
 import { VisaoGeralTab } from "@/components/comunicacao/visao-geral-tab";
 import { FilaProativaTab } from "@/components/comunicacao/fila-proativa-tab";
 import { IaConfigTab } from "@/components/comunicacao/ia-config-tab";
-import { useMyPermissions } from "@/hooks/use-my-permissions";
+import { useMyAccess } from "@/hooks/use-my-permissions";
 import { LayoutDashboard, ListChecks, Settings2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
@@ -52,7 +52,7 @@ function primeiroNome(v: string | null | undefined) {
 
 function ComunicacaoPage() {
   const qc = useQueryClient();
-  const perms = useMyPermissions();
+  const perms = useMyAccess();
   const [aba, setAba] = useState("visao");
 
   // -------- shared data --------
