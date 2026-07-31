@@ -1,39 +1,34 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import {
-  gerarMensagemCobrancaIA,
-  refinarTexto,
-  montarVisaoGeral,
-  gerarResumoInteligente,
-  listarFilaEnriquecida,
-  montarPainelOperacional,
-} from "./comunicacao-central.server";
+
+const central = () => import("./comunicacao-central.server");
 
 /* ============================================================
  * Visão geral
  * ============================================================ */
 export const visaoGeralComunicacao = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => await montarVisaoGeral(context.supabase));
+  .handler(async ({ context }) => await (await central()).montarVisaoGeral(context.supabase));
 
 export const resumoInteligente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const kpis = await montarVisaoGeral(context.supabase);
-    return await gerarResumoInteligente(context.supabase, kpis as any);
+    const m = await central();
+    const kpis = await m.montarVisaoGeral(context.supabase);
+    return await m.gerarResumoInteligente(context.supabase, kpis as any);
   });
 
 export const painelOperacional = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => await montarPainelOperacional(context.supabase));
+  .handler(async ({ context }) => await (await central()).montarPainelOperacional(context.supabase));
 
 /* ============================================================
  * Fila proativa inteligente
  * ============================================================ */
 export const listarFilaProativa = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => await listarFilaEnriquecida(context.supabase));
+  .handler(async ({ context }) => await (await central()).listarFilaEnriquecida(context.supabase));
 
 export const adiarSugestao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -100,7 +95,7 @@ export const gerarCobrancaIA = createServerFn({ method: "POST" })
   )
   .handler(
     async ({ data, context }) =>
-      await gerarMensagemCobrancaIA(
+      await (await central()).gerarMensagemCobrancaIA(
         context.supabase,
         data.cobrancaId,
         data.opcoes,
@@ -125,7 +120,7 @@ export const refinarMensagem = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => await refinarTexto(context.supabase, data.texto, data.acao));
+  .handler(async ({ data, context }) => await (await central()).refinarTexto(context.supabase, data.texto, data.acao));
 
 /* ============================================================
  * Registro rastreável do envio aprovado

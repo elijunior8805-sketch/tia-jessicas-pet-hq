@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { chamarIAEstruturada, carregarIaConfig } from "./ia-core.server";
-import { CONTRATO_JSON, REGRAS_INVIOLAVEIS } from "./comunicacao-central.server";
+
 
 export const obterIaConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -89,8 +88,10 @@ export const testarGeracaoIA = createServerFn({ method: "POST" })
     z.object({ cenario: z.string().min(3).max(600) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const config = await carregarIaConfig(context.supabase);
-    const r = await chamarIAEstruturada({
+    const core = await import("./ia-core.server");
+    const { CONTRATO_JSON, REGRAS_INVIOLAVEIS } = await import("./comunicacao-central.server");
+    const config = await core.carregarIaConfig(context.supabase);
+    const r = await core.chamarIAEstruturada({
       system:
         "Você redige mensagens de cobrança humanas e respeitosas para um spa de pets premium. Responde exclusivamente em JSON válido.",
       prompt: `Cenário de teste fornecido pelo administrador (dados fictícios, apenas para conferir o comportamento):
