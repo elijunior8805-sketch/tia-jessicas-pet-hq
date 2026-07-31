@@ -60,6 +60,7 @@ import {
   Clock,
   Loader2,
   Inbox,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
