@@ -20,7 +20,7 @@ export type ReciboAtendimento = {
   profissional?: string | null;
   /** Observações registradas no check-in */
   checkin_obs?: string | null;
-  /** Observações internas do atendimento (visíveis no PDF do cliente) */
+  /** Observações internas — uso interno, NUNCA renderizadas no PDF do cliente */
   observacoes_internas?: string | null;
   /** Comportamentos observados */
   comportamentos?: string[] | null;
@@ -335,7 +335,7 @@ export async function generateReciboPDF(d: ReciboData, returnBlob = false) {
     }
 
     linhaCampo("Observações do check-in", at?.checkin_obs ?? null);
-    linhaCampo("Observações do atendimento", at?.observacoes_internas ?? null);
+    // Observações internas não são exibidas ao cliente (uso interno da equipe).
     linhaCampo("Recomendações", at?.recomendacoes ?? null);
     if (at?.proxima_visita) {
       linhaCampo("Próxima visita sugerida", fmtDate(at.proxima_visita));
