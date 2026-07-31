@@ -246,7 +246,7 @@ export async function generateReciboPDF(d: ReciboData, returnBlob = false) {
     !!at &&
     (servicosAt.length > 0 ||
       !!at.checkin_obs ||
-      !!at.observacoes_internas ||
+      
       !!at.recomendacoes ||
       !!at.proxima_visita ||
       comportamentos.length > 0 ||
