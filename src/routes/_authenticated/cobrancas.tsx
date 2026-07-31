@@ -395,6 +395,7 @@ function CobrancaDialog({
   const pagar = useServerFn(marcarPagamento);
   const sugerir = useServerFn(sugerirMensagemCobranca);
   const registrarResposta = useServerFn(registrarRespostaCliente);
+  const excluir = useServerFn(excluirCobranca);
 
   const qHist = useQuery({
     queryKey: ["cobrancas", "historico", cobranca.id],
