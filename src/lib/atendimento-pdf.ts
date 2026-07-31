@@ -338,7 +338,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   if (comportamentos.length) { section("Comportamento observado"); paragraph(comportamentos.join(", ")); }
   const obsCheckin = (atendimento?.observacoes_checkin?.trim?.() || atendimento?.observacoes?.trim?.() || (atendimento as any)?.check_in_obs?.trim?.() || "");
   section("Observacoes de check-in"); paragraph(obsCheckin);
-  section("Observacoes internas"); paragraph(atendimento?.observacoes_internas);
+  // Observações internas são de uso exclusivo da equipe — nunca no relatório do cliente.
   section("Recomendacoes ao tutor"); paragraph(atendimento?.recomendacoes);
   if (atendimento?.proxima_visita) { section("Proxima visita sugerida"); paragraph(fmtDate(atendimento.proxima_visita)); }
 
