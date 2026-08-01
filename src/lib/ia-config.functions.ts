@@ -1,17 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { garantirAdminIa, podeGerenciarIa } from "./ia-config.server";
 
 
 export const obterIaConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [cfg, regras] = await Promise.all([
+    const [cfg, regras, pode] = await Promise.all([
       context.supabase.from("ia_config").select("*").maybeSingle(),
       context.supabase.from("ia_regras_tom").select("*").order("ordem"),
+      podeGerenciarIa(context.supabase, context.userId),
     ]);
     if (cfg.error) throw new Error(cfg.error.message);
-    return { config: cfg.data, regras: regras.data ?? [] };
+    return { config: cfg.data, regras: regras.data ?? [], podeEditar: pode };
   });
 
 const ConfigSchema = z.object({
