@@ -101,6 +101,7 @@ function ComunicacaoPage() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="visao"><LayoutDashboard className="h-4 w-4 mr-2" /> Visão geral</TabsTrigger>
           <TabsTrigger value="fila"><ListChecks className="h-4 w-4 mr-2" /> Fila proativa</TabsTrigger>
+          <TabsTrigger value="promessas"><HandCoins className="h-4 w-4 mr-2" /> Promessas</TabsTrigger>
           <TabsTrigger value="sugestoes"><Sparkles className="h-4 w-4 mr-2" /> Sugestões</TabsTrigger>
           <TabsTrigger value="compor"><Wand2 className="h-4 w-4 mr-2" /> Compor</TabsTrigger>
           <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-2" /> Templates</TabsTrigger>
@@ -110,8 +111,12 @@ function ComunicacaoPage() {
 
         <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
         <TabsContent value="fila"><FilaProativaTab /></TabsContent>
+        <TabsContent value="promessas">
+          <PromessasTab podeEditar={!!perms.data?.canManageUsers || !!perms.data?.isAdmin} />
+        </TabsContent>
 
         <TabsContent value="sugestoes"><SugestoesTab /></TabsContent>
+
         <TabsContent value="compor">
           <ComporTab clientes={clientesQ.data ?? []} pets={petsQ.data ?? []} />
         </TabsContent>
