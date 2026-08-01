@@ -318,7 +318,7 @@ export async function gerarMensagemCobrancaIA(
       ? `- Link de pagamento: ${config.link_pagamento}`
       : null,
     `- Relacionamento: ${ctx.totalAtendimentos} atendimento(s) já realizados${ctx.cliente.vip ? ", cliente VIP" : ""}`,
-    ctx.cliente.observacoes ? `- Observações do cadastro: ${ctx.cliente.observacoes}` : null,
+    ctx.cliente.observacoes ? `- Observações do cadastro: ${sanitizarEntradaIa(ctx.cliente.observacoes, 400)}` : null,
     ctx.cliente.tom_preferido ? `- Tom preferido do cliente: ${ctx.cliente.tom_preferido}` : null,
     opts.incluirAssinatura && config.assinatura ? `- Assinatura da empresa: ${config.assinatura}` : null,
   ]
