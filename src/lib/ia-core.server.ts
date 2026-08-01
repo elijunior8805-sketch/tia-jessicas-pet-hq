@@ -358,7 +358,27 @@ export async function chamarIAEstruturada(
     dados.mensagem = corte.slice(0, corte.lastIndexOf(" ") > 0 ? corte.lastIndexOf(" ") : corte.length).trim();
   }
 
+  aplicarGuardaSaida(dados.mensagem, p);
+
   return { ...dados, modelo: r.modelo, usouFallback: r.usouFallback, tokens: r.tokens };
+}
+
+/**
+ * Guarda central de saída: nenhum texto com palavra proibida chega à tela.
+ * Vale para todos os fluxos que passam pelo núcleo.
+ */
+function aplicarGuardaSaida(texto: string, p: ChamadaParams): void {
+  const guard = verificarPalavrasProibidas(texto, p.config);
+  if (guard.ok) return;
+  void registrarMetricaIa(p.sb, {
+    origem: p.origem ?? "desconhecida",
+    sucesso: false,
+    codigoErro: "conteudo_bloqueado",
+  });
+  throw new IaIndisponivelError(
+    `A mensagem gerada continha termo(s) não permitido(s): ${guard.encontradas.join(", ")}. Nada foi exibido — gere novamente ou use um template manual.`,
+    "conteudo_bloqueado",
+  );
 }
 
 /** Chama a IA esperando apenas texto puro (mantém compatibilidade com o legado). */
@@ -369,6 +389,7 @@ export async function chamarIATexto(p: ChamadaParams): Promise<ChamadaResultado>
     .replace(/```$/i, "")
     .replace(/^["'`]+|["'`]+$/g, "")
     .trim();
+  aplicarGuardaSaida(texto, p);
   return { ...r, texto };
 }
 
