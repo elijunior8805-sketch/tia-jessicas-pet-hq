@@ -197,12 +197,15 @@ export function GeradorCobrancaDialog({
   const [instrucao, setInstrucao] = useState("");
   const [promessaData, setPromessaData] = useState("");
   const [promessaValor, setPromessaValor] = useState<string>("");
+  const [geracaoMs, setGeracaoMs] = useState<number | null>(null);
+  const [aprovado, setAprovado] = useState(false);
 
   const podeIA = !!sugestao.cobranca_id;
 
   const gerarM = useMutation({
-    mutationFn: () =>
-      gerarFn({
+    mutationFn: async () => {
+      const t0 = Date.now();
+      const r = await gerarFn({
         data: {
           cobrancaId: sugestao.cobranca_id,
           opcoes: {
@@ -211,10 +214,14 @@ export function GeradorCobrancaDialog({
           },
           instrucaoExtra: instrucao || null,
         },
-      }),
+      });
+      setGeracaoMs(Date.now() - t0);
+      return r;
+    },
     onSuccess: (r: any) => {
       setTexto(r.mensagem ?? "");
       setMeta(r);
+      setAprovado(false);
       if (r.alerta) toast.warning(r.alerta);
     },
     onError: (e: any) => toast.error(e?.message ?? "A IA não conseguiu gerar agora."),
@@ -241,6 +248,15 @@ export function GeradorCobrancaDialog({
           tipo: sugestao.tipo ?? "cobranca",
           cobrancaId: sugestao.cobranca_id ?? null,
           sugestaoId: sugestao.id ?? null,
+          textoEditado: meta?.mensagem && meta.mensagem !== texto ? texto : null,
+          tempoGeracaoMs: geracaoMs,
+          tokensEstimados: Math.round((texto?.length ?? 0) / 4),
+          contextoIa: {
+            tom, firmeza, tamanho, emojis, citarPet, incluirValor,
+            incluirPix, permitirNegociacao,
+            instrucao: instrucao || null,
+            revisadoManualmente: !!meta?.mensagem && meta.mensagem !== texto,
+          },
         },
       });
       if (promessaData) {
