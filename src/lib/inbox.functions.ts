@@ -247,6 +247,10 @@ export const registrarEnvioManual = createServerFn({ method: "POST" })
       status: "enviada",
       autor_id: context.userId,
       tags: ["registro_manual"],
+      aprovado_por: context.userId,
+      aprovado_em: new Date().toISOString(),
+      enviado_em: new Date().toISOString(),
+      contexto_ia: { origem: "registro_manual", aprovacao: "confirmacao_humana" },
     });
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -271,6 +275,10 @@ export const registrarNotaInterna = createServerFn({ method: "POST" })
       status: "enviada",
       autor_id: context.userId,
       tags: ["nota_interna"],
+      aprovado_por: context.userId,
+      aprovado_em: new Date().toISOString(),
+      enviado_em: new Date().toISOString(),
+      contexto_ia: { origem: "nota_interna", aprovacao: "autoria_humana" },
     });
     if (error) throw new Error(error.message);
     return { ok: true };
