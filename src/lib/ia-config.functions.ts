@@ -78,6 +78,7 @@ export const salvarRegraTom = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await garantirAdminIa(context.supabase, context.userId);
     const { id, ...resto } = data;
     const { error } = await context.supabase.from("ia_regras_tom").update(resto).eq("id", id);
     if (error) throw new Error(error.message);
