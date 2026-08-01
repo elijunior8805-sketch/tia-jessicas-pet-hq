@@ -20,6 +20,9 @@ import {
   filaDoDia as FILA_FN,
   funilCobrancas as FUNIL_FN,
   excluirCobranca,
+  restaurarCobranca,
+  listarCobrancasArquivadas,
+  type CobrancaArquivadaDTO,
   type CobrancaDTO,
   type CobrancaStatus,
 } from "@/lib/cobrancas.functions";
@@ -61,6 +64,8 @@ import {
   Loader2,
   Inbox,
   Trash2,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
@@ -185,7 +190,15 @@ function CobrancasPage() {
           <TabsTrigger value="fila">Fila do Dia</TabsTrigger>
           <TabsTrigger value="todas">Todas</TabsTrigger>
           <TabsTrigger value="funil">Funil de recuperação</TabsTrigger>
+          <TabsTrigger value="lixeira">
+            <Archive className="h-3.5 w-3.5 mr-1" />
+            Lixeira
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="lixeira">
+          <LixeiraTab />
+        </TabsContent>
 
         <TabsContent value="fila">
           <FilaDoDiaTab onSelect={setSelecionada} />
@@ -451,7 +464,7 @@ function CobrancaDialog({
     mutationFn: async () => {
       if (
         !window.confirm(
-          `Excluir definitivamente a cobrança de ${cobranca.cliente_nome}? Essa ação não pode ser desfeita.`,
+          `Enviar para a lixeira a cobrança de ${cobranca.cliente_nome}?\n\nEla sai das listas e dos totais, mas fica guardada na aba "Lixeira" e pode ser restaurada a qualquer momento — inclusive pelo celular.`,
         )
       ) {
         return null;
@@ -460,7 +473,9 @@ function CobrancaDialog({
     },
     onSuccess: (r) => {
       if (!r) return;
-      toast.success("Cobrança excluída");
+      toast.success("Cobrança enviada para a lixeira", {
+        description: 'Para trazer de volta, abra a aba "Lixeira".',
+      });
       invalidar();
       onClose();
     },
@@ -872,7 +887,7 @@ function CobrancaDialog({
             ) : (
               <Trash2 className="h-4 w-4 mr-1" />
             )}
-            Excluir cobrança
+            Excluir (vai para a lixeira)
           </Button>
           <Button variant="outline" onClick={onClose}>
             Fechar
@@ -880,6 +895,88 @@ function CobrancaDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ===================================================================
+// Lixeira — cobranças arquivadas, com restauração em 1 toque
+// ===================================================================
+function LixeiraTab() {
+  const qc = useQueryClient();
+  const listarArq = useServerFn(listarCobrancasArquivadas);
+  const restaurar = useServerFn(restaurarCobranca);
+
+  const q = useQuery({
+    queryKey: ["cobrancas", "arquivadas"],
+    queryFn: () => listarArq(),
+  });
+
+  const restaurarMut = useMutation({
+    mutationFn: (id: string) => restaurar({ data: { cobrancaId: id } }),
+    onSuccess: () => {
+      toast.success("Cobrança restaurada");
+      qc.invalidateQueries({ queryKey: ["cobrancas"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao restaurar"),
+  });
+
+  const itens = (q.data ?? []) as CobrancaArquivadaDTO[];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Archive className="h-4 w-4" />
+          Lixeira de cobranças
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Nada é apagado de verdade. Tudo que você excluir fica aqui, com histórico
+          preservado, e volta para a lista com um toque em “Restaurar”.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {q.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+          </div>
+        ) : itens.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-8 text-center">
+            A lixeira está vazia.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {itens.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{c.cliente_nome}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {fmtMoney(c.saldo)} • venc. {fmtDate(c.vencimento)}
+                    {c.pet_nome ? ` • ${c.pet_nome}` : ""}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Excluída em {fmtDate(c.arquivada_em)}
+                    {c.arquivada_por_nome ? ` por ${c.arquivada_por_nome}` : ""}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => restaurarMut.mutate(c.id)}
+                  disabled={restaurarMut.isPending}
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Restaurar
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
