@@ -1016,22 +1016,136 @@ export const funilCobrancas = createServerFn({ method: "GET" })
     return kpis;
   });
 
-// ============= Excluir =============
+// ============= Arquivar / Restaurar (lixeira) =============
+// "Excluir" nunca apaga de verdade: a cobrança vai para a lixeira e pode ser
+// restaurada a qualquer momento, inclusive pelo celular.
 export const excluirCobranca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({ cobrancaId: z.string().uuid(), motivo: z.string().max(300).optional() })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, claims } = context;
+
+    const { error } = await supabase
+      .from("cobrancas")
+      .update({
+        arquivada_em: new Date().toISOString(),
+        arquivada_por: context.userId,
+        arquivada_motivo: data.motivo ?? null,
+      })
+      .eq("id", data.cobrancaId);
+    if (error) {
+      console.error("[cobrancas] arquivar erro:", error.message);
+      throw new Error("Não foi possível arquivar a cobrança");
+    }
+
+    await logEvento(
+      supabase,
+      data.cobrancaId,
+      "nota",
+      { acao: "arquivada", motivo: data.motivo ?? null },
+      "sistema",
+      (claims as any)?.email ?? null,
+    );
+    return { ok: true };
+  });
+
+export const restaurarCobranca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
     z.object({ cobrancaId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, claims } = context;
 
-    // Remove eventos vinculados primeiro (evita órfãos caso não haja cascade).
-    await supabase.from("cobrancas_eventos").delete().eq("cobranca_id", data.cobrancaId);
-
-    const { error } = await supabase.from("cobrancas").delete().eq("id", data.cobrancaId);
+    const { error } = await supabase
+      .from("cobrancas")
+      .update({ arquivada_em: null, arquivada_por: null, arquivada_motivo: null })
+      .eq("id", data.cobrancaId);
     if (error) {
-      console.error("[cobrancas] excluir erro:", error.message);
-      throw new Error("Não foi possível excluir a cobrança");
+      console.error("[cobrancas] restaurar erro:", error.message);
+      throw new Error("Não foi possível restaurar a cobrança");
     }
+
+    await logEvento(
+      supabase,
+      data.cobrancaId,
+      "nota",
+      { acao: "restaurada" },
+      "sistema",
+      (claims as any)?.email ?? null,
+    );
     return { ok: true };
   });
+
+export type CobrancaArquivadaDTO = CobrancaDTO & {
+  arquivada_em: string;
+  arquivada_motivo: string | null;
+  arquivada_por_nome: string | null;
+};
+
+export const listarCobrancasArquivadas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CobrancaArquivadaDTO[]> => {
+    const { supabase } = context;
+
+    const { data: rows, error } = await supabase
+      .from("cobrancas")
+      .select(
+        `id, pagamento_id, cliente_id, atendimento_id, valor_original, valor_pago, saldo,
+         vencimento, status, promessa_data, tentativas, ultima_cobranca_em, pausada, pausada_motivo,
+         arquivada_em, arquivada_por, arquivada_motivo,
+         clientes:cliente_id ( nome, whatsapp ),
+         atendimentos:atendimento_id ( data_inicio, pets:pet_id ( nome ) )`,
+      )
+      .not("arquivada_em", "is", null)
+      .order("arquivada_em", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    const autores = Array.from(
+      new Set((rows ?? []).map((r: any) => r.arquivada_por).filter(Boolean)),
+    ) as string[];
+    const nomePorId = new Map<string, string>();
+    if (autores.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", autores);
+      for (const p of (profs ?? []) as any[]) nomePorId.set(p.id, p.nome ?? "");
+    }
+
+    const hoje = new Date();
+    return (rows ?? []).map((r: any) => {
+      const venc = new Date(`${r.vencimento}T00:00:00`);
+      const dias = Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
+      return {
+        id: r.id,
+        pagamento_id: r.pagamento_id,
+        cliente_id: r.cliente_id,
+        cliente_nome: r.clientes?.nome ?? "Cliente",
+        cliente_whatsapp: r.clientes?.whatsapp ?? null,
+        atendimento_id: r.atendimento_id,
+        pet_nome: r.atendimentos?.pets?.nome ?? null,
+        data_atendimento: r.atendimentos?.data_inicio ?? null,
+        valor_original: Number(r.valor_original ?? 0),
+        valor_pago: Number(r.valor_pago ?? 0),
+        saldo: Number(r.saldo ?? 0),
+        vencimento: r.vencimento,
+        dias_atraso: dias > 0 ? dias : 0,
+        status: r.status,
+        promessa_data: r.promessa_data,
+        tentativas: r.tentativas ?? 0,
+        ultima_cobranca_em: r.ultima_cobranca_em,
+        pausada: !!r.pausada,
+        pausada_motivo: r.pausada_motivo,
+        arquivada_em: r.arquivada_em,
+        arquivada_motivo: r.arquivada_motivo,
+        arquivada_por_nome: r.arquivada_por ? nomePorId.get(r.arquivada_por) ?? null : null,
+      };
+    });
+  });
+
