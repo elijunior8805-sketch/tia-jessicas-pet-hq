@@ -109,6 +109,8 @@ Regras:
       system: "Você redige mensagens curtas, cordiais e humanas para um pet shop premium.",
       prompt,
       config,
+      origem: `sugestao:${data.tipo ?? "generico"}`,
+      sb: context.supabase,
     });
     const texto = r.texto;
     if (!texto) throw new Error("A IA não retornou texto.");

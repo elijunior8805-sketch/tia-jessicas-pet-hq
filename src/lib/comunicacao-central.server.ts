@@ -420,6 +420,8 @@ Regras invioláveis: não altere nomes, datas, valores em R$, serviços, chave P
 ${texto}
 --- FIM ---`,
     config,
+    origem: `refino:${acao}`,
+    sb,
   });
 
   const guard = verificarPalavrasProibidas(r.texto, config);
