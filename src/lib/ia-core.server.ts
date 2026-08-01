@@ -13,6 +13,7 @@
  * Este arquivo é server-only (sufixo .server.ts).
  */
 import { z } from "zod";
+import { sanitizarPromptFinal } from "./ia-seguranca.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
