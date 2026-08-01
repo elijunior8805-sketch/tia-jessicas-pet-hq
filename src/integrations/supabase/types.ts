@@ -2138,6 +2138,7 @@ export type Database = {
           corpo: string
           created_at: string
           direcao: string
+          enviado_em: string | null
           erro_ia: string | null
           id: string
           lida_em: string | null
@@ -2174,6 +2175,7 @@ export type Database = {
           corpo: string
           created_at?: string
           direcao: string
+          enviado_em?: string | null
           erro_ia?: string | null
           id?: string
           lida_em?: string | null
@@ -2210,6 +2212,7 @@ export type Database = {
           corpo?: string
           created_at?: string
           direcao?: string
+          enviado_em?: string | null
           erro_ia?: string | null
           id?: string
           lida_em?: string | null
