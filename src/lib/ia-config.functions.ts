@@ -41,6 +41,7 @@ export const salvarIaConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ConfigSchema.parse(d))
   .handler(async ({ data, context }) => {
+    await garantirAdminIa(context.supabase, context.userId);
     const { data: existente } = await context.supabase
       .from("ia_config")
       .select("id")
