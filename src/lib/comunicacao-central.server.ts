@@ -527,6 +527,9 @@ export async function gerarResumoInteligente(sb: any, kpis: Record<string, numbe
 Devolva apenas o texto, sem markdown.`,
       config,
       temperatura: 0.3,
+      origem: "resumo_operacional",
+      sb,
+
     });
     return { resumo: r.texto, modelo: r.modelo, ia: true };
   } catch {
