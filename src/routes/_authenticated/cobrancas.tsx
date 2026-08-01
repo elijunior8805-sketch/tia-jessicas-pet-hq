@@ -953,7 +953,7 @@ function LixeiraTab() {
                 <div className="min-w-0">
                   <div className="font-medium truncate">{c.cliente_nome}</div>
                   <div className="text-xs text-muted-foreground">
-                    {fmtMoney(c.saldo)} • venc. {fmtDate(c.vencimento)}
+                    {brl(c.saldo)} • venc. {fmtDate(c.vencimento)}
                     {c.pet_nome ? ` • ${c.pet_nome}` : ""}
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">
