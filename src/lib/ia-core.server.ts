@@ -101,7 +101,41 @@ type ChamadaParams = {
   json?: boolean;
   /** Sobrescreve a criatividade da config. */
   temperatura?: number;
+  /** Rótulo do fluxo que originou a chamada (métricas). */
+  origem?: string;
+  /** Client Supabase autenticado, usado para registrar a métrica. */
+  sb?: any;
 };
+
+/** Registra a métrica da chamada de IA sem nunca quebrar o fluxo principal. */
+export async function registrarMetricaIa(
+  sb: any,
+  m: {
+    origem: string;
+    modelo?: string | null;
+    usouFallback?: boolean;
+    sucesso: boolean;
+    codigoErro?: string | null;
+    duracaoMs?: number | null;
+    tokens?: number | null;
+  },
+): Promise<void> {
+  if (!sb) return;
+  try {
+    await sb.from("ia_metricas").insert({
+      origem: m.origem,
+      modelo: m.modelo ?? null,
+      usou_fallback: !!m.usouFallback,
+      sucesso: m.sucesso,
+      codigo_erro: m.codigoErro ?? null,
+      duracao_ms: m.duracaoMs ?? null,
+      tokens: m.tokens ?? null,
+    });
+  } catch {
+    /* métricas nunca podem derrubar a geração */
+  }
+}
+
 
 type ChamadaResultado = {
   texto: string;
