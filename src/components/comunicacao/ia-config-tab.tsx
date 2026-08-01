@@ -55,7 +55,9 @@ export function IaConfigTab({ isAdmin }: { isAdmin: boolean }) {
 
   const testarM = useMutation({ mutationFn: () => testarFn({ data: { cenario } }) });
 
-  if (!isAdmin) {
+  const podeEditar = isAdmin && (q.data as any)?.podeEditar !== false;
+
+  if (!isAdmin || (q.isFetched && !podeEditar)) {
     return (
       <Alert className="border-amber-200 bg-amber-50/60">
         <ShieldAlert className="h-4 w-4 text-amber-700" />
