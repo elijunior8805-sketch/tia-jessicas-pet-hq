@@ -90,6 +90,10 @@ export const registrarAberturaWhatsApp = createServerFn({ method: "POST" })
         tipo: data.tipo,
         tags: [data.tipo],
         metadata: { destinatario: data.destinatario, telefone: data.telefone },
+        aprovado_por: userId,
+        aprovado_em: new Date().toISOString(),
+        enviado_em: new Date().toISOString(),
+        contexto_ia: { origem: "envio_documento", aprovacao: "clique_humano" },
       });
     }
     return { id: ins.id as string };

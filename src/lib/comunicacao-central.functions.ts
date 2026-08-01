@@ -181,6 +181,7 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
       agendada_para: data.agendadaPara ?? null,
       aprovado_por: context.userId,
       aprovado_em: new Date().toISOString(),
+      enviado_em: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
     return { ok: true };
