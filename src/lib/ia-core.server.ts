@@ -214,10 +214,36 @@ async function chamadaUnica(
 }
 
 /**
- * Chamada resiliente: tenta o modelo principal (com retentativas para falhas
- * transitórias) e cai para o modelo alternativo quando necessário.
+ * Chamada resiliente com métricas: tenta o modelo principal (com retentativas
+ * para falhas transitórias) e cai para o modelo alternativo quando necessário.
  */
 export async function chamarIA(p: ChamadaParams): Promise<ChamadaResultado> {
+  const inicio = Date.now();
+  try {
+    const r = await chamarIaInterno(p);
+    void registrarMetricaIa(p.sb, {
+      origem: p.origem ?? "desconhecida",
+      modelo: r.modelo,
+      usouFallback: r.usouFallback,
+      sucesso: true,
+      duracaoMs: Date.now() - inicio,
+      tokens: r.tokens,
+    });
+    return r;
+  } catch (e: any) {
+    void registrarMetricaIa(p.sb, {
+      origem: p.origem ?? "desconhecida",
+      modelo: p.config.modelo_principal,
+      sucesso: false,
+      codigoErro: e?.codigo ?? "erro",
+      duracaoMs: Date.now() - inicio,
+    });
+    throw e;
+  }
+}
+
+async function chamarIaInterno(p: ChamadaParams): Promise<ChamadaResultado> {
+
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey)
     throw new IaIndisponivelError(
