@@ -145,6 +145,11 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
         templateId: z.string().uuid().optional().nullable(),
         promessaId: z.string().uuid().optional().nullable(),
         resultadoContato: z.string().max(120).optional().nullable(),
+        textoEditado: z.string().max(4000).optional().nullable(),
+        contextoIa: z.record(z.string(), z.any()).optional().nullable(),
+        tempoGeracaoMs: z.number().int().min(0).max(600000).optional().nullable(),
+        tokensEstimados: z.number().int().min(0).optional().nullable(),
+        agendadaPara: z.string().optional().nullable(),
       })
       .parse(d),
   )
@@ -169,6 +174,13 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
       nivel_firmeza: data.nivelFirmeza ?? null,
       modelo_ia: data.modeloIa ?? null,
       resultado_contato: data.resultadoContato ?? null,
+      texto_editado: data.textoEditado ?? null,
+      contexto_ia: (data.contextoIa ?? null) as any,
+      tempo_geracao_ms: data.tempoGeracaoMs ?? null,
+      tokens_estimados: data.tokensEstimados ?? null,
+      agendada_para: data.agendadaPara ?? null,
+      aprovado_por: context.userId,
+      aprovado_em: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -244,4 +256,46 @@ export const salvarPromessa = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return { id: row!.id };
+  });
+
+/* ============================================================
+ * Métricas de uso da IA (últimos 30 dias)
+ * ============================================================ */
+export const metricasIa = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data, error } = await context.supabase
+      .from("ia_metricas")
+      .select("origem, modelo, sucesso, codigo_erro, duracao_ms, tokens, usou_fallback, created_at")
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw new Error(error.message);
+    const linhas = data ?? [];
+    const total = linhas.length;
+    const sucessos = linhas.filter((l: any) => l.sucesso).length;
+    const duracoes = linhas
+      .map((l: any) => l.duracao_ms)
+      .filter((n: any): n is number => typeof n === "number");
+    const tempoMedio = duracoes.length
+      ? Math.round(duracoes.reduce((a: number, b: number) => a + b, 0) / duracoes.length)
+      : 0;
+    const porModelo: Record<string, number> = {};
+    const porErro: Record<string, number> = {};
+    for (const l of linhas as any[]) {
+      if (l.modelo) porModelo[l.modelo] = (porModelo[l.modelo] ?? 0) + 1;
+      if (!l.sucesso) porErro[l.codigo_erro ?? "erro"] = (porErro[l.codigo_erro ?? "erro"] ?? 0) + 1;
+    }
+    return {
+      total,
+      sucessos,
+      falhas: total - sucessos,
+      taxaSucesso: total ? Math.round((sucessos / total) * 100) : 0,
+      tempoMedioMs: tempoMedio,
+      fallbacks: linhas.filter((l: any) => l.usou_fallback).length,
+      tokens: linhas.reduce((a: number, l: any) => a + (l.tokens ?? 0), 0),
+      porModelo,
+      porErro,
+    };
   });
