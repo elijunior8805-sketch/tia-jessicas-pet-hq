@@ -13,6 +13,7 @@ import {
   type IaConfig,
   type PrioridadeLabel,
 } from "./ia-core.server";
+import { sanitizarEntradaIa } from "./ia-seguranca.server";
 
 export const TONS_COBRANCA = [
   "acolhedor",
