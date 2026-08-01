@@ -37,7 +37,9 @@ import { VisaoGeralTab } from "@/components/comunicacao/visao-geral-tab";
 import { FilaProativaTab } from "@/components/comunicacao/fila-proativa-tab";
 import { IaConfigTab } from "@/components/comunicacao/ia-config-tab";
 import { useMyAccess } from "@/hooks/use-my-permissions";
-import { LayoutDashboard, ListChecks, Settings2 } from "lucide-react";
+import { LayoutDashboard, ListChecks, Settings2, HandCoins } from "lucide-react";
+import { PromessasTab } from "@/components/comunicacao/promessas-tab";
+
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
   component: ComunicacaoPage,
