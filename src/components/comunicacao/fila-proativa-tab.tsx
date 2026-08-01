@@ -395,13 +395,23 @@ export function GeradorCobrancaDialog({
           </Card>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 sm:items-center">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground mr-auto cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={aprovado}
+              onChange={(e) => setAprovado(e.target.checked)}
+            />
+            Li e aprovo o texto acima
+          </label>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => enviarM.mutate()} disabled={!texto.trim() || enviarM.isPending}>
+          <Button onClick={() => enviarM.mutate()} disabled={!texto.trim() || !aprovado || enviarM.isPending}>
             {enviarM.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             Aprovar e abrir WhatsApp
           </Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
