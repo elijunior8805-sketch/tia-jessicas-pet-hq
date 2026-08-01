@@ -92,6 +92,7 @@ export const testarGeracaoIA = createServerFn({ method: "POST" })
     z.object({ cenario: z.string().min(3).max(600) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    await garantirAdminIa(context.supabase, context.userId);
     const core = await import("./ia-core.server");
     const { CONTRATO_JSON, REGRAS_INVIOLAVEIS } = await import("./comunicacao-central.server");
     const config = await core.carregarIaConfig(context.supabase);
