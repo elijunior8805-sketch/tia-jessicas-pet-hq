@@ -95,6 +95,7 @@ export const registrarAberturaWhatsApp = createServerFn({ method: "POST" })
         enviado_em: new Date().toISOString(),
         contexto_ia: { origem: "envio_documento", aprovacao: "clique_humano" },
       });
+    }
     return { id: ins.id as string };
   });
 
