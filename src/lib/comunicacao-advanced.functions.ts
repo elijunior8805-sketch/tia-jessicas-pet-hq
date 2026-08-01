@@ -336,6 +336,7 @@ export const gerarSugestoesProativas = createServerFn({ method: "POST" })
     const { data: cobrs } = await sb
       .from("cobrancas")
       .select("id, valor_original, saldo, vencimento, cliente_id, clientes(nome, whatsapp, opt_out_comunicacao)")
+      .is("arquivada_em", null)
       .in("status", ["vencido", "a_vencer", "pago_parcial"])
       .lt("vencimento", hoje.toISOString().slice(0, 10))
       .gt("saldo", 0)

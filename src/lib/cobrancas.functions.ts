@@ -85,6 +85,7 @@ export const listarCobrancas = createServerFn({ method: "POST" })
          clientes:cliente_id ( nome, whatsapp ),
          atendimentos:atendimento_id ( data_inicio, pets:pet_id ( nome ) )`,
       )
+      .is("arquivada_em", null)
       .order("vencimento", { ascending: true })
       .limit(data.limit);
 
@@ -159,11 +160,13 @@ export const kpisCobrancas = createServerFn({ method: "GET" })
       supabase
         .from("cobrancas")
         .select("saldo, vencimento, status")
+        .is("arquivada_em", null)
         .not("status", "in", "(pago)")
         .gt("saldo", 0),
       supabase
         .from("cobrancas")
         .select("valor_original, updated_at")
+        .is("arquivada_em", null)
         .eq("status", "pago")
         .gte("updated_at", inicioMes),
     ]);
@@ -876,6 +879,7 @@ export const filaDoDia = createServerFn({ method: "GET" })
          clientes:cliente_id ( nome, whatsapp ),
          atendimentos:atendimento_id ( data_inicio, pets:pet_id ( nome ) )`,
       )
+      .is("arquivada_em", null)
       .eq("pausada", false)
       .not("status", "eq", "pago")
       .gt("saldo", 0)
@@ -956,6 +960,7 @@ export const funilCobrancas = createServerFn({ method: "GET" })
     const { data: cobs, error } = await supabase
       .from("cobrancas")
       .select("id, status, valor_original, tentativas, created_at, updated_at")
+      .is("arquivada_em", null)
       .gte("created_at", inicioMes);
     if (error) throw new Error(error.message);
 

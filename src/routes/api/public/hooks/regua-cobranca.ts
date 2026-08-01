@@ -33,6 +33,7 @@ export const Route = createFileRoute("/api/public/hooks/regua-cobranca")({
         await admin
           .from("cobrancas")
           .update({ status: "vencido" })
+          .is("arquivada_em", null)
           .eq("status", "a_vencer")
           .lt("vencimento", iso);
 
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/api/public/hooks/regua-cobranca")({
         const { data: promessasVencidas } = await admin
           .from("cobrancas")
           .select("id, promessa_data")
+          .is("arquivada_em", null)
           .eq("status", "promessa")
           .lt("promessa_data", iso);
 
@@ -78,6 +80,7 @@ export const Route = createFileRoute("/api/public/hooks/regua-cobranca")({
         const { data: cobrancas, error } = await admin
           .from("cobrancas")
           .select("id, vencimento, status, ultima_cobranca_em, pausada")
+          .is("arquivada_em", null)
           .in("status", ["a_vencer", "vencido"])
           .eq("pausada", false)
           .gt("saldo", 0);

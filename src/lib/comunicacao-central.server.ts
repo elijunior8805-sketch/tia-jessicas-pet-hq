@@ -157,6 +157,7 @@ export async function montarContextoCobranca(sb: any, cobrancaId: string) {
        clientes:cliente_id ( id, nome, whatsapp, email, vip, observacoes, tom_preferido, opt_out_comunicacao, created_at ),
        atendimentos:atendimento_id ( id, data_inicio, servicos_executados, pets:pet_id ( nome ) )`,
     )
+    .is("arquivada_em", null)
     .eq("id", cobrancaId)
     .maybeSingle();
 
@@ -454,6 +455,7 @@ export async function montarVisaoGeral(sb: any) {
     sb
       .from("cobrancas")
       .select("id, saldo", { count: "exact" })
+      .is("arquivada_em", null)
       .lt("vencimento", hoje)
       .gt("saldo", 0)
       .not("status", "in", "(pago,negociado,pausada)"),
@@ -475,17 +477,20 @@ export async function montarVisaoGeral(sb: any) {
     sb
       .from("cobrancas")
       .select("id", { count: "exact", head: true })
+      .is("arquivada_em", null)
       .eq("status", "pago")
       .gte("updated_at", inicioDia),
     sb
       .from("cobrancas")
       .select("id", { count: "exact", head: true })
+      .is("arquivada_em", null)
       .gt("tentativas", 0)
       .gt("saldo", 0)
       .lt("ultima_cobranca_em", h48),
     sb
       .from("cobrancas")
       .select("id", { count: "exact", head: true })
+      .is("arquivada_em", null)
       .gte("tentativas", 3)
       .gt("saldo", 0),
   ]);
