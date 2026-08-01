@@ -795,6 +795,9 @@ export type Database = {
       }
       cobrancas: {
         Row: {
+          arquivada_em: string | null
+          arquivada_motivo: string | null
+          arquivada_por: string | null
           atendimento_id: string | null
           cliente_id: string
           created_at: string
@@ -816,6 +819,9 @@ export type Database = {
           version: number
         }
         Insert: {
+          arquivada_em?: string | null
+          arquivada_motivo?: string | null
+          arquivada_por?: string | null
           atendimento_id?: string | null
           cliente_id: string
           created_at?: string
@@ -837,6 +843,9 @@ export type Database = {
           version?: number
         }
         Update: {
+          arquivada_em?: string | null
+          arquivada_motivo?: string | null
+          arquivada_por?: string | null
           atendimento_id?: string | null
           cliente_id?: string
           created_at?: string
