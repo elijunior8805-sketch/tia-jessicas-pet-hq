@@ -54,7 +54,14 @@ export const revisarMensagemWhatsApp = createServerFn({ method: "POST" })
 
     const { chamarIATexto, carregarIaConfig } = await import("./ia-core.server");
     const config = await carregarIaConfig(context.supabase);
-    const r = await chamarIATexto({ system, prompt, config, temperatura: 0.2 });
+    const r = await chamarIATexto({
+      system,
+      prompt,
+      config,
+      temperatura: 0.2,
+      origem: `revisao:${data.modo}`,
+      sb: context.supabase,
+    });
 
     const revisado = r.texto
       .replace(/^\s*(vers[aã]o revisada|texto revisado|revisado)\s*:\s*/i, "")

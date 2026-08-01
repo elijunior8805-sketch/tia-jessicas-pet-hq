@@ -22,10 +22,7 @@ const InputSchema = z.object({
 export const sugerirMensagemWhatsApp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => InputSchema.parse(data))
-  .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
-
+  .handler(async ({ data, context }) => {
     const tipoLabel: Record<string, string> = {
       lembrete_agendamento: "lembrete de agendamento próximo",
       confirmacao: "confirmação de agendamento",
@@ -53,29 +50,16 @@ Regras:
 - Não invente datas, valores, horários ou serviços que não estejam no contexto.
 - Não use markdown, aspas ou prefixos. Devolva SOMENTE o texto puro da mensagem.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
-        messages: [
-          { role: "system", content: "Você redige mensagens curtas, cordiais e humanas para um pet shop premium." },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const { chamarIATexto, carregarIaConfig } = await import("./ia-core.server");
+    const config = await carregarIaConfig(context.supabase);
+    const r = await chamarIATexto({
+      system: "Você redige mensagens curtas, cordiais e humanas para um pet shop premium.",
+      prompt,
+      config,
+      origem: `whatsapp:${data.tipo}`,
+      sb: context.supabase,
     });
-
-    if (res.status === 429) throw new Error("Limite de uso da IA atingido. Tente novamente em instantes.");
-    if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`Falha na IA: ${res.status} ${t.slice(0, 200)}`);
-    }
-    const json = await res.json();
-    const texto: string = json?.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!texto) throw new Error("A IA não retornou texto.");
-    return { mensagem: texto };
+    if (!r.texto) throw new Error("A IA não retornou texto.");
+    return { mensagem: r.texto, modelo: r.modelo };
   });
+

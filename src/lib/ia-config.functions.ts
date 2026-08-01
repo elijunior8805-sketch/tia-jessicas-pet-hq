@@ -101,6 +101,8 @@ ${REGRAS_INVIOLAVEIS}
 
 ${CONTRATO_JSON}`,
       config,
+      origem: "teste_admin",
+      sb: context.supabase,
     });
     return r;
   });

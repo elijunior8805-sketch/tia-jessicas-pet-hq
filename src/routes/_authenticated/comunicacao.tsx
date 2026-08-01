@@ -37,7 +37,9 @@ import { VisaoGeralTab } from "@/components/comunicacao/visao-geral-tab";
 import { FilaProativaTab } from "@/components/comunicacao/fila-proativa-tab";
 import { IaConfigTab } from "@/components/comunicacao/ia-config-tab";
 import { useMyAccess } from "@/hooks/use-my-permissions";
-import { LayoutDashboard, ListChecks, Settings2 } from "lucide-react";
+import { LayoutDashboard, ListChecks, Settings2, HandCoins } from "lucide-react";
+import { PromessasTab } from "@/components/comunicacao/promessas-tab";
+
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
   component: ComunicacaoPage,
@@ -101,6 +103,7 @@ function ComunicacaoPage() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="visao"><LayoutDashboard className="h-4 w-4 mr-2" /> Visão geral</TabsTrigger>
           <TabsTrigger value="fila"><ListChecks className="h-4 w-4 mr-2" /> Fila proativa</TabsTrigger>
+          <TabsTrigger value="promessas"><HandCoins className="h-4 w-4 mr-2" /> Promessas</TabsTrigger>
           <TabsTrigger value="sugestoes"><Sparkles className="h-4 w-4 mr-2" /> Sugestões</TabsTrigger>
           <TabsTrigger value="compor"><Wand2 className="h-4 w-4 mr-2" /> Compor</TabsTrigger>
           <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-2" /> Templates</TabsTrigger>
@@ -110,8 +113,12 @@ function ComunicacaoPage() {
 
         <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
         <TabsContent value="fila"><FilaProativaTab /></TabsContent>
+        <TabsContent value="promessas">
+          <PromessasTab podeEditar={!!perms.data?.canManageUsers || !!perms.data?.isAdmin} />
+        </TabsContent>
 
         <TabsContent value="sugestoes"><SugestoesTab /></TabsContent>
+
         <TabsContent value="compor">
           <ComporTab clientes={clientesQ.data ?? []} pets={petsQ.data ?? []} />
         </TabsContent>

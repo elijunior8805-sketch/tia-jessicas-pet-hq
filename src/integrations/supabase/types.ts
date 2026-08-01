@@ -1444,6 +1444,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_metricas: {
+        Row: {
+          codigo_erro: string | null
+          created_at: string
+          duracao_ms: number | null
+          id: string
+          modelo: string | null
+          origem: string
+          sucesso: boolean
+          tokens: number | null
+          user_id: string | null
+          usou_fallback: boolean
+        }
+        Insert: {
+          codigo_erro?: string | null
+          created_at?: string
+          duracao_ms?: number | null
+          id?: string
+          modelo?: string | null
+          origem: string
+          sucesso?: boolean
+          tokens?: number | null
+          user_id?: string | null
+          usou_fallback?: boolean
+        }
+        Update: {
+          codigo_erro?: string | null
+          created_at?: string
+          duracao_ms?: number | null
+          id?: string
+          modelo?: string | null
+          origem?: string
+          sucesso?: boolean
+          tokens?: number | null
+          user_id?: string | null
+          usou_fallback?: boolean
+        }
+        Relationships: []
+      }
       ia_regras_tom: {
         Row: {
           ativo: boolean
@@ -2086,15 +2125,20 @@ export type Database = {
       }
       mensagens: {
         Row: {
+          agendada_para: string | null
+          aprovado_em: string | null
+          aprovado_por: string | null
           atendimento_id: string | null
           autor_email: string | null
           autor_id: string | null
           canal: string
           cliente_id: string
           cobranca_id: string | null
+          contexto_ia: Json | null
           corpo: string
           created_at: string
           direcao: string
+          erro_ia: string | null
           id: string
           lida_em: string | null
           mensagem_ia_original: string | null
@@ -2109,20 +2153,28 @@ export type Database = {
           sugestao_id: string | null
           tags: Json
           template_id: string | null
+          tempo_geracao_ms: number | null
+          texto_editado: string | null
           tipo: string | null
+          tokens_estimados: number | null
           tom_escolhido: string | null
           tom_sugerido: string | null
         }
         Insert: {
+          agendada_para?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
           atendimento_id?: string | null
           autor_email?: string | null
           autor_id?: string | null
           canal?: string
           cliente_id: string
           cobranca_id?: string | null
+          contexto_ia?: Json | null
           corpo: string
           created_at?: string
           direcao: string
+          erro_ia?: string | null
           id?: string
           lida_em?: string | null
           mensagem_ia_original?: string | null
@@ -2137,20 +2189,28 @@ export type Database = {
           sugestao_id?: string | null
           tags?: Json
           template_id?: string | null
+          tempo_geracao_ms?: number | null
+          texto_editado?: string | null
           tipo?: string | null
+          tokens_estimados?: number | null
           tom_escolhido?: string | null
           tom_sugerido?: string | null
         }
         Update: {
+          agendada_para?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
           atendimento_id?: string | null
           autor_email?: string | null
           autor_id?: string | null
           canal?: string
           cliente_id?: string
           cobranca_id?: string | null
+          contexto_ia?: Json | null
           corpo?: string
           created_at?: string
           direcao?: string
+          erro_ia?: string | null
           id?: string
           lida_em?: string | null
           mensagem_ia_original?: string | null
@@ -2165,7 +2225,10 @@ export type Database = {
           sugestao_id?: string | null
           tags?: Json
           template_id?: string | null
+          tempo_geracao_ms?: number | null
+          texto_editado?: string | null
           tipo?: string | null
+          tokens_estimados?: number | null
           tom_escolhido?: string | null
           tom_sugerido?: string | null
         }

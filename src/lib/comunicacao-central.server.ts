@@ -349,6 +349,8 @@ ${CONTRATO_JSON}`;
       "Você redige mensagens de cobrança humanas, curtas e respeitosas para um spa de pets premium. Responde exclusivamente em JSON válido.",
     prompt,
     config,
+    origem: "cobranca:gerador",
+    sb,
   });
 
   const guard = verificarPalavrasProibidas(r.mensagem, config);
@@ -418,6 +420,8 @@ Regras invioláveis: não altere nomes, datas, valores em R$, serviços, chave P
 ${texto}
 --- FIM ---`,
     config,
+    origem: `refino:${acao}`,
+    sb,
   });
 
   const guard = verificarPalavrasProibidas(r.texto, config);
@@ -523,6 +527,9 @@ export async function gerarResumoInteligente(sb: any, kpis: Record<string, numbe
 Devolva apenas o texto, sem markdown.`,
       config,
       temperatura: 0.3,
+      origem: "resumo_operacional",
+      sb,
+
     });
     return { resumo: r.texto, modelo: r.modelo, ia: true };
   } catch {

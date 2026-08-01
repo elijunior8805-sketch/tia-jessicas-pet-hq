@@ -9,7 +9,7 @@ import {
   MessageSquareWarning, Banknote, PhoneOff, CalendarX2,
 } from "lucide-react";
 import {
-  visaoGeralComunicacao, resumoInteligente, painelOperacional,
+  visaoGeralComunicacao, resumoInteligente, painelOperacional, metricasIa,
 } from "@/lib/comunicacao-central.functions";
 
 const brl = (v: number) =>
@@ -161,7 +161,52 @@ export function VisaoGeralTab({ onIrParaFila }: { onIrParaFila?: () => void }) {
           </div>
         )}
       </Card>
+
+      <MetricasIaCard />
     </div>
+  );
+}
+
+function MetricasIaCard() {
+  const metricasFn = useServerFn(metricasIa);
+  const q = useQuery({
+    queryKey: ["comunicacao", "metricas-ia"],
+    queryFn: () => metricasFn(),
+    refetchInterval: 300_000,
+  });
+  const m = q.data as any;
+
+  return (
+    <Card className="p-4">
+      <p className="text-sm font-medium mb-3 flex items-center gap-2">
+        <Sparkles className="h-4 w-4" /> Desempenho da IA (últimos 30 dias)
+      </p>
+      {q.isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : !m || m.total === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Nenhuma geração registrada ainda neste período.
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div><p className="text-xs text-muted-foreground">Gerações</p><p className="text-xl font-semibold">{m.total}</p></div>
+          <div><p className="text-xs text-muted-foreground">Taxa de sucesso</p><p className="text-xl font-semibold">{m.taxaSucesso}%</p></div>
+          <div><p className="text-xs text-muted-foreground">Tempo médio</p><p className="text-xl font-semibold">{(m.tempoMedioMs / 1000).toFixed(1)}s</p></div>
+          <div><p className="text-xs text-muted-foreground">Fallbacks</p><p className="text-xl font-semibold">{m.fallbacks}</p></div>
+          <div><p className="text-xs text-muted-foreground">Falhas</p><p className="text-xl font-semibold">{m.falhas}</p></div>
+          {Object.keys(m.porModelo ?? {}).length > 0 ? (
+            <div className="col-span-2 lg:col-span-5 flex flex-wrap gap-1.5 pt-1">
+              {Object.entries(m.porModelo as Record<string, number>).map(([k, v]) => (
+                <Badge key={k} variant="secondary">{k} · {v}</Badge>
+              ))}
+              {Object.entries(m.porErro as Record<string, number>).map(([k, v]) => (
+                <Badge key={k} variant="destructive">{k} · {v}</Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Card>
   );
 }
 

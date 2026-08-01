@@ -447,9 +447,8 @@ export const sugerirMensagemCobranca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => IAInput.parse(data))
   .handler(async ({ data, context }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
     const { supabase } = context;
+
 
     const { data: cob, error } = await supabase
       .from("cobrancas")
@@ -507,41 +506,27 @@ Regras obrigatórias:
 - Não invente valores, datas ou serviços que não estejam nos dados acima.
 - Devolva SOMENTE o texto puro da mensagem, sem markdown, aspas ou prefixos.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você redige mensagens curtas, cordiais e humanas de cobrança amigável para um pet shop premium. Nunca use tom agressivo.",
-          },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const { chamarIATexto, carregarIaConfig } = await import("./ia-core.server");
+    const iaConfig = await carregarIaConfig(supabase);
+    const r = await chamarIATexto({
+      system:
+        "Você redige mensagens curtas, cordiais e humanas de cobrança amigável para um pet shop premium. Nunca use tom agressivo.",
+      prompt,
+      config: iaConfig,
+      origem: `cobranca:${data.intencao}`,
+      sb: supabase,
     });
-
-    if (res.status === 429) throw new Error("Limite de uso da IA atingido. Tente novamente em instantes.");
-    if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`Falha na IA: ${res.status} ${t.slice(0, 200)}`);
-    }
-    const json = await res.json();
-    const texto: string = json?.choices?.[0]?.message?.content?.trim() ?? "";
+    const texto = r.texto;
     if (!texto) throw new Error("A IA não retornou texto.");
 
     await logEvento(supabase, data.cobrancaId, "ia_sugestao", {
       intencao: data.intencao,
+      modelo: r.modelo,
       preview: texto.slice(0, 200),
     });
 
-    return { mensagem: texto };
+    return { mensagem: texto, modelo: r.modelo };
+
   });
 
 // ============= Config e templates =============
