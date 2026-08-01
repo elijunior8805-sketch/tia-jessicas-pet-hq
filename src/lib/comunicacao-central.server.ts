@@ -349,6 +349,8 @@ ${CONTRATO_JSON}`;
       "Você redige mensagens de cobrança humanas, curtas e respeitosas para um spa de pets premium. Responde exclusivamente em JSON válido.",
     prompt,
     config,
+    origem: "cobranca:gerador",
+    sb,
   });
 
   const guard = verificarPalavrasProibidas(r.mensagem, config);
