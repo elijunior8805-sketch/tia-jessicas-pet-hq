@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-type Period = "hoje" | "semana" | "mes" | "personalizado";
+type Period = "hoje" | "semana" | "mes" | "30dias" | "personalizado";
 
 function greeting(d = new Date()) {
   const h = d.getHours();
