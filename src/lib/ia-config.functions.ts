@@ -45,8 +45,9 @@ export const salvarIaConfig = createServerFn({ method: "POST" })
     // Config nova invalida qualquer texto guardado em cache pelo núcleo.
     const { invalidarCacheIa } = await import("./ia-cache.server");
     invalidarCacheIa();
-
+    const { data: existente } = await context.supabase
       .from("ia_config")
+
       .select("id")
       .maybeSingle();
     if (existente) {
