@@ -540,7 +540,9 @@ Devolva apenas o texto, sem markdown.`,
         : "Nenhuma pendência de comunicação no momento.",
       modelo: "regras-locais",
       ia: false,
+      doCache: false,
     };
+
   }
 }
 
