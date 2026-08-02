@@ -391,7 +391,7 @@ function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-0.5">Total recebido dia a dia</p>
             </div>
             <span className="text-[10px] text-[oklch(0.45_0.11_155)] uppercase tracking-[0.16em] font-semibold px-2.5 py-1 rounded-full bg-[oklch(0.94_0.04_150)]">
-              {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : "Custom"}
+              {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : period === "30dias" ? "30 dias" : "Custom"}
             </span>
           </div>
           {data && data.serie.some((p) => p.valor > 0) ? (
