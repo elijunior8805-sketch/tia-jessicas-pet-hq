@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import {
   TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw,
 } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useMyProfile, firstName } from "@/hooks/use-my-profile";
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-type Period = "hoje" | "semana" | "mes" | "personalizado";
+type Period = "hoje" | "semana" | "mes" | "30dias" | "personalizado";
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -65,7 +65,7 @@ const STATUS_STYLE: Record<string, { label: string; className: string }> = {
 };
 
 function DashboardPage() {
-  const [period, setPeriod] = useState<Period>("mes");
+  const [period, setPeriod] = useState<Period>("30dias");
   const [customFrom, setCustomFrom] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState<string>(format(new Date(), "yyyy-MM-dd"));
 
@@ -74,6 +74,7 @@ function DashboardPage() {
     if (period === "hoje") return { from: format(now, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
     if (period === "semana") return { from: format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"), to: format(endOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd") };
     if (period === "mes") return { from: format(startOfMonth(now), "yyyy-MM-dd"), to: format(endOfMonth(now), "yyyy-MM-dd") };
+    if (period === "30dias") return { from: format(subDays(now, 29), "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
     return { from: customFrom, to: customTo };
   }, [period, customFrom, customTo]);
 
@@ -224,6 +225,7 @@ function DashboardPage() {
     ["hoje", "Hoje", "Hoje"],
     ["semana", "Semana", "Sem."],
     ["mes", "Mês", "Mês"],
+    ["30dias", "30 dias", "30d"],
     ["personalizado", "Personalizado", "Custom"],
   ] as const;
 
@@ -389,7 +391,7 @@ function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-0.5">Total recebido dia a dia</p>
             </div>
             <span className="text-[10px] text-[oklch(0.45_0.11_155)] uppercase tracking-[0.16em] font-semibold px-2.5 py-1 rounded-full bg-[oklch(0.94_0.04_150)]">
-              {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : "Custom"}
+              {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : period === "30dias" ? "30 dias" : "Custom"}
             </span>
           </div>
           {data && data.serie.some((p) => p.valor > 0) ? (
