@@ -106,7 +106,15 @@ type ChamadaParams = {
   origem?: string;
   /** Client Supabase autenticado, usado para registrar a métrica. */
   sb?: any;
+  /**
+   * Reaproveita por alguns minutos a resposta de uma chamada idêntica.
+   * Passe `false`/omita em fluxos que precisam de variação (ex.: "outra versão").
+   */
+  cacheTtlMs?: number;
+  /** Complemento opcional da chave de cache (ex.: id da cobrança). */
+  cacheEscopo?: string;
 };
+
 
 /** Registra a métrica da chamada de IA sem nunca quebrar o fluxo principal. */
 export async function registrarMetricaIa(
