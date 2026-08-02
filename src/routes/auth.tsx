@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 
@@ -76,7 +75,6 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nome, setNome] = useState("");
 
   // Cooldown separado por ação
   const [signupCooldown, setSignupCooldown] = useState(0);
@@ -130,22 +128,8 @@ function AuthPage() {
     navigate({ to: "/dashboard" });
   }
 
-  async function handleSignup(e: React.FormEvent) {
-    e.preventDefault();
-    if (signupCooldown > 0) return;
-    setLoading(true);
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await withRetry(() =>
-      supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: redirectUrl, data: { nome } },
-      }),
-    );
-    setLoading(false);
-    if (error) return handleAuthError("signup", error);
-    toast.success("Conta criada. Você já pode entrar.");
-  }
+  // Cadastro público desativado: contas são criadas apenas pela administração.
+
 
   async function handleReset() {
     if (resetCooldown > 0) return;
@@ -172,66 +156,33 @@ function AuthPage() {
         </div>
 
         <div className="card-premium p-6 sm:p-8">
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Criar conta</TabsTrigger>
-            </TabsList>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="l-email">E-mail</Label>
+              <Input id="l-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="l-pass">Senha</Label>
+              <Input id="l-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Entrando…" : "Entrar"}
+            </Button>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={resetCooldown > 0}
+              className="w-full text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resetCooldown > 0
+                ? `Aguarde ${resetCooldown}s para reenviar`
+                : "Esqueci minha senha"}
+            </button>
+            <p className="text-xs text-center text-muted-foreground pt-2">
+              O acesso é criado apenas pela administração, na tela de Usuários.
+            </p>
+          </form>
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="l-email">E-mail</Label>
-                  <Input id="l-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="l-pass">Senha</Label>
-                  <Input id="l-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Entrando…" : "Entrar"}
-                </Button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  disabled={resetCooldown > 0}
-                  className="w-full text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {resetCooldown > 0
-                    ? `Aguarde ${resetCooldown}s para reenviar`
-                    : "Esqueci minha senha"}
-                </button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="s-nome">Seu nome</Label>
-                  <Input id="s-nome" required value={nome} onChange={(e) => setNome(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="s-email">E-mail</Label>
-                  <Input id="s-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="s-pass">Senha</Label>
-                  <Input id="s-pass" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-                  <p className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
-                </div>
-                <Button type="submit" className="w-full" disabled={loading || signupCooldown > 0}>
-                  {loading
-                    ? "Criando…"
-                    : signupCooldown > 0
-                    ? `Aguarde ${signupCooldown}s`
-                    : "Criar conta"}
-                </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  A primeira conta criada torna-se administradora automaticamente.
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
         </div>
       </div>
     </div>
