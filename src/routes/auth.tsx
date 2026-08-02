@@ -130,22 +130,8 @@ function AuthPage() {
     navigate({ to: "/dashboard" });
   }
 
-  async function handleSignup(e: React.FormEvent) {
-    e.preventDefault();
-    if (signupCooldown > 0) return;
-    setLoading(true);
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await withRetry(() =>
-      supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: redirectUrl, data: { nome } },
-      }),
-    );
-    setLoading(false);
-    if (error) return handleAuthError("signup", error);
-    toast.success("Conta criada. Você já pode entrar.");
-  }
+  // Cadastro público desativado: contas são criadas apenas pela administração.
+
 
   async function handleReset() {
     if (resetCooldown > 0) return;
