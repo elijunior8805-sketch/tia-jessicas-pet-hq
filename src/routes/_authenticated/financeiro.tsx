@@ -213,7 +213,7 @@ function statusBadgeCls(s: string) {
  * Preset de período
  * ============================================================ */
 
-type Preset = "hoje" | "ontem" | "semana" | "mes" | "personalizado";
+type Preset = "hoje" | "ontem" | "semana" | "mes" | "30dias" | "personalizado";
 
 function computePreset(preset: Preset, hoje = new Date()): { de: string; ate: string } {
   const fmt = (d: Date) => format(d, "yyyy-MM-dd");
@@ -231,8 +231,10 @@ function computePreset(preset: Preset, hoje = new Date()): { de: string; ate: st
       };
     case "mes":
       return { de: fmt(startOfMonth(hoje)), ate: fmt(endOfMonth(hoje)) };
+    case "30dias":
+      return { de: fmt(subDays(hoje, 29)), ate: fmt(hoje) };
     default:
-      return { de: fmt(startOfMonth(hoje)), ate: fmt(endOfMonth(hoje)) };
+      return { de: fmt(subDays(hoje, 29)), ate: fmt(hoje) };
   }
 }
 
