@@ -1311,7 +1311,7 @@ function FinanceiroPage() {
             {/* Presets + range */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-xl bg-muted p-1">
-                {(["hoje", "ontem", "semana", "mes", "personalizado"] as Preset[]).map((p) => (
+                {(["hoje", "ontem", "semana", "mes", "30dias", "personalizado"] as Preset[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => aplicarPreset(p)}
