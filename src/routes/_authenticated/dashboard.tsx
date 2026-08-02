@@ -65,7 +65,7 @@ const STATUS_STYLE: Record<string, { label: string; className: string }> = {
 };
 
 function DashboardPage() {
-  const [period, setPeriod] = useState<Period>("mes");
+  const [period, setPeriod] = useState<Period>("30dias");
   const [customFrom, setCustomFrom] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState<string>(format(new Date(), "yyyy-MM-dd"));
 
@@ -74,6 +74,7 @@ function DashboardPage() {
     if (period === "hoje") return { from: format(now, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
     if (period === "semana") return { from: format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"), to: format(endOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd") };
     if (period === "mes") return { from: format(startOfMonth(now), "yyyy-MM-dd"), to: format(endOfMonth(now), "yyyy-MM-dd") };
+    if (period === "30dias") return { from: format(subDays(now, 29), "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
     return { from: customFrom, to: customTo };
   }, [period, customFrom, customTo]);
 
