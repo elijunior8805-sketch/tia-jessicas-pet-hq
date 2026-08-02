@@ -225,6 +225,7 @@ function DashboardPage() {
     ["hoje", "Hoje", "Hoje"],
     ["semana", "Semana", "Sem."],
     ["mes", "Mês", "Mês"],
+    ["30dias", "30 dias", "30d"],
     ["personalizado", "Personalizado", "Custom"],
   ] as const;
 
