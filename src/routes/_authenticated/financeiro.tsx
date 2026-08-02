@@ -750,7 +750,7 @@ function FinanceiroPage() {
   };
 
   const limparFiltros = () => {
-    aplicarPreset("mes");
+    aplicarPreset("30dias");
     setFFormas([]);
     setFBloco("todos");
     setFStatus("todos");
