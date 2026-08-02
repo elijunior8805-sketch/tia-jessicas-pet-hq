@@ -352,8 +352,12 @@ ${CONTRATO_JSON}`;
     prompt,
     config,
     origem: "cobranca:gerador",
+    // Protege contra clique duplo/reabertura da mesma cobrança em sequência.
+    cacheTtlMs: 90 * 1000,
+    cacheEscopo: ctx.cobranca.id ?? cobrancaId,
     sb,
   });
+
 
   const guard = verificarPalavrasProibidas(r.mensagem, config);
   if (!guard.ok) {
@@ -395,36 +399,15 @@ function REGRAS_INVIOLÁVEIS_SAFE() {
   return REGRAS_INVIOLAVEIS;
 }
 
-/** Refina um texto já existente (mais gentil, mais firme, resumir, corrigir…). */
+/** Refina um texto já existente — delega ao gerador único (cache + métricas). */
 export async function refinarTexto(
   sb: any,
   texto: string,
   acao: string,
-): Promise<{ texto: string; modelo: string }> {
+): Promise<{ texto: string; modelo: string; doCache: boolean }> {
   const config = await carregarIaConfig(sb);
-  const instrucoes: Record<string, string> = {
-    mais_gentil: "Reescreva de forma mais gentil e acolhedora, reduzindo a firmeza.",
-    mais_direta: "Reescreva de forma mais direta e objetiva, cortando rodeios.",
-    mais_firme: "Reescreva de forma mais firme e assertiva, sem jamais ameaçar ou constranger.",
-    resumir: "Resuma mantendo todas as informações essenciais em no máximo 3 linhas.",
-    corrigir: "Corrija apenas ortografia, acentuação e pontuação. Preserve a redação original.",
-    outra_versao: "Reescreva com outra abordagem, mantendo o mesmo tom e as mesmas informações.",
-  };
-
-  const r = await chamarIATexto({
-    system:
-      "Você reescreve mensagens de WhatsApp de um spa de pets premium. Devolve SOMENTE o texto final, sem aspas, sem markdown, sem prefixos.",
-    prompt: `${instrucoes[acao] ?? instrucoes["outra_versao"]}
-
-Regras invioláveis: não altere nomes, datas, valores em R$, serviços, chave Pix ou qualquer número. Não invente informação nova. Não ameace nem constranja.
-
---- TEXTO ---
-${texto}
---- FIM ---`,
-    config,
-    origem: `refino:${acao}`,
-    sb,
-  });
+  const { refinarTextoIa } = await import("./ia-geracao.server");
+  const r = await refinarTextoIa(sb, texto, acao, config);
 
   const guard = verificarPalavrasProibidas(r.texto, config);
   if (!guard.ok)
@@ -432,8 +415,9 @@ ${texto}
       `O texto refinado continha termo(s) não permitido(s): ${guard.encontradas.join(", ")}.`,
     );
 
-  return { texto: r.texto, modelo: r.modelo };
+  return { texto: r.texto, modelo: r.modelo, doCache: r.doCache };
 }
+
 
 /** Números reais para a Visão geral. */
 export async function montarVisaoGeral(sb: any) {
@@ -534,10 +518,13 @@ Devolva apenas o texto, sem markdown.`,
       config,
       temperatura: 0.3,
       origem: "resumo_operacional",
+      // Os mesmos números no mesmo dia devolvem o mesmo resumo, sem gastar crédito.
+      cacheTtlMs: 10 * 60 * 1000,
+      cacheEscopo: hojeISO(),
       sb,
-
     });
-    return { resumo: r.texto, modelo: r.modelo, ia: true };
+
+    return { resumo: r.texto, modelo: r.modelo, ia: true, doCache: !!r.doCache };
   } catch {
     // Fallback determinístico — nunca deixa a tela sem resumo.
     const partes: string[] = [];
@@ -553,7 +540,9 @@ Devolva apenas o texto, sem markdown.`,
         : "Nenhuma pendência de comunicação no momento.",
       modelo: "regras-locais",
       ia: false,
+      doCache: false,
     };
+
   }
 }
 

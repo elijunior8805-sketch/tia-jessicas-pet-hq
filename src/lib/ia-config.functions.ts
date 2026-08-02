@@ -42,8 +42,12 @@ export const salvarIaConfig = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ConfigSchema.parse(d))
   .handler(async ({ data, context }) => {
     await garantirAdminIa(context.supabase, context.userId);
+    // Config nova invalida qualquer texto guardado em cache pelo núcleo.
+    const { invalidarCacheIa } = await import("./ia-cache.server");
+    invalidarCacheIa();
     const { data: existente } = await context.supabase
       .from("ia_config")
+
       .select("id")
       .maybeSingle();
     if (existente) {

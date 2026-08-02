@@ -14,6 +14,8 @@
  */
 import { z } from "zod";
 import { sanitizarPromptFinal } from "./ia-seguranca.server";
+import { chaveCacheIa, gravarCacheIa, lerCacheIa } from "./ia-cache.server";
+
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -106,7 +108,15 @@ type ChamadaParams = {
   origem?: string;
   /** Client Supabase autenticado, usado para registrar a métrica. */
   sb?: any;
+  /**
+   * Reaproveita por alguns minutos a resposta de uma chamada idêntica.
+   * Passe `false`/omita em fluxos que precisam de variação (ex.: "outra versão").
+   */
+  cacheTtlMs?: number;
+  /** Complemento opcional da chave de cache (ex.: id da cobrança). */
+  cacheEscopo?: string;
 };
+
 
 /** Registra a métrica da chamada de IA sem nunca quebrar o fluxo principal. */
 export async function registrarMetricaIa(
@@ -143,7 +153,10 @@ type ChamadaResultado = {
   modelo: string;
   usouFallback: boolean;
   tokens: number | null;
+  /** true quando o texto veio do cache curto, sem consumir crédito. */
+  doCache?: boolean;
 };
+
 
 async function chamadaUnica(
   modelo: string,
@@ -220,10 +233,40 @@ async function chamadaUnica(
  */
 export async function chamarIA(p: ChamadaParams): Promise<ChamadaResultado> {
   const inicio = Date.now();
+  const origem = p.origem ?? "desconhecida";
+  const usaCache = !!p.cacheTtlMs && p.cacheTtlMs > 0;
+  const chave = usaCache
+    ? `ia:${origem}:${chaveCacheIa(
+        p.config.modelo_principal,
+        p.config.modelo_alternativo,
+        p.temperatura ?? p.config.criatividade,
+        p.json ? "json" : "texto",
+        p.cacheEscopo ?? "",
+        p.system,
+        p.prompt,
+      )}`
+    : null;
+
+  if (chave) {
+    const guardado = lerCacheIa<ChamadaResultado>(chave);
+    if (guardado) {
+      void registrarMetricaIa(p.sb, {
+        origem: `${origem}:cache`,
+        modelo: guardado.modelo,
+        usouFallback: guardado.usouFallback,
+        sucesso: true,
+        duracaoMs: Date.now() - inicio,
+        tokens: 0,
+      });
+      return { ...guardado, doCache: true };
+    }
+  }
+
   try {
     const r = await chamarIaInterno(p);
+    if (chave) gravarCacheIa(chave, r, p.cacheTtlMs);
     void registrarMetricaIa(p.sb, {
-      origem: p.origem ?? "desconhecida",
+      origem,
       modelo: r.modelo,
       usouFallback: r.usouFallback,
       sucesso: true,
@@ -233,7 +276,7 @@ export async function chamarIA(p: ChamadaParams): Promise<ChamadaResultado> {
     return r;
   } catch (e: any) {
     void registrarMetricaIa(p.sb, {
-      origem: p.origem ?? "desconhecida",
+      origem,
       modelo: p.config.modelo_principal,
       sucesso: false,
       codigoErro: e?.codigo ?? "erro",
@@ -242,6 +285,7 @@ export async function chamarIA(p: ChamadaParams): Promise<ChamadaResultado> {
     throw e;
   }
 }
+
 
 async function chamarIaInterno(p: ChamadaParams): Promise<ChamadaResultado> {
 
