@@ -14,6 +14,8 @@
  */
 import { z } from "zod";
 import { sanitizarPromptFinal } from "./ia-seguranca.server";
+import { chaveCacheIa, gravarCacheIa, lerCacheIa } from "./ia-cache.server";
+
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
