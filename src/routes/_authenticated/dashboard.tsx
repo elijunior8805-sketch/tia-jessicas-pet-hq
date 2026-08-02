@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import {
   TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw,
 } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useMyProfile, firstName } from "@/hooks/use-my-profile";
