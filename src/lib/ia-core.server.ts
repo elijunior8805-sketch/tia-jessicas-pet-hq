@@ -151,7 +151,10 @@ type ChamadaResultado = {
   modelo: string;
   usouFallback: boolean;
   tokens: number | null;
+  /** true quando o texto veio do cache curto, sem consumir crédito. */
+  doCache?: boolean;
 };
+
 
 async function chamadaUnica(
   modelo: string,
