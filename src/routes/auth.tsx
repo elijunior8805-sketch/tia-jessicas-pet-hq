@@ -76,7 +76,6 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nome, setNome] = useState("");
 
   // Cooldown separado por ação
   const [signupCooldown, setSignupCooldown] = useState(0);
