@@ -352,8 +352,12 @@ ${CONTRATO_JSON}`;
     prompt,
     config,
     origem: "cobranca:gerador",
+    // Protege contra clique duplo/reabertura da mesma cobrança em sequência.
+    cacheTtlMs: 90 * 1000,
+    cacheEscopo: ctx.cobranca.id ?? cobrancaId,
     sb,
   });
+
 
   const guard = verificarPalavrasProibidas(r.mensagem, config);
   if (!guard.ok) {
