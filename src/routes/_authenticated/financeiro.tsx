@@ -727,8 +727,8 @@ function FinanceiroPage() {
   const hoje = new Date();
 
   // Filtros
-  const [preset, setPreset] = useState<Preset>("mes");
-  const initialRange = computePreset("mes", hoje);
+  const [preset, setPreset] = useState<Preset>("30dias");
+  const initialRange = computePreset("30dias", hoje);
   const [inicio, setInicio] = useState(initialRange.de);
   const [fim, setFim] = useState(initialRange.ate);
   const [fFormas, setFFormas] = useState<string[]>([]); // vazio = todas
