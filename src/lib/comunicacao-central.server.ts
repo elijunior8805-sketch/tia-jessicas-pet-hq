@@ -520,7 +520,7 @@ Devolva apenas o texto, sem markdown.`,
       sb,
     });
 
-    return { resumo: r.texto, modelo: r.modelo, ia: true };
+    return { resumo: r.texto, modelo: r.modelo, ia: true, doCache: !!r.doCache };
   } catch {
     // Fallback determinístico — nunca deixa a tela sem resumo.
     const partes: string[] = [];
