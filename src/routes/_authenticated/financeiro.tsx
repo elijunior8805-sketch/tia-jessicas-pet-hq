@@ -213,7 +213,7 @@ function statusBadgeCls(s: string) {
  * Preset de período
  * ============================================================ */
 
-type Preset = "hoje" | "ontem" | "semana" | "mes" | "personalizado";
+type Preset = "hoje" | "ontem" | "semana" | "mes" | "30dias" | "personalizado";
 
 function computePreset(preset: Preset, hoje = new Date()): { de: string; ate: string } {
   const fmt = (d: Date) => format(d, "yyyy-MM-dd");
@@ -231,8 +231,10 @@ function computePreset(preset: Preset, hoje = new Date()): { de: string; ate: st
       };
     case "mes":
       return { de: fmt(startOfMonth(hoje)), ate: fmt(endOfMonth(hoje)) };
+    case "30dias":
+      return { de: fmt(subDays(hoje, 29)), ate: fmt(hoje) };
     default:
-      return { de: fmt(startOfMonth(hoje)), ate: fmt(endOfMonth(hoje)) };
+      return { de: fmt(subDays(hoje, 29)), ate: fmt(hoje) };
   }
 }
 
@@ -725,8 +727,8 @@ function FinanceiroPage() {
   const hoje = new Date();
 
   // Filtros
-  const [preset, setPreset] = useState<Preset>("mes");
-  const initialRange = computePreset("mes", hoje);
+  const [preset, setPreset] = useState<Preset>("30dias");
+  const initialRange = computePreset("30dias", hoje);
   const [inicio, setInicio] = useState(initialRange.de);
   const [fim, setFim] = useState(initialRange.ate);
   const [fFormas, setFFormas] = useState<string[]>([]); // vazio = todas
@@ -748,7 +750,7 @@ function FinanceiroPage() {
   };
 
   const limparFiltros = () => {
-    aplicarPreset("mes");
+    aplicarPreset("30dias");
     setFFormas([]);
     setFBloco("todos");
     setFStatus("todos");
@@ -1309,7 +1311,7 @@ function FinanceiroPage() {
             {/* Presets + range */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-xl bg-muted p-1">
-                {(["hoje", "ontem", "semana", "mes", "personalizado"] as Preset[]).map((p) => (
+                {(["hoje", "ontem", "semana", "mes", "30dias", "personalizado"] as Preset[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => aplicarPreset(p)}
@@ -1324,6 +1326,7 @@ function FinanceiroPage() {
                     {p === "ontem" && "Ontem"}
                     {p === "semana" && "Semana"}
                     {p === "mes" && "Mês"}
+                    {p === "30dias" && "30 dias"}
                     {p === "personalizado" && "Personalizado"}
                   </button>
                 ))}
