@@ -1326,6 +1326,7 @@ function FinanceiroPage() {
                     {p === "ontem" && "Ontem"}
                     {p === "semana" && "Semana"}
                     {p === "mes" && "Mês"}
+                    {p === "30dias" && "30 dias"}
                     {p === "personalizado" && "Personalizado"}
                   </button>
                 ))}
