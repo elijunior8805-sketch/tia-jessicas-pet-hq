@@ -514,9 +514,12 @@ Devolva apenas o texto, sem markdown.`,
       config,
       temperatura: 0.3,
       origem: "resumo_operacional",
+      // Os mesmos números no mesmo dia devolvem o mesmo resumo, sem gastar crédito.
+      cacheTtlMs: 10 * 60 * 1000,
+      cacheEscopo: hojeISO(),
       sb,
-
     });
+
     return { resumo: r.texto, modelo: r.modelo, ia: true };
   } catch {
     // Fallback determinístico — nunca deixa a tela sem resumo.
