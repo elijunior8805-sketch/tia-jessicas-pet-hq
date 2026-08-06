@@ -398,7 +398,7 @@ function AtendimentoDetalhe() {
       if (error) throw error;
 
       if (data) {
-        // Buscar o atendimento anterior real para obter a "Última Visita" correta
+        // Regra Global: Última Visita = Atendimento concluído imediatamente anterior a este
         const { data: anterior } = await supabase
           .from("atendimentos")
           .select("data_inicio")
@@ -408,6 +408,7 @@ function AtendimentoDetalhe() {
           .order("data_inicio", { ascending: false })
           .limit(1)
           .maybeSingle();
+        
         (data as any).ultima_visita = anterior?.data_inicio ?? null;
       }
 
