@@ -100,7 +100,11 @@ function ClienteDetalhe() {
   if (!data) return <PageShell><div className="text-sm text-muted-foreground">Cliente não encontrado.</div></PageShell>;
 
   const totalAtend = atends?.length ?? 0;
-  const datasExec = (atends ?? []).map((a: any) => a.data_execucao).filter(Boolean).sort();
+  const datasExec = (atends ?? [])
+    .filter((a: any) => a.status === "concluido" || a.status === "finalizado")
+    .map((a: any) => a.data_execucao)
+    .filter(Boolean)
+    .sort();
   const ultimaVisita = datasExec[datasExec.length - 1] as string | undefined;
   const proximas = (data.pets ?? [])
     .map((p: any) => p.proxima_visita)
