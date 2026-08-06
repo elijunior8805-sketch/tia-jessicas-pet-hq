@@ -398,6 +398,20 @@ function AtendimentoDetalhe() {
       if (error) throw error;
 
       if (data) {
+        // Buscar o atendimento anterior real para obter a "Última Visita" correta
+        const { data: anterior } = await supabase
+          .from("atendimentos")
+          .select("data_inicio")
+          .eq("pet_id", data.pet_id)
+          .lt("data_inicio", data.data_inicio)
+          .not("encerrado_em", "is", null)
+          .order("data_inicio", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        (data as any).ultima_visita = anterior?.data_inicio ?? null;
+      }
+
+      if (data) {
         // Buscar o atendimento anterior para obter a real "Última Visita"
         const { data: anterior } = await supabase
           .from("atendimentos")
