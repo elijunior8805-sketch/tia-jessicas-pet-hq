@@ -199,11 +199,16 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
       doc.setFont("helvetica", "normal"); doc.setTextColor(...C.mute);
       doc.text(k, x + 12, ly);
       doc.setFont("helvetica", "bold"); doc.setTextColor(...C.ink);
-      const value = doc.splitTextToSize(v || "—", boxW - 90);
-      doc.text(value, x + 82, ly);
+      const value = doc.splitTextToSize(v || "—", boxW - 95);
+      doc.text(value, x + 87, ly);
       ly += 16;
     });
   };
+
+  const ultimaVisitaStr = (atendimento as any).ultima_visita
+    ? fmtDate((atendimento as any).ultima_visita)
+    : "Primeira visita";
+
   drawBox(M, "Tutor", [
     ["Nome", cliente.nome ?? "—"],
     ["WhatsApp", cliente.whatsapp ?? "—"],
@@ -212,7 +217,8 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   ]);
   drawBox(M + boxW + 12, "Pet", [
     ["Nome", pet.nome ?? "—"],
-    ["Raca / Porte", `${pet.raca ?? "—"} / ${pet.porte ?? "—"}`],
+    ["Raça / Porte", `${pet.raca ?? "—"} / ${pet.porte ?? "—"}`],
+    ["Última visita", ultimaVisitaStr],
     ["Alergias", pet.alergias ?? "—"],
     ["Temperamento", pet.temperamento ?? "—"],
   ]);

@@ -396,6 +396,36 @@ function AtendimentoDetalhe() {
         agendamentos(id, data, hora, observacoes)
       `).eq("id", atendId).maybeSingle();
       if (error) throw error;
+
+      if (data) {
+        // Buscar o atendimento anterior real para obter a "Última Visita" correta
+        const { data: anterior } = await supabase
+          .from("atendimentos")
+          .select("data_inicio")
+          .eq("pet_id", data.pet_id)
+          .lt("data_inicio", data.data_inicio)
+          .not("encerrado_em", "is", null)
+          .order("data_inicio", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        (data as any).ultima_visita = anterior?.data_inicio ?? null;
+      }
+
+      if (data) {
+        // Buscar o atendimento anterior para obter a real "Última Visita"
+        const { data: anterior } = await supabase
+          .from("atendimentos")
+          .select("data_inicio")
+          .eq("pet_id", data.pet_id)
+          .lt("data_inicio", data.data_inicio)
+          .not("encerrado_em", "is", null)
+          .order("data_inicio", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        (data as any).ultima_visita = anterior?.data_inicio ?? null;
+      }
+
       return data;
     },
   });
@@ -588,7 +618,10 @@ function AtendimentoDetalhe() {
   if (pet?.necessita_focinheira) alertas.push("Precisa de focinheira");
   if (pet?.cuidados_saude) alertas.push(`Saúde: ${pet.cuidados_saude}`);
 
-  const subtitleParts = [pet?.raca, pet?.porte, cliente?.whatsapp].filter(Boolean);
+  const ultimaVisitaStr = (atendimento as any)?.ultima_visita
+    ? new Date((atendimento as any).ultima_visita).toLocaleDateString("pt-BR")
+    : "Primeira visita";
+  const subtitleParts = [pet?.raca, pet?.porte, `Última visita: ${ultimaVisitaStr}`].filter(Boolean);
 
   // ---- Handlers ----
 
