@@ -60,7 +60,11 @@ function FichaOperacional() {
         .eq("pet_id", petId)
         .not("encerrado_em", "is", null)
         .order("data_inicio", { ascending: false })
-        .limit(1);
+        .limit(2);
+      
+      // Se houver pelo menos um encerrado, a última visita é o mais recente.
+      // A regra de "anterior" aplica-se ao RELATÓRIO do atendimento atual.
+      // Na ficha, mostramos a última data de fato gravada.
       return { total: count ?? 0, ultima: ult?.[0]?.data_inicio ?? null };
     },
   });
