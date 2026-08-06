@@ -604,7 +604,10 @@ function AtendimentoDetalhe() {
   if (pet?.necessita_focinheira) alertas.push("Precisa de focinheira");
   if (pet?.cuidados_saude) alertas.push(`Saúde: ${pet.cuidados_saude}`);
 
-  const subtitleParts = [pet?.raca, pet?.porte, cliente?.whatsapp].filter(Boolean);
+  const ultimaVisitaStr = (atendimento as any)?.ultima_visita
+    ? new Date((atendimento as any).ultima_visita).toLocaleDateString("pt-BR")
+    : "Primeira visita";
+  const subtitleParts = [pet?.raca, pet?.porte, `Última visita: ${ultimaVisitaStr}`].filter(Boolean);
 
   // ---- Handlers ----
 
