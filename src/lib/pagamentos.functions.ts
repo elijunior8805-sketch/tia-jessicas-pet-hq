@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { format } from "date-fns";
 
 const StatusEnum = z.enum(["pendente", "parcial", "atrasado", "pago", "cancelado"]);
 
@@ -312,4 +313,44 @@ export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
     }
 
     return { resultados, totalOk, totalFalha };
+  });
+
+export const confirmarRecebimento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({
+      pagamentoId: z.string().uuid(),
+      forma: z.enum(["pix", "dinheiro", "debito", "credito", "outras"]),
+      valor: z.number().min(0.01),
+      dataPagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: atual, error: readErr } = await supabase
+      .from("pagamentos")
+      .select("id, status, valor_pago")
+      .eq("id", data.pagamentoId)
+      .single();
+
+    if (readErr || !atual) throw new Error("Pagamento não encontrado");
+    if (atual.status === "pago") throw new Error("Pagamento já foi recebido anteriormente");
+
+    const { error: updErr } = await supabase
+      .from("pagamentos")
+      .update({
+        status: "pago",
+        forma: data.forma,
+        valor_pago: data.valor,
+        data_pagamento: data.dataPagamento,
+      })
+      .eq("id", data.pagamentoId);
+
+    if (updErr) {
+      console.error("[pagamentos] confirmarRecebimento erro:", updErr.message);
+      throw new Error("Falha ao registrar recebimento");
+    }
+
+    return { success: true };
   });

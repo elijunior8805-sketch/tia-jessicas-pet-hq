@@ -6,6 +6,7 @@ import {
   listarPagamentosAbertos,
   registrarContatoCobranca,
   registrarContatoCobrancaLote,
+  confirmarRecebimento,
   type PagamentoAbertoDTO,
   type CobrancaLoteItem,
 } from "@/lib/pagamentos.functions";
@@ -50,6 +51,7 @@ function PagamentosAbertosPage() {
   const listar = useServerFn(listarPagamentosAbertos);
   const registrar = useServerFn(registrarContatoCobranca);
   const registrarLote = useServerFn(registrarContatoCobrancaLote);
+  const confirmarRec = useServerFn(confirmarRecebimento);
   const qc = useQueryClient();
   const [busca, setBusca] = useState("");
   const [somenteAtrasados, setSomenteAtrasados] = useState(false);
@@ -129,6 +131,28 @@ function PagamentosAbertosPage() {
       cliente_id: (p as any).cliente_id ?? null,
     });
   }
+
+  const [recebendo, setRecebendo] = useState<PagamentoAbertoDTO | null>(null);
+
+  const confirmRecMut = useMutation({
+    mutationFn: (vars: { forma: any; data: string }) =>
+      confirmarRec({
+        data: {
+          pagamentoId: recebendo!.id,
+          forma: vars.forma,
+          valor: recebendo!.saldo,
+          dataPagamento: vars.data,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Pagamento recebido com sucesso!");
+      setRecebendo(null);
+      qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+      qc.invalidateQueries({ queryKey: ["fin-pag"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao receber"),
+  });
 
 
   return (
@@ -265,7 +289,16 @@ function PagamentosAbertosPage() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-2">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => setRecebendo(p)}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                          Receber
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -361,10 +394,91 @@ function PagamentosAbertosPage() {
         onSent={() => qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] })}
       />
     </div>
+      <Dialog open={!!recebendo} onOpenChange={(v) => !v && setRecebendo(null)}>
+        {recebendo && (
+          <ReceberPagamentoModal
+            p={recebendo}
+            onConfirm={(forma, data) => confirmRecMut.mutate({ forma, data })}
+            loading={confirmRecMut.isPending}
+          />
+        )}
+      </Dialog>
+    </div>
   );
 }
 
+function ReceberPagamentoModal({
+  p,
+  onConfirm,
+  loading,
+}: {
+  p: PagamentoAbertoDTO;
+  onConfirm: (forma: string, data: string) => void;
+  loading: boolean;
+}) {
+  const [forma, setForma] = useState("pix");
+  const [data, setData] = useState(new Date().toISOString().split("T")[0]);
 
+  return (
+    <DialogContent className="max-w-sm">
+      <DialogHeader>
+        <DialogTitle>Receber Pagamento</DialogTitle>
+        <DialogDescription>
+          Registre o recebimento da parcela pendente.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-2">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <span className="text-muted-foreground">Cliente:</span>
+          <span className="font-medium">{p.cliente_nome}</span>
+          <span className="text-muted-foreground">Pet:</span>
+          <span className="font-medium">{p.pet_nome ?? "—"}</span>
+          <span className="text-muted-foreground">Atendimento:</span>
+          <span className="font-medium">
+            {(p as any).data_atendimento
+              ? new Date((p as any).data_atendimento + "T12:00:00").toLocaleDateString("pt-BR")
+              : "—"}
+          </span>
+          <span className="text-muted-foreground font-semibold">Valor:</span>
+          <span className="font-bold text-emerald-600">{brl(p.saldo)}</span>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Forma de pagamento</Label>
+          <select
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={forma}
+            onChange={(e) => setForma(e.target.value)}
+          >
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="debito">Débito</option>
+            <option value="credito">Crédito</option>
+            <option value="outras">Outras</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Data do recebimento</Label>
+          <Input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button
+          className="w-full bg-emerald-600 hover:bg-emerald-700"
+          disabled={loading}
+          onClick={() => onConfirm(forma, data)}
+        >
+          {loading ? "Processando..." : "CONFIRMAR PAGAMENTO"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
 
 function KpiCard({
   icon, label, value, sub, destaque,
