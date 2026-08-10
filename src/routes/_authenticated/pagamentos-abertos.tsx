@@ -107,7 +107,7 @@ function PagamentosAbertosPage() {
       return;
     }
     const dataAt = (p as any).data_atendimento
-      ? new Date((p as any).data_atendimento + "T00:00:00").toLocaleDateString("pt-BR")
+      ? new Date((p as any).data_atendimento).toLocaleDateString("pt-BR")
       : "";
     const venc = p.vencimento
       ? new Date(p.vencimento + "T00:00:00").toLocaleDateString("pt-BR")
@@ -435,7 +435,7 @@ function ReceberPagamentoModal({
           <span className="text-muted-foreground">Atendimento:</span>
           <span className="font-medium">
             {(p as any).data_atendimento
-              ? new Date((p as any).data_atendimento + "T12:00:00").toLocaleDateString("pt-BR")
+              ? new Date((p as any).data_atendimento).toLocaleDateString("pt-BR")
               : "—"}
           </span>
           <span className="text-muted-foreground font-semibold">Valor:</span>
