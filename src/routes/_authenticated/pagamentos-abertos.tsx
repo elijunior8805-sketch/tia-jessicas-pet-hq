@@ -393,7 +393,6 @@ function PagamentosAbertosPage() {
         payload={composer.state.payload}
         onSent={() => qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] })}
       />
-    </div>
       <Dialog open={!!recebendo} onOpenChange={(v) => !v && setRecebendo(null)}>
         {recebendo && (
           <ReceberPagamentoModal
