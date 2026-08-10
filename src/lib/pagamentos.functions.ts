@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { format } from "date-fns";
 
 const StatusEnum = z.enum(["pendente", "parcial", "atrasado", "pago", "cancelado"]);
 
@@ -26,6 +27,7 @@ export type PagamentoAbertoDTO = {
   dias_atraso: number;
   status: string;
   atendimento_id: string | null;
+  data_atendimento?: string | null;
   observacoes: string | null;
 };
 
@@ -68,7 +70,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     let query = supabase
       .from("pagamentos")
       .select(
-        "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))"
+        "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(data_atendimento, finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))"
       )
       .in("status", [...statusFiltro])
       .order("vencimento", { ascending: true, nullsFirst: false })
@@ -110,6 +112,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
         dias_atraso: diasAtraso,
         status: r.status,
         atendimento_id: r.atendimento_id,
+        data_atendimento: r.atendimentos?.data_atendimento ?? null,
         observacoes: r.observacoes,
       };
     });
@@ -312,4 +315,44 @@ export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
     }
 
     return { resultados, totalOk, totalFalha };
+  });
+
+export const confirmarRecebimento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({
+      pagamentoId: z.string().uuid(),
+      forma: z.enum(["pix", "dinheiro", "debito", "credito", "outras"]),
+      valor: z.number().min(0.01),
+      dataPagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: atual, error: readErr } = await supabase
+      .from("pagamentos")
+      .select("id, status, valor_pago")
+      .eq("id", data.pagamentoId)
+      .single();
+
+    if (readErr || !atual) throw new Error("Pagamento não encontrado");
+    if (atual.status === "pago") throw new Error("Pagamento já foi recebido anteriormente");
+
+    const { error: updErr } = await supabase
+      .from("pagamentos")
+      .update({
+        status: "pago",
+        forma: data.forma,
+        valor_pago: data.valor,
+        data_pagamento: data.dataPagamento,
+      })
+      .eq("id", data.pagamentoId);
+
+    if (updErr) {
+      console.error("[pagamentos] confirmarRecebimento erro:", updErr.message);
+      throw new Error("Falha ao registrar recebimento");
+    }
+
+    return { success: true };
   });
