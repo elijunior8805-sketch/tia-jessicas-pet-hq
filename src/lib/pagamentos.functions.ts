@@ -27,6 +27,7 @@ export type PagamentoAbertoDTO = {
   dias_atraso: number;
   status: string;
   atendimento_id: string | null;
+  data_atendimento?: string | null;
   observacoes: string | null;
 };
 
@@ -69,7 +70,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     let query = supabase
       .from("pagamentos")
       .select(
-        "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))"
+        "id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(data_atendimento, finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))"
       )
       .in("status", [...statusFiltro])
       .order("vencimento", { ascending: true, nullsFirst: false })
@@ -111,6 +112,7 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
         dias_atraso: diasAtraso,
         status: r.status,
         atendimento_id: r.atendimento_id,
+        data_atendimento: r.atendimentos?.data_atendimento ?? null,
         observacoes: r.observacoes,
       };
     });
