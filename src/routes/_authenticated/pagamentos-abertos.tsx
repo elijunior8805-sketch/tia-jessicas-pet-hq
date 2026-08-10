@@ -250,7 +250,7 @@ function PagamentosAbertosPage() {
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
-                    <TableHead className="w-32 text-right">Ações</TableHead>
+                    <TableHead className="w-48 text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
