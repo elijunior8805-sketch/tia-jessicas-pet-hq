@@ -133,7 +133,7 @@ export const Route = createFileRoute("/_authenticated/agenda")({
   validateSearch: (search: Record<string, unknown>) => ({
     cliente: typeof search.cliente === "string" ? search.cliente : undefined,
     pet: typeof search.pet === "string" ? search.pet : undefined,
-  }),
+  }) as { cliente?: string; pet?: string },
 });
 
 type Status =

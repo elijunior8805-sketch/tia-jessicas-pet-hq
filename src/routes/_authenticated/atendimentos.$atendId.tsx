@@ -583,7 +583,7 @@ function AtendimentoDetalhe() {
       qc.invalidateQueries({ queryKey: ["pagamentos"] });
       qc.invalidateQueries({ queryKey: ["pets"] });
       setExcluirOpen(false);
-      navigate({ to: "/agenda" });
+      navigate({ to: "/agenda", search: {} });
     },
     onError: (e: any) => toast.error(e.message ?? "Erro ao excluir atendimento"),
   });

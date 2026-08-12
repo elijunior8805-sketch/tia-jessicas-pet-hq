@@ -304,7 +304,7 @@ function DashboardPage() {
                   className="pl-10 h-11 rounded-full bg-white/10 backdrop-blur border-white/20 text-white placeholder:text-white/60 focus-visible:ring-[oklch(0.78_0.11_82)] focus-visible:ring-offset-0"
                 />
               </div>
-              <Link to="/agenda" className="w-full sm:w-auto">
+              <Link to="/agenda" search={{}} className="w-full sm:w-auto">
                 <Button
                   size="default"
                   className="h-11 w-full sm:w-auto px-6 rounded-full gap-2 whitespace-nowrap font-semibold border-0 transition-all hover:-translate-y-[1px]"
