@@ -25,6 +25,8 @@ export function useRealtimeFinanceiro(queryKeys: (string | (string | undefined |
       .channel(`rt-financeiro-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "pagamentos" }, invalidate)
       .on("postgres_changes", { event: "*", schema: "public", table: "atendimentos" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "compras_parcelas" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cobrancas" }, invalidate)
       .subscribe();
 
     return () => {
