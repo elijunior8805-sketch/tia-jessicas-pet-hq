@@ -45,7 +45,6 @@ import {
   Receipt,
   Coins,
   X,
-  FlaskConical,
   Trash2,
   SlidersHorizontal,
   Filter,
