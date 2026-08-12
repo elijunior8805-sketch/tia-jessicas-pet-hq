@@ -132,7 +132,7 @@ function DashboardPage() {
         return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       };
 
-      const [comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
+      const [comprasRes, atendRes, novosClientesRes, proxAgRes, pagamentosRes] = await Promise.all([
         // Despesas do painel: considera parcelas pagas pela data de pagamento
         // e parcelas ainda em aberto pela data de vencimento. Assim o card não
         // some quando a compra foi lançada mas ainda não foi baixada/paga.
@@ -160,6 +160,14 @@ function DashboardPage() {
           .order("data", { ascending: true })
           .order("hora_inicio", { ascending: true })
           .limit(6),
+        // Buscar aportes e ajustes (entradas não-serviço)
+        supabase
+          .from("pagamentos")
+          .select("valor_pago, data_pagamento, categoria_receita")
+          .neq("categoria_receita", "servico")
+          .eq("status", "pago")
+          .gte("data_pagamento", from)
+          .lte("data_pagamento", to),
       ]);
 
       if (comprasRes.error) {
