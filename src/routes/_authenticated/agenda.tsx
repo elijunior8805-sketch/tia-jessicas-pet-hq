@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { toast } from "sonner";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
@@ -289,6 +291,8 @@ function AgendaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.cliente, search.pet]);
   const qc = useQueryClient();
+  useRealtimeFinanceiro(["agendamentos"]);
+
   const { data: profile } = useMyProfile();
   const signer = { name: displayName(profile), initials: initials(profile) };
 
