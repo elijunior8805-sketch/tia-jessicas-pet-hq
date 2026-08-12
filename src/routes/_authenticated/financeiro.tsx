@@ -96,6 +96,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 
 /* ============================================================
  * Tipos e utilitários
@@ -724,6 +726,8 @@ function TesteToolbar({ onChange }: { onChange: () => void }) {
 
 function FinanceiroPage() {
   const qc = useQueryClient();
+  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc"]);
+
   const hoje = new Date();
 
   // Filtros

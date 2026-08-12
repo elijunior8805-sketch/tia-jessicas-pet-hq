@@ -16,6 +16,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { useMyProfile, firstName } from "@/hooks/use-my-profile";
 import { recalcularAgregados } from "@/lib/agregados.functions";
 import { toast } from "sonner";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
