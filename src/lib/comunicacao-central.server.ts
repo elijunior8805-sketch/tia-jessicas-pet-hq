@@ -59,11 +59,11 @@ const TOM_INSTRUCAO: Record<string, string> = {
 };
 
 const FIRMEZA_INSTRUCAO: Record<number, string> = {
-  1: "Muito gentil: priorize o afeto e a leveza acima da cobrança.",
-  2: "Gentil: cobre com delicadeza, deixando a porta aberta.",
-  3: "Equilibrado: cordial, porém claro sobre o que se espera.",
-  4: "Firme: deixe explícito o que precisa ser resolvido e em qual prazo.",
-  5: "Muito firme, mantendo respeito: seja inequívoco, sem jamais constranger ou ameaçar.",
+  1: "Profissional: cordial, porém sem pressão. Priorize o afeto e a leveza.",
+  2: "Direto: cobre com clareza, mantendo a porta aberta.",
+  3: "Firme e Sério: deixe explícito que o prazo venceu e que o pagamento é fundamental para o negócio.",
+  4: "Enérgico e Inequívoco: use tom direto e firme. A mensagem deve fazer o cliente sentir a gravidade do atraso e a urgência máxima de regularização, sem ser mal-educado.",
+  5: "Tom de Cobrança Extremo: firmeza absoluta e direta. A pessoa deve sentir que a situação 'passou dos limites' e que a cobrança é muito mais firme do que uma simples abordagem profissional, mantendo o respeito mas sendo incisivo sobre a necessidade imediata de pagamento.",
 };
 
 export const REGRAS_INVIOLAVEIS = `REGRAS INVIOLÁVEIS (o descumprimento invalida a resposta):
