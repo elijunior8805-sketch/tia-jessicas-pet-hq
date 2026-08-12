@@ -1042,10 +1042,18 @@ function FinanceiroPage() {
     const receitaBruta = Number(faturamentoCompetencia);
 
     // Ticket Médio: agora utiliza o total acumulado do faturamento por competência (serviços finalizados)
-    // dividido pela quantidade de atendimentos únicos no período. Isso garante consistência com o Dashboard.
-    const atendimentosUnicos = new Set(receitasFiltradas.filter(p => p.categoria_receita === 'servico' && p.atendimento_id).map(p => p.atendimento_id));
-    const contagemAtend = atendimentosUnicos.size;
-    const ticketMedio = contagemAtend > 0 ? receitaBruta / contagemAtend : 0;
+    // dividido pela quantidade de atendimentos únicos no período. 
+    // Usamos 'pagamentos' (fonte bruta) em vez de 'receitasFiltradas' para garantir que 
+    // mesmo que haja filtros ativos na tabela, o KPI do topo reflita o período total.
+    const ticketMedio = useMemo(() => {
+      const atendimentosUnicos = new Set(
+        pagamentos
+          .filter(p => p.categoria_receita === 'servico' && p.atendimento_id)
+          .map(p => p.atendimento_id)
+      );
+      const contagemAtend = atendimentosUnicos.size;
+      return contagemAtend > 0 ? receitaBruta / contagemAtend : 0;
+    }, [receitaBruta, pagamentos]);
 
     // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado.
     const aportesAjustes = recebidosRows
