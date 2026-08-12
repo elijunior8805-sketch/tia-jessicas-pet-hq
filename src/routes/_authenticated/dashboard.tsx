@@ -16,6 +16,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { useMyProfile, firstName } from "@/hooks/use-my-profile";
 import { recalcularAgregados } from "@/lib/agregados.functions";
 import { toast } from "sonner";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -81,6 +83,8 @@ function DashboardPage() {
   const { data: profile } = useMyProfile();
   const queryClient = useQueryClient();
   const recalcFn = useServerFn(recalcularAgregados);
+  useRealtimeFinanceiro(["dashboard-metrics", "agendamentos"]);
+
   const recalc = useMutation({
     mutationFn: () => recalcFn({ data: undefined as any }),
     onSuccess: async (res) => {
@@ -103,7 +107,8 @@ function DashboardPage() {
 
   const { data } = useQuery({
     queryKey: ["dashboard-metrics", from, to],
-    staleTime: 0,
+    staleTime: 30000,
+
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -304,7 +309,7 @@ function DashboardPage() {
                   className="pl-10 h-11 rounded-full bg-white/10 backdrop-blur border-white/20 text-white placeholder:text-white/60 focus-visible:ring-[oklch(0.78_0.11_82)] focus-visible:ring-offset-0"
                 />
               </div>
-              <Link to="/agenda" className="w-full sm:w-auto">
+              <Link to="/agenda" search={{}} className="w-full sm:w-auto">
                 <Button
                   size="default"
                   className="h-11 w-full sm:w-auto px-6 rounded-full gap-2 whitespace-nowrap font-semibold border-0 transition-all hover:-translate-y-[1px]"
@@ -485,6 +490,8 @@ function DashboardPage() {
                     <Link
                       key={a.id}
                       to="/agenda"
+                      search={{}}
+
                       className="group flex gap-2.5 sm:gap-3 items-center rounded-xl p-2 sm:p-2.5 -mx-2 sm:-mx-2.5 hover:bg-[oklch(0.97_0.02_150)] transition-colors"
                     >
                       <div className="flex flex-col items-center justify-center w-[52px] sm:w-14 shrink-0 rounded-lg py-1.5 bg-[oklch(0.96_0.02_155)] border border-[oklch(0.90_0.02_155)]">

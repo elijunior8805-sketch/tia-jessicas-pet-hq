@@ -96,6 +96,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 
 /* ============================================================
  * Tipos e utilitários
@@ -724,6 +726,8 @@ function TesteToolbar({ onChange }: { onChange: () => void }) {
 
 function FinanceiroPage() {
   const qc = useQueryClient();
+  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc"]);
+
   const hoje = new Date();
 
   // Filtros
@@ -734,6 +738,8 @@ function FinanceiroPage() {
   const [fFormas, setFFormas] = useState<string[]>([]); // vazio = todas
   const [fBloco, setFBloco] = useState<"todos" | "entradas" | "saidas">("todos");
   const [fStatus, setFStatus] = useState<string>("todos");
+  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia"]);
+
   const [fCategoria, setFCategoria] = useState<string>("todas"); // categoria_receita
   const [fCliente, setFCliente] = useState<string>("todos");
   const [incluirTeste, setIncluirTeste] = useState<boolean>(import.meta.env.DEV);
@@ -948,7 +954,8 @@ function FinanceiroPage() {
   // Considera o período por encerrado_em (fallback data_inicio).
   const { data: faturamentoCompetencia = 0 } = useQuery<number>({
     queryKey: ["fin-fat-competencia", inicio, fim],
-    staleTime: 0,
+    staleTime: 30000,
+
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {

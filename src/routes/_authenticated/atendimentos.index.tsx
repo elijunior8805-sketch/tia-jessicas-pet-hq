@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 import {
   Clock, PawPrint, User, PlayCircle, ArrowRight, ClipboardCheck,
   AlertTriangle, Sparkles, ListChecks, Star,
@@ -37,6 +39,8 @@ function toLocalDay(iso: string | null | undefined) {
 
 function AtendimentosPainel() {
   const qc = useQueryClient();
+  useRealtimeFinanceiro(["atendimentos-painel"]);
+
   const navigate = useNavigate();
   const { vip: vipParam } = Route.useSearch();
   const onlyVip = vipParam === "1";
