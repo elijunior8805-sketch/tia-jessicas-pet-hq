@@ -1038,18 +1038,14 @@ function FinanceiroPage() {
     );
     const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
+    // Receita bruta por competência (mesma regra do Dashboard)
+    const receitaBruta = Number(faturamentoCompetencia);
+
     // Ticket Médio: agora utiliza o total acumulado do faturamento por competência (serviços finalizados)
-    // dividido pela quantidade de atendimentos no período. Isso garante consistência com o Dashboard.
-    // Primeiro, vamos calcular a quantidade de atendimentos finalizados no período.
-    const ticketMedio = useMemo(() => {
-      // Como o faturamentoCompetencia já vem do servidor como um número total, 
-      // precisamos de uma query ou cálculo que nos dê a contagem de atendimentos.
-      // Para manter a consistência com a lógica do Dashboard e evitar novas queries complexas aqui,
-      // vamos inferir a contagem a partir dos pagamentos que são de categoria 'servico' e estão vinculados a atendimentos.
-      const atendimentosUnicos = new Set(receitasFiltradas.filter(p => p.categoria_receita === 'servico' && p.atendimento_id).map(p => p.atendimento_id));
-      const contagem = atendimentosUnicos.size;
-      return contagem > 0 ? receitaBruta / contagem : 0;
-    }, [receitaBruta, receitasFiltradas]);
+    // dividido pela quantidade de atendimentos únicos no período. Isso garante consistência com o Dashboard.
+    const atendimentosUnicos = new Set(receitasFiltradas.filter(p => p.categoria_receita === 'servico' && p.atendimento_id).map(p => p.atendimento_id));
+    const contagemAtend = atendimentosUnicos.size;
+    const ticketMedio = contagemAtend > 0 ? receitaBruta / contagemAtend : 0;
 
     // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado.
     const aportesAjustes = recebidosRows
@@ -1071,14 +1067,10 @@ function FinanceiroPage() {
       .reduce((s, p) => s + saldoReceita(p), 0);
     const qtdPendentes = emAberto.length;
 
-
     // Despesas pagas no período
     const despesasPagas = despesasFiltradas
       .filter((p) => p.data_pagamento && p.data_pagamento >= inicio && p.data_pagamento <= fim && p.status !== "cancelado")
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
-
-    // Receita bruta por competência
-    const receitaBruta = Number(faturamentoCompetencia);
 
     // Lucro estimado: receita competência - despesas pagas
     const lucroEstimado = receitaBruta - despesasPagas;
