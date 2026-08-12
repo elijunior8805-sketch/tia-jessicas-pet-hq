@@ -1038,13 +1038,13 @@ function FinanceiroPage() {
     );
     const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    // "Serviço" recebido para ticket médio (exclui aportes/ajustes; apenas com valor_pago > 0)
+    // "Serviço" recebido para ticket médio (usamos a regra global que inclui taxas)
     const recServico = recebidosRows.filter((p) => p.categoria_receita === "servico" && Number(p.valor_pago || 0) > 0);
     const ticketMedio = recServico.length ? recServico.reduce((s, p) => s + Number(p.valor_pago || 0), 0) / recServico.length : 0;
 
-    // Aportes / Ajustes separados
+    // Aportes / Ajustes: qualquer categoria que não seja 'servico' (Entradas Diversas)
     const aportesAjustes = recebidosRows
-      .filter((p) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
+      .filter((p) => p.categoria_receita !== "servico")
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
     // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
