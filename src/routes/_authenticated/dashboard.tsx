@@ -189,32 +189,40 @@ function DashboardPage() {
         }
         return s;
       }, 0);
-      // Faturamento / Atendimentos / Ticket Médio: somente atendimentos
-      // finalizados (finalizado=true), com encerrado_em preenchido e
-      // valor_executado > 0, cuja data local (America/Sao_Paulo) de
-      // `encerrado_em` cai dentro do período selecionado.
-      const executados = atendimentos.filter((a: any) => {
-        if (a.finalizado !== true || !a.encerrado_em) return false;
-        if (valorRealExecutado(a) <= 0) return false;
-        const ref = toLocalDay(a.encerrado_em);
-        return ref >= from && ref <= to;
-      });
-      const atendCount = executados.length;
-      const somaExec = executados.reduce((s, a: any) => s + valorRealExecutado(a), 0);
+      // Faturamento / Atendimentos / Ticket Médio: 
+      // Padronizado para usar Receitas de Serviços recebidas (Fluxo de Caixa) 
+      // conforme solicitado, para bater com o Financeiro.
+      const pagamentosTodosRes = await supabase
+        .from("pagamentos")
+        .select("id, atendimento_id, valor_pago, data_pagamento, categoria_receita, status")
+        .eq("status", "pago")
+        .gte("data_pagamento", from)
+        .lte("data_pagamento", to);
       
-      // Aportes e Ajustes: qualquer categoria que não seja 'servico'
-      const aportesAjustes = (pagamentosRes.data ?? []).reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      const pagamentosPeriodo = pagamentosTodosRes.data ?? [];
       
-      const bilhete = atendCount > 0 ? somaExec / atendCount : 0;
-      const faturamento = somaExec;
+      const receitasServico = pagamentosPeriodo.filter(
+        (p: any) => p.categoria_receita === "servico" || p.atendimento_id
+      );
+
+      const faturamento = receitasServico.reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      const atendimentosUnicosSet = new Set(receitasServico.map((p: any) => p.atendimento_id).filter(Boolean));
+      const atendCount = atendimentosUnicosSet.size;
+      const bilhete = atendCount > 0 ? faturamento / atendCount : 0;
+      
+      // Aportes e Ajustes: categorias específicas conforme solicitado
+      const aportesAjustes = pagamentosPeriodo
+        .filter((p: any) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
+        .reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      
       const lucro = faturamento + aportesAjustes - despesas;
 
-      const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
-      const serie = dias.map((d) => {
+      const diasIntervalo = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
+      const serie = diasIntervalo.map((d) => {
         const key = format(d, "yyyy-MM-dd");
-        const val = executados
-          .filter((a: any) => toLocalDay(a.encerrado_em) === key)
-          .reduce((s, a: any) => s + valorRealExecutado(a), 0);
+        const val = receitasServico
+          .filter((p: any) => p.data_pagamento === key)
+          .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
         return { dia: format(d, "dd/MM"), valor: val };
       });
 
