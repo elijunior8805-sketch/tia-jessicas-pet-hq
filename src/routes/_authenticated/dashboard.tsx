@@ -83,6 +83,8 @@ function DashboardPage() {
   const { data: profile } = useMyProfile();
   const queryClient = useQueryClient();
   const recalcFn = useServerFn(recalcularAgregados);
+  useRealtimeFinanceiro(["dashboard-metrics", "agendamentos"]);
+
   const recalc = useMutation({
     mutationFn: () => recalcFn({ data: undefined as any }),
     onSuccess: async (res) => {
@@ -105,7 +107,8 @@ function DashboardPage() {
 
   const { data } = useQuery({
     queryKey: ["dashboard-metrics", from, to],
-    staleTime: 0,
+    staleTime: 30000,
+
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
