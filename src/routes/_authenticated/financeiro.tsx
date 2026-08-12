@@ -1038,13 +1038,22 @@ function FinanceiroPage() {
     );
     const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    // "Serviço" recebido para ticket médio (usamos a regra global que inclui taxas)
-    const recServico = recebidosRows.filter((p) => p.categoria_receita === "servico" && Number(p.valor_pago || 0) > 0);
-    const ticketMedio = recServico.length ? recServico.reduce((s, p) => s + Number(p.valor_pago || 0), 0) / recServico.length : 0;
+    // Ticket Médio: agora utiliza o total acumulado do faturamento por competência (serviços finalizados)
+    // dividido pela quantidade de atendimentos no período. Isso garante consistência com o Dashboard.
+    // Primeiro, vamos calcular a quantidade de atendimentos finalizados no período.
+    const ticketMedio = useMemo(() => {
+      // Como o faturamentoCompetencia já vem do servidor como um número total, 
+      // precisamos de uma query ou cálculo que nos dê a contagem de atendimentos.
+      // Para manter a consistência com a lógica do Dashboard e evitar novas queries complexas aqui,
+      // vamos inferir a contagem a partir dos pagamentos que são de categoria 'servico' e estão vinculados a atendimentos.
+      const atendimentosUnicos = new Set(receitasFiltradas.filter(p => p.categoria_receita === 'servico' && p.atendimento_id).map(p => p.atendimento_id));
+      const contagem = atendimentosUnicos.size;
+      return contagem > 0 ? receitaBruta / contagem : 0;
+    }, [receitaBruta, receitasFiltradas]);
 
-    // Aportes / Ajustes: qualquer categoria que não seja 'servico' (Entradas Diversas)
+    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado.
     const aportesAjustes = recebidosRows
-      .filter((p) => p.categoria_receita !== "servico")
+      .filter((p) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
     // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
