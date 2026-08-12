@@ -1041,19 +1041,23 @@ function FinanceiroPage() {
     // Receita bruta por competência (mesma regra do Dashboard)
     const receitaBruta = Number(faturamentoCompetencia);
 
-    // Ticket Médio: total do faturamento por competência dividido pela quantidade
-    // de atendimentos únicos do período. Usa `pagamentos` (base bruta) para não
-    // zerar quando há filtros ativos na tabela.
-    const atendimentosUnicos = new Set(
-      pagamentos
-        .filter((p) => p.categoria_receita === "servico" && p.atendimento_id)
-        .map((p) => p.atendimento_id),
+    // Ticket Médio: total das receitas de serviços recebidas no período
+    // dividido pela quantidade de atendimentos únicos com pagamentos nesse período.
+    const receitasServico = pagamentos.filter(
+      (p) =>
+        p.categoria_receita === "servico" &&
+        p.data_pagamento &&
+        p.data_pagamento >= inicio &&
+        p.data_pagamento <= fim &&
+        p.status !== "cancelado",
     );
-    const ticketMedio = atendimentosUnicos.size > 0 ? receitaBruta / atendimentosUnicos.size : 0;
+    const valorTotalServicos = receitasServico.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    const atendimentosUnicos = new Set(receitasServico.map((p) => p.atendimento_id).filter(Boolean));
+    const ticketMedio = atendimentosUnicos.size > 0 ? valorTotalServicos / atendimentosUnicos.size : 0;
 
-    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado.
+    // Aportes / Ajustes: qualquer receita que não seja 'servico' ou 'produto'
     const aportesAjustes = recebidosRows
-      .filter((p) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
+      .filter((p) => p.categoria_receita !== "servico" && p.categoria_receita !== "produto")
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
     // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
