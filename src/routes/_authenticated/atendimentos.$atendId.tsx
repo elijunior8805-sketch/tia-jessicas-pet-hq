@@ -903,7 +903,7 @@ function AtendimentoDetalhe() {
     <PageShell>
       {/* Header */}
       <div className="mb-6">
-        <Link to="/agenda" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
+        <Link to="/agenda" search={{}} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
           <ArrowLeft className="h-4 w-4" /> Voltar para agenda
         </Link>
         <div className="mt-4 flex items-start justify-between gap-4 flex-wrap">

@@ -485,6 +485,8 @@ function DashboardPage() {
                     <Link
                       key={a.id}
                       to="/agenda"
+                      search={{}}
+
                       className="group flex gap-2.5 sm:gap-3 items-center rounded-xl p-2 sm:p-2.5 -mx-2 sm:-mx-2.5 hover:bg-[oklch(0.97_0.02_150)] transition-colors"
                     >
                       <div className="flex flex-col items-center justify-center w-[52px] sm:w-14 shrink-0 rounded-lg py-1.5 bg-[oklch(0.96_0.02_155)] border border-[oklch(0.90_0.02_155)]">
