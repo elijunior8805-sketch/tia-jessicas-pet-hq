@@ -230,12 +230,12 @@ function DashboardPage() {
   });
 
   const kpis = [
-    { label: "Faturamento",   value: data ? brl(data.faturamento) : "—", hint: "Receitas no período",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Faturamento",   value: data ? brl(data.faturamento) : "—", hint: "Receitas de serviços",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
     { label: "Despesas",      value: data ? brl(data.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
-    { label: "Lucro",         value: data ? brl(data.lucro)       : "—", hint: "Receitas − despesas",     icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Lucro",         value: data ? brl(data.lucro)       : "—", hint: "Saldo operacional",       icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Ticket Médio",  value: data ? brl(data.bilhete)     : "—", hint: "Média por serviço",       icon: Receipt,    tone: KPI_TONES.ambar     },
+    { label: "Aportes",       value: data ? brl(data.aportesAjustes) : "—", hint: "Entradas diversas", icon: Coins,      tone: KPI_TONES.salvia    },
     { label: "Atendimentos",  value: data?.atendCount ?? "—",           hint: "Realizados no período",   icon: PawPrint,   tone: KPI_TONES.petroleo  },
-    { label: "Ticket Médio",  value: data ? brl(data.bilhete)     : "—", hint: "Por atendimento",         icon: Receipt,    tone: KPI_TONES.ambar     },
-    { label: "Novos Clientes",value: data?.novosClientes ?? "—",         hint: "Cadastrados no período",  icon: Users,      tone: KPI_TONES.salvia    },
   ];
 
   const hoje = new Date();
