@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw,
+  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw, Coins,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
