@@ -885,7 +885,7 @@ function FinanceiroPage() {
   }, [parcelas, fBloco, fFormas, fStatus]);
 
   // ============ KPIs ============
-  const hojeStr = format(new Date(), "yyyy-MM-dd");
+  
 
   const kpis = useMemo(() => {
     // Considera recebidos = data_pagamento no período E status pago/parcial (valor_pago real)
