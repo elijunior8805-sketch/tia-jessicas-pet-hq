@@ -160,11 +160,11 @@ function DashboardPage() {
           .order("data", { ascending: true })
           .order("hora_inicio", { ascending: true })
           .limit(6),
-        // Buscar aportes e ajustes (entradas não-serviço)
+        // Buscar aportes e ajustes (categorias específicas conforme solicitado)
         supabase
           .from("pagamentos")
           .select("valor_pago, data_pagamento, categoria_receita")
-          .neq("categoria_receita", "servico")
+          .in("categoria_receita", ["aporte", "ajuste"])
           .eq("status", "pago")
           .gte("data_pagamento", from)
           .lte("data_pagamento", to),
