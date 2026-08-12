@@ -51,11 +51,11 @@ const TOM_INSTRUCAO: Record<string, string> = {
   profissional: "profissional e claro, cortês sem frieza",
   objetivo: "objetivo e enxuto, direto ao ponto sem rispidez",
   direto: "direto, sem rodeios, mantendo total respeito",
-  firme_respeitoso: "firme e assertivo, deixando claro que a situação passou dos limites e exige pagamento imediato",
+  firme_respeitoso: "extremamente firme, enfatizando que a situação passou de todos os limites aceitáveis e impacta a confiança mútua, exigindo regularização imediata",
   empatico: "empático, reconhecendo a dificuldade e oferecendo ajuda",
   negociacao: "de negociação, propondo alternativas de parcelamento ou nova data",
   lembrete_promessa: "de lembrete gentil sobre a data que o próprio cliente prometeu",
-  ultimo_aviso: "de aviso final enérgico, sendo muito direto sobre a gravidade do atraso, sem ameaças físicas ou jurídicas",
+  ultimo_aviso: "de aviso final com firmeza absoluta, destacando que o atraso prolongado é inaceitável e prejudica a continuidade do atendimento, sem emojis e sem ameaças.",
 };
 
 const FIRMEZA_INSTRUCAO: Record<number, string> = {
@@ -63,7 +63,7 @@ const FIRMEZA_INSTRUCAO: Record<number, string> = {
   2: "Direto: cobre com clareza, mantendo a porta aberta.",
   3: "Firme e Sério: deixe explícito que o prazo venceu e que o pagamento é fundamental para o negócio.",
   4: "Enérgico e Inequívoco: use tom direto e firme. A mensagem deve fazer o cliente sentir a gravidade do atraso e a urgência máxima de regularização, sem ser mal-educado.",
-  5: "Tom de Cobrança Extremo: firmeza absoluta e direta. A pessoa deve sentir que a situação 'passou dos limites' e que a cobrança é muito mais firme do que uma simples abordagem profissional, mantendo o respeito mas sendo incisivo sobre a necessidade imediata de pagamento.",
+  5: "Tom de Cobrança Extremamente Firme: firmeza absoluta e direta. A mensagem deve focar no impacto prolongado, na quebra de confiança e no fato de que a situação 'passou dos limites'. Urgência máxima e zero emojis, mantendo a seriedade do Spa.",
 };
 
 export const REGRAS_INVIOLAVEIS = `REGRAS INVIOLÁVEIS (o descumprimento invalida a resposta):
