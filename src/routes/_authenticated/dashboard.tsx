@@ -217,12 +217,12 @@ function DashboardPage() {
       
       const lucro = faturamento + aportesAjustes - despesas;
 
-      const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
-      const serie = dias.map((d) => {
+      const diasIntervalo = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
+      const serie = diasIntervalo.map((d) => {
         const key = format(d, "yyyy-MM-dd");
-        const val = executados
-          .filter((a: any) => toLocalDay(a.encerrado_em) === key)
-          .reduce((s, a: any) => s + valorRealExecutado(a), 0);
+        const val = receitasServico
+          .filter((p: any) => p.data_pagamento === key)
+          .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
         return { dia: format(d, "dd/MM"), valor: val };
       });
 
