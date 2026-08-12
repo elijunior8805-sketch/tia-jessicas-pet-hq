@@ -34,7 +34,7 @@ export type AcaoRefino =
 const INSTRUCAO_REFINO: Record<AcaoRefino, string> = {
   mais_gentil: "Reescreva de forma mais gentil e acolhedora, reduzindo a firmeza.",
   mais_direta: "Reescreva de forma mais direta e objetiva, cortando rodeios.",
-  mais_firme: "Reescreva com um tom de cobrança enérgico e firme. A pessoa deve sentir que o atraso passou dos limites e que a regularização é urgente e obrigatória, mantendo o respeito mas sendo muito incisivo.",
+  mais_firme: "Reescreva com um tom de cobrança extremamente firme, indicando que a situação já passou por um longo tempo sem regularização e 'saiu dos limites'. O foco deve ser no impacto no negócio e na quebra de confiança, fazendo o cliente sentir a urgência máxima sem usar emojis.",
   resumir: "Resuma mantendo todas as informações essenciais em no máximo 3 linhas.",
   corrigir: "Corrija apenas ortografia, acentuação e pontuação. Preserve a redação original.",
   outra_versao: "Reescreva com outra abordagem, mantendo o mesmo tom e as mesmas informações.",
@@ -88,7 +88,7 @@ export const TOM_REVISAO: Record<string, string> = {
   amigavel: "amigável, próximo e caloroso, sem gírias.",
   profissional: "profissional e objetivo, cortês mas sem frieza.",
   acolhedor: "acolhedor, gentil e empático.",
-  cobranca_educada: "cobrança enérgica e direta, sendo firme sobre o atraso sem ser mal-educado.",
+  cobranca_educada: "cobrança extremamente firme e direta, enfatizando que o atraso prolongado passou dos limites e impacta a confiança e o negócio, sem usar nenhum emoji.",
   confirmacao_objetiva: "confirmação objetiva e clara, com poucas palavras, sem enfeites.",
 };
 
