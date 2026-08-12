@@ -201,9 +201,13 @@ function DashboardPage() {
       });
       const atendCount = executados.length;
       const somaExec = executados.reduce((s, a: any) => s + valorRealExecutado(a), 0);
-      const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
+      
+      // Aportes e Ajustes: qualquer categoria que não seja 'servico'
+      const aportesAjustes = (pagamentosRes.data ?? []).reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      
+      const bilhete = atendCount > 0 ? somaExec / atendCount : 0;
       const faturamento = somaExec;
-      const lucro = faturamento - despesas;
+      const lucro = faturamento + aportesAjustes - despesas;
 
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
       const serie = dias.map((d) => {
@@ -217,6 +221,7 @@ function DashboardPage() {
       return {
         faturamento, despesas, lucro,
         atendCount, bilhete,
+        aportesAjustes,
         novosClientes: novosClientes.length,
         serie,
         proximos: proxAgRes.data ?? [],
