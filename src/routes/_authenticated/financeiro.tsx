@@ -583,153 +583,16 @@ function LancamentoManualDialog({ onCreated }: { onCreated: () => void }) {
 }
 
 /* ============================================================
- * Painel dedicado a dados de teste
- * ============================================================ */
-
-function TesteToolbar({ onChange }: { onChange: () => void }) {
-  const [busy, setBusy] = useState(false);
-
-  const seed = async () => {
-    setBusy(true);
-    try {
-      const hoje = format(new Date(), "yyyy-MM-dd");
-      const linhas: Array<{ forma: string; valor: number; label: string; categoria: string }> = [
-        { forma: "dinheiro", valor: 100, label: "TESTE Dinheiro", categoria: "venda_produto" },
-        { forma: "pix", valor: 200, label: "TESTE Pix", categoria: "venda_produto" },
-        { forma: "credito", valor: 300, label: "TESTE Crédito", categoria: "venda_produto" },
-        { forma: "debito", valor: 150, label: "TESTE Débito", categoria: "venda_produto" },
-        { forma: "outras", valor: 50, label: "TESTE Outras receitas", categoria: "outros" },
-      ];
-      const payload: any[] = linhas.map((l) => ({
-        valor_total: l.valor,
-        valor_pago: l.valor,
-        forma: l.forma,
-        status: "pago",
-        data_pagamento: hoje,
-        vencimento: hoje,
-        descricao: l.label,
-        categoria_receita: l.categoria,
-        is_teste: true,
-      }));
-      // Pendente
-      payload.push({
-        valor_total: 400,
-        valor_pago: 0,
-        forma: "pendente",
-        status: "pendente",
-        vencimento: hoje,
-        descricao: "TESTE Pendente",
-        categoria_receita: "outros",
-        is_teste: true,
-      });
-      // Parcial
-      payload.push({
-        valor_total: 500,
-        valor_pago: 200,
-        forma: "pix",
-        status: "parcial",
-        data_pagamento: hoje,
-        vencimento: hoje,
-        descricao: "TESTE Parcial",
-        categoria_receita: "outros",
-        is_teste: true,
-      });
-      // Cancelado
-      payload.push({
-        valor_total: 999,
-        valor_pago: 0,
-        forma: "pix",
-        status: "cancelado",
-        vencimento: hoje,
-        descricao: "TESTE Cancelado",
-        categoria_receita: "outros",
-        is_teste: true,
-      });
-      const { error: e1 } = await supabase.from("pagamentos").insert(payload);
-      if (e1) throw e1;
-
-      // Despesa: precisa fornecedor
-      const { data: forn } = await supabase.from("fornecedores").select("id").limit(1).maybeSingle();
-      if (forn?.id) {
-        const { data: compra, error: eC } = await supabase
-          .from("compras")
-          .insert({
-            fornecedor_id: forn.id,
-            descricao: "TESTE Despesa",
-            data_compra: hoje,
-            valor_total: 120,
-            forma_pagamento: "dinheiro",
-            parcelas: 1,
-            primeiro_vencimento: hoje,
-            is_teste: true,
-          } as any)
-          .select("id")
-          .single();
-        if (eC) throw eC;
-        await supabase.rpc("gerar_parcelas_compra", { _compra_id: compra.id });
-        await supabase
-          .from("compras_parcelas")
-          .update({
-            valor_pago: 120,
-            data_pagamento: hoje,
-            status: "pago",
-            forma_pagamento: "dinheiro",
-            is_teste: true,
-          } as any)
-          .eq("compra_id", compra.id);
-      } else {
-        toast.info("Cadastre um fornecedor para incluir a despesa de teste.");
-      }
-
-      toast.success("Dados de teste criados");
-      onChange();
-    } catch (e: any) {
-      toast.error(e.message || "Falha ao criar dados de teste");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const limpar = async () => {
-    if (!confirm("Remover todos os lançamentos marcados como TESTE?")) return;
-    setBusy(true);
-    try {
-      const { data, error } = await supabase.rpc("limpar_dados_teste_financeiro");
-      if (error) throw error;
-      toast.success(
-        `Removidos: ${(data as any)?.pagamentos_removidos ?? 0} receitas / ${(data as any)?.compras_removidas ?? 0} despesas`,
-      );
-      onChange();
-    } catch (e: any) {
-      toast.error(e.message || "Falha ao limpar");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex gap-2">
-      <Button size="sm" variant="outline" onClick={seed} disabled={busy}>
-        <FlaskConical className="h-4 w-4 mr-1" /> Criar dados de teste
-      </Button>
-      <Button size="sm" variant="outline" onClick={limpar} disabled={busy}>
-        <Trash2 className="h-4 w-4 mr-1" /> Limpar dados de teste
-      </Button>
-    </div>
-  );
-}
-
-/* ============================================================
  * Página principal
  * ============================================================ */
 
 function FinanceiroPage() {
   const qc = useQueryClient();
-  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc"]);
+  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia", "fin-pag-ant"]);
 
   const hoje = new Date();
+  const hojeStr = format(hoje, "yyyy-MM-dd");
 
-  // Filtros
   const [preset, setPreset] = useState<Preset>("30dias");
   const initialRange = computePreset("30dias", hoje);
   const [inicio, setInicio] = useState(initialRange.de);
@@ -737,11 +600,8 @@ function FinanceiroPage() {
   const [fFormas, setFFormas] = useState<string[]>([]); // vazio = todas
   const [fBloco, setFBloco] = useState<"todos" | "entradas" | "saidas">("todos");
   const [fStatus, setFStatus] = useState<string>("todos");
-  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia"]);
-
   const [fCategoria, setFCategoria] = useState<string>("todas"); // categoria_receita
   const [fCliente, setFCliente] = useState<string>("todos");
-  const [incluirTeste, setIncluirTeste] = useState<boolean>(import.meta.env.DEV);
   const [showMoreFilters, setShowMoreFilters] = useState<boolean>(false);
   const IS_DEV = import.meta.env.DEV;
 
