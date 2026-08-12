@@ -51,11 +51,11 @@ const TOM_INSTRUCAO: Record<string, string> = {
   profissional: "profissional e claro, cortês sem frieza",
   objetivo: "objetivo e enxuto, direto ao ponto sem rispidez",
   direto: "direto, sem rodeios, mantendo total respeito",
-  firme_respeitoso: "firme e assertivo, sempre respeitoso e sem constranger",
+  firme_respeitoso: "firme e assertivo, deixando claro que a situação passou dos limites e exige pagamento imediato",
   empatico: "empático, reconhecendo a dificuldade e oferecendo ajuda",
   negociacao: "de negociação, propondo alternativas de parcelamento ou nova data",
   lembrete_promessa: "de lembrete gentil sobre a data que o próprio cliente prometeu",
-  ultimo_aviso: "de aviso final, sério e respeitoso, sem qualquer ameaça",
+  ultimo_aviso: "de aviso final enérgico, sendo muito direto sobre a gravidade do atraso, sem ameaças físicas ou jurídicas",
 };
 
 const FIRMEZA_INSTRUCAO: Record<number, string> = {
