@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw,
+  TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw, Coins,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isToday, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -132,7 +132,7 @@ function DashboardPage() {
         return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       };
 
-      const [comprasRes, atendRes, novosClientesRes, proxAgRes] = await Promise.all([
+      const [comprasRes, atendRes, novosClientesRes, proxAgRes, pagamentosRes] = await Promise.all([
         // Despesas do painel: considera parcelas pagas pela data de pagamento
         // e parcelas ainda em aberto pela data de vencimento. Assim o card não
         // some quando a compra foi lançada mas ainda não foi baixada/paga.
@@ -160,6 +160,14 @@ function DashboardPage() {
           .order("data", { ascending: true })
           .order("hora_inicio", { ascending: true })
           .limit(6),
+        // Buscar aportes e ajustes (entradas não-serviço)
+        supabase
+          .from("pagamentos")
+          .select("valor_pago, data_pagamento, categoria_receita")
+          .neq("categoria_receita", "servico")
+          .eq("status", "pago")
+          .gte("data_pagamento", from)
+          .lte("data_pagamento", to),
       ]);
 
       if (comprasRes.error) {
@@ -193,9 +201,13 @@ function DashboardPage() {
       });
       const atendCount = executados.length;
       const somaExec = executados.reduce((s, a: any) => s + valorRealExecutado(a), 0);
-      const bilhete = executados.length > 0 ? somaExec / executados.length : 0;
+      
+      // Aportes e Ajustes: qualquer categoria que não seja 'servico'
+      const aportesAjustes = (pagamentosRes.data ?? []).reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      
+      const bilhete = atendCount > 0 ? somaExec / atendCount : 0;
       const faturamento = somaExec;
-      const lucro = faturamento - despesas;
+      const lucro = faturamento + aportesAjustes - despesas;
 
       const dias = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
       const serie = dias.map((d) => {
@@ -209,6 +221,7 @@ function DashboardPage() {
       return {
         faturamento, despesas, lucro,
         atendCount, bilhete,
+        aportesAjustes,
         novosClientes: novosClientes.length,
         serie,
         proximos: proxAgRes.data ?? [],
@@ -217,12 +230,12 @@ function DashboardPage() {
   });
 
   const kpis = [
-    { label: "Faturamento",   value: data ? brl(data.faturamento) : "—", hint: "Receitas no período",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Faturamento",   value: data ? brl(data.faturamento) : "—", hint: "Receitas de serviços",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
     { label: "Despesas",      value: data ? brl(data.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
-    { label: "Lucro",         value: data ? brl(data.lucro)       : "—", hint: "Receitas − despesas",     icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Lucro",         value: data ? brl(data.lucro)       : "—", hint: "Saldo operacional",       icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Ticket Médio",  value: data ? brl(data.bilhete)     : "—", hint: "Média por serviço",       icon: Receipt,    tone: KPI_TONES.ambar     },
+    { label: "Aportes",       value: data ? brl(data.aportesAjustes) : "—", hint: "Entradas diversas", icon: Coins,      tone: KPI_TONES.salvia    },
     { label: "Atendimentos",  value: data?.atendCount ?? "—",           hint: "Realizados no período",   icon: PawPrint,   tone: KPI_TONES.petroleo  },
-    { label: "Ticket Médio",  value: data ? brl(data.bilhete)     : "—", hint: "Por atendimento",         icon: Receipt,    tone: KPI_TONES.ambar     },
-    { label: "Novos Clientes",value: data?.novosClientes ?? "—",         hint: "Cadastrados no período",  icon: Users,      tone: KPI_TONES.salvia    },
   ];
 
   const hoje = new Date();
