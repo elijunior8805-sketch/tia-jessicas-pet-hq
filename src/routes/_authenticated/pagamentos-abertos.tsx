@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+
 import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
 import { renderTemplate } from "@/lib/whatsapp-templates";
 import { abrirWhatsApp } from "@/lib/whatsapp";
@@ -53,6 +55,8 @@ function PagamentosAbertosPage() {
   const registrarLote = useServerFn(registrarContatoCobrancaLote);
   const confirmarRec = useServerFn(confirmarRecebimento);
   const qc = useQueryClient();
+  useRealtimeFinanceiro(["pagamentos-abertos", "dashboard-metrics", "fin-resumo"]);
+
   const [busca, setBusca] = useState("");
   const [somenteAtrasados, setSomenteAtrasados] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
