@@ -1043,7 +1043,8 @@ function FinanceiroPage() {
 
     // Ticket Médio: total das receitas de serviços recebidas no período
     // dividido pela quantidade de atendimentos únicos com pagamentos nesse período.
-    const receitasServico = pagamentos.filter(
+    // Usamos `pagamentos` bruto (ignora filtros da tabela) para os KPIs fixos do topo.
+    const receitasServicoPeriodo = pagamentos.filter(
       (p) =>
         p.categoria_receita === "servico" &&
         p.data_pagamento &&
@@ -1051,13 +1052,21 @@ function FinanceiroPage() {
         p.data_pagamento <= fim &&
         p.status !== "cancelado",
     );
-    const valorTotalServicos = receitasServico.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
-    const atendimentosUnicos = new Set(receitasServico.map((p) => p.atendimento_id).filter(Boolean));
-    const ticketMedio = atendimentosUnicos.size > 0 ? valorTotalServicos / atendimentosUnicos.size : 0;
+    const valorTotalServicos = receitasServicoPeriodo.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    const atendimentosUnicosSet = new Set(receitasServicoPeriodo.map((p) => p.atendimento_id).filter(Boolean));
+    const ticketMedio = atendimentosUnicosSet.size > 0 ? valorTotalServicos / atendimentosUnicosSet.size : 0;
 
-    // Aportes / Ajustes: qualquer receita que não seja 'servico' ou 'produto'
-    const aportesAjustes = recebidosRows
-      .filter((p) => p.categoria_receita !== "servico" && p.categoria_receita !== "produto")
+    // Aportes / Ajustes: qualquer receita recebida no período que não seja 'servico' ou 'produto'
+    const aportesAjustes = pagamentos
+      .filter(
+        (p) =>
+          p.data_pagamento &&
+          p.data_pagamento >= inicio &&
+          p.data_pagamento <= fim &&
+          p.status !== "cancelado" &&
+          p.categoria_receita !== "servico" &&
+          p.categoria_receita !== "produto",
+      )
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
     // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
