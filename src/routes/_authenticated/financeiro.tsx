@@ -1043,10 +1043,9 @@ function FinanceiroPage() {
 
     // Ticket Médio: total das receitas de serviços recebidas no período
     // dividido pela quantidade de atendimentos únicos com pagamentos nesse período.
-    // Usamos `pagamentos` bruto (ignora filtros da tabela) para os KPIs fixos do topo.
     const receitasServicoPeriodo = pagamentos.filter(
       (p) =>
-        p.categoria_receita === "servico" &&
+        (p.categoria_receita === "servico" || p.atendimento_id) &&
         p.data_pagamento &&
         p.data_pagamento >= inicio &&
         p.data_pagamento <= fim &&
@@ -1056,7 +1055,7 @@ function FinanceiroPage() {
     const atendimentosUnicosSet = new Set(receitasServicoPeriodo.map((p) => p.atendimento_id).filter(Boolean));
     const ticketMedio = atendimentosUnicosSet.size > 0 ? valorTotalServicos / atendimentosUnicosSet.size : 0;
 
-    // Aportes / Ajustes: qualquer receita recebida no período que não seja 'servico' ou 'produto'
+    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado na última resposta.
     const aportesAjustes = pagamentos
       .filter(
         (p) =>
@@ -1064,8 +1063,7 @@ function FinanceiroPage() {
           p.data_pagamento >= inicio &&
           p.data_pagamento <= fim &&
           p.status !== "cancelado" &&
-          p.categoria_receita !== "servico" &&
-          p.categoria_receita !== "produto",
+          (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste"),
       )
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
