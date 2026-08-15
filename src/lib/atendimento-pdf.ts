@@ -318,7 +318,6 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     { label: "Usou focinheira", on: !!(atendimento as any)?.usou_focinheira },
     { label: "Precisou de pausa", on: !!(atendimento as any)?.precisou_pausa },
     { label: "Alergia registrada no check-in", on: !!(atendimento as any)?.alergia_checkin },
-    { label: "Precisou de focinheira", on: !!(atendimento as any)?.usou_focinheira },
   ];
   const activeFlags = flags.filter((f) => f.on);
   if (activeFlags.length) {

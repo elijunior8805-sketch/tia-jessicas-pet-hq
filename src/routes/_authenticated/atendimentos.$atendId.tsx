@@ -1181,8 +1181,13 @@ function AtendimentoDetalhe() {
                     onCheckedChange={(v) => setPausa(!!v)} />
                   Precisou de pausa
                 </label>
-              </div>
-              <div>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={!!(atendimento as any)?.alergia_checkin} disabled={readOnly}
+                    onCheckedChange={(v) => patchMut.mutate({ alergia_checkin: !!v } as never)} />
+                  Alergia registrada no check-in
+                </label>
+                <div>
                 <Label htmlFor="obs">Comportamento, particularidades e incidentes</Label>
                 <Textarea id="obs" value={obs} disabled={readOnly}
                   onChange={(e) => setObs(e.target.value)}
