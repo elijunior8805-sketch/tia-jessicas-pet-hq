@@ -613,11 +613,8 @@ function AtendimentoDetalhe() {
 
   const st = (n: number) => getEtapaStatus(atendimento, n);
 
+  // Alertas do cadastro geral removidos do topo para isolamento do atendimento de banho
   const alertas: string[] = [];
-  if (pet?.alergias) alertas.push(`Alergia: ${pet.alergias}`);
-  if (pet?.temperamento) alertas.push(`Temperamento: ${pet.temperamento}`);
-  if (pet?.necessita_focinheira) alertas.push("Precisa de focinheira");
-  if (pet?.cuidados_saude) alertas.push(`Saúde: ${pet.cuidados_saude}`);
 
   const ultimaVisitaStr = (atendimento as any)?.ultima_visita
     ? new Date((atendimento as any).ultima_visita).toLocaleDateString("pt-BR")
@@ -1184,8 +1181,13 @@ function AtendimentoDetalhe() {
                     onCheckedChange={(v) => setPausa(!!v)} />
                   Precisou de pausa
                 </label>
-              </div>
-              <div>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={!!(atendimento as any)?.alergia_checkin} disabled={readOnly}
+                    onCheckedChange={(v) => patchMut.mutate({ alergia_checkin: !!v } as never)} />
+                  Alergia registrada no check-in
+                </label>
+                <div>
                 <Label htmlFor="obs">Comportamento, particularidades e incidentes</Label>
                 <Textarea id="obs" value={obs} disabled={readOnly}
                   onChange={(e) => setObs(e.target.value)}
