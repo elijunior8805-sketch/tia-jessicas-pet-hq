@@ -317,8 +317,8 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   const flags: { label: string; on: boolean }[] = [
     { label: "Usou focinheira", on: !!(atendimento as any)?.usou_focinheira },
     { label: "Precisou de pausa", on: !!(atendimento as any)?.precisou_pausa },
-    { label: "Alergia registrada", on: !!(pet?.alergias && String(pet.alergias).trim()) },
-    { label: "Precisa de focinheira (ficha)", on: !!(pet as any)?.necessita_focinheira },
+    { label: "Alergia registrada no check-in", on: !!(atendimento as any)?.alergia_checkin },
+    { label: "Precisou de focinheira", on: !!(atendimento as any)?.usou_focinheira },
   ];
   const activeFlags = flags.filter((f) => f.on);
   if (activeFlags.length) {
@@ -340,7 +340,8 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     paragraph("Sem alertas registrados no check-in.");
   }
 
-  if (pet?.alergias) { section("Alergias do pet"); paragraph(String(pet.alergias)); }
+  // Seção de alergias do cadastro geral removida para cumprir regra de isolamento.
+  // Informações de saúde devem ser incluídas nas observações de check-in se relevantes para o atendimento.
   if (comportamentos.length) { section("Comportamento observado"); paragraph(comportamentos.join(", ")); }
   const obsCheckin = (atendimento?.observacoes_checkin?.trim?.() || atendimento?.observacoes?.trim?.() || (atendimento as any)?.check_in_obs?.trim?.() || "");
   section("Observacoes de check-in"); paragraph(obsCheckin);

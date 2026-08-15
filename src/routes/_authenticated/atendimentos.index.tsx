@@ -348,7 +348,7 @@ function AguardandoCard({ ag, onIniciar, loading }: { ag: any; onIniciar: () => 
         </div>
       </div>
       <CardHeader pet={ag.pets} cliente={ag.clientes} />
-      <AlertChips pet={ag.pets} />
+      {/* Removido AlertChips para cumprir regra de isolamento do cadastro geral no banho */}
       <div className="mt-3 flex gap-2">
         <Button className="gap-1 flex-1" onClick={onIniciar} disabled={loading}>
           <PlayCircle className="h-4 w-4" /> Iniciar
@@ -377,7 +377,7 @@ function EmAndamentoCard({ a }: { a: any }) {
           {brl(Number(a.valor_executado ?? 0) + Number(a.taxa_leva_traz ?? 0))}
         </span>
       </div>
-      <AlertChips pet={a.pets} />
+      {/* Removido AlertChips para cumprir regra de isolamento do cadastro geral no banho */}
       <div className="mt-3">
         <Link to="/atendimentos/$atendId" params={{ atendId: a.id }}>
           <Button className="gap-1 w-full">

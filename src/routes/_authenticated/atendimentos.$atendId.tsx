@@ -613,11 +613,8 @@ function AtendimentoDetalhe() {
 
   const st = (n: number) => getEtapaStatus(atendimento, n);
 
+  // Alertas do cadastro geral removidos do topo para isolamento do atendimento de banho
   const alertas: string[] = [];
-  if (pet?.alergias) alertas.push(`Alergia: ${pet.alergias}`);
-  if (pet?.temperamento) alertas.push(`Temperamento: ${pet.temperamento}`);
-  if (pet?.necessita_focinheira) alertas.push("Precisa de focinheira");
-  if (pet?.cuidados_saude) alertas.push(`Saúde: ${pet.cuidados_saude}`);
 
   const ultimaVisitaStr = (atendimento as any)?.ultima_visita
     ? new Date((atendimento as any).ultima_visita).toLocaleDateString("pt-BR")
