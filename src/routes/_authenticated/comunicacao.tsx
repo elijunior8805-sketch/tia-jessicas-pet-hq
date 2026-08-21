@@ -139,6 +139,45 @@ function ComunicacaoPage() {
   );
 }
 
+function InboxInteligenteTab() {
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
+
+  return (
+    <Card className="h-[calc(100vh-280px)] overflow-hidden rounded-2xl border-border/60 flex shadow-lg">
+      <div className="w-80 shrink-0">
+        <ChatThreadsCol 
+          selectedId={selectedClienteId || undefined} 
+          onSelectThread={setSelectedClienteId} 
+        />
+      </div>
+      <div className="flex-1 flex min-w-0">
+        {selectedClienteId ? (
+          <>
+            <div className="flex-1 min-w-0">
+              <ChatTimelineCol clienteId={selectedClienteId} />
+            </div>
+            <div className="hidden xl:block">
+              <ChatContextCol clienteId={selectedClienteId} />
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-muted/5">
+            <MessageCircle className="h-12 w-12 mb-4 opacity-10" />
+            <p className="text-sm font-medium">Selecione uma conversa para começar</p>
+            <p className="text-xs opacity-70">Busque por cliente, pet ou telefone na lista ao lado.</p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// Imports for the new components
+import { ChatThreadsCol } from "@/components/comunicacao/chat-threads-col";
+import { ChatTimelineCol } from "@/components/comunicacao/chat-timeline-col";
+import { ChatContextCol } from "@/components/comunicacao/chat-context-col";
+
+
 /* ============================================================
  * SUB-ABA: Sugestões proativas
  * ============================================================ */
