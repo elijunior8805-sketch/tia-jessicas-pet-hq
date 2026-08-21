@@ -299,7 +299,7 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
                   </TabsContent>
 
                   <TabsContent value="historico" className="m-0 space-y-4">
-                    {dossie.historico.length === 0 ? (
+                    {dossie?.historico && dossie.historico.length === 0 ? (
                       <div className="text-center py-10 text-muted-foreground text-sm">
                         Nenhum contato registrado ainda.
                       </div>
