@@ -31,7 +31,7 @@ import {
   obterDossieCobranca,
   registrarPromessaAvancada,
   type FilaItemDTO
-} from "@/lib/cobrancas-adv.functions";
+} from "@/lib/cobrancas-advanced.functions";
 import { CobrancaPainelLateral } from "@/components/cobrancas/CobrancaPainelLateral";
 
 
