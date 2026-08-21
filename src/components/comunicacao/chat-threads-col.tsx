@@ -69,44 +69,47 @@ export function ChatThreadsCol({ onSelectThread, selectedId }: ChatThreadsColPro
           <div className="p-8 text-center text-xs text-muted-foreground">Nenhuma conversa encontrada.</div>
         ) : (
           <div className="divide-y divide-border/40">
-            {threads?.map((t: any) => (
-              <button
-                key={t.cliente_id}
-                onClick={() => onSelectThread(t.cliente_id)}
-                className={cn(
-                  "w-full p-4 text-left transition-colors hover:bg-muted/50 flex flex-col gap-1",
-                  selectedId === t.cliente_id && "bg-primary/5 border-l-4 border-primary"
-                )}
-              >
-                <div className="flex justify-between items-start gap-2">
-                  <span className="font-semibold text-sm truncate">{t.cliente_nome}</span>
-                  {t.ultima_em && (
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                      {formatDistanceToNow(new Date(t.ultima_em), { addSuffix: true, locale: ptBR })}
+            {threads?.map((t: any) => {
+              const ultimaEm = t.ultima_em ? new Date(t.ultima_em) : null;
+              return (
+                <button
+                  key={t.cliente_id}
+                  onClick={() => onSelectThread(t.cliente_id)}
+                  className={cn(
+                    "w-full p-4 text-left transition-colors hover:bg-muted/50 flex flex-col gap-1",
+                    selectedId === t.cliente_id && "bg-primary/5 border-l-4 border-primary"
+                  )}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="font-semibold text-sm truncate">{t.cliente_nome}</span>
+                    {ultimaEm && (
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {formatDistanceToNow(ultimaEm, { addSuffix: true, locale: ptBR })}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {t.pet_primeiro_nome && (
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                      Pet: {t.pet_primeiro_nome}
                     </span>
                   )}
-                </div>
-                
-                {t.pet_primeiro_nome && (
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                    Pet: {t.pet_primeiro_nome}
-                  </span>
-                )}
-                
-                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 italic">
-                  {t.ultima_mensagem || "Sem mensagens"}
-                </p>
+                  
+                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 italic">
+                    {t.ultima_mensagem || "Sem mensagens"}
+                  </p>
 
-                <div className="flex items-center gap-2 mt-1.5">
-                  {t.nao_lidas > 0 && (
-                    <Badge className="h-4 px-1.5 text-[9px] bg-primary">{t.nao_lidas} não lidas</Badge>
-                  )}
-                  {t.status_conversa === 'atencao_humana' && (
-                    <Badge variant="destructive" className="h-4 px-1.5 text-[9px]">Atenção</Badge>
-                  )}
-                </div>
-              </button>
-            ))}
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {Number(t.nao_lidas || 0) > 0 && (
+                      <Badge className="h-4 px-1.5 text-[9px] bg-primary">{t.nao_lidas} não lidas</Badge>
+                    )}
+                    {t.status_conversa === 'atencao_humana' && (
+                      <Badge variant="destructive" className="h-4 px-1.5 text-[9px]">Atenção</Badge>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
