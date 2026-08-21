@@ -26,6 +26,12 @@ import {
   type CobrancaDTO,
   type CobrancaStatus,
 } from "@/lib/cobrancas.functions";
+import {
+  filaPriorizada,
+  obterDossieCobranca,
+  registrarPromessaAvancada,
+  type FilaItemDTO
+} from "@/lib/cobrancas-advanced.functions";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
