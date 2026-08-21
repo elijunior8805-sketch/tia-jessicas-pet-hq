@@ -20,10 +20,12 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
   const qc = useQueryClient();
   const timelineEndRef = useRef<HTMLDivElement>(null);
   const [mensagem, setMensagem] = useState("");
+  const [abordagens, setAbordagens] = useState<{ cordial: string; firme: string; incisiva: string } | null>(null);
   
   const dossieFn = useServerFn(obterDossieConversa);
   const respFn = useServerFn(registrarRespostaCliente);
   const enviarFn = useServerFn(registrarComunicacao);
+  const abordarFn = useServerFn(gerar3AbordagensIA);
 
   const { data: dossie, isLoading } = useQuery({
     queryKey: ["chat-dossie", clienteId],
@@ -38,22 +40,51 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
     }
   });
 
+  const abordarMut = useMutation({
+    mutationFn: async () => {
+      const petId = dossie?.pets?.[0]?.id;
+      const temVencido = (dossie?.cobrancas?.length || 0) > 0;
+      return abordarFn({ 
+        data: { 
+          clienteId, 
+          petId, 
+          objetivo: temVencido ? "cobranca" : "reativacao" 
+        } 
+      });
+    },
+    onSuccess: (data) => {
+      setAbordagens(data as any);
+      toast.success("IA gerou 3 abordagens.");
+    }
+  });
+
   const enviarMut = useMutation({
-    mutationFn: (corpo: string) => enviarFn({ data: { clienteId, corpo, canal: "whatsapp" } }),
+    mutationFn: (corpo: string) => enviarFn({ 
+      data: { 
+        clienteId, 
+        corpo, 
+        canal: "whatsapp",
+        origem: "chat-inbox",
+        tomEscolhido: abordagens ? "ia-abordagem" : "manual"
+      } 
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["chat-dossie", clienteId] });
       setMensagem("");
+      setAbordagens(null);
       toast.success("Mensagem registrada.");
     }
   });
 
-  const handleEnviar = () => {
-    if (!mensagem.trim()) return;
-    enviarMut.mutate(mensagem);
+  const handleEnviar = (textoOverride?: string) => {
+    const finalMsg = textoOverride || mensagem;
+    if (!finalMsg.trim()) return;
+    enviarMut.mutate(finalMsg);
     if (dossie?.cliente?.whatsapp) {
-      abrirWhatsAppBusiness(dossie.cliente.whatsapp, mensagem);
+      abrirWhatsAppBusiness(dossie.cliente.whatsapp, finalMsg);
     }
   };
+
 
   useEffect(() => {
     timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -109,30 +140,66 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
         <div ref={timelineEndRef} />
       </div>
 
-      <div className="p-4 border-t bg-card/50">
+      <div className="p-4 border-t bg-card/50 space-y-3">
+        {abordagens && (
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: 'cordial', label: 'Cordial', text: abordagens.cordial, color: 'text-emerald-600 bg-emerald-50' },
+              { id: 'firme', label: 'Firme', text: abordagens.firme, color: 'text-amber-600 bg-amber-50' },
+              { id: 'incisiva', label: 'Incisiva', text: abordagens.incisiva, color: 'text-rose-600 bg-rose-50' },
+            ].map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setMensagem(a.text)}
+                className={cn(
+                  "p-2 text-[10px] text-left rounded-lg border border-transparent hover:border-primary/20 transition-all line-clamp-3",
+                  a.color
+                )}
+                title={a.text}
+              >
+                <div className="font-bold uppercase tracking-tighter mb-0.5">{a.label}</div>
+                {a.text}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="relative">
           <Textarea
-            placeholder="Digite uma mensagem ou registre a resposta do cliente..."
+            placeholder="Digite uma mensagem ou selecione uma abordagem da IA..."
             className="min-h-[100px] pr-24 resize-none shadow-sm"
             value={mensagem}
             onChange={(e) => setMensagem(e.target.value)}
           />
           <div className="absolute bottom-3 right-3 flex gap-2">
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Melhorar com IA">
-              <Sparkles className="h-4 w-4" />
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className={cn("h-8 w-8", abordagens ? "text-primary bg-primary/10" : "text-muted-foreground")}
+              onClick={() => abordarMut.mutate()}
+              disabled={abordarMut.isPending}
+              title="Gerar 3 abordagens com IA"
+            >
+              {abordarMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             </Button>
-            <Button size="icon" className="h-8 w-8" onClick={handleEnviar} disabled={!mensagem.trim() || enviarMut.isPending}>
+            <Button size="icon" className="h-8 w-8" onClick={() => handleEnviar()} disabled={!mensagem.trim() || enviarMut.isPending}>
               {enviarMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
         </div>
-        <div className="flex gap-2 mt-3">
-          <Button variant="secondary" size="sm" className="h-7 text-[10px]" onClick={() => respMut.mutate(mensagem)} disabled={!mensagem.trim() || respMut.isPending}>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => respMut.mutate(mensagem)} disabled={!mensagem.trim() || respMut.isPending}>
             {respMut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
             Registrar Resposta do Cliente
           </Button>
+          {abordagens && (
+            <Button variant="ghost" size="sm" className="h-7 text-[10px] text-muted-foreground" onClick={() => setAbordagens(null)}>
+              Limpar IA
+            </Button>
+          )}
         </div>
       </div>
+
     </div>
   );
 }
