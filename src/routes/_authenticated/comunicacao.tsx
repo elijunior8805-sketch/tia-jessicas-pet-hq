@@ -33,7 +33,13 @@ import {
   gerarSugestoesProativas, listarSugestoes, atualizarStatusSugestao, feedbackSugestao,
   listarHistoricoMensagens,
 } from "@/lib/comunicacao-advanced.functions";
-import { gerar3AbordagensIA } from "@/lib/comunicacao-central.functions";
+import { 
+  gerar3AbordagensIA, 
+  listarThreads, 
+  obterDossieConversa, 
+  registrarRespostaCliente 
+} from "@/lib/comunicacao-central.functions";
+
 import { VisaoGeralTab } from "@/components/comunicacao/visao-geral-tab";
 import { FilaProativaTab } from "@/components/comunicacao/fila-proativa-tab";
 import { IaConfigTab } from "@/components/comunicacao/ia-config-tab";
@@ -41,6 +47,10 @@ import { ComporTab } from "@/components/comunicacao/compor-tab";
 import { useMyAccess } from "@/hooks/use-my-permissions";
 import { LayoutDashboard, ListChecks, Settings2, HandCoins } from "lucide-react";
 import { PromessasTab } from "@/components/comunicacao/promessas-tab";
+import { ChatThreadsCol } from "@/components/comunicacao/chat-threads-col";
+import { ChatTimelineCol } from "@/components/comunicacao/chat-timeline-col";
+import { ChatContextCol } from "@/components/comunicacao/chat-context-col";
+
 
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
@@ -58,6 +68,8 @@ function ComunicacaoPage() {
   const qc = useQueryClient();
   const perms = useMyAccess();
   const [aba, setAba] = useState("visao");
+  const [inboxClienteId, setInboxClienteId] = useState<string | null>(null);
+
 
   // -------- shared data --------
   const clientesQ = useQuery({
@@ -104,6 +116,7 @@ function ComunicacaoPage() {
       <Tabs value={aba} onValueChange={setAba} className="space-y-6">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="visao"><LayoutDashboard className="h-4 w-4 mr-2" /> Visão geral</TabsTrigger>
+          <TabsTrigger value="inbox"><MessageCircle className="h-4 w-4 mr-2" /> Inbox Inteligente</TabsTrigger>
           <TabsTrigger value="fila"><ListChecks className="h-4 w-4 mr-2" /> Fila proativa</TabsTrigger>
           <TabsTrigger value="promessas"><HandCoins className="h-4 w-4 mr-2" /> Promessas</TabsTrigger>
           <TabsTrigger value="sugestoes"><Sparkles className="h-4 w-4 mr-2" /> Sugestões</TabsTrigger>
@@ -113,7 +126,20 @@ function ComunicacaoPage() {
           <TabsTrigger value="config"><Settings2 className="h-4 w-4 mr-2" /> Configurações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
+        <TabsContent value="visao">
+          <VisaoGeralTab 
+            onIrParaFila={() => setAba("fila")} 
+            onIrParaInbox={(cid) => {
+              if (cid) setInboxClienteId(cid);
+              setAba("inbox");
+            }} 
+          />
+        </TabsContent>
+        <TabsContent value="inbox">
+          <InboxTab initialClienteId={inboxClienteId} onClienteSelect={setInboxClienteId} />
+        </TabsContent>
+
+
         <TabsContent value="fila"><FilaProativaTab /></TabsContent>
         <TabsContent value="promessas">
           <PromessasTab podeEditar={!!perms.data?.canManageUsers || !!perms.data?.isAdmin} />
@@ -135,6 +161,41 @@ function ComunicacaoPage() {
     </PageShell>
   );
 }
+
+function InboxInteligenteTab() {
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
+
+  return (
+    <Card className="h-[calc(100vh-280px)] overflow-hidden rounded-2xl border-border/60 flex shadow-lg">
+      <div className="w-80 shrink-0">
+        <ChatThreadsCol 
+          selectedId={selectedClienteId || undefined} 
+          onSelectThread={setSelectedClienteId} 
+        />
+      </div>
+      <div className="flex-1 flex min-w-0">
+        {selectedClienteId ? (
+          <>
+            <div className="flex-1 min-w-0">
+              <ChatTimelineCol clienteId={selectedClienteId} />
+            </div>
+            <div className="hidden xl:block">
+              <ChatContextCol clienteId={selectedClienteId} />
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-muted/5">
+            <MessageCircle className="h-12 w-12 mb-4 opacity-10" />
+            <p className="text-sm font-medium">Selecione uma conversa para começar</p>
+            <p className="text-xs opacity-70">Busque por cliente, pet ou telefone na lista ao lado.</p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+
 
 /* ============================================================
  * SUB-ABA: Sugestões proativas
@@ -501,3 +562,53 @@ function HistoricoTab({ clientes }: { clientes: Cliente[] }) {
     </Card>
   );
 }
+
+/* ============================================================
+ * SUB-ABA: Inbox Inteligente (Central de Mensagens)
+ * ============================================================ */
+function InboxTab({ initialClienteId, onClienteSelect }: { initialClienteId: string | null, onClienteSelect: (id: string | null) => void }) {
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(initialClienteId);
+
+  // Sincroniza estado interno se o pai mudar
+  useMemo(() => {
+    if (initialClienteId !== selectedClienteId) {
+      setSelectedClienteId(initialClienteId);
+    }
+  }, [initialClienteId]);
+
+  const handleSelect = (id: string) => {
+    setSelectedClienteId(id);
+    onClienteSelect(id);
+  };
+
+
+  return (
+    <div className="flex h-[calc(100vh-280px)] min-h-[500px] border border-border/60 rounded-2xl overflow-hidden bg-background shadow-sm">
+      <ChatThreadsCol 
+        selectedId={selectedClienteId || undefined}
+        onSelectThread={handleSelect}
+      />
+
+      
+      <div className="flex-1 flex overflow-hidden">
+        {selectedClienteId ? (
+          <>
+            <ChatTimelineCol clienteId={selectedClienteId} />
+            <ChatContextCol clienteId={selectedClienteId} />
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 bg-muted/5">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <MessageCircle className="h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-display font-semibold text-primary">Inbox Inteligente</h3>
+            <p className="text-sm max-w-xs text-center mt-2">
+              Selecione uma conversa ao lado para visualizar o histórico e compor respostas com IA.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

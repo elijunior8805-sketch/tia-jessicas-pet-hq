@@ -41,7 +41,7 @@ function Kpi({
   );
 }
 
-export function VisaoGeralTab({ onIrParaFila }: { onIrParaFila?: () => void }) {
+export function VisaoGeralTab({ onIrParaFila, onIrParaInbox }: { onIrParaFila?: () => void, onIrParaInbox?: (clienteId?: string) => void }) {
   const visaoFn = useServerFn(visaoGeralComunicacao);
   const resumoFn = useServerFn(resumoInteligente);
   const painelFn = useServerFn(painelOperacional);
@@ -111,9 +111,15 @@ export function VisaoGeralTab({ onIrParaFila }: { onIrParaFila?: () => void }) {
             <p className="text-[11px] text-muted-foreground">
               Fonte: {(resumoM.data as any).ia ? `IA (${(resumoM.data as any).modelo})` : "regras locais (IA indisponível)"}
             </p>
-            {onIrParaFila ? (
-              <Button size="sm" variant="outline" onClick={onIrParaFila}>Abrir fila proativa</Button>
-            ) : null}
+            <div className="flex gap-2">
+              {onIrParaFila ? (
+                <Button size="sm" variant="outline" onClick={onIrParaFila}>Abrir fila proativa</Button>
+              ) : null}
+              {onIrParaInbox ? (
+                <Button size="sm" variant="outline" onClick={() => onIrParaInbox()}>Abrir Inbox Inteligente</Button>
+              ) : null}
+            </div>
+
           </div>
         ) : resumoM.isError ? (
           <p className="mt-3 text-xs text-rose-700">
