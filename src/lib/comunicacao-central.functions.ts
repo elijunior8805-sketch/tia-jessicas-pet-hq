@@ -122,6 +122,28 @@ export const refinarMensagem = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => await (await central()).refinarTexto(context.supabase, data.texto, data.acao));
 
+export const gerar3AbordagensIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      cobrancaId: z.string().uuid().optional().nullable(),
+      clienteId: z.string().uuid(),
+      petId: z.string().uuid().optional().nullable(),
+      contextoManual: z.string().max(1000).optional().nullable(),
+      objetivo: z.enum(["cobranca", "lembrete", "reativacao", "aniversario", "outro"]).default("cobranca"),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    return await (await central()).gerar3AbordagensIA(
+      context.supabase,
+      data.clienteId,
+      data.cobrancaId,
+      data.petId,
+      data.contextoManual,
+      data.objetivo
+    );
+  });
+
 /* ============================================================
  * Registro rastreável do envio aprovado
  * ============================================================ */
@@ -150,6 +172,7 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
         tempoGeracaoMs: z.number().int().min(0).max(600000).optional().nullable(),
         tokensEstimados: z.number().int().min(0).optional().nullable(),
         agendadaPara: z.string().optional().nullable(),
+        origem: z.string().optional().nullable(),
       })
       .parse(d),
   )
@@ -182,6 +205,7 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
       aprovado_por: context.userId,
       aprovado_em: new Date().toISOString(),
       enviado_em: new Date().toISOString(),
+      metadata: { origem: data.origem || "compositor" }
     });
     if (error) throw new Error(error.message);
     return { ok: true };

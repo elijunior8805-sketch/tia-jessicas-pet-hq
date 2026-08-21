@@ -615,9 +615,15 @@ export function calcularPrioridade(ctx: ContextoPrioridade): {
   if (d > 0) s += Math.min(30, d * 2);
   if (ctx.valorPendente) s += Math.min(20, Math.floor(ctx.valorPendente / 50) * 2);
   if (ctx.tentativas) s += Math.min(12, ctx.tentativas * 4);
-  if (ctx.promessaVencida) s += 18;
-  if (ctx.semResposta) s += 10;
+  
+  // Enriquecimento da prioridade (Part 1 do plano)
+  if (ctx.promessaVencida) s += 25; // Aumentado (crítico)
+  if (ctx.semResposta) s += 15;
   if (ctx.riscoPerda) s += 12;
+
+  // Analisar silêncio prolongado
+  if (ctx.semResposta && (ctx.tentativas || 0) > 1) s += 10;
+
   if (ctx.horasAteAtendimento != null && ctx.horasAteAtendimento <= 24)
     s += ctx.horasAteAtendimento <= 6 ? 25 : 15;
 
