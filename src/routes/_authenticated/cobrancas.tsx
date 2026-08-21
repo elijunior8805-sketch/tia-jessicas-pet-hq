@@ -301,7 +301,7 @@ function CobrancasPage() {
                     <tr
                       key={c.id}
                       className="border-t hover:bg-muted/40 cursor-pointer"
-                      onClick={() => setSelecionada(c)}
+                      onClick={() => setSelecionadaId(c.id)}
                     >
                       <td className="py-2 pr-3">
                         <div className="font-medium">{c.cliente_nome}</div>
