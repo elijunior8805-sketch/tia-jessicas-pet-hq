@@ -423,15 +423,18 @@ export async function gerar3AbordagensIA(
     }
   }
 
-  // 3. Pegar última mensagem enviada para evitar repetição
-  const { data: ultimaMsg } = await sb
+  // 3. Pegar histórico recente para contexto rico
+  const { data: historicoRecente } = await sb
     .from("mensagens")
-    .select("corpo, created_at")
+    .select("corpo, created_at, direcao")
     .eq("cliente_id", clienteId)
-    .eq("direcao", "out")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(5);
+
+  const ultimaSaida = historicoRecente?.find((m: any) => m.direcao === "out");
+  const ultimasMensagens = (historicoRecente || [])
+    .map((m: any) => `${m.direcao === "out" ? "Nós" : "Cliente"}: ${m.corpo}`)
+    .join("\n");
 
   const dados = [
     `- Cliente: ${cliente?.nome}`,
