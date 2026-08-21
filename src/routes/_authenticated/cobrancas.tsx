@@ -347,6 +347,13 @@ function CobrancasPage() {
 
 
 
+      {selecionadaId && (
+        <CobrancaPainelLateral
+          cobrancaId={selecionadaId}
+          onClose={() => setSelecionadaId(null)}
+        />
+      )}
+
       {selecionada && (
         <CobrancaDialog
           cobranca={selecionada}
