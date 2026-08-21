@@ -117,14 +117,19 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
           </div>
         </div>
         <div className="flex gap-2">
-           <Button variant="outline" size="sm" className="gap-2" onClick={() => abrirWhatsAppBusiness(dossie?.cliente?.whatsapp || "")}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2 text-primary border-primary/20 hover:bg-primary/5" 
+            onClick={() => abrirWhatsAppBusiness(dossie?.cliente?.whatsapp || "")}
+          >
             <Phone className="h-4 w-4" />
-            Abrir WhatsApp
+            WhatsApp Business
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-100"
             onClick={() => {
               if (dossie?.cliente?.whatsapp) {
                 const e164 = dossie.cliente.whatsapp.replace(/\D+/g, "");
@@ -138,13 +143,14 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+            className="text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-100"
             onClick={() => resolverMut.mutate()}
             disabled={resolverMut.isPending}
           >
             {resolverMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
             Resolvida
           </Button>
+
         </div>
 
 
