@@ -125,7 +125,7 @@ function ComunicacaoPage() {
         </TabsList>
 
         <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
-        <TabsContent value="inbox"><InboxInteligenteTab /></TabsContent>
+        <TabsContent value="inbox"><InboxTab /></TabsContent>
 
         <TabsContent value="fila"><FilaProativaTab /></TabsContent>
         <TabsContent value="promessas">
