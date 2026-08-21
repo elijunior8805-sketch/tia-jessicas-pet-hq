@@ -840,6 +840,7 @@ function AgendamentoRow({
   })();
 
   return (
+    <>
     <Card className="p-4 hover:shadow-elegant transition bg-card border-border/50">
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Lado Esquerdo: Hora e Status (Mobile: Lado a lado; Desktop: Coluna) */}
