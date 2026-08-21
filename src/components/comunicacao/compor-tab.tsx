@@ -16,6 +16,7 @@ import {
 import { gerar3AbordagensIA, registrarComunicacao } from "@/lib/comunicacao-central.functions";
 import { abrirWhatsAppBusiness } from "@/lib/whatsapp";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 type Cliente = { id: string; nome: string; whatsapp: string | null; tom_preferido: string | null; opt_out_comunicacao: boolean };
 type Pet = { id: string; nome: string; cliente_id: string };
@@ -284,7 +285,7 @@ function UltimosContatos({ clienteId }: { clienteId: string }) {
 
   return (
     <div className="space-y-2">
-      {msgs.map((m, i) => (
+      {(msgs || []).map((m: any, i: number) => (
         <div key={i} className={`p-2 rounded-lg text-[11px] ${m.direcao === 'out' ? 'bg-muted/50' : 'bg-primary/5 border border-primary/10'}`}>
           <div className="flex justify-between text-[10px] mb-1 opacity-70">
             <span>{m.direcao === 'out' ? 'Nós' : 'Cliente'}</span>
