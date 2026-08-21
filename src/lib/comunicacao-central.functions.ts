@@ -144,6 +144,39 @@ export const gerar3AbordagensIA = createServerFn({ method: "POST" })
     );
   });
 
+export const listarThreads = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      busca: z.string().optional(),
+      status: z.enum(["abertas", "nao_lidas", "resolvidas", "atencao"]).default("abertas"),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    return await (await central()).listarThreads(context.supabase, data.busca, data.status);
+  });
+
+export const obterDossieConversa = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clienteId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    return await (await central()).obterDossieConversa(context.supabase, data.clienteId);
+  });
+
+export const registrarRespostaCliente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      clienteId: z.string().uuid(),
+      corpo: z.string().min(1).max(4000),
+      canal: z.string().default("whatsapp"),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    return await (await central()).registrarRespostaCliente(context.supabase, data.clienteId, data.corpo, data.canal, context.userId);
+  });
+
+
 /* ============================================================
  * Registro rastreável do envio aprovado
  * ============================================================ */
