@@ -64,7 +64,7 @@ export function ChatContextCol({ clienteId }: ChatContextColProps) {
         <Card className={cn("p-4 border-l-4", (totalDevedor || 0) > 0 ? "border-l-rose-500" : "border-l-emerald-500")}>
           <p className="text-[10px] text-muted-foreground uppercase">Saldo Devedor Total</p>
           <p className="text-xl font-bold">{brl(totalDevedor)}</p>
-          {dossie?.promessas?.length > 0 && (
+          {dossie?.promessas && dossie.promessas.length > 0 && (
             <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600">
               <AlertCircle className="h-3 w-3" />
               <span>{dossie.promessas.length} promessa(s) ativa(s)</span>
@@ -72,6 +72,7 @@ export function ChatContextCol({ clienteId }: ChatContextColProps) {
           )}
         </Card>
       </div>
+
 
       <div className="space-y-4">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
