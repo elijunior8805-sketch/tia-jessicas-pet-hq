@@ -69,6 +69,9 @@ export function ComporTab({ clientes, pets }: { clientes: Cliente[]; pets: Pet[]
           canal: "whatsapp",
           tipo: objetivo,
           textoEditado: editada,
+          origem: "compositor_inteligente",
+          mensagemIaOriginal: selecionada !== null ? versoes[selecionada]?.texto : null,
+          modeloIa: versoes[0]?.modelo || null,
         }
       });
       
