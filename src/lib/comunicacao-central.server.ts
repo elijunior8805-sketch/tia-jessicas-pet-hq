@@ -8,6 +8,7 @@ import {
   sugerirTom,
   calcularPrioridade,
   chamarIAEstruturada,
+  chamarIA,
   chamarIATexto,
   verificarPalavrasProibidas,
   type IaConfig,
