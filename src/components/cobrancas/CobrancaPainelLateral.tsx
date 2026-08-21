@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { 
   obterDossieCobranca, 
   registrarPromessaAvancada 
-} from "@/lib/cobrancas-advanced.functions";
+} from "@/lib/cobrancas-adv.functions";
 import { registrarEnvio, sugerirMensagemCobranca } from "@/lib/cobrancas.functions";
 import {
   Sheet,
