@@ -1059,8 +1059,8 @@ function AgendamentoRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </Card>
-  );
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Prévia do aviso de encerramento</DialogTitle>
             <DialogDescription>
@@ -1103,7 +1103,6 @@ function AgendamentoRow({
                 });
                 setPreviewOpen(false);
               }}
-
             >
               <Send className="h-4 w-4" /> Enviar no WhatsApp
             </Button>
@@ -1123,7 +1122,6 @@ function AgendamentoRow({
         defaultDate={row.data}
         editId={row.id}
       />
-
 
       <Dialog open={reagendarOpen} onOpenChange={setReagendarOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1149,10 +1147,11 @@ function AgendamentoRow({
           <DialogFooter>
             <Button variant="outline" onClick={() => setReagendarOpen(false)}>Cancelar</Button>
             <Button
+              className="bg-primary text-primary-foreground"
+              disabled={reagendarMut.isPending}
               onClick={() => reagendarMut.mutate()}
-              disabled={reagendarMut.isPending || !novaData || !novaHora}
             >
-              {reagendarMut.isPending ? "Salvando…" : "Confirmar reagendamento"}
+              {reagendarMut.isPending ? "Salvando…" : "Confirmar novo horário"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1161,33 +1160,18 @@ function AgendamentoRow({
       <Dialog open={cancelarOpen} onOpenChange={setCancelarOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Cancelar agendamento</DialogTitle>
+            <DialogTitle>Cancelar Agendamento</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja cancelar o agendamento de{" "}
-              <strong>{row.pets?.nome ?? "pet"}</strong> às{" "}
-              <strong>{row.hora ? String(row.hora).slice(0, 5) : "—"}</strong>?
+              Tem certeza que deseja cancelar o agendamento de <strong>{row.pets?.nome ?? "pet"}</strong>?
             </DialogDescription>
           </DialogHeader>
-          <div>
-            <Label>Motivo (opcional)</Label>
-            <Textarea
-              rows={3}
-              value={motivoCancel}
-              onChange={(e) => setMotivoCancel(e.target.value)}
-              placeholder="Ex.: cliente pediu para remarcar por motivo pessoal"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              O motivo é anexado às observações do agendamento para histórico.
-            </p>
-          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelarOpen(false)}>Voltar</Button>
             <Button
               variant="destructive"
-              onClick={() => cancelarMut.mutate()}
-              disabled={cancelarMut.isPending}
+              onClick={() => onChangeStatus("cancelado")}
             >
-              {cancelarMut.isPending ? "Cancelando…" : "Cancelar agendamento"}
+              Confirmar Cancelamento
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1196,7 +1180,7 @@ function AgendamentoRow({
       <Dialog open={excluirOpen} onOpenChange={setExcluirOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Excluir agendamento</DialogTitle>
+            <DialogTitle className="text-destructive">Excluir Definitivamente</DialogTitle>
             <DialogDescription>
               Esta ação remove permanentemente o agendamento de{" "}
               <strong>{row.pets?.nome ?? "pet"}</strong> em{" "}
@@ -1217,7 +1201,7 @@ function AgendamentoRow({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   );
 }
 
