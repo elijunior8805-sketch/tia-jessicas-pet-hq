@@ -330,7 +330,14 @@ function CobrancasPage() {
                         {c.tentativas > 0 ? ` • ${c.tentativas}x` : ""}
                       </td>
                       <td className="py-2 pr-3 text-right">
-                        <Button size="sm" variant="outline">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelecionadaId(c.id);
+                          }}
+                        >
                           Abrir
                         </Button>
                       </td>
