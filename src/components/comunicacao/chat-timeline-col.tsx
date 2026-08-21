@@ -10,6 +10,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { brl } from "@/lib/comunicacao-central.server";
 import { toast } from "sonner";
+import { abrirWhatsAppBusiness } from "@/lib/whatsapp";
+
 
 
 interface ChatTimelineColProps {
