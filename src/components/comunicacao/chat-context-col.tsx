@@ -7,10 +7,12 @@ import { obterDossieConversa } from "@/lib/comunicacao-central.functions";
 import { brl } from "@/lib/comunicacao-central.server";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface ChatContextColProps {
   clienteId: string;
 }
+
 
 export function ChatContextCol({ clienteId }: ChatContextColProps) {
   const dossieFn = useServerFn(obterDossieConversa);
