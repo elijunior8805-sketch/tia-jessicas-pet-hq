@@ -905,7 +905,7 @@ export async function obterDossieConversa(sb: any, clienteId: string) {
 /**
  * Registra a resposta de um cliente e detecta intenção usando IA.
  */
-export async function registrarRespostaCliente(sb: any, clienteId: string, corpo: string, canal: string, autorId: string) {
+export async function registrarRespostaCliente(sb: any, clienteId: string, corpo: string, canal: string = 'whatsapp') {
   // 1. Inserir a mensagem de entrada
   const { data: msg, error: msgError } = await sb.from("mensagens").insert({
     cliente_id: clienteId,
