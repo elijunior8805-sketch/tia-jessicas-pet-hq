@@ -132,9 +132,30 @@ export const obterDossieCobranca = createServerFn({ method: "POST" })
 
     if (cobRes.error) throw cobRes.error;
 
+    const hoje = new Date();
+    hoje.setUTCHours(0, 0, 0, 0);
+    const v = new Date(cobRes.data.vencimento + (cobRes.data.vencimento.includes('T') ? '' : 'T00:00:00Z')).getTime();
+    const dias = Math.max(0, Math.floor((hoje.getTime() - v) / 86400000));
+
+    let score = 0;
+    score += Math.min(40, dias * 2);
+    score += Math.min(30, (Number(cobRes.data.saldo) / 100) * 5);
+    score += ((cobRes.data as any).promessas_quebradas ?? 0) * 20;
+
+    let prio = ((cobRes.data as any).prioridade as any) || "media";
+    if (score > 80) prio = "critica";
+    else if (score > 50) prio = "alta";
+    else if (score > 20) prio = "media";
+    else prio = "baixa";
+
     return {
-      cobranca: cobRes.data,
+      cobranca: {
+        ...cobRes.data,
+        dias_atraso: dias,
+        prioridade: prio
+      },
       historico: histRes.data ?? [],
       promessas: promRes.data ?? []
     };
   });
+
