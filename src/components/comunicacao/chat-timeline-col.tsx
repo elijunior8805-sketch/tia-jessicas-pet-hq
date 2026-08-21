@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { obterDossieConversa, registrarRespostaCliente, registrarComunicacao, gerar3AbordagensIA } from "@/lib/comunicacao-central.functions";
+import { obterDossieConversa, registrarRespostaCliente, registrarComunicacao, gerar3AbordagensIA, resolverThread } from "@/lib/comunicacao-central.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Phone, Wand2, Sparkles, Loader2 } from "lucide-react";
