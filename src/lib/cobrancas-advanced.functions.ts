@@ -22,7 +22,6 @@ export const filaPriorizada = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase } = context;
 
-    // Lógica de score: atraso + valor + promessas quebradas
     const { data: rows, error } = await supabase
       .from("cobrancas")
       .select(`
@@ -42,18 +41,16 @@ export const filaPriorizada = createServerFn({ method: "GET" })
     hoje.setUTCHours(0, 0, 0, 0);
 
     const itens = (rows ?? []).map((r: any) => {
-      const v = new Date(r.vencimento + "T00:00:00Z").getTime();
+      const v = new Date(r.vencimento + (r.vencimento.includes('T') ? '' : 'T00:00:00Z')).getTime();
       const dias = Math.max(0, Math.floor((hoje.getTime() - v) / 86400000));
       
-      // Cálculo de score (0-100)
       let score = 0;
-      score += Math.min(40, dias * 2); // Até 40 pontos por atraso
-      score += Math.min(30, (Number(r.saldo) / 100) * 5); // Até 30 pontos por valor
-      score += (r.promessas_quebradas ?? 0) * 20; // 20 pontos por promessa quebrada
+      score += Math.min(40, dias * 2);
+      score += Math.min(30, (Number(r.saldo) / 100) * 5);
+      score += (r.promessas_quebradas ?? 0) * 20;
       
       if (r.status === "sem_retorno") score += 10;
       
-      // Determinar prioridade se não estiver setada
       let prio = r.prioridade || "media";
       if (score > 80) prio = "critica";
       else if (score > 50) prio = "alta";
@@ -68,12 +65,12 @@ export const filaPriorizada = createServerFn({ method: "GET" })
         saldo: Number(r.saldo),
         dias_atraso: dias,
         prioridade: prio,
-        prioridade_justificativa: r.prioridade_justificativa || \`Score: \${Math.round(score)}\`,
+        prioridade_justificativa: r.prioridade_justificativa || `Score: ${Math.round(score)}`,
         status: r.status,
         tentativas: r.tentativas ?? 0,
         ultima_resposta_em: r.ultima_resposta_em,
         score: Math.min(100, Math.round(score))
-      };
+      } as FilaItemDTO;
     });
 
     return itens.sort((a, b) => b.score - a.score);
@@ -116,7 +113,7 @@ export const registrarPromessaAvancada = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const obterDossieCobranca = createServerFn({ method: "GET" })
+export const obterDossieCobranca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ cobrancaId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
