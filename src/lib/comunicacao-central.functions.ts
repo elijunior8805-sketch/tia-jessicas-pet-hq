@@ -172,6 +172,7 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
         tempoGeracaoMs: z.number().int().min(0).max(600000).optional().nullable(),
         tokensEstimados: z.number().int().min(0).optional().nullable(),
         agendadaPara: z.string().optional().nullable(),
+        origem: z.string().optional().nullable(),
       })
       .parse(d),
   )
@@ -204,6 +205,7 @@ export const registrarComunicacao = createServerFn({ method: "POST" })
       aprovado_por: context.userId,
       aprovado_em: new Date().toISOString(),
       enviado_em: new Date().toISOString(),
+      metadata: { origem: data.origem || "compositor" }
     });
     if (error) throw new Error(error.message);
     return { ok: true };
