@@ -104,6 +104,7 @@ function ComunicacaoPage() {
       <Tabs value={aba} onValueChange={setAba} className="space-y-6">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="visao"><LayoutDashboard className="h-4 w-4 mr-2" /> Visão geral</TabsTrigger>
+          <TabsTrigger value="inbox"><MessageCircle className="h-4 w-4 mr-2" /> Inbox Inteligente</TabsTrigger>
           <TabsTrigger value="fila"><ListChecks className="h-4 w-4 mr-2" /> Fila proativa</TabsTrigger>
           <TabsTrigger value="promessas"><HandCoins className="h-4 w-4 mr-2" /> Promessas</TabsTrigger>
           <TabsTrigger value="sugestoes"><Sparkles className="h-4 w-4 mr-2" /> Sugestões</TabsTrigger>
@@ -114,6 +115,8 @@ function ComunicacaoPage() {
         </TabsList>
 
         <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
+        <TabsContent value="inbox"><InboxInteligenteTab /></TabsContent>
+
         <TabsContent value="fila"><FilaProativaTab /></TabsContent>
         <TabsContent value="promessas">
           <PromessasTab podeEditar={!!perms.data?.canManageUsers || !!perms.data?.isAdmin} />
