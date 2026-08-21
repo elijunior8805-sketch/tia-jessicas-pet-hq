@@ -173,7 +173,7 @@ export const registrarRespostaCliente = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
-    return await (await central()).registrarRespostaCliente(context.supabase, data.clienteId, data.corpo, data.canal, context.userId);
+    return await (await central()).registrarRespostaCliente(context.supabase, data.clienteId, data.corpo, data.canal);
   });
 
 export const resolverThread = createServerFn({ method: "POST" })
