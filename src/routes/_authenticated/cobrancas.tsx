@@ -211,7 +211,7 @@ function CobrancasPage() {
         </TabsContent>
 
         <TabsContent value="fila">
-          <FilaDoDiaTab onSelect={setSelecionada} />
+          <FilaDoDiaTab onSelect={(c) => setSelecionadaId(c.id)} />
         </TabsContent>
 
         <TabsContent value="funil">
@@ -219,6 +219,7 @@ function CobrancasPage() {
         </TabsContent>
 
         <TabsContent value="todas">
+
       <Card>
 
         <CardHeader className="pb-3">
