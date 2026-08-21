@@ -305,7 +305,7 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {dossie.historico.map((h: any) => (
+                        {dossie?.historico.map((h: any) => (
                           <div key={h.id} className="border rounded-lg p-3 space-y-2 text-sm">
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                               <span className="uppercase font-semibold text-primary">{h.tipo}</span>
