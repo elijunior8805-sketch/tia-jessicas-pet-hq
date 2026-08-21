@@ -12,8 +12,6 @@ import { brl } from "@/lib/comunicacao-central.server";
 import { toast } from "sonner";
 import { abrirWhatsAppBusiness } from "@/lib/whatsapp";
 
-
-
 interface ChatTimelineColProps {
   clienteId: string;
 }
@@ -45,22 +43,23 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["chat-dossie", clienteId] });
       setMensagem("");
-      toast.success("Mensagem registrada e enviada.");
+      toast.success("Mensagem registrada.");
     }
   });
 
-  useEffect(() => {
-    timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [dossie?.historico]);
-
+  const handleEnviar = () => {
+    if (!mensagem.trim()) return;
     enviarMut.mutate(mensagem);
     if (dossie?.cliente?.whatsapp) {
       abrirWhatsAppBusiness(dossie.cliente.whatsapp, mensagem);
     }
   };
 
-  if (isLoading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  useEffect(() => {
+    timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [dossie?.historico]);
 
+  if (isLoading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="flex flex-col h-full bg-background relative">
@@ -80,7 +79,6 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
             Abrir WhatsApp
           </Button>
         </div>
-
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -123,13 +121,14 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
             <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Melhorar com IA">
               <Sparkles className="h-4 w-4" />
             </Button>
-            <Button size="icon" className="h-8 w-8" onClick={() => enviarMut.mutate(mensagem)} disabled={!mensagem.trim() || enviarMut.isPending}>
+            <Button size="icon" className="h-8 w-8" onClick={handleEnviar} disabled={!mensagem.trim() || enviarMut.isPending}>
               {enviarMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
         </div>
         <div className="flex gap-2 mt-3">
           <Button variant="secondary" size="sm" className="h-7 text-[10px]" onClick={() => respMut.mutate(mensagem)} disabled={!mensagem.trim() || respMut.isPending}>
+            {respMut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
             Registrar Resposta do Cliente
           </Button>
         </div>
