@@ -1296,19 +1296,26 @@ function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
                     <tr
                       key={c.id}
                       className="border-t hover:bg-muted/40 cursor-pointer"
-                      onClick={() => onSelect(c)}
+                      onClick={() => onSelect(c as any)}
                     >
                       <td className="py-2 px-3">
-                        <Badge className="bg-gold/20 text-foreground border-gold/40">
-                          {c.score}
+                        <Badge 
+                          className={
+                            c.prioridade === 'critica' ? "bg-rose-100 text-rose-900 border-rose-200" :
+                            c.prioridade === 'alta' ? "bg-amber-100 text-amber-900 border-amber-200" :
+                            "bg-gold/20 text-foreground border-gold/40"
+                          }
+                        >
+                          {c.score} - {c.prioridade}
                         </Badge>
                       </td>
                       <td className="py-2 px-3">
                         <div className="font-medium">{c.cliente_nome}</div>
                         <div className="text-xs text-muted-foreground">
-                          {c.pet_nome ?? "—"}
+                          {c.pet_nome ?? "—"} • {c.prioridade_justificativa}
                         </div>
                       </td>
+
                       <td className="py-2 px-3 font-medium">{brl(c.saldo)}</td>
                       <td className="py-2 px-3">
                         {c.dias_atraso > 0 ? (
