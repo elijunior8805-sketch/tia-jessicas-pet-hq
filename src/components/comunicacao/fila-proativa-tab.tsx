@@ -110,59 +110,84 @@ export function FilaProativaTab() {
           Nenhum contato pendente com esse filtro. 🐾
         </Card>
       ) : (
-        <div className="space-y-3">
-          {linhas.map((s) => (
-            <Card key={s.id} className={`p-4 ${s._adiada ? "opacity-60" : ""}`}>
-              <div className="flex flex-wrap items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium truncate">{s.clientes?.nome ?? "Cliente"}</p>
-                    {s.pets?.nome ? <Badge variant="secondary">{s.pets.nome}</Badge> : null}
-                    <Badge variant="outline" className={PRIO_STYLE[s._prioridade_label] ?? ""}>
-                      {String(s._prioridade_label).toUpperCase()}
-                    </Badge>
-                    {s.clientes?.opt_out_comunicacao ? (
-                      <Badge variant="outline" className="border-rose-200 text-rose-700">
-                        <ShieldAlert className="h-3 w-3 mr-1" /> Não perturbe
+          <div className="rounded-xl border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">Cliente / Pet</th>
+                  <th className="px-4 py-3 text-left font-medium">Motivo</th>
+                  <th className="px-4 py-3 text-left font-medium">Prioridade</th>
+                  <th className="px-4 py-3 text-left font-medium">Valores</th>
+                  <th className="px-4 py-3 text-left font-medium">Último Contato</th>
+                  <th className="px-4 py-3 text-right font-medium whitespace-nowrap">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {linhas.map((s) => (
+                  <tr key={s.id} className={`${s._adiada ? "opacity-60 bg-muted/20" : "hover:bg-muted/5 transition-colors"}`}>
+                    <td className="px-4 py-3">
+                      <div className="font-medium truncate max-w-[150px]">{s.clientes?.nome ?? "Cliente"}</div>
+                      {s.pets?.nome && <div className="text-[10px] text-muted-foreground italic">{s.pets.nome}</div>}
+                      {s.clientes?.opt_out_comunicacao && (
+                        <Badge variant="outline" className="mt-1 border-rose-200 text-rose-700 text-[9px] h-4">
+                          LGPD 🚫
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs line-clamp-2 max-w-[200px]" title={s.motivo}>{s.motivo}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className={`${PRIO_STYLE[s._prioridade_label] ?? ""} text-[10px] h-5`}>
+                        {String(s._prioridade_label).toUpperCase()}
                       </Badge>
-                    ) : null}
-                    {s._adiada ? <Badge variant="outline"><Clock className="h-3 w-3 mr-1" /> Adiada</Badge> : null}
-                  </div>
-
-                  <p className="text-sm text-muted-foreground mt-1">{s.motivo}</p>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground mt-2">
-                    {s._valor_pendente > 0 ? <span>Pendente: <strong>{brl(s._valor_pendente)}</strong></span> : null}
-                    {s._dias_atraso > 0 ? <span>{s._dias_atraso} dia(s) de atraso</span> : null}
-                    {s._sem_resposta ? <span>Sem resposta há mais de 48h</span> : null}
-                    {s._promessa_vencida ? <span className="text-rose-600">Promessa vencida</span> : null}
-                    <span>Tom sugerido: <strong>{s._tom_sugerido}</strong></span>
-                  </div>
-
-                  <p className="text-xs mt-2">
-                    <span className="text-muted-foreground">Próxima ação: </span>{s._proxima_acao}
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2 shrink-0">
-                  <Button size="sm" onClick={() => setAberta(s)} disabled={s.clientes?.opt_out_comunicacao}>
-                    <Sparkles className="h-4 w-4 mr-2" /> Gerar mensagem
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline"
-                      onClick={() => adiarM.mutate({ id: s.id, horas: 24 })}>
-                      Adiar 24h
-                    </Button>
-                    <Button size="sm" variant="ghost"
-                      onClick={() => resolverM.mutate({ id: s.id, resultado: "Resolvido manualmente" })}>
-                      <CheckCircle2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+                      {s._promessa_vencida && <div className="text-[9px] text-rose-600 font-bold mt-1">QUEBRA DE PROMESSA</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-xs">{brl(s._valor_pendente)}</div>
+                      {s._dias_atraso > 0 && <div className="text-[10px] text-muted-foreground">{s._dias_atraso}d atraso</div>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {s._ultima_comunicacao ? new Date(s._ultima_comunicacao).toLocaleDateString() : "Nunca"}
+                      {s._sem_resposta && <div className="text-amber-600 text-[9px] font-medium mt-0.5">SILÊNCIO +48H</div>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 text-primary"
+                          onClick={() => setAberta(s)}
+                          disabled={s.clientes?.opt_out_comunicacao}
+                          title="Gerar Mensagem IA"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 text-muted-foreground"
+                          onClick={() => adiarM.mutate({ id: s.id, horas: 24 })}
+                          title="Adiar 24h"
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 text-emerald-600"
+                          onClick={() => resolverM.mutate({ id: s.id, resultado: "Resolvido manualmente" })}
+                          title="Marcar como resolvido"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
       )}
 
       {aberta ? (
