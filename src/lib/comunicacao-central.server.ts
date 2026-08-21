@@ -946,13 +946,6 @@ Retorne um JSON: { "intencao": string, "confianca": number, "sugestao_operador":
     sb
   });
 
-    system: "Você é um classificador de intenções de clientes de Pet Shop.",
-    prompt,
-    config,
-    json: true,
-    origem: "intencao:resposta_cliente",
-    sb
-  });
 
   let intencaoData = { intencao: "OUTRO", confianca: 0, sugestao_operador: "Aguardar resposta", pausar_cobranca: false };
   try {
