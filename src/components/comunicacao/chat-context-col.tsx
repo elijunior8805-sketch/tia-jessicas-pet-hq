@@ -61,7 +61,7 @@ export function ChatContextCol({ clienteId }: ChatContextColProps) {
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
           <Wallet className="h-3 w-3" /> Financeiro
         </h4>
-        <Card className={cn("p-4 border-l-4", totalDevedor > 0 ? "border-l-rose-500" : "border-l-emerald-500")}>
+        <Card className={cn("p-4 border-l-4", (totalDevedor || 0) > 0 ? "border-l-rose-500" : "border-l-emerald-500")}>
           <p className="text-[10px] text-muted-foreground uppercase">Saldo Devedor Total</p>
           <p className="text-xl font-bold">{brl(totalDevedor)}</p>
           {dossie?.promessas?.length > 0 && (
