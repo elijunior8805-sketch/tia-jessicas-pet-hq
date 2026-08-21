@@ -28,10 +28,10 @@ import {
 } from "@/lib/cobrancas.functions";
 import {
   filaPriorizada,
-  obterDossieCobranca,
+  obterDossieCobrancaAvancada as obterDossieCobranca,
   registrarPromessaAvancada,
   type FilaItemDTO
-} from "@/lib/cobrancas-advanced.functions";
+} from "@/lib/cobrancas.functions";
 import { CobrancaPainelLateral } from "@/components/cobrancas/CobrancaPainelLateral";
 
 
