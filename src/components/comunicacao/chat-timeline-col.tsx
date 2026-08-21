@@ -119,7 +119,7 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
           </div>
         </div>
         <div className="flex gap-2 mt-3">
-          <Button variant="secondary" size="xs" className="h-7 text-[10px]" onClick={() => respMut.mutate(mensagem)} disabled={!mensagem.trim() || respMut.isPending}>
+          <Button variant="secondary" size="sm" className="h-7 text-[10px]" onClick={() => respMut.mutate(mensagem)} disabled={!mensagem.trim() || respMut.isPending}>
             Registrar Resposta do Cliente
           </Button>
         </div>
