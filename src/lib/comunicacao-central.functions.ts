@@ -176,6 +176,14 @@ export const registrarRespostaCliente = createServerFn({ method: "POST" })
     return await (await central()).registrarRespostaCliente(context.supabase, data.clienteId, data.corpo, data.canal, context.userId);
   });
 
+export const resolverThread = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clienteId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    return await (await central()).resolverThread(context.supabase, data.clienteId, context.userId);
+  });
+
+
 
 /* ============================================================
  * Registro rastreável do envio aprovado
