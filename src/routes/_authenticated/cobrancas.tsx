@@ -1233,22 +1233,20 @@ function TemplateEditor({
 // Fila do Dia — cobranças priorizadas por score
 // ===================================================================
 function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
-
-  // Lazy import server fn to avoid re-declaring at top; use dynamic require via ESM import at module scope
-  // (server fns are already static-imported in the file we live in)
-  // We import here through window.__cobrancasFns fallback — but simpler: rely on the static import below.
-  const filaFn = useServerFn(FILA_FN);
+  const filaFn = useServerFn(filaPriorizada);
   const q = useQuery({
-    queryKey: ["cobrancas", "fila"],
+    queryKey: ["cobrancas", "fila-priorizada"],
     queryFn: () => filaFn(),
     refetchInterval: 60_000,
   });
 
   const items = q.data ?? [];
-  const grupos = items.reduce<Record<string, typeof items>>((acc, it) => {
-    (acc[it.gatilho_label] ??= [] as any).push(it);
+  const grupos = items.reduce<Record<string, FilaItemDTO[]>>((acc, it) => {
+    const label = it.prioridade.charAt(0).toUpperCase() + it.prioridade.slice(1);
+    (acc[label] ??= []).push(it);
     return acc;
   }, {});
+
 
   if (q.isLoading) {
     return (
