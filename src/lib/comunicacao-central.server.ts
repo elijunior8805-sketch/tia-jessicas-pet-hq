@@ -441,7 +441,7 @@ export async function gerar3AbordagensIA(
     pet?.nome ? `- Pet: ${pet.nome}` : null,
     ctxCobranca ? `- Saldo pendente: ${brl(ctxCobranca.cobranca.saldo)}` : null,
     ctxCobranca ? `- Dias de atraso: ${ctxCobranca.dias}` : null,
-    ultimaMsg ? `- Última mensagem enviada: "${ultimaMsg.corpo}"` : null,
+    ultimasMensagens ? `- Histórico Recente:\n${ultimasMensagens}` : null,
     contextoManual ? `- Observação do operador: ${contextoManual}` : null,
   ].filter(Boolean).join("\n");
 
@@ -454,7 +454,8 @@ ${dados}
 REGRAS:
 - Devolva um JSON com a chave "versoes" contendo um array de 3 objetos { tom: string, texto: string }.
 - As 3 versões devem ser: 1) Direta e Cordial, 2) Firme e Séria, 3) Incisiva (ênfase na urgência).
-- Não repita a abordagem da "Última mensagem enviada" se houver.
+- Não repita a abordagem da última mensagem enviada por nós: "${ultimaSaida?.corpo || ""}".
+- Varie a estrutura e as palavras entre as 3 versões.
 - Sem aspas no texto, sem markdown, no máximo 1 emoji sutil 🐾 nas versões leves, nenhum nas firmes.
 
 ${REGRAS_INVIOLAVEIS}
