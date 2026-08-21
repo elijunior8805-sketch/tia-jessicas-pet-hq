@@ -1288,76 +1288,69 @@ function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
   }
 
   return (
-    <div className="space-y-4">
-      {Object.entries(grupos).map(([label, arr]) => (
-        <Card key={label}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>{label}</span>
-              <Badge variant="outline">{arr.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 px-3">Prioridade</th>
-                    <th className="py-2 px-3">Cliente / Pet</th>
-                    <th className="py-2 px-3">Saldo</th>
-                    <th className="py-2 px-3">Atraso</th>
-                    <th className="py-2 px-3">Tentativas</th>
-                    <th className="py-2 px-3 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {arr.map((c) => (
-                    <tr
-                      key={c.id}
-                      className="border-t hover:bg-muted/40 cursor-pointer"
-                      onClick={() => onSelect(c as any)}
-                    >
-                      <td className="py-2 px-3">
-                        <Badge 
-                          className={
-                            c.prioridade === 'critica' ? "bg-rose-100 text-rose-900 border-rose-200" :
-                            c.prioridade === 'alta' ? "bg-amber-100 text-amber-900 border-amber-200" :
-                            "bg-gold/20 text-foreground border-gold/40"
-                          }
-                        >
-                          {c.score} - {c.prioridade}
-                        </Badge>
-                      </td>
-                      <td className="py-2 px-3">
-                        <div className="font-medium">{c.cliente_nome}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {c.pet_nome ?? "—"} • {c.prioridade_justificativa}
-                        </div>
-                      </td>
-
-                      <td className="py-2 px-3 font-medium">{brl(c.saldo)}</td>
-                      <td className="py-2 px-3">
-                        {c.dias_atraso > 0 ? (
-                          <span className="text-rose-700 font-medium">{c.dias_atraso}d</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 text-muted-foreground">{c.tentativas}x</td>
-                      <td className="py-2 px-3 text-right">
-                        <Button size="sm" variant="outline">Abrir</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Object.entries(grupos).map(([label, rows]) => (
+          <Card key={label} className="border-gold/20 shadow-sm">
+            <CardHeader className="py-3 bg-muted/30">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                <span>{label}</span>
+                <Badge variant="secondary" className="bg-gold/20 text-gold-900">
+                  {rows.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="max-h-[400px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y">
+                    {rows.map((c) => (
+                      <tr
+                        key={c.id}
+                        className="border-t hover:bg-muted/40 cursor-pointer"
+                        onClick={() => onSelect(c as any)}
+                      >
+                        <td className="py-2 px-3">
+                          <Badge 
+                            className={
+                              c.prioridade === 'critica' ? "bg-rose-100 text-rose-900 border-rose-200" :
+                              c.prioridade === 'alta' ? "bg-amber-100 text-amber-900 border-amber-200" :
+                              "bg-gold/20 text-foreground border-gold/40"
+                            }
+                          >
+                            {c.score}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="font-medium">{c.cliente_nome}</div>
+                          <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">
+                            {c.pet_nome ?? "—"} • {c.prioridade_justificativa}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className="font-semibold text-rose-600">
+                            {Number(c.saldo).toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {c.dias_atraso}d atraso
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
+
 
 // ===================================================================
 // Funil de recuperação — mês corrente
