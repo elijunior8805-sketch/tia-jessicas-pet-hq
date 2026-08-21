@@ -232,10 +232,18 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => respMut.mutate(mensagem)} disabled={!mensagem.trim() || respMut.isPending}>
-            {respMut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-            Registrar Resposta do Cliente
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-[10px] border-amber-200 text-amber-700 hover:bg-amber-50" 
+            onClick={() => respMut.mutate(mensagem)} 
+            disabled={!mensagem.trim() || respMut.isPending}
+            title="Usa IA para classificar a intenção e alertar no Inbox"
+          >
+            {respMut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Wand2 className="h-3 w-3 mr-1" />}
+            Registrar e Analisar com IA
           </Button>
+
           {abordagens && (
             <Button variant="ghost" size="sm" className="h-7 text-[10px] text-muted-foreground" onClick={() => setAbordagens(null)}>
               Limpar IA
