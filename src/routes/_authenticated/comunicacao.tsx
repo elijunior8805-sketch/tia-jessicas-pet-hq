@@ -549,3 +549,39 @@ function HistoricoTab({ clientes }: { clientes: Cliente[] }) {
     </Card>
   );
 }
+
+/* ============================================================
+ * SUB-ABA: Inbox Inteligente (Central de Mensagens)
+ * ============================================================ */
+function InboxTab() {
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
+
+  return (
+    <div className="flex h-[calc(100vh-280px)] min-h-[500px] border border-border/60 rounded-2xl overflow-hidden bg-background shadow-sm">
+      <ChatThreadsCol 
+        selectedId={selectedClienteId || undefined}
+        onSelectThread={(id) => setSelectedClienteId(id)}
+      />
+      
+      <div className="flex-1 flex overflow-hidden">
+        {selectedClienteId ? (
+          <>
+            <ChatTimelineCol clienteId={selectedClienteId} />
+            <ChatContextCol clienteId={selectedClienteId} />
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 bg-muted/5">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <MessageCircle className="h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-display font-semibold text-primary">Inbox Inteligente</h3>
+            <p className="text-sm max-w-xs text-center mt-2">
+              Selecione uma conversa ao lado para visualizar o histórico e compor respostas com IA.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
