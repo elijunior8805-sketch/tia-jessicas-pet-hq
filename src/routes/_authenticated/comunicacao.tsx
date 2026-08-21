@@ -47,6 +47,10 @@ import { ComporTab } from "@/components/comunicacao/compor-tab";
 import { useMyAccess } from "@/hooks/use-my-permissions";
 import { LayoutDashboard, ListChecks, Settings2, HandCoins } from "lucide-react";
 import { PromessasTab } from "@/components/comunicacao/promessas-tab";
+import { ChatThreadsCol } from "@/components/comunicacao/chat-threads-col";
+import { ChatTimelineCol } from "@/components/comunicacao/chat-timeline-col";
+import { ChatContextCol } from "@/components/comunicacao/chat-context-col";
+
 
 
 export const Route = createFileRoute("/_authenticated/comunicacao")({
