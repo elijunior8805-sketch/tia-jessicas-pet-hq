@@ -933,18 +933,24 @@ Opções de intenção:
 Retorne um JSON: { "intencao": string, "confianca": number, "sugestao_operador": string, "pausar_cobranca": boolean }`;
 
   const iaRes = await chamarIA({
-    system: `Você é um classificador de intenções de clientes de Pet Shop.
+    system: `Você é um classificador de intenções de clientes de Pet Shop especializado em banho e tosa.
     As intenções ajudam o Spa a priorizar quem precisa de atenção humana urgente.
-    Intenções Críticas: CONTESTACAO (reclamações), PAGO_JA (afirma que pagou mas o sistema não viu).
-    Intenções Operacionais: PROMESSA (diz quando vai pagar), AGENDAMENTO (quer marcar algo).
     
-    Responda apenas com o JSON conforme solicitado.`,
+    Categorias:
+    - PAGO_JA: Afirma que já pagou (crítico, requer conferência).
+    - PROMESSA: Indica quando pagará (operacional).
+    - CONTESTACAO: Reclamações sobre serviço ou cobrança (crítico).
+    - AGENDAMENTO: Quer marcar, desmarcar ou alterar horário.
+    - OUTRO: Dúvidas ou mensagens gerais.
+    
+    Responda APENAS com o JSON: { "intencao": string, "confianca": number, "sugestao_operador": string, "pausar_cobranca": boolean }`,
     prompt,
     config,
     json: true,
     origem: "intencao:resposta_cliente",
     sb
   });
+
 
 
   let intencaoData = { intencao: "OUTRO", confianca: 0, sugestao_operador: "Aguardar resposta", pausar_cobranca: false };
