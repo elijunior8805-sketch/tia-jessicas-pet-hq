@@ -95,6 +95,4 @@ export function ChatContextCol({ clienteId }: ChatContextColProps) {
     </div>
   );
 }
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(" ");
-}
+
