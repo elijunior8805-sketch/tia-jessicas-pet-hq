@@ -64,9 +64,10 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
 
   if (!cobrancaId) return null;
 
-  const cob = dossie?.cobranca;
+  const cob = dossie?.cobranca as any;
   const cliente = cob?.clientes;
   const pet = cob?.atendimentos?.pets;
+
 
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
