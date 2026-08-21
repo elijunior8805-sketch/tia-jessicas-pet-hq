@@ -53,7 +53,14 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
     timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [dossie?.historico]);
 
+    enviarMut.mutate(mensagem);
+    if (dossie?.cliente?.whatsapp) {
+      abrirWhatsAppBusiness(dossie.cliente.whatsapp, mensagem);
+    }
+  };
+
   if (isLoading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
 
   return (
     <div className="flex flex-col h-full bg-background relative">
