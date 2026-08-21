@@ -793,6 +793,50 @@ export type Database = {
         }
         Relationships: []
       }
+      cobranca_promessas: {
+        Row: {
+          cobranca_id: string
+          created_at: string | null
+          data_prometida: string
+          id: string
+          observacao: string | null
+          responsavel_id: string | null
+          status: string | null
+          updated_at: string | null
+          valor: number
+        }
+        Insert: {
+          cobranca_id: string
+          created_at?: string | null
+          data_prometida: string
+          id?: string
+          observacao?: string | null
+          responsavel_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor: number
+        }
+        Update: {
+          cobranca_id?: string
+          created_at?: string | null
+          data_prometida?: string
+          id?: string
+          observacao?: string | null
+          responsavel_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_promessas_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cobrancas: {
         Row: {
           arquivada_em: string | null
@@ -802,15 +846,21 @@ export type Database = {
           cliente_id: string
           created_at: string
           created_by: string | null
+          etapa_kanban: string | null
           id: string
           pagamento_id: string
           pausada: boolean
           pausada_motivo: string | null
+          prioridade: string | null
+          prioridade_justificativa: string | null
           promessa_data: string | null
+          promessas_quebradas: number | null
+          responsavel_id: string | null
           saldo: number
           status: Database["public"]["Enums"]["cobranca_status"]
           tentativas: number
           ultima_cobranca_em: string | null
+          ultima_resposta_em: string | null
           updated_at: string
           updated_by: string | null
           valor_original: number
@@ -826,15 +876,21 @@ export type Database = {
           cliente_id: string
           created_at?: string
           created_by?: string | null
+          etapa_kanban?: string | null
           id?: string
           pagamento_id: string
           pausada?: boolean
           pausada_motivo?: string | null
+          prioridade?: string | null
+          prioridade_justificativa?: string | null
           promessa_data?: string | null
+          promessas_quebradas?: number | null
+          responsavel_id?: string | null
           saldo: number
           status?: Database["public"]["Enums"]["cobranca_status"]
           tentativas?: number
           ultima_cobranca_em?: string | null
+          ultima_resposta_em?: string | null
           updated_at?: string
           updated_by?: string | null
           valor_original: number
@@ -850,15 +906,21 @@ export type Database = {
           cliente_id?: string
           created_at?: string
           created_by?: string | null
+          etapa_kanban?: string | null
           id?: string
           pagamento_id?: string
           pausada?: boolean
           pausada_motivo?: string | null
+          prioridade?: string | null
+          prioridade_justificativa?: string | null
           promessa_data?: string | null
+          promessas_quebradas?: number | null
+          responsavel_id?: string | null
           saldo?: number
           status?: Database["public"]["Enums"]["cobranca_status"]
           tentativas?: number
           ultima_cobranca_em?: string | null
+          ultima_resposta_em?: string | null
           updated_at?: string
           updated_by?: string | null
           valor_original?: number
