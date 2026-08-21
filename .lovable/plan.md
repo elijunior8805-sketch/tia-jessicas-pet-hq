@@ -3,42 +3,27 @@
 Transformação da aba de Comunicação em uma central de atendimento 360°, integrando IA, histórico unificado e gestão de cobrança proativa.
 
 ## 1. Estrutura de Dados & Backend
-- **Nova Tabela/View `mensagens_threads_v2`**: Já identificada no esquema. Ela agrupa mensagens por cliente e pet, trazendo contadores de não lidas e status da conversa.
-- **Server Functions**:
-  - `listarThreads`: Recupera a lista de conversas ativas com filtros (não lidas, cobranças, agendamentos).
-  - `obterThreadDetalhada`: Retorna o histórico completo (mensagens, agendamentos, cobranças) para um cliente específico.
-  - `processarRespostaCliente`: Endpoint para registrar manualmente ou via webhook a resposta do cliente, disparando a lógica de detecção de intenção (promessa, contestação, etc.).
-  - `atualizarStatusConversa`: Permite mover conversas entre status (Nova, Atenção Humana, Resolvida).
+- **Thread Management**: Utilizar a view `mensagens_threads_v2` para consolidar a lista de conversas.
+- **Novas Server Functions em `comunicacao-central.functions.ts`**:
+  - `listarConversas`: Listagem com filtros de status e busca.
+  - `obterDossieConversa`: Dados unificados de cliente, pet, financeiro e histórico para a conversa selecionada.
+  - `registrarRespostaIA`: Processa a resposta do cliente usando IA para detectar intenções (Promessa, Pagamento, Contestação, Insatisfação).
 
-## 2. UI: Nova Central de Mensagens (Layout 3 Colunas)
-Substituir a atual visualização de histórico por uma interface de chat moderna:
+## 2. Interface (UI) - Layout de 3 Colunas
+Refatorar a aba de Histórico/Comunicação para um layout tipo "Inbox":
+- **Coluna Esquerda (Conversas)**: Lista de clientes com contadores de mensagens e badges de status (Nova, Atenção Humana, Cobrança).
+- **Área Central (Timeline)**: Chat cronológico integrando mensagens enviadas e recebidas, além de eventos de sistema (Check-in, Pagamentos).
+- **Painel Direito (Contexto)**: Widget fixo com dados do pet, saldo devedor, promessas ativas e botões de ação rápida.
 
-### Coluna Esquerda: Lista de Conversas
-- Busca global (Cliente/Pet/Tel).
-- Filtros rápidos: "Não lidas", "Aguardando Resposta", "Cobranças", "Atenção Humana".
-- Cards de conversa com badges de status e última mensagem.
+## 3. Fluxo Inteligente
+- **Detecção de Resposta**: Quando o operador registra uma resposta, a IA sugere automaticamente:
+  - Registro de Promessa (se o cliente disser que paga amanhã).
+  - Pausa de cobrança (se houver contestação).
+  - Alerta de "Atenção Humana" (em caso de insatisfação).
+- **Histórico Auditável**: Cada mensagem registrará quem aprovou, o modelo da IA usado e se houve edição manual do texto sugerido.
 
-### Coluna Central: Timeline & Ações
-- Timeline cronológica unificada: Mensagens (Nossas vs Cliente), registros de Check-in, Pagamentos e Promessas.
-- Balão de "Sugestão da IA" persistente baseado na última resposta do cliente.
-- Compositor Integrado: Acesso rápido às 3 abordagens da IA e templates.
-- Botão flutuante para abertura do WhatsApp Business.
-
-### Coluna Direita: Dossiê em Tempo Real
-- Widget de Cliente/Pet com fotos.
-- Resumo Financeiro: Saldo devedor total, promessas ativas.
-- Próximo Agendamento: Card visual com data/hora.
-- Próxima Ação Recomendada pela IA.
-
-## 3. Inteligência & Automação
-- **Intenção do Cliente**: Ao registrar uma resposta, a IA classifica em:
-  - `PAGO_AMANHA` -> Sugere registro de promessa.
-  - `JA_PAGUEI` -> Alerta para validação financeira.
-  - `CONTESTACAO` -> Pausa réguas de cobrança automáticas e marca "Atenção Humana".
-- **Auditoria**: Garantir que cada mensagem no histórico tenha `aprovado_por` e `modelo_ia` gravados.
-
-## 4. Mobile First
-- Adaptar o layout de 3 colunas para um sistema de abas deslizantes: [Lista] <-> [Chat] <-> [Dossiê].
+## 4. Mobile
+- Implementar navegação por abas ou drawer lateral para garantir que as 3 colunas sejam acessíveis em telas pequenas sem perda de funcionalidade.
 
 ---
-*Este plano substitui a lógica de "Histórico" simples por uma ferramenta ativa de CRM e Cobrança.*
+Este plano foca na integração definitiva entre a comunicação e o financeiro, transformando a "Central de Mensagens" no coração operacional do Spa.
