@@ -68,11 +68,12 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
           </div>
         </div>
         <div className="flex gap-2">
-           <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`https://wa.me/${dossie?.cliente?.whatsapp?.replace(/\D/g, '')}`, '_blank')}>
+           <Button variant="outline" size="sm" className="gap-2" onClick={() => abrirWhatsAppBusiness(dossie?.cliente?.whatsapp || "")}>
             <Phone className="h-4 w-4" />
             Abrir WhatsApp
           </Button>
         </div>
+
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
