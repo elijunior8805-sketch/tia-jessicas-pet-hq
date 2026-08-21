@@ -182,10 +182,6 @@ function InboxInteligenteTab() {
   );
 }
 
-// Imports for the new components
-import { ChatThreadsCol } from "@/components/comunicacao/chat-threads-col";
-import { ChatTimelineCol } from "@/components/comunicacao/chat-timeline-col";
-import { ChatContextCol } from "@/components/comunicacao/chat-context-col";
 
 
 /* ============================================================
