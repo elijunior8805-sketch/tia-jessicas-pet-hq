@@ -852,8 +852,32 @@ export async function listarThreads(sb: any, busca?: string, status: string = "a
 
   const { data, error } = await query.order("ultima_em", { ascending: false }).limit(100);
   if (error) throw error;
+
+  // Marcar como lidas ao listar se for o caso? Não, isso deve ser explícito.
   return data ?? [];
 }
+
+/**
+ * Resolve uma conversa (marca como resolvida).
+ */
+export async function resolverThread(sb: any, clienteId: string, resolvidaPor: string) {
+  // Encontra a última mensagem "in" que não está resolvida e marca o status global da thread?
+  // Na verdade, a view mensagens_threads_v2 olha a última mensagem.
+  // Vamos inserir uma mensagem de sistema ou atualizar as mensagens pendentes.
+  const { error } = await sb
+    .from("mensagens")
+    .update({ 
+      status: "resolvida",
+      resolvida_em: new Date().toISOString(),
+      resolvida_por: resolvidaPor
+    })
+    .eq("cliente_id", clienteId)
+    .is("resolvida_em", null);
+  
+  if (error) throw error;
+  return { ok: true };
+}
+
 
 /**
  * Obtém o dossiê completo de uma conversa para o painel lateral.
