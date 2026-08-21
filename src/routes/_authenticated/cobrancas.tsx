@@ -140,6 +140,8 @@ function CobrancasPage() {
   });
 
   const [selecionada, setSelecionada] = useState<CobrancaDTO | null>(null);
+  const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
+
   const [showConfig, setShowConfig] = useState(false);
   const composer = useWhatsAppComposer();
 
