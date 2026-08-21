@@ -29,7 +29,9 @@ export type AcaoRefino =
   | "mais_firme"
   | "resumir"
   | "corrigir"
-  | "outra_versao";
+  | "outra_versao"
+  | "acolhedor"
+  | "incisivo";
 
 const INSTRUCAO_REFINO: Record<AcaoRefino, string> = {
   mais_gentil: "Reescreva de forma mais gentil e acolhedora, reduzindo a firmeza.",

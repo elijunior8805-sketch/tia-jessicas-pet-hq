@@ -33,6 +33,7 @@ import {
   gerarSugestoesProativas, listarSugestoes, atualizarStatusSugestao, feedbackSugestao,
   listarHistoricoMensagens,
 } from "@/lib/comunicacao-advanced.functions";
+import { gerar3AbordagensIA } from "@/lib/comunicacao-central.functions";
 import { VisaoGeralTab } from "@/components/comunicacao/visao-geral-tab";
 import { FilaProativaTab } from "@/components/comunicacao/fila-proativa-tab";
 import { IaConfigTab } from "@/components/comunicacao/ia-config-tab";
