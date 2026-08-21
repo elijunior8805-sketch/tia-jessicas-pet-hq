@@ -68,6 +68,8 @@ function ComunicacaoPage() {
   const qc = useQueryClient();
   const perms = useMyAccess();
   const [aba, setAba] = useState("visao");
+  const [inboxClienteId, setInboxClienteId] = useState<string | null>(null);
+
 
   // -------- shared data --------
   const clientesQ = useQuery({
@@ -124,8 +126,19 @@ function ComunicacaoPage() {
           <TabsTrigger value="config"><Settings2 className="h-4 w-4 mr-2" /> Configurações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="visao"><VisaoGeralTab onIrParaFila={() => setAba("fila")} /></TabsContent>
-        <TabsContent value="inbox"><InboxTab /></TabsContent>
+        <TabsContent value="visao">
+          <VisaoGeralTab 
+            onIrParaFila={() => setAba("fila")} 
+            onIrParaInbox={(cid) => {
+              if (cid) setInboxClienteId(cid);
+              setAba("inbox");
+            }} 
+          />
+        </TabsContent>
+        <TabsContent value="inbox">
+          <InboxTab initialClienteId={inboxClienteId} onClienteSelect={setInboxClienteId} />
+        </TabsContent>
+
 
         <TabsContent value="fila"><FilaProativaTab /></TabsContent>
         <TabsContent value="promessas">
@@ -553,15 +566,29 @@ function HistoricoTab({ clientes }: { clientes: Cliente[] }) {
 /* ============================================================
  * SUB-ABA: Inbox Inteligente (Central de Mensagens)
  * ============================================================ */
-function InboxTab() {
-  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
+function InboxTab({ initialClienteId, onClienteSelect }: { initialClienteId: string | null, onClienteSelect: (id: string | null) => void }) {
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(initialClienteId);
+
+  // Sincroniza estado interno se o pai mudar
+  useMemo(() => {
+    if (initialClienteId !== selectedClienteId) {
+      setSelectedClienteId(initialClienteId);
+    }
+  }, [initialClienteId]);
+
+  const handleSelect = (id: string) => {
+    setSelectedClienteId(id);
+    onClienteSelect(id);
+  };
+
 
   return (
     <div className="flex h-[calc(100vh-280px)] min-h-[500px] border border-border/60 rounded-2xl overflow-hidden bg-background shadow-sm">
       <ChatThreadsCol 
         selectedId={selectedClienteId || undefined}
-        onSelectThread={(id) => setSelectedClienteId(id)}
+        onSelectThread={handleSelect}
       />
+
       
       <div className="flex-1 flex overflow-hidden">
         {selectedClienteId ? (
