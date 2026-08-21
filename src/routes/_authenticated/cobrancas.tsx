@@ -32,6 +32,8 @@ import {
   registrarPromessaAvancada,
   type FilaItemDTO
 } from "@/lib/cobrancas-advanced.functions";
+import { CobrancaPainelLateral } from "@/components/cobrancas/CobrancaPainelLateral";
+
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
