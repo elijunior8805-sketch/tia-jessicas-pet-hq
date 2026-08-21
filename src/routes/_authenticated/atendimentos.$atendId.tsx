@@ -955,7 +955,7 @@ function AtendimentoDetalhe() {
           <Card className="p-6 border-l-4 border-l-gold">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <h2 className="font-display text-xl flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-primary" /> Serviço solicitado
+                <ClipboardList className="h-5 w-5 text-primary" /> Serviço solicitado (parte 3)
               </h2>
               <EtapaBadge st={st(1)} />
             </div>
@@ -1029,7 +1029,7 @@ function AtendimentoDetalhe() {
             {!readOnly && !isEtapaConfirmada(atendimento, 1) && (
               <Button className="mt-4 w-full uppercase" onClick={() => confirmarEtapa(1)}>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Confirmar serviço solicitado
+                Confirmar serviço solicitado (parte 3)
               </Button>
             )}
             <ConfirmadaFooter st={st(1)} />
