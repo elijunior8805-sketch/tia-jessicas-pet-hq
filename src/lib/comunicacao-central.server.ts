@@ -828,3 +828,108 @@ export async function montarPainelOperacional(sb: any) {
     conferirPagamento: conferirPagamento.data ?? [],
   };
 }
+
+/**
+ * Lista as threads de conversa ativas usando a view mensagens_threads_v2.
+ */
+export async function listarThreads(sb: any, busca?: string, status: string = "abertas") {
+  let query = sb.from("mensagens_threads_v2").select("*");
+
+  if (busca) {
+    query = query.or(`cliente_nome.ilike.%${busca}%,cliente_telefone.ilike.%${busca}%,pet_primeiro_nome.ilike.%${busca}%`);
+  }
+
+  if (status === "nao_lidas") {
+    query = query.gt("nao_lidas", 0);
+  } else if (status === "resolvidas") {
+    query = query.not("resolvida_em", "is", null);
+  } else if (status === "atencao") {
+    query = query.eq("status_conversa", "atencao_humana");
+  } else {
+    // Abertas (padrão)
+    query = query.is("resolvida_em", null);
+  }
+
+  const { data, error } = await query.order("ultima_em", { ascending: false }).limit(100);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Obtém o dossiê completo de uma conversa para o painel lateral.
+ */
+export async function obterDossieConversa(sb: any, clienteId: string) {
+  const [cliente, pets, cobrancas, promessas, historico, proximoAgendamento] = await Promise.all([
+    sb.from("clientes").select("*").eq("id", clienteId).single(),
+    sb.from("pets").select("id, nome, raca, foto_url").eq("cliente_id", clienteId),
+    sb.from("cobrancas").select("*").eq("cliente_id", clienteId).gt("saldo", 0).is("arquivada_em", null),
+    sb.from("promessas_pagamento").select("*").eq("cliente_id", clienteId).eq("status", "aguardando"),
+    sb.from("mensagens").select("*").eq("cliente_id", clienteId).order("created_at", { ascending: true }).limit(50),
+    sb.from("agendamentos").select("*, pets(nome)").eq("cliente_id", clienteId).gte("data", hojeISO()).order("data").order("hora").limit(1).maybeSingle(),
+  ]);
+
+  return {
+    cliente: cliente.data,
+    pets: pets.data ?? [],
+    cobrancas: cobrancas.data ?? [],
+    promessas: promessas.data ?? [],
+    historico: historico.data ?? [],
+    proximoAgendamento: proximoAgendamento.data,
+  };
+}
+
+/**
+ * Registra a resposta de um cliente e detecta intenção usando IA.
+ */
+export async function registrarRespostaCliente(sb: any, clienteId: string, corpo: string, canal: string, autorId: string) {
+  // 1. Inserir a mensagem de entrada
+  const { data: msg, error: msgError } = await sb.from("mensagens").insert({
+    cliente_id: clienteId,
+    direcao: "in",
+    canal,
+    corpo,
+    status: "recebida",
+    recebida_em: new Date().toISOString()
+  }).select().single();
+
+  if (msgError) throw msgError;
+
+  // 2. IA Detectar intenção (PAGO, AMANHA, CONTESTACAO, DUVIDA)
+  const config = await carregarIaConfig(sb);
+  const prompt = `Analise a resposta de um cliente de um pet shop e classifique a intenção.
+Resposta: "${corpo}"
+
+Opções de intenção:
+- PAGO_JA: Afirma que já pagou.
+- PROMESSA: Diz que vai pagar em uma data específica.
+- CONTESTACAO: Reclama de valor, serviço ou tom de cobrança.
+- AGENDAMENTO: Quer marcar ou desmarcar banho.
+- OUTRO: Dúvidas gerais.
+
+Retorne um JSON: { "intencao": string, "confianca": number, "sugestao_operador": string, "pausar_cobranca": boolean }`;
+
+  const iaRes = await chamarIA({
+    system: "Você é um classificador de intenções de clientes de Pet Shop.",
+    prompt,
+    config,
+    json: true,
+    origem: "intencao:resposta_cliente",
+    sb
+  });
+
+  let intencaoData = { intencao: "OUTRO", confianca: 0, sugestao_operador: "Aguardar resposta", pausar_cobranca: false };
+  try {
+    intencaoData = JSON.parse(iaRes.texto.replace(/```json|```/g, "").trim());
+  } catch(e) {}
+
+  // 3. Atualizar status da conversa se necessário
+  if (intencaoData.pausar_cobranca || intencaoData.intencao === "CONTESTACAO") {
+    await sb.from("mensagens").update({ 
+      metadata: { ...msg.metadata, intencao: intencaoData.intencao, sugestao: intencaoData.sugestao_operador },
+      status: "atencao_humana" 
+    }).eq("id", msg.id);
+  }
+
+  return { ok: true, msg, intencao: intencaoData };
+}
+
