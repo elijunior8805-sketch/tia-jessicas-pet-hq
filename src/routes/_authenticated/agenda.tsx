@@ -840,122 +840,121 @@ function AgendamentoRow({
   })();
 
   return (
-    <Card className="p-4 hover:shadow-elegant transition">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-4 items-start">
-        <div className="text-center min-w-[64px]">
-          <div className="font-display text-2xl font-semibold text-primary leading-none">
-            {row.hora ? String(row.hora).slice(0, 5) : "—"}
+    <Card className="p-4 hover:shadow-elegant transition bg-card border-border/50">
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Lado Esquerdo: Hora e Status (Mobile: Lado a lado; Desktop: Coluna) */}
+        <div className="flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-2 sm:min-w-[100px] sm:border-r sm:border-border/40 sm:pr-4">
+          <div>
+            <div className="font-display text-2xl font-bold text-primary leading-tight">
+              {row.hora ? String(row.hora).slice(0, 5) : "—"}
+            </div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Clock className="h-3 w-3" />
+              {duracaoTotal || "—"} min
+            </div>
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground flex items-center justify-center gap-1">
-            <Clock className="h-3 w-3" />
-            {duracaoTotal || "—"} min
+          <div className="flex flex-col items-end sm:items-start gap-1">
+            <Badge variant="outline" className={`text-[10px] uppercase font-bold py-0.5 ${meta.tone}`}>
+              {meta.label}
+            </Badge>
+            {row.clientes?.vip === true && (
+              <Badge className="badge-gold text-[9px] h-4">VIP</Badge>
+            )}
           </div>
         </div>
 
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`px-2 py-0.5 rounded-full text-[11px] border ${meta.tone}`}>
-              {meta.label}
-            </span>
-            {row.clientes?.vip === true && (
-              <span title="Cliente marcado como VIP no cadastro" className="inline-flex">
-                <Badge className="badge-gold text-[10px]">VIP</Badge>
-              </span>
-            )}
-            <span
-              className="font-display font-semibold text-primary truncate"
-              title={itensServicos.map((it) => it.nome).join(" + ")}
-            >
-              {servicosLabel}
-            </span>
-            {totalItens > 1 && (
-              <Badge variant="secondary" className="text-[10px]">
-                {totalItens} serviços
-              </Badge>
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1 min-w-0">
-              <PawPrint className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">
+        {/* Centro: Informações do Atendimento */}
+        <div className="flex-1 min-w-0 space-y-3">
+          {/* Cliente e Pet */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border/40">
+              <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1 flex items-center gap-1">
+                <PawPrint className="h-3 w-3" /> Pet
+              </div>
+              <div className="font-display font-bold text-primary text-base truncate">
                 {row.pets?.nome ?? "—"}
-                {row.pets?.porte ? ` · ${row.pets.porte}` : ""}
+              </div>
+              <div className="text-xs text-muted-foreground truncate">
+                {row.pets?.porte ? `${row.pets.porte}` : ""}
                 {row.pets?.raca ? ` · ${row.pets.raca}` : ""}
-              </span>
-            </span>
-            <span className="flex items-center gap-1 min-w-0">
-              <User className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{row.clientes?.nome ?? "—"}</span>
-            </span>
-            {row.clientes?.whatsapp && (
-              <span className="flex items-center gap-1">
-                <MessageCircle className="h-3.5 w-3.5" />
-                {row.clientes.whatsapp}
-              </span>
-            )}
+              </div>
+            </div>
+
+            <div className="bg-muted/30 p-2.5 rounded-xl border border-border/40">
+              <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1 flex items-center gap-1">
+                <User className="h-3 w-3" /> Tutor
+              </div>
+              <div className="font-semibold text-foreground text-sm truncate">
+                {row.clientes?.nome ?? "—"}
+              </div>
+              {row.clientes?.whatsapp && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <MessageCircle className="h-3 w-3" />
+                  {row.clientes.whatsapp}
+                </div>
+              )}
+            </div>
           </div>
-          {totalItens > 1 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+
+          {/* Serviços */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground">Serviços Solicitados</span>
+              {totalItens > 1 && (
+                <span className="text-[10px] text-primary font-bold">{totalItens} itens</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {itensServicos.map((it, i) => (
-                <span
+                <Badge
                   key={i}
-                  className="text-[11px] px-2 py-0.5 rounded-full bg-primary/5 border border-primary/15 text-primary/90"
-                  title={it.duracao_min ? `${it.duracao_min} min · ${brl(it.valor_unit)}` : brl(it.valor_unit)}
+                  variant="secondary"
+                  className="bg-primary/5 text-primary border-primary/10 text-[11px] font-medium py-0.5 px-2"
                 >
                   {it.nome}
-                </span>
+                </Badge>
               ))}
             </div>
-          )}
+          </div>
+
           {row.observacoes && (
-            <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{row.observacoes}</p>
+            <div className="text-xs text-muted-foreground bg-gold/5 p-2 rounded-lg border border-gold/10 italic">
+              "{row.observacoes}"
+            </div>
           )}
         </div>
 
-        <div className="text-right shrink-0 flex flex-col items-end gap-2">
-          <div>
-            <div className="font-display text-lg font-semibold text-primary">{brl(total)}</div>
-            {totalItens > 1 && (
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {brl(valorServicos)} em serviços
-              </div>
-            )}
+        {/* Lado Direito: Financeiro e Ações (Mobile: Fixo embaixo; Desktop: Coluna Lateral) */}
+        <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-between gap-3 sm:min-w-[140px] pt-2 sm:pt-0 border-t sm:border-t-0 sm:border-l border-border/40 sm:pl-4">
+          <div className="text-left sm:text-right">
+            <div className="font-display text-xl font-bold text-primary leading-none">
+              {brl(total)}
+            </div>
             {Number(row.taxa_leva_traz ?? 0) > 0 && (
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                inclui leva-e-traz {brl(row.taxa_leva_traz)}
+              <div className="text-[9px] uppercase font-bold text-success mt-1">
+                + Leva e Traz {brl(row.taxa_leva_traz)}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {podeEditarServicos && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                onClick={() => setEditServicosOpen(true)}
-                title="Editar serviços deste agendamento"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Serviços
-              </Button>
-            )}
+
+          <div className="flex flex-wrap sm:flex-col gap-2 justify-end w-full max-w-[200px] sm:max-w-none">
             {["agendado","confirmado","aguardando","em_atendimento"].includes(row.status) && (
               <Button
                 size="sm"
-                className="gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                className="flex-1 sm:w-full gap-1.5 bg-primary font-bold text-xs h-9 rounded-lg"
                 disabled={iniciando}
                 onClick={onIniciar}
-                title={row.status === "em_atendimento" ? "Retomar atendimento" : "Iniciar atendimento"}
               >
-                <Play className="h-3.5 w-3.5" />
-                {row.status === "em_atendimento" ? "Retomar" : "Iniciar atendimento"}
+                <Play className="h-3.5 w-3.5 fill-current" />
+                {row.status === "em_atendimento" ? "Retomar" : "Atender"}
               </Button>
             )}
+            
             {(row.status === "agendado" || row.status === "confirmado" || row.status === "aguardando" || row.status === "finalizado") && (
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1 border-success/40 text-success hover:bg-success/10"
+                className="flex-1 sm:w-full gap-1.5 border-success/30 text-success hover:bg-success/5 font-bold text-xs h-9 rounded-lg"
                 onClick={() => {
                   if (row.status === "finalizado") {
                     openFinalizadoPreview();
@@ -963,106 +962,105 @@ function AgendamentoRow({
                     openWhatsApp(row, signer);
                   }
                 }}
-                title={
-                  row.status === "agendado"
-                    ? "Enviar confirmação por WhatsApp"
-                    : row.status === "confirmado"
-                    ? "Enviar lembrete por WhatsApp"
-                    : row.status === "aguardando"
-                    ? "Enviar mensagem de aguardando"
-                    : "Enviar aviso de encerramento por WhatsApp"
-                }
               >
                 <Send className="h-3.5 w-3.5" />
-                {row.status === "agendado"
-                  ? "Confirmar"
-                  : row.status === "confirmado"
-                  ? "Lembrar"
-                  : row.status === "aguardando"
-                  ? "Cobrar"
-                  : "Avisar encerramento"}
-              </Button>
-
-            )}
-            {podeCheckIn && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 border-gold/50 text-gold-foreground hover:bg-gold/10"
-                onClick={() => onChangeStatus("aguardando")}
-                title="Registrar chegada do pet (check-in)"
-              >
-                <LogIn className="h-3.5 w-3.5" />
-                Check-in
+                {row.status === "agendado" ? "Confirmar" : 
+                 row.status === "confirmado" ? "Lembrar" : 
+                 row.status === "aguardando" ? "Cobrar" : "Avisar"}
               </Button>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1">
-                  Ações <MoreHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Ações rápidas</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setEditarOpen(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-2" /> Editar agendamento…
-                </DropdownMenuItem>
-                {podeReagendar && (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setNovaData(row.data ?? "");
-                      setNovaHora(normalizarHora(row.hora));
-                      setReagendarOpen(true);
-                    }}
-                  >
-                    <CalendarIcon className="h-3.5 w-3.5 mr-2" /> Reagendar…
-                  </DropdownMenuItem>
-                )}
-                {podeCheckIn && (
-                  <DropdownMenuItem onClick={() => onChangeStatus("aguardando")}>
-                    <LogIn className="h-3.5 w-3.5 mr-2" /> Marcar check-in
-                  </DropdownMenuItem>
-                )}
-                {row.status === "aguardando" && (
-                  <DropdownMenuItem onClick={onIniciar} disabled={iniciando}>
-                    <Play className="h-3.5 w-3.5 mr-2" /> Iniciar atendimento
-                  </DropdownMenuItem>
-                )}
-                {podeCancelar && (
-                  <DropdownMenuItem
-                    onClick={() => setCancelarOpen(true)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Cancelar agendamento
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={() => setExcluirOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir definitivamente
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
-                {STATUS.map((s) => (
-                  <DropdownMenuItem
-                    key={s.value}
-                    disabled={row.status === s.value}
-                    onClick={() => onChangeStatus(s.value)}
-                  >
-                    {s.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
-
         </div>
       </div>
 
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="sm:max-w-lg">
+      {/* Rodapé de Ações Secundárias */}
+      <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between">
+        <div className="flex gap-2">
+          {podeCheckIn && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-[11px] font-bold text-gold-foreground hover:bg-gold/10 gap-1.5"
+              onClick={() => onChangeStatus("aguardando")}
+            >
+              <LogIn className="h-3 w-3" /> Check-in
+            </Button>
+          )}
+          {podeEditarServicos && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-[11px] font-bold text-muted-foreground gap-1.5"
+              onClick={() => setEditServicosOpen(true)}
+            >
+              <Pencil className="h-3 w-3" /> Serviços
+            </Button>
+          )}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 text-[11px] font-bold gap-1">
+              Opções <MoreHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Gestão do Agendamento</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setEditarOpen(true)}>
+              <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Completo
+            </DropdownMenuItem>
+            {podeReagendar && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setNovaData(row.data ?? "");
+                  setNovaHora(normalizarHora(row.hora));
+                  setReagendarOpen(true);
+                }}
+              >
+                <CalendarIcon className="h-3.5 w-3.5 mr-2" /> Reagendar
+              </DropdownMenuItem>
+            )}
+            {podeCheckIn && (
+              <DropdownMenuItem onClick={() => onChangeStatus("aguardando")}>
+                <LogIn className="h-3.5 w-3.5 mr-2" /> Marcar check-in
+              </DropdownMenuItem>
+            )}
+            {row.status === "aguardando" && (
+              <DropdownMenuItem onClick={onIniciar} disabled={iniciando}>
+                <Play className="h-3.5 w-3.5 mr-2" /> Iniciar atendimento
+              </DropdownMenuItem>
+            )}
+            {podeCancelar && (
+              <DropdownMenuItem
+                onClick={() => setCancelarOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" /> Cancelar agendamento
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() => setExcluirOpen(true)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir definitivamente
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Alterar status</DropdownMenuLabel>
+            {STATUS.map((s) => (
+              <DropdownMenuItem
+                key={s.value}
+                disabled={row.status === s.value}
+                onClick={() => onChangeStatus(s.value)}
+              >
+                {s.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </Card>
+  );
           <DialogHeader>
             <DialogTitle>Prévia do aviso de encerramento</DialogTitle>
             <DialogDescription>
