@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-server";
+import { useServerFn } from "@tanstack/react-start";
 import { obterDossieConversa, registrarRespostaCliente, registrarComunicacao } from "@/lib/comunicacao-central.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { brl } from "@/lib/comunicacao-central.server";
 import { toast } from "sonner";
+
 
 interface ChatTimelineColProps {
   clienteId: string;
