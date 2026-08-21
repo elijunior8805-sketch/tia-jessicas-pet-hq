@@ -124,6 +124,20 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
           <Button 
             variant="ghost" 
             size="sm" 
+            className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            onClick={() => {
+              if (dossie?.cliente?.whatsapp) {
+                const e164 = dossie.cliente.whatsapp.replace(/\D+/g, "");
+                window.open(`https://wa.me/${e164}`, "_blank");
+              }
+            }}
+          >
+            <Phone className="h-3 w-3 mr-1" />
+            WhatsApp Web
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
             className="text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
             onClick={() => resolverMut.mutate()}
             disabled={resolverMut.isPending}
@@ -132,6 +146,7 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
             Resolvida
           </Button>
         </div>
+
 
       </div>
 
