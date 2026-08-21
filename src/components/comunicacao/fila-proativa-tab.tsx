@@ -386,7 +386,8 @@ export function GeradorCobrancaDialog({
             <div className="flex flex-wrap gap-2">
               {[
                 ["mais_gentil", "Mais gentil"], ["mais_direta", "Mais direta"],
-                ["mais_firme", "Mais firme"], ["resumir", "Resumir"], ["corrigir", "Corrigir"],
+                ["mais_firme", "Mais firme"], ["acolhedor", "Mais acolhedor"], ["incisivo", "Incisivo"],
+                ["resumir", "Resumir"], ["corrigir", "Corrigir"],
               ].map(([a, l]) => (
                 <Button key={a} size="sm" variant="outline" disabled={!texto || refinarM.isPending}
                   onClick={() => refinarM.mutate(a as string)}>
