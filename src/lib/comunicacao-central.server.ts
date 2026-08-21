@@ -395,6 +395,97 @@ ${CONTRATO_JSON}`;
   };
 }
 
+/**
+ * Gera 3 abordagens distintas (Direta, Firme, Incisiva) simultaneamente.
+ */
+export async function gerar3AbordagensIA(
+  sb: any,
+  clienteId: string,
+  cobrancaId?: string | null,
+  petId?: string | null,
+  contextoManual?: string | null,
+  objetivo: string = "cobranca"
+) {
+  const config = await carregarIaConfig(sb);
+  
+  // 1. Montar contexto básico do cliente/pet
+  const { data: cliente } = await sb.from("clientes").select("*").eq("id", clienteId).single();
+  const { data: pet } = petId ? await sb.from("pets").select("*").eq("id", petId).single() : { data: null };
+  
+  // 2. Se for cobrança, pegar contexto da cobrança
+  let ctxCobranca = null;
+  if (cobrancaId) {
+    try {
+      ctxCobranca = await montarContextoCobranca(sb, cobrancaId);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // 3. Pegar última mensagem enviada para evitar repetição
+  const { data: ultimaMsg } = await sb
+    .from("mensagens")
+    .select("corpo, created_at")
+    .eq("cliente_id", clienteId)
+    .eq("direcao", "out")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const dados = [
+    `- Cliente: ${cliente?.nome}`,
+    pet?.nome ? `- Pet: ${pet.nome}` : null,
+    ctxCobranca ? `- Saldo pendente: ${brl(ctxCobranca.cobranca.saldo)}` : null,
+    ctxCobranca ? `- Dias de atraso: ${ctxCobranca.dias}` : null,
+    ultimaMsg ? `- Última mensagem enviada: "${ultimaMsg.corpo}"` : null,
+    contextoManual ? `- Observação do operador: ${contextoManual}` : null,
+  ].filter(Boolean).join("\n");
+
+  const prompt = `Gere 3 versões de mensagem de WhatsApp para o Spa de Pet Tia Jéssica.
+Objetivo: ${objetivo}
+
+DADOS:
+${dados}
+
+REGRAS:
+- Devolva um JSON com a chave "versoes" contendo um array de 3 objetos { tom: string, texto: string }.
+- As 3 versões devem ser: 1) Direta e Cordial, 2) Firme e Séria, 3) Incisiva (ênfase na urgência).
+- Não repita a abordagem da "Última mensagem enviada" se houver.
+- Sem aspas no texto, sem markdown, no máximo 1 emoji sutil 🐾 nas versões leves, nenhum nas firmes.
+
+${REGRAS_INVIOLAVEIS}
+
+Responda SOMENTE o JSON.`;
+
+  const r = await chamarIA({
+    system: "Você é um assistente de comunicação premium especializado em redação de mensagens para spa de pets.",
+    prompt,
+    config,
+    json: true,
+    origem: "comunicacao:gerar3",
+    sb,
+  });
+
+  try {
+    const parsed: any = JSON.parse(r.texto.replace(/```json|```/g, "").trim());
+    return {
+      versoes: (parsed.versoes || []).map((v: any) => {
+        const guard = verificarPalavrasProibidas(v.texto, config);
+        return {
+          ...v,
+          bloqueada: !guard.ok,
+          palavrasBloqueadas: guard.encontradas,
+          texto: guard.ok ? v.texto : "Mensagem bloqueada por termos impróprios."
+        };
+      }),
+      modelo: r.modelo
+    };
+  } catch (e) {
+    throw new Error("Erro ao processar as abordagens da IA.");
+  }
+}
+
+
 function REGRAS_INVIOLÁVEIS_SAFE() {
   return REGRAS_INVIOLAVEIS;
 }
