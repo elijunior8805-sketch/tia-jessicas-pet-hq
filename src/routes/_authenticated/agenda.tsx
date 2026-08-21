@@ -1059,6 +1059,7 @@ function AgendamentoRow({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
     </Card>
 
     <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
