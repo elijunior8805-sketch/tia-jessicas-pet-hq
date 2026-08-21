@@ -1059,8 +1059,9 @@ function AgendamentoRow({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+    </Card>
+
+    <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Prévia do aviso de encerramento</DialogTitle>
