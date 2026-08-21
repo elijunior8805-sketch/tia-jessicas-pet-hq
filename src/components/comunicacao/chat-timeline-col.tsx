@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { obterDossieConversa, registrarRespostaCliente, registrarComunicacao, gerar3AbordagensIA, resolverThread } from "@/lib/comunicacao-central.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Phone, Wand2, Sparkles, Loader2 } from "lucide-react";
+import { Send, Phone, Wand2, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -26,6 +26,8 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
   const respFn = useServerFn(registrarRespostaCliente);
   const enviarFn = useServerFn(registrarComunicacao);
   const abordarFn = useServerFn(gerar3AbordagensIA);
+  const resolverFn = useServerFn(resolverThread);
+
 
   const { data: dossie, isLoading } = useQuery({
     queryKey: ["chat-dossie", clienteId],
@@ -90,7 +92,17 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
     timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [dossie?.historico]);
 
+  const resolverMut = useMutation({
+    mutationFn: () => resolverFn({ data: { clienteId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat-threads"] });
+      qc.invalidateQueries({ queryKey: ["chat-dossie", clienteId] });
+      toast.success("Conversa marcada como resolvida.");
+    }
+  });
+
   if (isLoading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
 
   return (
     <div className="flex flex-col h-full bg-background relative">
@@ -109,7 +121,18 @@ export function ChatTimelineCol({ clienteId }: ChatTimelineColProps) {
             <Phone className="h-4 w-4" />
             Abrir WhatsApp
           </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+            onClick={() => resolverMut.mutate()}
+            disabled={resolverMut.isPending}
+          >
+            {resolverMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+            Resolvida
+          </Button>
         </div>
+
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
