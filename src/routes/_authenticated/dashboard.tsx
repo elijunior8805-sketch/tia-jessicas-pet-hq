@@ -91,9 +91,9 @@ function DashboardPage() {
     onSuccess: async (res) => {
       await queryClient.invalidateQueries();
       const parts = [
-        res.atendimentos_resetados ? `${res.atendimentos_resetados} atendimento(s) reabertos` : null,
-        res.agendamentos_reabertos ? `${res.agendamentos_reabertos} agendamento(s) reabertos` : null,
-        res.pets_recalculados ? `${res.pets_recalculados} pet(s) com histórico atualizado` : null,
+        (res as any).atendimentos_resetados ? `${(res as any).atendimentos_resetados} atendimento(s) reabertos` : null,
+        (res as any).agendamentos_reabertos ? `${(res as any).agendamentos_reabertos} agendamento(s) reabertos` : null,
+        (res as any).pets_recalculados ? `${(res as any).pets_recalculados} pet(s) com histórico atualizado` : null,
       ].filter(Boolean);
       toast.success(
         parts.length
