@@ -79,7 +79,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     if (isOpen && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Olá! Sou sua Assistente IA. Como posso ajudar no Spa da Tia Jéssica hoje?`,
+        content: `Olá! Sou sua Assistente Operacional. Posso consultar agenda, atendimentos, clientes, pets, financeiro e ajudar a executar tarefas autorizadas do Spa. O que você precisa?`,
         timestamp: new Date().toISOString()
       }]);
     }
