@@ -690,10 +690,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             size="sm" 
                             variant="ghost" 
                             className={cn("h-8 text-[11px] font-bold rounded-lg px-3", msg.role === 'user' ? 'text-white hover:bg-white/10' : 'text-[#C99845] hover:bg-[#C99845]/5')}
-                            onClick={() => window.open('/dashboard', '_blank')}
+                            onClick={() => {
+                              if (msg.intent?.intencao?.includes('agenda')) window.open('/agenda', '_blank');
+                              else if (msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia')) window.open('/financeiro', '_blank');
+                              else window.open('/dashboard', '_blank');
+                            }}
                           >
-                            <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Sistema
+                            <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 
+                            {msg.intent?.intencao?.includes('agenda') ? 'Abrir Agenda' : 
+                             msg.intent?.intencao?.includes('financeiro') ? 'Abrir Financeiro' : 'Abrir Sistema'}
                           </Button>
+                          
+                          {msg.intent.intencao === 'consulta_cliente' && searchResults?.clientes && searchResults.clientes.length > 0 && (
+                             <Button 
+                               size="sm" 
+                               className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                               onClick={() => window.open(`/clientes?id=${searchResults.clientes[0].id}`, '_blank')}
+                             >
+                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes
+                             </Button>
+                          )}
+
+                          {msg.intent.intencao === 'comando_nao_reconhecido' && msg.content.includes('não cadastrado') && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => window.open('/clientes?novo=true', '_blank')}
+                            >
+                              <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
+                            </Button>
+                          )}
                           
                           {msg.intent.intencao === 'criar_agendamento' && msg.intent.cliente_nome && (
                             <Button 
