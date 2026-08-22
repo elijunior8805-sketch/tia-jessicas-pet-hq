@@ -23,10 +23,14 @@ export const classificarIntencao = createServerFn({ method: "POST" })
       .eq('id', context.userId)
       .maybeSingle();
 
+    const { carregarIaConfig } = await import("../ia-core.server");
+    const config = await carregarIaConfig(context.supabase);
+
     return classificarComandoIA(
       data.texto, 
       {
         contexto: data.contexto,
+        config: config,
         user: {
           id: context.userId,
           nome: (profile as any)?.nome || 'Usuário',
