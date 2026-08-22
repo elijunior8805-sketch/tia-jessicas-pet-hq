@@ -441,7 +441,7 @@ export const marcarPagamento = createServerFn({ method: "POST" })
 const IAInput = z.object({
   cobrancaId: z.string().uuid(),
   intencao: z
-    .enum(["cobranca", "lembrete", "agradecimento", "negociacao", "resposta"])
+    .enum(["cobranca", "lembrete", "agradecimento", "negociacao", "resposta", "incisiva"])
     .default("cobranca"),
   respostaCliente: z.string().max(2000).optional().nullable(),
 });
@@ -485,6 +485,7 @@ export const sugerirMensagemCobranca = createServerFn({ method: "POST" })
       agradecimento: "agradecimento por pagamento recebido",
       negociacao: "proposta amigável de negociação/parcelamento",
       resposta: "resposta empática à mensagem recebida do cliente",
+      incisiva: `cobrança incisiva e firme de pagamento com atraso crítico de ${dias} dias`,
     };
 
     const prompt = `Você é a assistente de relacionamento do "Spa de Pet Tia Jéssica".
