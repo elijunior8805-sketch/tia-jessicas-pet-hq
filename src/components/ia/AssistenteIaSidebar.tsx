@@ -190,8 +190,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           data: { termo: res.pagador, apenas_pendentes: true }
         });
 
-        const pendenciaExata = searchRes?.find((p: any) => 
-          Math.abs((p.valor_total - (p.valor_pago || 0)) - res.valor) < 0.01
+        const searchResList = searchRes as any[];
+        const pendenciaExata = searchResList?.find((p: any) => 
+          p.valor_total && Math.abs((Number(p.valor_total) - Number(p.valor_pago || 0)) - res.valor) < 0.01
         );
 
         if (pendenciaExata) {
