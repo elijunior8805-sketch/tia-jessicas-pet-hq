@@ -322,7 +322,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       console.error('Erro IA:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "Erro técnico. Tente novamente.",
+        content: "Aconteceu um erro. Tente novamente.",
         timestamp: new Date().toISOString()
       }]);
     } finally {
