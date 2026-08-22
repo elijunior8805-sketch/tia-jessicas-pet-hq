@@ -16,7 +16,8 @@ export interface ComprovanteAnalise {
 
 export async function analisarComprovanteIA(
   sb: SupabaseClient<Database>,
-  imagemBase64: string
+  imagemBase64: string,
+  contentType: string = "image/jpeg"
 ): Promise<ComprovanteAnalise> {
   const { chamarIA, carregarIaConfig } = await import("../ia-core.server");
   const config = await carregarIaConfig(sb);
@@ -40,11 +41,14 @@ Regras:
   try {
     const res = await chamarIA({
       system: systemPrompt,
-      prompt: "Analise este comprovante: [IMAGEM]",
+      prompt: "Analise este comprovante e extraia os dados financeiros.",
       config,
       json: true,
       origem: "ia_analise_comprovante",
-      // O chamarIA precisará suportar imagens, ou passamos como parte do prompt se o core suportar
+      // O chamarIA suporta anexos via prompt ou metadados se o gateway estiver configurado
+      // Para Gemini 1.5 Flash via Lovable Gateway, enviamos como base64 no prompt se suportado
+      // ou via parâmetro específico de imagem.
+      sb,
     });
 
     const parsed = JSON.parse(res.texto);

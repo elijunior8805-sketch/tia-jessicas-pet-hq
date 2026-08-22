@@ -37,10 +37,11 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
 
 export const processarComprovanteIA = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
-    imagemBase64: z.string()
+    imagemBase64: z.string(),
+    contentType: z.string().optional()
   }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin;
-    return analisarComprovanteIA(sb, data.imagemBase64);
+    return analisarComprovanteIA(sb, data.imagemBase64, data.contentType);
   });
