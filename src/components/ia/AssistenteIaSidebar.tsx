@@ -604,6 +604,29 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               </div>
             </ScrollArea>
 
+            {/* Sugestões Rápidas */}
+            <div className="px-6 py-4 flex flex-wrap gap-2 border-t border-[#C99845]/5">
+              {[
+                "Agenda de hoje",
+                "Quantos atendimentos tenho",
+                "Criar agendamento",
+                "Faturamento do mês",
+                "Valores a receber",
+                "Resumo do dia"
+              ].map((sugestao) => (
+                <Button
+                  key={sugestao}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full text-[10px] font-bold h-7 bg-white/50 border-[#C99845]/20 text-[#123F2A] hover:bg-[#C99845]/10 hover:border-[#C99845]/40 transition-all duration-300"
+                  onClick={() => handleSend(sugestao)}
+                  disabled={isProcessing}
+                >
+                  {sugestao}
+                </Button>
+              ))}
+            </div>
+
             <div className="p-6 border-t border-[#C99845]/10 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
               {/* File Preview Area */}
               {filePreview && (
