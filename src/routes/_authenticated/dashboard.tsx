@@ -485,6 +485,14 @@ function DashboardPage() {
   );
 }
 
+const DASHBOARD_AUDIT_CONTENT = `Este painel agora consome a mesma fonte de dados unificada do Financeiro.
+
+PERÍODO DE TESTE
+01/07/2026 até 31/07/2026.
+
+DADOS UNIFICADOS
+Os valores de Faturamento, Recebido e Lucro são obtidos via backend a partir da view 'public.vw_financeiro_indicadores', garantindo que não existam divergências entre as telas do sistema.`;
+
 const AuditNote = () => (
   <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
     <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
