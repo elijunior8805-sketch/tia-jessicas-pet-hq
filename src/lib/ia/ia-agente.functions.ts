@@ -25,12 +25,13 @@ export const classificarIntencao = createServerFn({ method: "POST" })
 
     return classificarComandoIA(
       data.texto, 
-      data.contexto, 
-      context.supabase, 
       {
-        id: context.userId,
-        nome: (profile as any)?.nome || 'Usuário',
-        perfil: (profile as any)?.perfil || 'user'
+        contexto: data.contexto,
+        user: {
+          id: context.userId,
+          nome: (profile as any)?.nome || 'Usuário',
+          cargo: (profile as any)?.perfil || 'user'
+        }
       }
     );
   });
