@@ -73,8 +73,7 @@ export async function criarAgendamentoIA(
       leva_traz: params.transporte || false,
       taxa_leva_traz: params.taxa_transporte || 0,
       observacoes: params.observacoes,
-    status: "agendado" as any
-
+      status: "agendado" as any
     })
     .select()
     .single();
@@ -127,7 +126,7 @@ export async function cancelarAgendamentoIA(
   const { data, error } = await sb
     .from("agendamentos")
     .update({
-      status: "cancelado",
+      status: "cancelado" as any,
       observacoes: motivo ? `Cancelado via IA: ${motivo}` : "Cancelado via IA"
     })
     .eq("id", agendamento_id)
