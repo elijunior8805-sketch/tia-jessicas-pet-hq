@@ -47,7 +47,7 @@ export async function validarDisponibilidadeReal(
   return {
     disponivel: true,
     conflitos: ocupados?.map(o => (o.pets as any)?.nome) || [],
-    aviso: ocupados && ocupados.length > 0 ? \`Atenção: Já existem \${ocupados.length} agendamentos para este horário.\` : null
+    aviso: ocupados && ocupados.length > 0 ? `Atenção: Já existem ${ocupados.length} agendamentos para este horário.` : null
   };
 }
 
@@ -133,7 +133,7 @@ export async function cancelarAgendamentoIA(
     .from("agendamentos")
     .update({
       status: "cancelado" as AgendamentoStatus,
-      observacoes: motivo ? \`Cancelado via IA: \${motivo}\` : "Cancelado via IA"
+      observacoes: motivo ? `Cancelado via IA: ${motivo}` : "Cancelado via IA"
     })
     .eq("id", agendamento_id)
     .select()
@@ -176,7 +176,7 @@ export async function registrarPagamentoIA(
       status,
       forma: params.forma,
       data_pagamento: params.data_pagamento || format(new Date(), 'yyyy-MM-dd'),
-      observacoes: params.observacoes ? \`\${pagamento.observacoes || ''}\nIA: \${params.observacoes}\`.trim() : pagamento.observacoes,
+      observacoes: params.observacoes ? `${pagamento.observacoes || ''}\nIA: ${params.observacoes}`.trim() : pagamento.observacoes,
       updated_at: new Date().toISOString()
     })
     .eq("id", params.pagamento_id)
@@ -198,7 +198,7 @@ export async function cancelarPagamentoIA(
     .update({
       status: "pendente" as Database["public"]["Enums"]["pagamento_status"],
       valor_pago: 0,
-      observacoes: \`Estornado via IA: \${motivo}\`,
+      observacoes: `Estornado via IA: ${motivo}`,
       updated_at: new Date().toISOString()
     })
     .eq("id", pagamento_id)
