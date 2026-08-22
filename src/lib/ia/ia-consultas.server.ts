@@ -1,6 +1,5 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { getFinancialKPIs } from "../financial-kpis.functions";
 import { format, subDays } from "date-fns";
 
 export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: { data?: string; pet_nome?: string; cliente_nome?: string; profissional?: string }) {
@@ -57,9 +56,29 @@ export async function buscarDadosClientesPets(sb: SupabaseClient<Database>, term
   return { clientes, pets };
 }
 
-export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; apenas_pendentes?: boolean; data?: string; period?: "hoje" | "mes" | "30dias" }) {
-  // Para consultas de KPIs financeiros, usamos a fonte central
-  if (!filtros.cliente_id && !filtros.data && !filtros.apenas_pendentes) {
+export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; apenas_pendentes?: boolean; data?: string; period?: "hoje" | "mes" | "30dias"; termo?: string }) {
+  // Se for uma busca por termo (ex: nome do pagador no comprovante)
+  if (filtros.termo) {
+    const { data, error } = await sb
+      .from("pagamentos")
+      .select(`
+        *,
+        atendimentos(
+          id,
+          data_inicio,
+          pet_id,
+          pets(nome),
+          clientes(nome)
+        )
+      `)
+      .ilike("descricao", `%${filtros.termo}%`)
+      .limit(50);
+    if (error) throw error;
+    return data;
+  }
+
+  // Para consultas de KPIs financeiros globais
+  if (!filtros.cliente_id && !filtros.data && !filtros.apenas_pendentes && !filtros.termo) {
     const now = new Date();
     let from = format(subDays(now, 29), "yyyy-MM-dd");
     let to = format(now, "yyyy-MM-dd");
