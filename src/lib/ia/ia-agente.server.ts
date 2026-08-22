@@ -60,7 +60,7 @@ export interface IAMessage {
  * Classifica a intenção do usuário usando o modelo Gemini.
  */
 export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
-  const { chamarIA } = await import("./ia-agente.functions.server");
+  const { chamarIA } = await import("../ia-core.server");
   
   const userContext = contexto?.user ? `
   USUÁRIO LOGADO:
