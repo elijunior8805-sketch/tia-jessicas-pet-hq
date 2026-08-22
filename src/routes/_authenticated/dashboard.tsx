@@ -293,12 +293,10 @@ function DashboardPage() {
               pendenciasCount: metrics.atendimentos,
               aportes: metrics.aportes
             } : {}} 
-            auditNote={DASHBOARD_AUDIT_CONTENT}
           />
         </div>
+      </div>
 
-
-      {/* ============ KPI CARDS PREMIUM ============ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 mb-6">
         {kpis.map((k) => (
           <Card
