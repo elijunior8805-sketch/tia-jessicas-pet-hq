@@ -74,10 +74,22 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
   const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>('idle');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIntent, setCurrentIntent] = useState<IAIntent | null>(null);
-  const [selectedEntity, setSelectedEntity] = useState<any>(null); // Para fluxo de confirmação de cliente/pet
+  const [selectedEntity, setSelectedEntity] = useState<any>(null); 
+  const [searchResults, setSearchResults] = useState<{clientes: any[], pets: any[]} | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
+
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([{
+        role: 'assistant',
+        content: "Olá! Sou sua Assistente IA. Como posso ajudar no Spa da Tia Jéssica hoje?",
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  }, [isOpen]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !recognizerRef.current) {
