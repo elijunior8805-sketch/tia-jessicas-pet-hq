@@ -73,7 +73,8 @@ export async function criarAgendamentoIA(
       leva_traz: params.transporte || false,
       taxa_leva_traz: params.taxa_transporte || 0,
       observacoes: params.observacoes,
-      status: "agendado"
+    status: "agendado" as any
+
     })
     .select()
     .single();

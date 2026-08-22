@@ -16,7 +16,9 @@ export const IAIntentSchema = z.object({
     "analisar_comprovante",
     "solicitar_resumo_operacional",
     "solicitar_analise_reativacao",
+    "disponibilidade",
     "comando_nao_reconhecido"
+
   ]),
   cliente_nome: z.string().optional().nullable(),
   cliente_telefone: z.string().optional().nullable(),
