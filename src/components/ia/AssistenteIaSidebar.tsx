@@ -293,7 +293,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
         
         if (dadosReais && dadosReais.length > 0) {
-          const total = dadosReais.reduce((acc: number, p: any) => acc + (p.valor_total - (p.valor_pago || 0)), 0);
+          const searchResList = dadosReais as any[];
+          const total = searchResList.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
           respostaFinal = `Você tem **${dadosReais.length} pendências** totalizando **R$ ${total.toFixed(2)}**.`;
         } else {
           respostaFinal = "Não encontrei pendências financeiras em aberto.";
