@@ -345,10 +345,18 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         const results = { clientes: (response.result || []) as any[], pets: [] as any[] };
         setSearchResults(results);
         
-        if (results.clientes.length > 0 || results.pets.length > 0) {
-          respostaFinal = "Localizei estes registros. **Selecione o correto** para prosseguirmos:";
+        if (results.clientes.length > 0) {
+          const c = results.clientes[0];
+          const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase());
+          
+          if (results.clientes.length === 1 && matchesTermo) {
+            respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
+          } else {
+            respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Você quis dizer algum destes clientes?\n\n` +
+              results.clientes.map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
+          }
         } else {
-          respostaFinal = `Não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar um novo?`;
+          respostaFinal = `Cliente não cadastrado. Deseja cadastrá-lo agora?`;
         }
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         const response = await consultarFinanceiroIA({
@@ -390,7 +398,20 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
         const response = await consultarResumoOperacionalIA();
         const resumo = response.result || {};
-        respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n- **Agendamentos**: ${resumo.total_agenda} (${resumo.confirmados} confirmados)\n- **Leva e Traz**: ${resumo.leva_traz} viagens\n- **Financeiro Pendente**: R$ ${resumo.valor_pendente.toFixed(2)}\n- **Promessas para Hoje**: ${resumo.promessas_hoje}`;
+        respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n` +
+          `#### 🕒 Próximo Atendimento\n` +
+          (resumo.proximo_atendimento 
+            ? `**${resumo.proximo_atendimento.hora}** — **${resumo.proximo_atendimento.pet}** (${resumo.proximo_atendimento.cliente}) — ${resumo.proximo_atendimento.servico}\n\n`
+            : `Nenhum agendamento futuro para hoje.\n\n`) +
+          `#### 📈 Indicadores\n` +
+          `- **Agendamentos**: ${resumo.total_agenda} (${resumo.confirmados} confirmados, ${resumo.em_atendimento} em curso)\n` +
+          `- **Finalizados**: ${resumo.finalizados}\n` +
+          `- **Leva e Traz**: ${resumo.leva_traz} viagens\n` +
+          `- **Promessas de Pagamento**: ${resumo.promessas_hoje}\n\n` +
+          `#### 💰 Financeiro (Hoje)\n` +
+          `- **Faturamento**: **R$ ${resumo.faturamento_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
+          `- **Recebido**: **R$ ${resumo.recebido_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
+          `- **Total Pendente (Geral)**: **R$ ${resumo.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**`;
       }
 
       const assistantMessage: IAMessage = {
