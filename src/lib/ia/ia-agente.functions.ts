@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { IAIntentSchema } from "./ia-agente.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const classificarIntencao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({
     texto: z.string(),
     contexto: z.array(z.object({
