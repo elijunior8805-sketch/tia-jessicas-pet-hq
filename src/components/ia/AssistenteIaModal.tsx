@@ -136,6 +136,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
 
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Processando sua solicitação...";
+      setSearchResults(null);
 
       // 2. Executar Lógica Baseada na Intenção
       if (intent.intencao === 'consulta_agenda') {
@@ -148,29 +149,22 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
         });
         
         if (dadosReais && dadosReais.length > 0) {
-          respostaFinal = `Encontrei ${dadosReais.length} agendamentos. Aqui estão os principais:\n\n`;
-          dadosReais.forEach((a: any) => {
-            respostaFinal += `- **${a.hora.slice(0, 5)}**: ${a.pets?.nome} (${a.clientes?.nome}) - *${a.status}*\n`;
-          });
+          respostaFinal = `Encontrei **${dadosReais.length} agendamentos**. Aqui estão os detalhes:`;
         } else {
           respostaFinal = "Não encontrei agendamentos para os critérios informados.";
         }
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
-        const { clientes, pets } = await consultarClientesPetsIA({ data: { termo } });
+        const results = await consultarClientesPetsIA({ data: { termo } });
+        setSearchResults(results);
         
-        if (clientes.length > 0 || pets.length > 0) {
-          respostaFinal = "Localizei os seguintes registros para sua confirmação:\n\n";
-          clientes.forEach((c: any) => respostaFinal += `- 👤 **Cliente**: ${c.nome} (${c.telefone || 'Sem tel'})\n`);
-          pets.forEach((p: any) => respostaFinal += `- 🐾 **Pet**: ${p.nome} (Tutor: ${p.clientes?.nome})\n`);
-          
-          if (intent.intencao === 'criar_agendamento') {
-             respostaFinal += "\n**Por favor, clique em um dos resultados acima ou no botão de confirmação para prosseguir com o agendamento.**";
-          }
+        if (results.clientes.length > 0 || results.pets.length > 0) {
+          respostaFinal = "Localizei estes registros. **Clique em um deles** para confirmar e prosseguir:";
         } else {
           respostaFinal = `Desculpe, não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar agora?`;
         }
       } else if (intent.intencao === 'consulta_financeira') {
+
         dadosReais = await consultarFinanceiroIA({
           data: { apenas_pendentes: true }
         });
