@@ -171,11 +171,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `Li o comprovante! Aqui estão os dados identificados:\n\n` +
-                   `- **Valor**: R$ ${res.valor.toFixed(2)}\n` +
+                   `- **Valor**: R$ ${res.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
                    `- **Data**: ${res.data}\n` +
                    `- **Pagador**: ${res.pagador}\n` +
-                   `- **Instituição**: ${res.instituicao}\n\n` +
-                   `Estou procurando a pendência correspondente...`,
+                   `- **Instituição**: ${res.instituicao}\n` +
+                   (res.id_transacao ? `- **ID Transação**: \`${res.id_transacao}\`\n` : '') +
+                   `\nEstou procurando a pendência correspondente...`,
           timestamp: new Date().toISOString()
         }]);
 
@@ -195,41 +196,63 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
 
         const searchResList = (response.result || []) as any[];
-        const pendenciaExata = searchResList?.find((p: any) => 
-          p.valor_total && Math.abs((Number(p.valor_total) - Number(p.valor_pago || 0)) - res.valor) < 0.01
-        );
+        
+        // Regra de Correspondência: Valor exato
+        const pendenciasValorExato = searchResList?.filter((p: any) => {
+          const saldo = Number(p.valor_total) - Number(p.valor_pago || 0);
+          return Math.abs(saldo - res.valor) < 0.01;
+        });
 
-        if (pendenciaExata) {
-          const petNome = (pendenciaExata.atendimentos as any)?.pets?.nome || 
-                         (pendenciaExata as any).atendimentos?.pets?.nome || 
-                         'Pet';
+        if (pendenciasValorExato && pendenciasValorExato.length === 1) {
+          const p = pendenciasValorExato[0];
+          const petNome = p.atendimentos?.pets?.nome || 'Pet';
+          const saldoAnterior = Number(p.valor_total) - Number(p.valor_pago || 0);
+          const saldoPosterior = Math.max(0, saldoAnterior - res.valor);
+
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: `Encontrei uma pendência exata para **${petNome}** no valor de **R$ ${res.valor.toFixed(2)}**.\n\nDeseja confirmar a baixa agora?`,
+            content: `Encontrei uma pendência exata para **${petNome}**!\n\n` +
+                     `- **Saldo Anterior**: R$ ${saldoAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+                     `- **Valor Comprovante**: R$ ${res.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+                     `- **Saldo Posterior**: R$ ${saldoPosterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+                     `Deseja confirmar a baixa agora?`,
             intent: {
               intencao: 'confirmar_baixa',
               valor: res.valor,
               forma_pagamento: 'pix',
-              observacoes: `Baixa via comprovante (ID: ${res.id_transacao || 'N/A'})`,
+              observacoes: `Baixa via comprovante IA (ID: ${res.id_transacao || 'N/A'})`,
               nivel_confianca: 1
             } as any,
             timestamp: new Date().toISOString(),
             meta: { 
-              pagamento_id: pendenciaExata.id, 
+              pagamento_id: p.id, 
               comprovante_path: filePath, 
               id_transacao: res.id_transacao 
             }
           } as any]);
-        } else {
+        } else if (pendenciasValorExato && pendenciasValorExato.length > 1) {
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: `Não encontrei uma pendência automática de valor exato. Por favor, selecione o atendimento manualmente ou me dê mais detalhes.`,
+            content: `Encontrei **${pendenciasValorExato.length} pendências** com o mesmo valor para este pagador. Qual delas você deseja baixar?`,
+            timestamp: new Date().toISOString()
+          }]);
+          // Aqui poderíamos exibir uma lista para seleção
+        } else {
+          // Tentar busca por valor parcial ou simplesmente informar que não achou
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Não encontrei uma pendência automática de valor exato (R$ ${res.valor.toFixed(2)}) para "${res.pagador}".\n\nPor favor, selecione o atendimento manualmente ou verifique se o valor está correto.`,
             timestamp: new Date().toISOString()
           }]);
         }
       } else {
-        toast.error(res.mensagem || "Não consegui ler o comprovante.");
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ **Erro na análise**: ${res.mensagem || "Não consegui ler o comprovante."}`,
+          timestamp: new Date().toISOString()
+        }]);
       }
+
     } catch (error) {
       console.error(error);
       toast.error("Erro ao processar comprovante.");
