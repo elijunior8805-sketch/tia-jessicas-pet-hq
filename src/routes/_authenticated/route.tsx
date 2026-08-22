@@ -75,7 +75,9 @@ function AuthenticatedLayout() {
             <Outlet />
           </main>
           <MobileNav />
+          <AssistenteIaBotao />
         </SidebarInset>
+
       </div>
     </SidebarProvider>
   );
