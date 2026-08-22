@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { registrarPagamentoIA, cancelarPagamentoIA } from "./ia-acoes.server";
+import { registrarPagamentoIA, estornarPagamentoIA } from "./ia-acoes.server";
 import { analisarComprovanteIA } from "./ia-comprovante.server";
 
 export const executarBaixaPagamento = createServerFn({ method: "POST" })
@@ -36,7 +36,7 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin;
-    return cancelarPagamentoIA(sb, data.pagamento_id, data.motivo);
+    return estornarPagamentoIA(sb, data.pagamento_id, data.motivo);
   });
 
 export const processarComprovanteIA = createServerFn({ method: "POST" })

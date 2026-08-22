@@ -11,7 +11,9 @@ export interface ComprovanteAnalise {
   id_transacao?: string;
   confianca: number;
   sucesso: boolean;
+  success: boolean; // Add compatibility for structured return
   mensagem?: string;
+  result?: any;
 }
 
 export async function analisarComprovanteIA(
@@ -61,7 +63,9 @@ Regras:
     return {
       ...parsed,
       confianca: 0.95,
-      sucesso: true
+      sucesso: true,
+      success: true,
+      result: parsed
     };
   } catch (error) {
     console.error("Erro ao analisar comprovante:", error);
@@ -74,6 +78,7 @@ Regras:
       instituicao: "",
       confianca: 0,
       sucesso: false,
+      success: false,
       mensagem: "Não foi possível processar a imagem do comprovante."
     };
   }

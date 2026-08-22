@@ -15,14 +15,24 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
     return buscarDadosAgenda(context.supabase, data);
   });
 
-export const consultarClientesPetsIA = createServerFn({ method: "POST" })
+export const buscarClientesIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({
     termo: z.string(),
   }).parse(data))
   .handler(async ({ data, context }) => {
-    const { buscarDadosClientesPets } = await import("./ia-consultas.server");
-    return buscarDadosClientesPets(context.supabase, data.termo);
+    const { buscarClientesIA: buscarClientes } = await import("./ia-consultas.server");
+    return buscarClientes(context.supabase, data.termo);
+  });
+
+export const buscarPetsDoClienteIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    cliente_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { buscarPetsDoClienteIA: buscarPets } = await import("./ia-consultas.server");
+    return buscarPets(context.supabase, data.cliente_id);
   });
 
 export const consultarFinanceiroIA = createServerFn({ method: "POST" })
@@ -62,4 +72,24 @@ export const analisarRiscoEvasaoIA = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { analisarRiscoEvasaoIA: analisarEvasao } = await import("./ia-consultas.server");
     return analisarEvasao(supabaseAdmin);
+  });
+
+export const buscarServicosIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    termo: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { buscarServicosIA: buscarServicos } = await import("./ia-consultas.server");
+    return buscarServicos(context.supabase, data.termo);
+  });
+
+export const consultarHistoricoPetIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    pet_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { consultarHistoricoPetIA: consultarHistorico } = await import("./ia-consultas.server");
+    return consultarHistorico(context.supabase, data.pet_id);
   });
