@@ -169,7 +169,7 @@ function DashboardPage() {
     ["personalizado", "Personalizado", "Custom"],
   ] as const;
 
-  const proximos = data?.proximos ?? [];
+  const proximos = auxData?.proximos ?? [];
   const atendimentosHoje = proximos.filter((a: any) => a.data === format(hoje, "yyyy-MM-dd")).length;
   const aguardando = proximos.filter((a: any) => a.status === "aguardando");
 
