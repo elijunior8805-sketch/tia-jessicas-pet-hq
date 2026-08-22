@@ -1,9 +1,22 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { format, subDays } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { createIAResponse } from "./ia-retorno.server";
+import { getFinancialKPIs } from "../financial-kpis.functions";
 
-export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: { data?: string; pet_nome?: string; cliente_nome?: string; profissional?: string }) {
+
+
+export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: { 
+  data?: string; 
+  periodo_inicio?: string;
+  periodo_fim?: string;
+  status?: string;
+  pet_nome?: string; 
+  cliente_nome?: string; 
+  profissional?: string;
+  servico_nome?: string;
+  leva_e_traz?: boolean;
+}) {
   let query = sb
     .from("agendamentos")
     .select(`
@@ -13,11 +26,35 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
       servicos(nome)
     `);
 
+  const timezone = "America/Sao_Paulo";
+  const hoje = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+
   if (filtros.data) {
     query = query.eq("data", filtros.data);
+  } else if (filtros.periodo_inicio && filtros.periodo_fim) {
+    query = query.gte("data", filtros.periodo_inicio).lte("data", filtros.periodo_fim);
+  } else {
+    // Default para hoje se nada for passado
+    query = query.eq("data", hoje);
+  }
+
+  if (filtros.status) {
+    query = query.eq("status", filtros.status as any);
+  }
+
+
+  if (filtros.leva_e_traz !== undefined) {
+    if (filtros.leva_e_traz) {
+      query = query.neq("leva_traz_modalidade", "nao_utilizar");
+    } else {
+      query = query.eq("leva_traz_modalidade", "nao_utilizar");
+    }
   }
   
-  const { data, error } = await query.order("hora", { ascending: true }).limit(50);
+  const { data, error } = await query.order("hora", { ascending: true }).limit(200);
   
   if (error) throw error;
   
@@ -32,12 +69,16 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
   if (filtros.profissional) {
     result = result.filter(a => a.profissional_id?.toLowerCase().includes(filtros.profissional!.toLowerCase()));
   }
+  if (filtros.servico_nome) {
+    result = result.filter(a => a.servicos?.nome?.toLowerCase().includes(filtros.servico_nome!.toLowerCase()));
+  }
 
   return createIAResponse({
     action: 'consulta_agenda',
     result: result
   });
 }
+
 
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
   const { data, error } = await sb
@@ -106,7 +147,20 @@ export async function listarAtendimentosIA(sb: SupabaseClient<Database>, filtros
   });
 }
 
-export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; apenas_pendentes?: boolean; data?: string; period?: "hoje" | "mes" | "30dias"; termo?: string }) {
+export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { 
+  cliente_id?: string; 
+  apenas_pendentes?: boolean; 
+  data?: string; 
+  period?: "hoje" | "ontem" | "semana" | "mes" | "mes_passado" | "30dias"; 
+  periodo_inicio?: string;
+  periodo_fim?: string;
+  termo?: string;
+}) {
+  const timezone = "America/Sao_Paulo";
+  const now = new Date();
+  const hojeStr = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+
+  // 1. Se for busca por termo em pagamentos
   if (filtros.termo) {
     const { data, error } = await sb
       .from("pagamentos")
@@ -130,32 +184,56 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     });
   }
 
-  if (!filtros.cliente_id && !filtros.data && !filtros.apenas_pendentes && !filtros.termo) {
-    const now = new Date();
-    let from = format(subDays(now, 29), "yyyy-MM-dd");
-    let to = format(now, "yyyy-MM-dd");
+  // 2. Se for Resumo de KPIs (Dashboard/IA)
+  if (!filtros.cliente_id && !filtros.apenas_pendentes && !filtros.termo) {
+    let from = filtros.periodo_inicio || hojeStr;
+    let to = filtros.periodo_fim || hojeStr;
 
-    if (filtros.period === "hoje") {
-      from = format(now, "yyyy-MM-dd");
-      to = from;
-    } else if (filtros.period === "mes") {
-      from = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
-      to = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
+    if (filtros.period) {
+      switch (filtros.period) {
+        case "hoje":
+          from = hojeStr;
+          to = hojeStr;
+          break;
+        case "ontem":
+          const ontem = subDays(now, 1);
+          from = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(ontem);
+          to = from;
+          break;
+        case "semana":
+          from = format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd");
+          to = hojeStr;
+          break;
+        case "mes":
+          from = format(startOfMonth(now), "yyyy-MM-dd");
+          to = hojeStr;
+          break;
+        case "mes_passado":
+          const firstOfLastMonth = startOfMonth(subDays(startOfMonth(now), 1));
+          from = format(firstOfLastMonth, "yyyy-MM-dd");
+          to = format(endOfMonth(firstOfLastMonth), "yyyy-MM-dd");
+          break;
+        case "30dias":
+          from = format(subDays(now, 30), "yyyy-MM-dd");
+          to = hojeStr;
+          break;
+      }
     }
 
-    const { data: indicators, error } = await sb
-      .from("vw_financeiro_indicadores")
-      .select("*")
-      .gte("data_referencia", from)
-      .lte("data_referencia", to);
-
-    if (error) throw error;
+    // Usar a função central de KPIs para garantir paridade
+    // Precisamos importar o helper admin pois server functions chamadas de dentro de outras podem ter problemas de RLS se não estiverem no contexto correto
+    // Mas buscarDadosFinanceiros é exportada como helper, então deve funcionar se o client sb tiver as permissões
+    const indicators = await getFinancialKPIs({ data: { from, to } });
 
     return createIAResponse({
       action: 'consultar_resumo_financeiro',
-      result: indicators
+      result: {
+        periodo: { from, to },
+        metricas: indicators
+      }
     });
   }
+
 
   let query = sb
     .from("pagamentos")

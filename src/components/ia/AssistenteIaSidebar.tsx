@@ -49,8 +49,9 @@ import {
   processarComprovanteIA,
 } from '@/lib/ia/ia-financeiro.functions';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -269,20 +270,32 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         const response = await consultarAgendaIA({
           data: {
             data: intent.data || undefined,
+            periodo_inicio: intent.periodo_inicio || undefined,
+            periodo_fim: intent.periodo_fim || undefined,
+            status: intent.status || undefined,
             pet_nome: intent.pet_nome || undefined,
-            cliente_nome: intent.cliente_nome || undefined
+            cliente_nome: intent.cliente_nome || undefined,
+            servico_nome: intent.filtros?.servico_nome || undefined,
+            leva_e_traz: intent.filtros?.leva_e_traz
           }
         });
         
         dadosReais = response.result || [];
+        const count = dadosReais.length;
+        
         if (intent.intencao === 'contar_atendimentos') {
-          respostaFinal = `Você tem **${dadosReais.length} atendimentos** agendados para este período.`;
-        } else if (dadosReais && dadosReais.length > 0) {
-          respostaFinal = `Encontrei **${dadosReais.length} agendamentos**. Aqui estão os principais:\n\n` + 
-            dadosReais.slice(0, 5).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)}`).join('\n');
+          let desc = `Você tem **${count} atendimento${count !== 1 ? 's' : ''}**`;
+          if (intent.status) desc += ` com status **${intent.status}**`;
+          if (intent.filtros?.servico_nome) desc += ` de **${intent.filtros.servico_nome}**`;
+          if (intent.data) desc += ` para o dia **${format(parseISO(intent.data), 'dd/MM')}**`;
+          respostaFinal = desc + ".";
+        } else if (count > 0) {
+          respostaFinal = `Encontrei **${count} agendamento${count !== 1 ? 's' : ''}**. Aqui estão os primeiros:\n\n` + 
+            dadosReais.slice(0, 10).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)} [${a.status}]`).join('\n');
         } else {
           respostaFinal = "Não encontrei agendamentos para este critério.";
         }
+
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
@@ -297,23 +310,40 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         const response = await consultarFinanceiroIA({
           data: { 
-            apenas_pendentes: intent.intencao === 'consultar_pendencias' || intent.intencao === 'consulta_financeira',
-            termo: intent.cliente_nome || undefined
+            apenas_pendentes: intent.intencao === 'consultar_pendencias',
+            termo: intent.cliente_nome || undefined,
+            period: intent.status as any || intent.data as any || undefined, // Mapeamento temporário
+            periodo_inicio: intent.periodo_inicio || undefined,
+            periodo_fim: intent.periodo_fim || undefined
           }
         });
         
-        dadosReais = response.result || [];
         if (intent.intencao === 'consultar_resumo_financeiro') {
-          // Lógica simplificada para o faturamento no resumo financeiro
-          const faturamento = dadosReais.reduce((acc: number, p: any) => acc + Number(p.valor_total || 0), 0);
-          respostaFinal = `O faturamento identificado para este critério é de **R$ ${faturamento.toFixed(2)}**.`;
-        } else if (dadosReais && dadosReais.length > 0) {
-          const searchResList = dadosReais as any[];
-          const total = searchResList.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
-          respostaFinal = `Identifiquei **${dadosReais.length} registros** totalizando **R$ ${total.toFixed(2)}** em aberto.`;
+          const { metricas, periodo } = response.result || {};
+          if (metricas) {
+            respostaFinal = `### 💰 Resumo Financeiro (${periodo.from} a ${periodo.to})\n\n` +
+              `- **Faturamento (Competência)**: R$ ${metricas.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **Recebido (Caixa)**: R$ ${metricas.recebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **Despesas**: R$ ${metricas.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **Resultado (Lucro)**: R$ ${metricas.lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **Saldo em Caixa**: R$ ${metricas.saldoCaixa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **Ticket Médio**: R$ ${metricas.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **A Receber Total**: R$ ${metricas.aReceber.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+              `- **Vencidos**: R$ ${metricas.vencido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+              `*Fonte: Financeiro Oficial.*`;
+          } else {
+            respostaFinal = "Não consegui extrair as métricas financeiras para este período.";
+          }
         } else {
-          respostaFinal = "Não encontrei registros financeiros para este critério.";
+          dadosReais = response.result || [];
+          if (dadosReais && dadosReais.length > 0) {
+            const total = dadosReais.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
+            respostaFinal = `Identifiquei **${dadosReais.length} registros** totalizando **R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** em aberto.`;
+          } else {
+            respostaFinal = "Não encontrei registros financeiros pendentes.";
+          }
         }
+
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
         const response = await consultarResumoOperacionalIA();
         const resumo = response.result || {};
