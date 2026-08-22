@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 
 export const IAIntentSchema = z.object({
   intencao: z.enum([
@@ -42,3 +44,28 @@ export interface IAMessage {
   intent?: IAIntent;
   timestamp: string;
 }
+
+export async function classificarComandoIA(texto: string, contexto?: { role: 'user' | 'assistant', content: string }[]) {
+  // Mock ou implementação real com Gemini via Lovable AI Gateway
+  // Por enquanto, vamos retornar uma estrutura baseada no texto
+  const lowercaseText = texto.toLowerCase();
+  
+  let intencao: IAIntent["intencao"] = "comando_nao_reconhecido";
+  let resumo = "";
+
+  if (lowercaseText.includes("agenda") || lowercaseText.includes("horário")) {
+    intencao = "consulta_agenda";
+    resumo = "Consultando a agenda para você.";
+  } else if (lowercaseText.includes("cliente")) {
+    intencao = "consulta_cliente";
+    resumo = "Buscando informações do cliente.";
+  }
+
+  return {
+    intencao,
+    nivel_confianca: 0.9,
+    resposta_ia: resumo || "Entendido. Como posso ajudar mais?",
+    resumo_acao: resumo
+  } as IAIntent;
+}
+
