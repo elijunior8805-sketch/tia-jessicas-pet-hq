@@ -80,6 +80,10 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     if (data.vencimentoDe) query = query.gte("vencimento", data.vencimentoDe);
     if (data.vencimentoAte) query = query.lte("vencimento", data.vencimentoAte);
 
+    // Garantir que não mostramos pagamentos de atendimentos que foram excluídos/não existem
+    // Embora a limpeza de órfãos no DB cuide disso, reforçamos aqui.
+    query = query.not("atendimento_id", "is", null);
+
     const { data: rows, error } = await query;
     if (error) {
       console.error("[pagamentos] listar erro:", error.message);
