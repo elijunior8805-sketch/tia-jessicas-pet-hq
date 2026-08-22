@@ -74,6 +74,7 @@ export type FinPdfData = {
   porForma: FinPdfPorForma[];
   entradas: FinPdfEntrada[];
   saidas: FinPdfSaida[];
+  auditNote?: string;
 };
 
 export async function generateFinanceiroPDF(d: FinPdfData) {
