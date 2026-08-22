@@ -258,6 +258,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Processando...";
+      const startTime = Date.now();
       setSearchResults(null);
 
       if (intent.intencao === 'consulta_agenda') {
@@ -270,9 +271,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
         
         if (dadosReais && dadosReais.length > 0) {
-          respostaFinal = `Encontrei **${dadosReais.length} agendamentos**.`;
+          respostaFinal = `Encontrei **${dadosReais.length} agendamentos**. Aqui estão os principais:\n\n` + 
+            dadosReais.slice(0, 3).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)}`).join('\n');
         } else {
-          respostaFinal = "Não encontrei agendamentos.";
+          respostaFinal = "Não encontrei agendamentos para este critério.";
         }
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
@@ -280,9 +282,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         setSearchResults(results);
         
         if (results.clientes.length > 0 || results.pets.length > 0) {
-          respostaFinal = "Localizei estes registros. **Clique em um deles** para confirmar:";
+          respostaFinal = "Localizei estes registros. **Selecione o correto** para prosseguirmos:";
         } else {
-          respostaFinal = `Não localizei nenhum cliente ou pet com "${termo}".`;
+          respostaFinal = `Não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar um novo?`;
         }
       } else if (intent.intencao === 'consulta_financeira') {
         dadosReais = await consultarFinanceiroIA({
@@ -290,14 +292,14 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
         
         if (dadosReais && dadosReais.length > 0) {
-          const total = dadosReais.reduce((acc: number, p: any) => acc + (p.valor_total || 0), 0);
-          respostaFinal = `Pendências financeiras: **R$ ${total.toFixed(2)}**.`;
+          const total = dadosReais.reduce((acc: number, p: any) => acc + (p.valor_total - (p.valor_pago || 0)), 0);
+          respostaFinal = `Você tem **${dadosReais.length} pendências** totalizando **R$ ${total.toFixed(2)}**.`;
         } else {
-          respostaFinal = "Não encontrei pendências financeiras.";
+          respostaFinal = "Não encontrei pendências financeiras em aberto.";
         }
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
         const resumo = await consultarResumoOperacionalIA();
-        respostaFinal = `### 📊 Resumo de Hoje\n\n- **Agenda**: ${resumo.total_agenda}\n- **Financeiro**: R$ ${resumo.valor_pendente.toFixed(2)}`;
+        respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n- **Agendamentos**: ${resumo.total_agenda} (${resumo.confirmados} confirmados)\n- **Leva e Traz**: ${resumo.leva_traz} viagens\n- **Financeiro Pendente**: R$ ${resumo.valor_pendente.toFixed(2)}\n- **Promessas para Hoje**: ${resumo.promessas_hoje}`;
       }
 
       const assistantMessage: IAMessage = {
@@ -314,7 +316,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         data: {
           comando_original: text,
           intencao_identificada: intent.intencao,
-          dados_extraidos: intent,
+          dados_extraidos: { ...intent, tempo_processamento: Date.now() - startTime },
           status: 'sucesso'
         }
       });

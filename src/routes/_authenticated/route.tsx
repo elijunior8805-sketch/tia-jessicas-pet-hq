@@ -44,7 +44,7 @@ function AuthenticatedLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full" data-sidebar-wrapper="">
         <AppSidebar />
         <SidebarInset className="flex flex-col min-w-0 flex-1">
           <header className="h-14 border-b border-border bg-card/60 backdrop-blur flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
