@@ -7,6 +7,8 @@ export const IAIntentSchema = z.object({
     "consulta_cliente",
     "consulta_pet",
     "consulta_financeira",
+    "consulta_historico_pet",
+    "buscar_servicos",
     "criar_agendamento",
     "remarcar",
     "cancelar",
