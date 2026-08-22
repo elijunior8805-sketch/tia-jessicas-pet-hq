@@ -8,7 +8,7 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
       *,
       pets(nome, raca, porte, observacoes),
       clientes(nome, telefone),
-      servicos(nome, preco)
+      servicos(nome)
     `);
 
   if (filtros.data) {
