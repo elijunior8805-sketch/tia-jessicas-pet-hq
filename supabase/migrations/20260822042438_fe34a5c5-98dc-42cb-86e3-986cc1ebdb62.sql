@@ -1,0 +1,1 @@
+ALTER VIEW public.vw_financeiro_indicadores SET (security_invoker = on);
