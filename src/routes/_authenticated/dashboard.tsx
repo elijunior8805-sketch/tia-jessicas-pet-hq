@@ -334,7 +334,7 @@ function DashboardPage() {
               {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : period === "30dias" ? "30 dias" : "Custom"}
             </span>
           </div>
-          {auxData && auxData.serie.some((p) => p.valor > 0) ? (
+          {auxData && auxData.serie.some((p: any) => p.valor > 0) ? (
             <div className="h-48 sm:h-60 lg:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={auxData.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
