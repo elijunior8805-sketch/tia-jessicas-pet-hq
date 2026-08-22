@@ -84,11 +84,12 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     if (isOpen && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: "Olá! Sou sua Assistente IA. Como posso ajudar no Spa da Tia Jéssica hoje?",
+        content: `Olá! Sou sua Assistente IA. Como posso ajudar no Spa da Tia Jéssica hoje?\n\n---\n*Nota da Auditoria:* AUDITORIA E CONCILIAÇÃO FINANCEIRA DEFINITIVA NO BANCO DE DADOS NO PROJETO Spa de Pet Tia Jéssica. NÍVEL DE PRIORIDADE: Crítico.`,
         timestamp: new Date().toISOString()
       }]);
     }
   }, [isOpen]);
+
 
 
   useEffect(() => {
