@@ -11,7 +11,9 @@ export interface ComprovanteAnalise {
   id_transacao?: string;
   confianca: number;
   sucesso: boolean;
+  success: boolean; // Add compatibility for structured return
   mensagem?: string;
+  result?: any;
 }
 
 export async function analisarComprovanteIA(
