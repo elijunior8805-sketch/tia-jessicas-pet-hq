@@ -469,7 +469,7 @@ function DashboardPage() {
     </PageShell>
   );
 }
-
+type PeriodTuple = readonly [Period, string, string];
 
 function PeriodTabs({
   period,
