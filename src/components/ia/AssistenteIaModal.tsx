@@ -372,6 +372,14 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
       setIsProcessing(false);
     }
   };
+  const toggleVoice = () => {
+    if (voiceStatus === 'listening') {
+      recognizerRef.current?.stop();
+    } else {
+      recognizerRef.current?.start();
+    }
+  };
+
 
   return (
     <AnimatePresence>
