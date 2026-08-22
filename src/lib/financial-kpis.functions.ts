@@ -41,12 +41,30 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     });
 
     // 3. Pending values (Accrual balance)
-    // Faturamento Competência - (Recebimentos vinculados a essa competência)
-    // Note: To be perfect, we would need to know which 'receita_recebida' rows belong to which 'receita_servico' rows.
-    // However, as per user requirement, let's keep it simple and unified.
+    // To maintain compatibility with Dashboard, we keep aReceber and vencido
+    const { data: pendingReceivables } = await supabase
+      .from("pagamentos")
+      .select("valor_total, valor_pago, vencimento")
+      .neq("status", "pago")
+      .neq("status", "cancelado")
+      .or(`categoria_receita.is.null,and(categoria_receita.neq.aporte,categoria_receita.neq.ajuste)`);
+
+    let aReceber = 0;
+    let vencido = 0;
+    const today = new Date().toISOString().split('T')[0];
+
+    pendingReceivables?.forEach((p: any) => {
+      const saldo = Number(p.valor_total || 0) - Number(p.valor_pago || 0);
+      if (saldo > 0) {
+        aReceber += saldo;
+        if (p.vencimento && p.vencimento < today) {
+          vencido += saldo;
+        }
+      }
+    });
     
     const saldoCaixa = recebidoPeriodo - despesasPagas + aportes;
-    const lucroCompetencia = faturamentoCompetencia - despesasPagas; // Simplified as per "Resultado por Competência"
+    const lucroCompetencia = faturamentoCompetencia - despesasPagas;
 
     const ticketMedio = atendimentosCount > 0 ? faturamentoCompetencia / atendimentosCount : 0;
 
@@ -58,6 +76,8 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       saldoCaixa,
       ticketMedio,
       atendimentos: atendimentosCount,
-      aportes
+      aportes,
+      aReceber,
+      vencido
     };
   });
