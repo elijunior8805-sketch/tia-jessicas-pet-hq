@@ -15,14 +15,24 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
     return buscarDadosAgenda(context.supabase, data);
   });
 
-export const consultarClientesPetsIA = createServerFn({ method: "POST" })
+export const buscarClientesIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({
     termo: z.string(),
   }).parse(data))
   .handler(async ({ data, context }) => {
-    const { buscarDadosClientesPets } = await import("./ia-consultas.server");
-    return buscarDadosClientesPets(context.supabase, data.termo);
+    const { buscarClientesIA: buscarClientes } = await import("./ia-consultas.server");
+    return buscarClientes(context.supabase, data.termo);
+  });
+
+export const buscarPetsDoClienteIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    cliente_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { buscarPetsDoClienteIA: buscarPets } = await import("./ia-consultas.server");
+    return buscarPets(context.supabase, data.cliente_id);
   });
 
 export const consultarFinanceiroIA = createServerFn({ method: "POST" })
