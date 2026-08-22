@@ -266,17 +266,36 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Filtro segmentado + Recalcular */}
+      {/* Filtro segmentado + Ações */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <PeriodTabs
-          period={period}
-          onChange={setPeriod}
-          periodos={periodos}
-          customFrom={customFrom}
-          customTo={customTo}
-          setCustomFrom={setCustomFrom}
-          setCustomTo={setCustomTo}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodTabs
+            period={period}
+            onChange={setPeriod}
+            periodos={periodos}
+            customFrom={customFrom}
+            customTo={customTo}
+            setCustomFrom={setCustomFrom}
+            setCustomTo={setCustomTo}
+          />
+          <RelatorioFinanceiroExport 
+            from={from} 
+            to={to} 
+            kpis={metrics ? {
+              receitaBruta: metrics.faturamento,
+              totalRecebido: metrics.recebido,
+              aReceber: metrics.aReceber,
+              vencido: metrics.vencido,
+              despesaTotal: metrics.despesas,
+              lucroEstimado: metrics.lucro,
+              saldoPeriodo: metrics.recebido - metrics.despesas,
+              ticketMedio: metrics.ticketMedio,
+              pendenciasCount: metrics.atendimentos,
+              aportes: metrics.aportes
+            } : {}} 
+            auditNote={DASHBOARD_AUDIT_CONTENT}
+          />
+        </div>
         <Button
           variant="outline"
           size="sm"
