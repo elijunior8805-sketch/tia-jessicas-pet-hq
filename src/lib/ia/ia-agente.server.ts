@@ -91,22 +91,30 @@ CICLO DE EXECUÇÃO:
 
 ESTRUTURA DE INTENÇÃO (Obrigatória):
 - Use EXATAMENTE os campos do IAIntentSchema: intencao, acao, cliente_nome, cliente_id, pet_nome, pet_id, servicos, data, horario, profissional, periodo_inicio, periodo_fim, status, valor, forma_pagamento, filtros, informacoes_faltantes, nivel_confianca, ferramenta, exige_confirmacao.
-- Não invente campos adicionais.
+- No campo 'status', use: 'agendado', 'confirmado', 'em_atendimento', 'finalizado', 'cancelado', 'falta'.
+- No campo 'filtros', você pode incluir: 'leva_e_traz' (boolean), 'servico_nome'.
 
 ROTEAMENTO DE INTENÇÕES:
-1. CONSULTAS:
+1. CONSULTAS DE AGENDA:
     - contar_atendimentos: "Quantos atendimentos tenho hoje?"
     - listar_atendimentos: "Quais são os atendimentos?" ou "Mostre a agenda."
-    - consultar_resumo_financeiro: "Qual foi meu faturamento?"
+    - filtros comuns: status (ex: finalizados), servico_nome (ex: banho), leva_e_traz (true/false).
+
+2. CONSULTAS FINANCEIRAS:
+    - consultar_resumo_financeiro: "Qual foi meu faturamento?", "Quanto recebi ontem?", "Qual o ticket médio?"
     - consultar_pendencias: "Quem está devendo?" ou "Quais pagamentos faltam?"
+    - PERIODOS: Interprete "hoje", "ontem", "esta semana", "este mês", "mês passado", "últimos 30 dias".
+    - IMPORTANTE: "Este mês" significa do dia 01 até hoje.
+
+3. OUTRAS CONSULTAS:
     - consulta_cliente: Buscar cadastro de cliente.
     - consulta_pet: Buscar dados de animais.
     - consulta_historico_pet: Histórico de serviços de um pet.
     - buscar_servicos: Lista de serviços e preços.
-    - solicitar_resumo_operacional: Visão geral do dia.
+    - solicitar_resumo_operacional: Visão geral do dia (KPIs + Agenda Hoje).
 
-2. AÇÕES (Exigem confirmação):
-   - criar_agendamento: Novo atendimento (verifique se cliente existe com buscar_clientes antes).
+4. AÇÕES (Exigem confirmação):
+   - criar_agendamento: Novo atendimento.
    - cadastrar_cliente: Novo cliente.
    - cadastrar_pet: Novo pet.
    - registrar_pagamento: Baixa de pagamento.
@@ -114,7 +122,8 @@ ROTEAMENTO DE INTENÇÕES:
 DIRETRIZES:
 - NUNCA trate o proprietário como tutor.
 - SEMPRE defina 'exige_confirmacao: true' para ações de escrita.
-- Responda de forma curta e operacional.`;
+- RESPOSTA: Se perguntarem quantidade ou valor, informe o número, o período e cite que a fonte é o Financeiro/Agenda oficial.`;
+
 
   try {
     const res = await chamarIA({
