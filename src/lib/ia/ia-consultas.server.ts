@@ -280,8 +280,8 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
   if (error) throw error;
 
   const slots = [];
-  let current = 8 * 60; 
-  const end = 18 * 60; 
+  let current = 8 * 60; // 08:00
+  const end = 19 * 60; // 19:00 (estendido para mais opções)
   const interval = 30; 
 
   while (current < end) {
@@ -289,7 +289,15 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
     const min = (current % 60).toString().padStart(2, '0');
     const timeStr = `${hour}:${min}:00`;
     
-    const isOccupied = (agendamentos || []).some(a => a.hora === timeStr);
+    // Verifica se o slot está livre
+    const isOccupied = (agendamentos || []).some(a => {
+      const aTime = a.hora.split(':').map(Number);
+      const aStart = aTime[0] * 60 + aTime[1];
+      const aEnd = aStart + (a.duracao_min || 60);
+      const slotStart = current;
+      const slotEnd = current + 30; // Considerando slots de 30min para sugestão
+      return slotStart < aEnd && slotEnd > aStart;
+    });
 
     if (!isOccupied) {
       slots.push(timeStr.slice(0, 5));
@@ -299,9 +307,10 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
 
   return createIAResponse({
     action: 'consultar_disponibilidade',
-    result: slots
+    result: slots.slice(0, 10) // Retornar as primeiras 10 opções
   });
 }
+
 
 export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>) {
   const hoje = new Intl.DateTimeFormat("en-CA", {

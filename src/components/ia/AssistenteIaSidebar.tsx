@@ -383,13 +383,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const handleConfirmarAgendamento = async (intent: IAIntent) => {
     setIsProcessing(true);
     try {
-      // Usar IDs se já vierem na intenção, senão buscar por nome
+      // 1. Resolver IDs
       let clienteId = intent.cliente_id;
       let petId = intent.pet_id;
       let servicosIds = intent.servicos_ids;
 
       if (!clienteId && intent.cliente_nome) {
-        const { data: cData } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).limit(1);
+        const { data: cData } = await supabase.from('clientes').select('id, nome').ilike('nome', `%${intent.cliente_nome}%`).limit(2);
+        if (cData && cData.length > 1) {
+          throw new Error(`Encontrei mais de um cliente com o nome "${intent.cliente_nome}". Por favor, informe o nome completo ou telefone.`);
+        }
         clienteId = cData?.[0]?.id;
       }
       
@@ -398,8 +401,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         petId = pData?.[0]?.id;
       }
       
-      if (!clienteId || !petId) throw new Error("Cliente ou Pet não localizado. Por favor, seja mais específico.");
+      if (!clienteId) throw new Error("Cliente não localizado. Deseja cadastrá-lo?");
+      if (!petId) throw new Error("Pet não localizado para este cliente.");
 
+      // 2. Resolver Serviços e Valores
       let servicosParaCriar: { id: string, nome: string, valor: number }[] = [];
       
       if (servicosIds && servicosIds.length > 0) {
@@ -410,10 +415,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         servicosParaCriar = sData || [];
       }
 
-      if (!servicosParaCriar.length) throw new Error("Não identifiquei os serviços solicitados no cadastro.");
+      if (!servicosParaCriar.length) throw new Error("Não identifiquei os serviços solicitados no cadastro oficial.");
 
-      // Re-validar disponibilidade no backend antes de gravar
-      const response = await validarAgendamentoIA({
+      // 3. Re-validar disponibilidade e duplicidade real (Server-side)
+      const validation = await validarAgendamentoIA({
         data: {
           data: intent.data!,
           hora: intent.horario!,
@@ -423,11 +428,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         }
       });
 
-      if (!response.success || !response.result?.disponivel) {
-        throw new Error(response.warnings?.[0] || response.result?.motivo || "Horário indisponível.");
+      if (!validation.success) {
+        throw new Error(validation.warnings?.[0] || "Horário indisponível.");
       }
 
-      await executarCriacaoAgendamento({
+      // 4. Executar Gravação Real
+      const res = await executarCriacaoAgendamento({
         data: {
           cliente_id: clienteId,
           pet_id: petId,
@@ -436,28 +442,44 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           servicos: servicosParaCriar,
           transporte: intent.transporte || false,
           taxa_transporte: intent.taxa_transporte || 0,
-          observacoes: intent.observacoes || "Agendado via Agente IA"
+          observacoes: intent.observacoes || "Agendado via Agente IA",
+          duracao_min: 60 // Valor padrão
         }
       });
 
+      const recordId = res.record_id || res.result?.id;
+
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `✅ **Agendamento realizado!**\n\n- **Pet**: ${intent.pet_nome}\n- **Data**: ${intent.data}\n- **Hora**: ${intent.horario}\n- **Serviços**: ${servicosParaCriar.map(s => s.nome).join(', ')}`,
-        timestamp: new Date().toISOString()
-      }]);
+        content: `✅ **Agendamento confirmado com sucesso!**\n\n- **ID**: \`${recordId}\`\n- **Pet**: ${intent.pet_nome}\n- **Data**: ${intent.data}\n- **Hora**: ${intent.horario}\n- **Serviços**: ${servicosParaCriar.map(s => s.nome).join(', ')}\n\nO registro já está visível na Agenda.`,
+        timestamp: new Date().toISOString(),
+        meta: { recordId }
+      } as any]);
+      
       setCurrentIntent(null);
-      toast.success("Agendado com sucesso!");
+      toast.success("Agendamento realizado!");
     } catch (error: any) {
       toast.error(error.message);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ **Não consegui concluir:** ${error.message}`,
-        timestamp: new Date().toISOString()
-      }]);
+      
+      // Se for erro de horário ocupado, sugerir alternativas
+      if (error.message.includes("indisponível") || error.message.includes("ocupado")) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ **Horário ocupado.** Deseja tentar em outro horário?`,
+          timestamp: new Date().toISOString()
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ **Não consegui concluir:** ${error.message}`,
+          timestamp: new Date().toISOString()
+        }]);
+      }
     } finally {
       setIsProcessing(false);
     }
   };
+
 
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);

@@ -68,8 +68,10 @@ export async function criarAgendamentoIA(
     transporte?: boolean;
     taxa_transporte?: number;
     observacoes?: string;
+    duracao_min?: number;
   }
 ) {
+
   const modalidade: LevaTrazModalidade = params.transporte ? "buscar_entregar" : "nao_utilizar";
 
   const { data: agendamento, error: errA } = await sb
@@ -83,8 +85,10 @@ export async function criarAgendamentoIA(
       leva_traz_modalidade: modalidade,
       taxa_leva_traz: params.taxa_transporte || 0,
       observacoes: params.observacoes,
-      status: "agendado" as AgendamentoStatus
+      status: "agendado" as AgendamentoStatus,
+      duracao_min: params.duracao_min || 60
     })
+
     .select()
     .single();
 
