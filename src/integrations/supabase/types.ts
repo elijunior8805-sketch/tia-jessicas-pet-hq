@@ -509,6 +509,39 @@ export type Database = {
         }
         Relationships: []
       }
+      auditoria_financeira: {
+        Row: {
+          data_consulta: string | null
+          fuso_horario: string | null
+          id: string
+          metadados: Json | null
+          periodo_ate: string
+          periodo_de: string
+          resultado: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          data_consulta?: string | null
+          fuso_horario?: string | null
+          id?: string
+          metadados?: Json | null
+          periodo_ate: string
+          periodo_de: string
+          resultado?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          data_consulta?: string | null
+          fuso_horario?: string | null
+          id?: string
+          metadados?: Json | null
+          periodo_ate?: string
+          periodo_de?: string
+          resultado?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       campanhas: {
         Row: {
           agendada_para: string | null
