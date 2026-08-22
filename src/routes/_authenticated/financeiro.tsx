@@ -915,7 +915,7 @@ function FinanceiroPage() {
     const atendimentosUnicosSet = new Set(receitasServicoPeriodo.map((p) => p.atendimento_id).filter(Boolean));
     const ticketMedio = atendimentosUnicosSet.size > 0 ? valorTotalServicos / atendimentosUnicosSet.size : 0;
 
-    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado na última resposta.
+    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste'
     const aportesAjustes = pagamentos
       .filter(
         (p) =>
@@ -931,11 +931,11 @@ function FinanceiroPage() {
     const emAberto = receitasFiltradas.filter((p) => {
       if (p.status === "pago" || p.status === "cancelado") return false;
       if (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste") return false;
-      if (!p.vencimento) return false;
-      if (p.vencimento < inicio || p.vencimento > fim) return false;
       const saldo = saldoReceita(p);
       return saldo > 0.005;
     });
+    
+    // Total a receber e Vencidos baseados no saldo real
     const totalAReceber = emAberto.reduce((s, p) => s + saldoReceita(p), 0);
     const totalVencidos = emAberto
       .filter((p) => p.vencimento && p.vencimento < hojeStr)
