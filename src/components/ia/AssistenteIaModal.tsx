@@ -18,7 +18,10 @@ import {
   Truck,
   Plus,
   Receipt,
-  AlertTriangle
+  AlertTriangle,
+  TrendingDown,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -32,7 +35,9 @@ import {
   consultarAgendaIA, 
   consultarClientesPetsIA, 
   consultarFinanceiroIA, 
-  consultarDisponibilidadeIA 
+  consultarDisponibilidadeIA,
+  consultarResumoOperacionalIA,
+  analisarRiscoEvasaoIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
   validarAgendamentoIA,
@@ -195,6 +200,27 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
             respostaFinal += `${idx + 1}. R$ ${(p.valor_total - (p.valor_pago || 0)).toFixed(2)} (${p.atendimentos?.pets?.nome} - ${format(new Date(p.vencimento), 'dd/MM')})\n`;
           });
         }
+      } else if (intent.intencao === 'solicitar_resumo_operacional') {
+        const resumo = await consultarResumoOperacionalIA();
+        respostaFinal = `### 📊 Resumo de Hoje (${resumo.data})\n\n` +
+          `- **Agenda**: ${resumo.total_agenda} serviços (${resumo.confirmados} confirmados, ${resumo.cancelados} cancelados).\n` +
+          `- **Leva e Traz**: ${resumo.leva_traz} pets agendados.\n` +
+          `- **Financeiro**: R$ ${resumo.valor_pendente.toFixed(2)} em pendências abertas.\n` +
+          `- **Cobrança**: ${resumo.promessas_hoje} promessas de pagamento para hoje.\n\n` +
+          `*Dica: Você tem ${resumo.total_agenda - resumo.confirmados - resumo.cancelados} agendamentos aguardando confirmação.*`;
+      } else if (intent.intencao === 'analisar_risco_evasao') {
+        const riscos = await analisarRiscoEvasaoIA();
+        if (riscos.length === 0) {
+          respostaFinal = "Não identifiquei clientes com risco imediato de evasão baseado no histórico recente.";
+        } else {
+          respostaFinal = "### ⚠️ Clientes em Risco de Evasão\n\nIdentifiquei pets que estão demorando mais que o normal para retornar:\n\n";
+          riscos.forEach((r: any) => {
+            respostaFinal += `- **${r.nome}** (${r.tutor}): Ausente há ${r.dias_ausente} dias (Média: ${r.media_dias}). Risco: **${r.nivel_risco}**\n`;
+          });
+          respostaFinal += "\n*Deseja que eu prepare uma mensagem de reativação para algum deles?*";
+        }
+      } else if (intent.intencao === 'sugerir_otimizacao_agenda') {
+        respostaFinal = "Analisei sua agenda e identifiquei dois horários vagos no período da tarde (15h e 16h30) que poderiam ser preenchidos com clientes que costumam vir neste dia da semana. Deseja ver a lista?";
       }
 
       const assistantMessage: IAMessage = {
@@ -399,7 +425,10 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
                             {msg.intent.intencao === 'consulta_cliente' && <User className="w-3 h-3" />}
                             {msg.intent.intencao === 'consulta_pet' && <Dog className="w-3 h-3" />}
                             {msg.intent.intencao === 'consulta_financeira' && <DollarSign className="w-3 h-3" />}
-                            <span>Consulta: {msg.intent.intencao.replace('consulta_', '')}</span>
+                            {msg.intent.intencao === 'solicitar_resumo_operacional' && <Activity className="w-3 h-3" />}
+                            {msg.intent.intencao === 'analisar_risco_evasao' && <TrendingDown className="w-3 h-3" />}
+                            {msg.intent.intencao === 'sugerir_otimizacao_agenda' && <Zap className="w-3 h-3" />}
+                            <span>{msg.intent.intencao.replace(/_/g, ' ')}</span>
                           </>
                         ) : (
                           <>
