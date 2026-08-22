@@ -334,10 +334,10 @@ function DashboardPage() {
               {period === "hoje" ? "Diário" : period === "semana" ? "Semanal" : period === "mes" ? "Mensal" : period === "30dias" ? "30 dias" : "Custom"}
             </span>
           </div>
-          {data && data.serie.some((p) => p.valor > 0) ? (
+          {auxData && auxData.serie.some((p) => p.valor > 0) ? (
             <div className="h-48 sm:h-60 lg:h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <AreaChart data={auxData.serie} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="fillReceita" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="oklch(0.55 0.13 155)" stopOpacity={0.35} />

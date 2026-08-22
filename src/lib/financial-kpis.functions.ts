@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 export const getFinancialKPIs = createServerFn({ method: "GET" })
-  .input(z.object({ from: z.string(), to: z.string() }))
+  .validator((data: unknown) => z.object({ from: z.string(), to: z.string() }).parse(data))
   .handler(async ({ data: { from, to } }) => {
     // 1. Fetch unified indicators from view
     const { data: indicators, error: indError } = await supabase
@@ -76,4 +76,3 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       vencido
     };
   });
-
