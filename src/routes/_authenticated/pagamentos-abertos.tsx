@@ -26,7 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, Trash2, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 
