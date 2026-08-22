@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { getFinancialKPIs } from "@/lib/financial-kpis.functions";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/page-shell";
@@ -105,51 +106,18 @@ function DashboardPage() {
 
 
 
-  const { data } = useQuery({
-    queryKey: ["dashboard-metrics", from, to],
+  const fetchKPIs = useServerFn(getFinancialKPIs);
+
+  const { data: metrics } = useQuery({
+    queryKey: ["dashboard-metrics-v2", from, to],
+    queryFn: () => fetchKPIs({ data: { from, to } }),
     staleTime: 30000,
+  });
 
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+  const { data: auxData } = useQuery({
+    queryKey: ["dashboard-aux", from, to],
     queryFn: async () => {
-      // Alarga a janela em ±1 dia no filtro do servidor para não perder
-      // atendimentos cuja data local (America/Sao_Paulo, UTC-3) cai no
-      // período, mas cujo timestamp UTC (encerrado_em/data_inicio) fica
-      // fora dele. O filtro definitivo é feito em JS usando o fuso local.
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const shiftDay = (iso: string, delta: number) => {
-        const d = parseISO(iso);
-        d.setDate(d.getDate() + delta);
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      };
-      const fromWide = shiftDay(from, -1);
-      const toWide = shiftDay(to, 1);
-      const toLocalDay = (v: any): string => {
-        if (!v) return "";
-        const d = new Date(v);
-        if (isNaN(d.getTime())) return String(v).slice(0, 10);
-        // yyyy-mm-dd em America/Sao_Paulo
-        return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-      };
-
-      const [comprasRes, pagamentosRes, novosClientesRes, proxAgRes] = await Promise.all([
-        // Despesas do painel: considera parcelas pagas pela data de pagamento
-        // e parcelas ainda em aberto pela data de vencimento. Assim o card não
-        // some quando a compra foi lançada mas ainda não foi baixada/paga.
-        supabase
-          .from("compras_parcelas")
-          .select("valor,valor_pago,vencimento,data_pagamento,status,is_teste")
-          .or(
-            `and(data_pagamento.gte.${from},data_pagamento.lte.${to}),and(vencimento.gte.${from},vencimento.lte.${to})`,
-          )
-          .or("is_teste.is.false,is_teste.is.null"),
-        // KPIs Unificados com Financeiro (Fluxo de Caixa)
-        supabase
-          .from("pagamentos")
-          .select("id, atendimento_id, valor_pago, data_pagamento, categoria_receita, status")
-          .eq("status", "pago")
-          .gte("data_pagamento", from)
-          .lte("data_pagamento", to),
+      const [novosClientesRes, proxAgRes] = await Promise.all([
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
           .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
@@ -160,72 +128,20 @@ function DashboardPage() {
           .limit(6),
       ]);
 
-      if (comprasRes.error) {
-        console.error("[dashboard] Falha ao carregar despesas", comprasRes.error);
-      }
-
-      const compras = comprasRes.data ?? [];
-      const pagamentosPeriodo = pagamentosRes.data ?? [];
-      const novosClientes = novosClientesRes.data ?? [];
-
-      const despesas = compras.reduce((s: number, r: any) => {
-        if (r.status === "cancelado") return s;
-        const pagaNoPeriodo = r.data_pagamento && r.data_pagamento >= from && r.data_pagamento <= to;
-        const venceNoPeriodo = r.vencimento && r.vencimento >= from && r.vencimento <= to;
-
-        if (pagaNoPeriodo) return s + Number(r.valor_pago || r.valor || 0);
-        if (venceNoPeriodo && r.status !== "pago") {
-          return s + Math.max(0, Number(r.valor || 0) - Number(r.valor_pago || 0));
-        }
-        return s;
-      }, 0);
-
-      // Faturamento: Receitas de Serviços + Taxas vinculadas a atendimentos
-      const receitasServico = pagamentosPeriodo.filter(
-        (p: any) => p.categoria_receita === "servico" || p.atendimento_id
-      );
-
-      const faturamento = receitasServico.reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
-      
-      // Ticket Médio: Faturamento de serviços / Atendimentos únicos com pagamento no período
-      const atendimentosUnicosSet = new Set(receitasServico.map((p: any) => p.atendimento_id).filter(Boolean));
-      const atendCount = atendimentosUnicosSet.size;
-      const bilhete = atendCount > 0 ? faturamento / atendCount : 0;
-      
-      // Aportes e Ajustes: categorias específicas
-      const aportesAjustes = pagamentosPeriodo
-        .filter((p: any) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
-        .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
-      
-      const lucro = faturamento + aportesAjustes - despesas;
-
-      const diasIntervalo = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
-      const serie = diasIntervalo.map((d) => {
-        const key = format(d, "yyyy-MM-dd");
-        const val = receitasServico
-          .filter((p: any) => p.data_pagamento === key)
-          .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
-        return { dia: format(d, "dd/MM"), valor: val };
-      });
-
       return {
-        faturamento, despesas, lucro,
-        atendCount, bilhete,
-        aportesAjustes,
-        novosClientes: novosClientes.length,
-        serie,
+        novosClientes: novosClientesRes.data?.length ?? 0,
         proximos: proxAgRes.data ?? [],
       };
     },
   });
 
   const kpis = [
-    { label: "Faturamento",   value: data ? brl(data.faturamento) : "—", hint: "Receitas de serviços",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
-    { label: "Despesas",      value: data ? brl(data.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
-    { label: "Lucro",         value: data ? brl(data.lucro)       : "—", hint: "Saldo operacional",       icon: Sparkles,   tone: KPI_TONES.dourado   },
-    { label: "Ticket Médio",  value: data ? brl(data.bilhete)     : "—", hint: "Média por serviço",       icon: Receipt,    tone: KPI_TONES.ambar     },
-    { label: "Aportes",       value: data ? brl(data.aportesAjustes) : "—", hint: "Entradas diversas", icon: Coins,      tone: KPI_TONES.salvia    },
-    { label: "Atendimentos",  value: data?.atendCount ?? "—",           hint: "Realizados no período",   icon: PawPrint,   tone: KPI_TONES.petroleo  },
+    { label: "Faturamento",   value: metrics ? brl(metrics.faturamento) : "—", hint: "Receitas de serviços",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Despesas",      value: metrics ? brl(metrics.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
+    { label: "Lucro",         value: metrics ? brl(metrics.lucro)       : "—", hint: "Saldo operacional",       icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Ticket Médio",  value: metrics ? brl(metrics.ticketMedio) : "—", hint: "Média por serviço",       icon: Receipt,    tone: KPI_TONES.ambar     },
+    { label: "Aportes",       value: metrics ? brl(metrics.aportes)    : "—", hint: "Entradas diversas",        icon: Coins,      tone: KPI_TONES.salvia    },
+    { label: "Atendimentos",  value: metrics?.atendimentos ?? "—",           hint: "Realizados no período",   icon: PawPrint,   tone: KPI_TONES.petroleo  },
   ];
 
   const hoje = new Date();

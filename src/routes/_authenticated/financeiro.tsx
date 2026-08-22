@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getFinancialKPIs } from "@/lib/financial-kpis.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -588,7 +590,8 @@ function LancamentoManualDialog({ onCreated }: { onCreated: () => void }) {
 
 function FinanceiroPage() {
   const qc = useQueryClient();
-  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia", "fin-pag-ant"]);
+  const fetchKPIs = useServerFn(getFinancialKPIs);
+  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia", "fin-pag-ant", "financial-kpis-v2"]);
 
   const hoje = new Date();
   const hojeStr = format(hoje, "yyyy-MM-dd");
