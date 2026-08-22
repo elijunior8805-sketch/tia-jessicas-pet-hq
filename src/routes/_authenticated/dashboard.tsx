@@ -109,9 +109,10 @@ function DashboardPage() {
   const fetchKPIs = useServerFn(getFinancialKPIs);
 
   const { data: metrics } = useQuery({
-    queryKey: ["dashboard-metrics-v2", from, to],
+    queryKey: ["dashboard-metrics-v3", from, to],
     queryFn: () => fetchKPIs({ data: { from, to } }),
     staleTime: 30000,
+    retry: 1,
   });
 
   const { data: auxData } = useQuery({
