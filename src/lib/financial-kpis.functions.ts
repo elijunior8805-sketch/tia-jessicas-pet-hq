@@ -15,9 +15,9 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     if (indError) throw indError;
 
     // 2. Aggregate
-    let faturamento = 0;
-    let recebido = 0;
-    let despesas = 0;
+    let faturamentoCompetencia = 0;
+    let recebidoPeriodo = 0;
+    let despesasPagas = 0;
     let aportes = 0;
     let atendimentosCount = 0;
 
@@ -25,14 +25,14 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       const val = Number(row.valor || 0);
       switch (row.tipo) {
         case 'receita_servico':
-          faturamento += val;
+          faturamentoCompetencia += val;
           atendimentosCount += Number(row.quantidade_atendimentos || 0);
           break;
         case 'receita_recebida':
-          recebido += val;
+          recebidoPeriodo += val;
           break;
         case 'despesa_paga':
-          despesas += val;
+          despesasPagas += val;
           break;
         case 'aporte_recebido':
           aportes += val;
@@ -40,7 +40,8 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       }
     });
 
-    // 3. Pending values (requires specific table read as view only tracks realized cash flow)
+    // 3. Pending values (Accrual balance)
+    // To maintain compatibility with Dashboard, we keep aReceber and vencido
     const { data: pendingReceivables } = await supabase
       .from("pagamentos")
       .select("valor_total, valor_pago, vencimento")
@@ -61,14 +62,18 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
         }
       }
     });
+    
+    const saldoCaixa = recebidoPeriodo - despesasPagas + aportes;
+    const lucroCompetencia = faturamentoCompetencia - despesasPagas;
 
-    const ticketMedio = atendimentosCount > 0 ? faturamento / atendimentosCount : 0;
+    const ticketMedio = atendimentosCount > 0 ? faturamentoCompetencia / atendimentosCount : 0;
 
     return {
-      faturamento,
-      recebido,
-      despesas,
-      lucro: recebido - despesas, // Lucro real baseado no caixa (dinheiro na mão)
+      faturamento: faturamentoCompetencia,
+      recebido: recebidoPeriodo,
+      despesas: despesasPagas,
+      lucro: lucroCompetencia, // Resultado por Competência
+      saldoCaixa,
       ticketMedio,
       atendimentos: atendimentosCount,
       aportes,
