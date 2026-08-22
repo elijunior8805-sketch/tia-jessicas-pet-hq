@@ -115,6 +115,8 @@ type ChamadaParams = {
   cacheTtlMs?: number;
   /** Complemento opcional da chave de cache (ex.: id da cobrança). */
   cacheEscopo?: string;
+  /** Conteúdo extra para modelos multimodais (ex: imagens) */
+  extraContent?: any[];
 };
 
 
@@ -172,7 +174,10 @@ async function chamadaUnica(
       temperature: p.temperatura ?? p.config.criatividade,
       messages: [
         { role: "system", content: p.system },
-        { role: "user", content: sanitizarPromptFinal(p.prompt) },
+        { role: "user", content: p.extraContent ? [
+          { type: "text", text: sanitizarPromptFinal(p.prompt) },
+          ...p.extraContent
+        ] : sanitizarPromptFinal(p.prompt) },
       ],
     };
     if (p.json) body["response_format"] = { type: "json_object" };
