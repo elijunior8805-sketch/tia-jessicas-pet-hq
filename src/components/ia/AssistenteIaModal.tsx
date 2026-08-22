@@ -13,7 +13,10 @@ import {
   Calendar,
   User,
   Dog,
-  DollarSign
+  DollarSign,
+  Clock,
+  Truck,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,10 +32,17 @@ import {
   consultarFinanceiroIA, 
   consultarDisponibilidadeIA 
 } from '@/lib/ia/ia-consultas.functions';
+import {
+  validarAgendamentoIA,
+  executarCriacaoAgendamento,
+  executarRemarcacao,
+  executarCancelamento
+} from '@/lib/ia/ia-acoes.functions';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ReactMarkdown from 'react-markdown';
+import { supabase } from '@/integrations/supabase/client';
 
 
 interface AssistenteIaModalProps {
@@ -46,6 +56,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
   const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>('idle');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIntent, setCurrentIntent] = useState<IAIntent | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<any>(null); // Para fluxo de confirmação de cliente/pet
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
@@ -96,7 +107,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Processando sua solicitação...";
 
-      // 2. Executar Consulta Baseada na Intenção
+      // 2. Executar Lógica Baseada na Intenção
       if (intent.intencao === 'consulta_agenda') {
         dadosReais = await consultarAgendaIA({
           data: {
@@ -114,16 +125,20 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
         } else {
           respostaFinal = "Não encontrei agendamentos para os critérios informados.";
         }
-      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet') {
+      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
         const { clientes, pets } = await consultarClientesPetsIA({ data: { termo } });
         
         if (clientes.length > 0 || pets.length > 0) {
-          respostaFinal = "Localizei os seguintes registros:\n\n";
+          respostaFinal = "Localizei os seguintes registros para sua confirmação:\n\n";
           clientes.forEach((c: any) => respostaFinal += `- 👤 **Cliente**: ${c.nome} (${c.telefone || 'Sem tel'})\n`);
           pets.forEach((p: any) => respostaFinal += `- 🐾 **Pet**: ${p.nome} (Tutor: ${p.clientes?.nome})\n`);
+          
+          if (intent.intencao === 'criar_agendamento') {
+             respostaFinal += "\n**Por favor, clique em um dos resultados acima ou no botão de confirmação para prosseguir com o agendamento.**";
+          }
         } else {
-          respostaFinal = "Desculpe, não localizei nenhum cliente ou pet com esse nome.";
+          respostaFinal = `Desculpe, não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar agora?`;
         }
       } else if (intent.intencao === 'consulta_financeira') {
         dadosReais = await consultarFinanceiroIA({
@@ -138,6 +153,13 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
           });
         } else {
           respostaFinal = "Não encontrei pendências financeiras no momento.";
+        }
+      } else if (intent.intencao === 'criar_agendamento' && intent.nivel_confianca > 0.7) {
+        // Fluxo de criação - Verificamos se temos o básico
+        if (intent.informacoes_faltantes && intent.informacoes_faltantes.length > 0) {
+           respostaFinal = `Estou quase lá! Preciso de mais algumas informações para o agendamento: ${intent.informacoes_faltantes.join(', ')}.`;
+        } else {
+           respostaFinal = `Entendi. Você quer agendar **${intent.servicos?.join(' e ')}** para o pet **${intent.pet_nome}** do cliente **${intent.cliente_nome}**.\n\nData: **${intent.data}** às **${intent.horario}**.\n${intent.transporte ? 'Com Leva e Traz.' : 'Sem transporte.'}\n\nConfirma essas informações?`;
         }
       }
 
@@ -175,6 +197,73 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     }
   };
 
+  const handleConfirmarAgendamento = async (intent: IAIntent) => {
+    setIsProcessing(true);
+    try {
+      // 1. Localizar IDs (IA extraiu nomes, precisamos de UUIDs)
+      const { data: cData } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).limit(1);
+      const { data: pData } = await supabase.from('pets').select('id').ilike('nome', `%${intent.pet_nome}%`).limit(1);
+      
+      if (!cData?.length || !pData?.length) {
+        throw new Error("Não consegui localizar o ID do cliente ou pet para salvar.");
+      }
+
+      // 2. Localizar IDs dos serviços
+      const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('nome', intent.servicos || []);
+      
+      if (!sData?.length) {
+        throw new Error("Não localizei os serviços informados no cadastro.");
+      }
+
+      // 3. Validar Disponibilidade
+      const validacao = await validarAgendamentoIA({
+        data: {
+          data: intent.data!,
+          hora: intent.horario!,
+          cliente_id: cData[0].id,
+          pet_id: pData[0].id,
+          servicos: sData.map(s => s.id)
+        }
+      });
+
+      if (validacao.aviso) {
+        toast.warning(validacao.aviso);
+      }
+
+      // 4. Salvar
+      await executarCriacaoAgendamento({
+        data: {
+          cliente_id: cData[0].id,
+          pet_id: pData[0].id,
+          data: intent.data!,
+          hora: intent.horario!,
+          servicos: sData.map(s => ({ id: s.id, nome: s.nome, valor: s.valor || 0 })),
+          transporte: intent.transporte || false,
+          taxa_transporte: 0, // Poderia ser configurável
+          observacoes: intent.observacoes || "Agendado via Assistente IA"
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Agendamento confirmado com sucesso!**\n\n${intent.pet_nome} está marcado para ${intent.data} às ${intent.horario}.`,
+        timestamp: new Date().toISOString()
+      }]);
+      setCurrentIntent(null);
+      toast.success("Agendamento realizado!");
+
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao salvar agendamento.");
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ **Erro ao salvar:** ${error.message}`,
+        timestamp: new Date().toISOString()
+      }]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const toggleVoice = () => {
     if (voiceStatus === 'listening') {
@@ -195,7 +284,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
             </div>
             <div>
               <h2 className="font-display font-semibold text-lg leading-none">Assistente Operacional IA</h2>
-              <p className="text-xs text-muted-foreground mt-1">Sempre pronta para ajudar</p>
+              <p className="text-xs text-muted-foreground mt-1">Fase 3: Agenda e Cadastros</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -214,7 +303,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
                 <div className="max-w-xs mx-auto">
                   <p className="text-sm font-medium">Como posso ajudar hoje?</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Você pode dizer "Ver agenda de hoje", "Cadastrar novo pet" ou "Resumo financeiro".
+                    Experimente: "Agende Eli Júnior para banho amanhã às 14h" ou "Remarque a Pipoca para segunda".
                   </p>
                 </div>
               </div>
@@ -231,32 +320,59 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </div>
                   
-                  {msg.intent && msg.intent.intencao !== 'comando_nao_reconhecido' && (
+                  {msg.intent && (
                     <div className="mt-3 pt-3 border-t border-black/10 text-xs font-medium space-y-2">
                       <div className="flex items-center gap-1.5 opacity-80">
-                        {msg.intent.intencao === 'consulta_agenda' && <Calendar className="w-3 h-3" />}
-                        {msg.intent.intencao === 'consulta_cliente' && <User className="w-3 h-3" />}
-                        {msg.intent.intencao === 'consulta_pet' && <Dog className="w-3 h-3" />}
-                        {msg.intent.intencao === 'consulta_financeira' && <DollarSign className="w-3 h-3" />}
-                        <span>Consulta: {msg.intent.intencao.replace('consulta_', '')}</span>
+                        {msg.intent.intencao.startsWith('consulta_') ? (
+                          <>
+                            {msg.intent.intencao === 'consulta_agenda' && <Calendar className="w-3 h-3" />}
+                            {msg.intent.intencao === 'consulta_cliente' && <User className="w-3 h-3" />}
+                            {msg.intent.intencao === 'consulta_pet' && <Dog className="w-3 h-3" />}
+                            {msg.intent.intencao === 'consulta_financeira' && <DollarSign className="w-3 h-3" />}
+                            <span>Consulta: {msg.intent.intencao.replace('consulta_', '')}</span>
+                          </>
+                        ) : (
+                          <>
+                            {msg.intent.intencao === 'criar_agendamento' && <Plus className="w-3 h-3" />}
+                            {msg.intent.intencao === 'remarcar' && <Clock className="w-3 h-3" />}
+                            <span>Ação: {msg.intent.intencao.replace('_', ' ')}</span>
+                          </>
+                        )}
                       </div>
-                      <div className="flex gap-2">
+                      
+                      <div className="flex flex-wrap gap-2">
+                        {/* Ações de Atalho */}
                         <Button 
                           size="sm" 
                           variant="outline" 
                           className="h-7 text-[10px] bg-white/10 hover:bg-white/20 border-white/20"
                           onClick={() => {
-                            if (msg.intent?.intencao === 'consulta_agenda') window.location.href = '/agenda';
-                            if (msg.intent?.intencao === 'consulta_financeira') window.location.href = '/financeiro';
+                            const path = msg.intent?.intencao === 'consulta_agenda' ? '/agenda' : 
+                                       msg.intent?.intencao === 'consulta_financeira' ? '/financeiro' : 
+                                       msg.intent?.intencao === 'consulta_cliente' ? '/clientes' : '/dashboard';
+                            window.open(path, '_blank');
                           }}
                         >
-                          <ExternalLink className="w-3 h-3 mr-1" />
-                          Ver no Módulo
+                          <ExternalLink className="w-3 h-3 mr-1" /> Ver no sistema
                         </Button>
+
+                        {/* Ação de Confirmação para Criar Agendamento */}
+                        {msg.intent.intencao === 'criar_agendamento' && 
+                         msg.intent.cliente_nome && 
+                         msg.intent.pet_nome && 
+                         msg.intent.horario && (
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-[10px] bg-green-600 hover:bg-green-700 text-white border-none"
+                            onClick={() => handleConfirmarAgendamento(msg.intent!)}
+                            disabled={isProcessing}
+                          >
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> Confirmar Agendamento
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
-
                 </div>
               </div>
             ))}
@@ -265,7 +381,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
               <div className="flex justify-start">
                 <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-gold" />
-                  <span className="text-sm text-muted-foreground">Processando...</span>
+                  <span className="text-sm text-muted-foreground">Pensando...</span>
                 </div>
               </div>
             )}
@@ -273,62 +389,47 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="p-6 border-t bg-muted/10 space-y-4">
-          <div className="relative">
-            <Textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder={voiceStatus === 'listening' ? "Ouvindo..." : "Digite seu comando..."}
-              className="min-h-[100px] resize-none pr-12 pb-10"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend(inputText);
-                }
-              }}
-            />
-            
-            <div className="absolute right-2 bottom-2 flex items-center gap-2">
+        <div className="p-4 border-t bg-muted/30">
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 bg-background border rounded-lg overflow-hidden flex items-end">
+              <Textarea
+                placeholder="Ex: Agendar banho para Eli amanhã às 10h..."
+                className="min-h-[44px] max-h-[120px] border-none focus-visible:ring-0 resize-none py-3"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend(inputText);
+                  }
+                }}
+              />
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => setInputText('')}
-                disabled={!inputText}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant={voiceStatus === 'listening' ? 'destructive' : 'secondary'} 
-                size="icon"
+                className={`h-11 w-11 shrink-0 ${voiceStatus === 'listening' ? 'text-red-500 bg-red-50' : ''}`}
                 onClick={toggleVoice}
-                className={voiceStatus === 'listening' ? 'animate-pulse' : ''}
               >
-                {voiceStatus === 'listening' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </Button>
-              <Button 
-                variant="default" 
-                size="icon"
-                onClick={() => handleSend(inputText)}
-                disabled={!inputText || isProcessing}
-                className="bg-gold hover:bg-gold/90"
-              >
-                <Send className="w-4 h-4" />
+                {voiceStatus === 'listening' ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
               </Button>
             </div>
+            <Button 
+              className="h-11 w-11 shrink-0 bg-gold hover:bg-gold/90" 
+              size="icon"
+              onClick={() => handleSend(inputText)}
+              disabled={!inputText.trim() || isProcessing}
+            >
+              <Send className="w-5 h-5" />
+            </Button>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-              Fase 1: Estrutura & Interpretação
-            </p>
-            <div className="flex items-center gap-4">
-              <Button variant="link" className="h-auto p-0 text-[10px] text-muted-foreground" onClick={() => setMessages([])}>
-                <RotateCcw className="w-3 h-3 mr-1" />
-                Limpar Conversa
-              </Button>
-              <Button variant="link" className="h-auto p-0 text-[10px] text-muted-foreground" onClick={onClose}>
-                Cancelar
-              </Button>
+          <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground px-1">
+            <div className="flex gap-3">
+              <span>Shift+Enter para nova linha</span>
+              <span>Comandos de voz ativos</span>
+            </div>
+            <div className="flex gap-2 items-center">
+              <RotateCcw className="w-3 h-3 cursor-pointer hover:text-gold" onClick={() => setMessages([])} />
+              <span>Limpar conversa</span>
             </div>
           </div>
         </div>
