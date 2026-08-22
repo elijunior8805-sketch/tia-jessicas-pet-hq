@@ -73,3 +73,13 @@ export const analisarRiscoEvasaoIA = createServerFn({ method: "GET" })
     const { analisarRiscoEvasaoIA: analisarEvasao } = await import("./ia-consultas.server");
     return analisarEvasao(supabaseAdmin);
   });
+
+export const buscarServicosIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    termo: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { buscarServicosIA: buscarServicos } = await import("./ia-consultas.server");
+    return buscarServicos(context.supabase, data.termo);
+  });
