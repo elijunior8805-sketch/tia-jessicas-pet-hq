@@ -35,4 +35,3 @@ Este plano estabelece a base da Assistente IA para o Spa de Pet Tia Jéssica, fo
 - **Voz:** Web Speech API (Browser-native).
 - **Estado:** React `useState` e `useReducer` para gerenciar o complexo estado da conversa/contexto.
 - **Segurança:** Verificação de roles via `useMyAccess` e validação no `handler` do Server Function.
-
