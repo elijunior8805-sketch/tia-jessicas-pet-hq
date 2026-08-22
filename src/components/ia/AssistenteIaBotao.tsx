@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AssistenteIaModal } from './AssistenteIaModal';
+import { AssistenteIaSidebar } from './AssistenteIaSidebar';
 import { useMyAccess } from '@/hooks/use-my-permissions';
 
 export function AssistenteIaBotao() {
@@ -22,7 +22,7 @@ export function AssistenteIaBotao() {
         <span className="sr-only">Assistente IA</span>
       </Button>
 
-      <AssistenteIaModal 
+      <AssistenteIaSidebar 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)} 
       />
