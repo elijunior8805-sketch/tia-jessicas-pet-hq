@@ -45,10 +45,16 @@ Regras:
       config,
       json: true,
       origem: "ia_analise_comprovante",
-      // O chamarIA suporta anexos via prompt ou metadados se o gateway estiver configurado
-      // Para Gemini 1.5 Flash via Lovable Gateway, enviamos como base64 no prompt se suportado
-      // ou via parâmetro específico de imagem.
       sb,
+      // Passar a imagem no formato esperado pelo Gateway para Visão
+      // Nota: A implementação atual do chamarIA precisa ser verificada se suporta multimodality.
+      // Se não, passamos a imagem no prompt seguindo o padrão de Visão do Gemini.
+      extraContent: [
+        {
+          type: "image",
+          image_url: { url: `data:${contentType};base64,${imagemBase64}` }
+        }
+      ]
     });
 
     const parsed = JSON.parse(res.texto);
