@@ -459,9 +459,29 @@ function DashboardPage() {
           </Card>
         </div>
       </div>
+      <AuditNote />
     </PageShell>
   );
 }
+
+const AuditNote = () => (
+  <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
+    <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
+      <div className="inline-flex items-center gap-2 rounded-full bg-[oklch(0.62_0.13_40/0.1)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.12_40)]">
+        CORREÇÃO FINANCEIRA CONTROLADA — SINCRONIZAÇÃO DASHBOARD
+      </div>
+      <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
+        {`Este painel agora consome a mesma fonte de dados unificada do Financeiro.
+
+PERÍODO DE TESTE
+01/07/2026 até 31/07/2026.
+
+DADOS UNIFICADOS
+Os valores de Faturamento, Recebido e Lucro são obtidos via backend a partir da view 'public.vw_financeiro_indicadores', garantindo que não existam divergências entre as telas do sistema.`}
+      </div>
+    </div>
+  </div>
+);
 
 type PeriodTuple = readonly [Period, string, string];
 
