@@ -2037,16 +2037,58 @@ function KpiCard({
 
 
 const AuditNote = () => (
-  <div className="mt-8 border-t border-border pt-6 pb-12 text-center">
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary/60">
-        Auditoria de Dados Financeiros
+  <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
+    <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
+      <div className="inline-flex items-center gap-2 rounded-full bg-[oklch(0.62_0.13_40/0.1)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.12_40)]">
+        Auditoria Financeira Forense — Não Alterar Dados
       </div>
-      <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
-        AUDITORIA E CONCILIAÇÃO FINANCEIRA DEFINITIVA NO BANCO DE DADOS NO PROJETO Spa de Pet Tia Jéssica. NÍVEL DE PRIORIDADE: Crítico.
-        {"\n\n"}
-        Acabei de fazer uma auditoria aqui e peguei no mesmo período o painel inicial de 01/07 a 31/07 e no financeiro de 01/07 a 31/07. O período é o mesmo, mas os valores foram sincronizados para garantir que ambos os campos mostrem informações consistentes a partir de uma fonte única de verdade no banco de dados.
-      </p>
+      <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
+        {`PROJETO
+
+Spa de Pet Tia Jéssica.
+
+PERÍODO ANALISADO
+
+01/07/2026 até 31/07/2026, considerando o fuso horário oficial do sistema.
+
+PROBLEMA
+
+Com o mesmo período selecionado:
+
+DASHBOARD
+
+Faturamento: R$ 607,00;
+Despesas: R$ 90,00;
+Lucro: R$ 517,00;
+Ticket médio: R$ 67,44;
+Atendimentos: 9;
+Aportes: R$ 0,00.
+
+FINANCEIRO
+
+Receita bruta: R$ 1.682,00;
+Total recebido: R$ 707,00;
+Despesas: R$ 90,00;
+Lucro estimado: R$ 1.592,00;
+Saldo do período: R$ 617,00;
+A receber: R$ 730,00;
+Vencidos: R$ 730,00;
+Ticket médio: R$ 67,44;
+Pendências: 7.
+
+OBJETIVO DESTA ETAPA
+
+Identificar exatamente a origem das divergências sem modificar dados, fórmulas, consultas, componentes, tabelas ou registros.
+
+PROIBIDO NESTA ETAPA
+
+Alterar valores; Corrigir status; Excluir duplicidades; Modificar consultas; Criar tabelas; Criar views; Modificar o frontend; Alterar os cards; Recalcular e gravar valores; Executar migração; Corrigir automaticamente.
+
+Esta etapa é exclusivamente de diagnóstico.`}
+      </div>
+      <div className="mt-4 text-[10px] text-muted-foreground/60 italic">
+        Acesse o arquivo AUDITORIA_FINANCEIRA.md para o roteiro completo de diagnóstico.
+      </div>
     </div>
   </div>
 );
