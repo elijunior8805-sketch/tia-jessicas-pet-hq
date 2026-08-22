@@ -128,9 +128,25 @@ function DashboardPage() {
           .limit(6),
       ]);
 
+      const diasIntervalo = eachDayOfInterval({ start: parseISO(from), end: parseISO(to) });
+      const { data: seriesData } = await supabase
+        .from("vw_financeiro_indicadores")
+        .select("*")
+        .eq("tipo", "receita_recebida")
+        .gte("data_referencia", from)
+        .lte("data_referencia", to);
+
+      const serie = diasIntervalo.map((d) => {
+        const key = format(d, "yyyy-MM-dd");
+        const val = seriesData?.filter((p: any) => p.data_referencia === key)
+          .reduce((s: number, p: any) => s + Number(p.valor || 0), 0) || 0;
+        return { dia: format(d, "dd/MM"), valor: val };
+      });
+
       return {
         novosClientes: novosClientesRes.data?.length ?? 0,
         proximos: proxAgRes.data ?? [],
+        serie
       };
     },
   });

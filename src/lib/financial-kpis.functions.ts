@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
 
 export const getFinancialKPIs = createServerFn({ method: "GET" })
-  .handler(async ({ data: { from, to } }: { data: { from: string, to: string } }) => {
+  .input(z.object({ from: z.string(), to: z.string() }))
+  .handler(async ({ data: { from, to } }) => {
     // 1. Fetch unified indicators from view
     const { data: indicators, error: indError } = await supabase
       .from("vw_financeiro_indicadores")
@@ -74,3 +76,4 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       vencido
     };
   });
+
