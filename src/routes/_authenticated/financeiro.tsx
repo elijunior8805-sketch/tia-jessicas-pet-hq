@@ -2040,51 +2040,70 @@ const AuditNote = () => (
   <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
     <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
       <div className="inline-flex items-center gap-2 rounded-full bg-[oklch(0.62_0.13_40/0.1)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.12_40)]">
-        Auditoria Financeira Forense — Não Alterar Dados
+        CORREÇÃO FINANCEIRA CONTROLADA — UTILIZAR O DIAGNÓSTICO ANTERIOR
       </div>
       <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
-        {`PROJETO
+        {`Utilize exclusivamente as evidências apresentadas na auditoria financeira forense do período de 01/07/2026 a 31/07/2026.
 
-Spa de Pet Tia Jéssica.
+OBJETIVO
 
-PERÍODO ANALISADO
+Corrigir a causa comprovada da divergência entre Dashboard e Financeiro, centralizar os indicadores no backend e garantir sincronização permanente.
 
-01/07/2026 até 31/07/2026, considerando o fuso horário oficial do sistema.
+PROTEÇÃO
 
-PROBLEMA
+Antes da alteração:
+Criar backup; Registrar totais anteriores; Registrar quantidade de registros; Salvar a lista dos IDs afetados; Preparar reversão; Não apagar históricos; Não alterar registros não relacionados ao problema.
 
-Com o mesmo período selecionado:
+CORREÇÃO MÍNIMA
 
-DASHBOARD
+Aplicar somente as correções comprovadas pelo diagnóstico.
+Dar prioridade a corrigir: Consulta; View; Função; Status; Filtro; Relacionamento; Duplicidade comprovada; Data de referência.
+Não recriar toda a estrutura financeira sem necessidade.
 
-Faturamento: R$ 607,00;
-Despesas: R$ 90,00;
-Lucro: R$ 517,00;
-Ticket médio: R$ 67,44;
-Atendimentos: 9;
-Aportes: R$ 0,00.
+FONTE ÚNICA
 
-FINANCEIRO
+Centralizar no backend:
+Faturamento por competência; Atendimentos realizados; Ticket médio faturado; Recebido no período; Saldo em aberto; Saldo vencido; Despesas; Resultado por competência; Saldo de caixa.
+Dashboard, Financeiro, Caixa, Cobrança, relatórios e Assistente IA deverão consumir essa mesma fonte.
 
-Receita bruta: R$ 1.682,00;
-Total recebido: R$ 707,00;
-Despesas: R$ 90,00;
-Lucro estimado: R$ 1.592,00;
-Saldo do período: R$ 617,00;
-A receber: R$ 730,00;
-Vencidos: R$ 730,00;
-Ticket médio: R$ 67,44;
-Pendências: 7.
+NOMES CORRETOS
 
-OBJETIVO DESTA ETAPA
+Utilizar:
+Faturamento por competência; Recebido no período; Resultado por competência; Saldo de caixa do período; Saldo em aberto; Saldo vencido; Ticket médio faturado.
+Não chamar conceitos diferentes pelo mesmo nome.
 
-Identificar exatamente a origem das divergências sem modificar dados, fórmulas, consultas, componentes, tabelas ou registros.
+REGRA DO FATURAMENTO
 
-PROIBIDO NESTA ETAPA
+Somar apenas atendimentos válidos e realizados no período de competência.
+Não incluir: Agendamentos futuros; Não realizados; Cancelados; Faltas sem cobrança válida; Duplicados; Testes; Pagamentos como nova receita; Registros de outros períodos.
 
-Alterar valores; Corrigir status; Excluir duplicidades; Modificar consultas; Criar tabelas; Criar views; Modificar o frontend; Alterar os cards; Recalcular e gravar valores; Executar migração; Corrigir automaticamente.
+COMPETÊNCIA E CAIXA
 
-Esta etapa é exclusivamente de diagnóstico.`}
+Não obrigar: Faturamento = Recebido no período.
+Faturamento utiliza competência. Recebimento utiliza data do pagamento.
+Se os valores forem diferentes por esse motivo, manter a diferença e explicar claramente na interface.
+
+OPERAÇÃO ATÔMICA
+
+A correção deverá ocorrer integralmente.
+Se qualquer etapa falhar: Reverter a operação; Não deixar valores parciais; Não deixar módulos divergentes; Registrar o erro.
+
+ATUALIZAÇÃO
+
+Depois da correção: Invalidar cache; Recalcular pela fonte central; Atualizar todas as abas; Atualizar desktop; Atualizar mobile; Atualizar relatórios; Atualizar Assistente IA.
+
+TESTE DE JULHO
+
+Aplicar o período: 01/07/2026 até 31/07/2026.
+O mesmo conceito deverá mostrar exatamente o mesmo valor em todas as telas.
+
+TESTES DE REGRESSÃO
+
+Testar: Pagamento integral; Pagamento parcial; Estorno; Cancelamento; Desconto; Taxa; Filtros; Relatórios; Desktop; Mobile; Atualização em tempo real.
+
+RELATÓRIO FINAL
+
+Apresentar: Causa confirmada; Correção realizada; Arquivos, funções, views ou consultas alteradas; Registros corrigidos; Valores anteriores; Valores posteriores; Resultado de cada teste; Confirmação de que todas as telas utilizam a fonte central.`}
       </div>
       <div className="mt-4 text-[10px] text-muted-foreground/60 italic">
         Acesse o arquivo AUDITORIA_FINANCEIRA.md para o roteiro completo de diagnóstico.
