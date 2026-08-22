@@ -1,18 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 export const getFinancialKPIs = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ from: z.string(), to: z.string() }).parse(data))
   .handler(async ({ data: { from, to } }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     // 1. Fetch unified indicators from view
-    const { data: indicators, error: indError } = await supabase
+    const { data: indicators, error: indError } = await supabaseAdmin
       .from("vw_financeiro_indicadores")
       .select("*")
       .gte("data_referencia", from)
       .lte("data_referencia", to);
 
-    if (indError) throw indError;
+    if (indError) {
+      console.error("[getFinancialKPIs] Error fetching indicators:", indError);
+      throw indError;
+    }
 
     // 2. Aggregate
     let faturamentoCompetencia = 0;
@@ -42,7 +46,7 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
 
     // 3. Pending values (Accrual balance)
     // To maintain compatibility with Dashboard, we keep aReceber and vencido
-    const { data: pendingReceivables } = await supabase
+    const { data: pendingReceivables, error: pendingError } = await supabaseAdmin
       .from("pagamentos")
       .select("valor_total, valor_pago, vencimento")
       .neq("status", "pago")
@@ -50,6 +54,11 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       .is("arquivado_em", null)
       .or("is_teste.is.null,is_teste.eq.false")
       .or(`categoria_receita.is.null,and(categoria_receita.neq.aporte,categoria_receita.neq.ajuste)`);
+
+    if (pendingError) {
+      console.error("[getFinancialKPIs] Error fetching pending receivables:", pendingError);
+      throw pendingError;
+    }
 
     let aReceber = 0;
     let vencido = 0;
