@@ -264,18 +264,17 @@ export async function criarClienteIA(
 
 export async function criarPetIA(
   sb: SupabaseClient<Database>,
-  params: { cliente_id: string; nome: string; especie: string; raca?: string; porte?: string; observacoes?: string }
+  params: { cliente_id: string; nome: string; especie?: string; raca?: string; porte?: string; observacoes?: string }
 ) {
   const { data, error } = await sb
     .from("pets")
     .insert({
       cliente_id: params.cliente_id,
       nome: params.nome,
-      especie: params.especie,
       raca: params.raca,
       porte: params.porte,
       observacoes: params.observacoes
-    })
+    } as any)
     .select()
     .single();
 
