@@ -32,12 +32,12 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
 
-  if (filtros.data) {
+  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) {
     query = query.eq("data", filtros.data);
-  } else if (filtros.periodo_inicio && filtros.periodo_fim) {
+  } else if (filtros.periodo_inicio && filtros.periodo_fim && /^\d{4}-\d{2}-\d{2}$/.test(filtros.periodo_inicio)) {
     query = query.gte("data", filtros.periodo_inicio).lte("data", filtros.periodo_fim);
   } else {
-    // Default para hoje se nada for passado
+    // Default para hoje se nada for passado ou se o formato for inválido
     query = query.eq("data", hoje);
   }
 
