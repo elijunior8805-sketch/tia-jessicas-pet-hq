@@ -122,6 +122,11 @@ Exemplo de saída:
     });
 
     const parsed = JSON.parse(res.texto);
+    
+    // Se a intenção for 'registrar_pagamento' mas não houver valor, 
+    // e o contexto tiver 'analisar_comprovante', mantemos a intenção original
+    // da IA para processamento de comprovante se ela detectar dados de baixa.
+
     return {
       ...parsed,
       nivel_confianca: parsed.nivel_confianca || 0.9
