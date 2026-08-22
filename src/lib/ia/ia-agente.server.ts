@@ -45,26 +45,46 @@ export interface IAMessage {
 }
 
 export async function classificarComandoIA(texto: string, contexto?: { role: 'user' | 'assistant', content: string }[]) {
-  // Mock ou implementação real com Gemini via Lovable AI Gateway
-  // Por enquanto, vamos retornar uma estrutura baseada no texto
   const lowercaseText = texto.toLowerCase();
   
   let intencao: IAIntent["intencao"] = "comando_nao_reconhecido";
   let resumo = "";
+  let resumo_acao = "";
 
-  if (lowercaseText.includes("agenda") || lowercaseText.includes("horário")) {
+  if (lowercaseText.includes("agenda") || lowercaseText.includes("horário") || lowercaseText.includes("atendimentos")) {
     intencao = "consulta_agenda";
-    resumo = "Consultando a agenda para você.";
-  } else if (lowercaseText.includes("cliente")) {
+    resumo = "Estou verificando os agendamentos no sistema para você.";
+    resumo_acao = "Consultar agenda de hoje";
+  } else if (lowercaseText.includes("cliente") || lowercaseText.includes("tutor")) {
     intencao = "consulta_cliente";
-    resumo = "Buscando informações do cliente.";
+    resumo = "Localizando as informações do cliente solicitado.";
+    resumo_acao = "Buscar cliente";
+  } else if (lowercaseText.includes("pet") || lowercaseText.includes("cachorro") || lowercaseText.includes("gato")) {
+    intencao = "consulta_pet";
+    resumo = "Buscando a ficha do pet no banco de dados.";
+    resumo_acao = "Buscar pet";
+  } else if (lowercaseText.includes("pagou") || lowercaseText.includes("receber") || lowercaseText.includes("financeiro")) {
+    intencao = "consulta_financeira";
+    resumo = "Analisando o status financeiro e pagamentos pendentes.";
+    resumo_acao = "Consultar financeiro";
+  } else if (lowercaseText.includes("agendar") || lowercaseText.includes("marcar")) {
+    intencao = "criar_agendamento";
+    resumo = "Preparando para criar um novo agendamento. Preciso confirmar os detalhes.";
+    resumo_acao = "Criar novo agendamento";
+  } else if (lowercaseText.includes("cadastrar") && (lowercaseText.includes("pet") || lowercaseText.includes("cachorro"))) {
+    intencao = "cadastrar_pet";
+    resumo = "Iniciando o cadastro de um novo pet.";
+    resumo_acao = "Cadastrar pet";
+  } else {
+    resumo = "Entendi seu comando. Como deseja prosseguir com esta operação?";
   }
 
   return {
     intencao,
-    nivel_confianca: 0.9,
-    resposta_ia: resumo || "Entendido. Como posso ajudar mais?",
-    resumo_acao: resumo
+    nivel_confianca: 0.95,
+    resposta_ia: resumo,
+    resumo_acao: resumo_acao || null
   } as IAIntent;
 }
+
 
