@@ -154,12 +154,12 @@ function DashboardPage() {
   });
 
   const kpis = [
-    { label: "Faturamento",   value: metrics ? brl(metrics.faturamento) : "—", hint: "Serviços realizados",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
-    { label: "Recebido",      value: metrics ? brl(metrics.recebido)    : "—", hint: "Entradas no caixa",       icon: Coins,      tone: KPI_TONES.salvia    },
-    { label: "Despesas",      value: metrics ? brl(metrics.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
-    { label: "Lucro Real",    value: metrics ? brl(metrics.lucro)       : "—", hint: "Saldo de caixa",          icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Faturamento",   value: metrics ? brl(metrics.faturamento) : "—", hint: "Serviços realizados (Competência)",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Recebido",      value: metrics ? brl(metrics.recebido)    : "—", hint: "Entradas no caixa do período",       icon: Coins,      tone: KPI_TONES.salvia    },
+    { label: "Despesas",      value: metrics ? brl(metrics.despesas)    : "—", hint: "Saídas no período (Pagas)",       icon: Wallet,     tone: KPI_TONES.terracota },
+    { label: "Lucro Real",    value: metrics ? brl(metrics.lucro)       : "—", hint: "Resultado por competência",          icon: Sparkles,   tone: KPI_TONES.dourado   },
     { label: "Ticket Médio",  value: metrics ? brl(metrics.ticketMedio) : "—", hint: "Média por serviço",       icon: Receipt,    tone: KPI_TONES.ambar     },
-    { label: "Atendimentos",  value: metrics?.atendimentos ?? "—",           hint: "Total do período",        icon: PawPrint,   tone: KPI_TONES.petroleo  },
+    { label: "Saldo Período", value: metrics ? brl(metrics.saldoCaixa) : "—", hint: "Saldo de caixa real (Receb. - Desp.)", icon: Wallet, tone: KPI_TONES.petroleo },
   ];
 
   const hoje = new Date();
