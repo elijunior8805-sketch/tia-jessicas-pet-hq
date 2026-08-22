@@ -68,7 +68,7 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       faturamento,
       recebido,
       despesas,
-      lucro: faturamento + aportes - despesas,
+      lucro: recebido - despesas, // Lucro real baseado no caixa (dinheiro na mão)
       ticketMedio,
       atendimentos: atendimentosCount,
       aportes,
