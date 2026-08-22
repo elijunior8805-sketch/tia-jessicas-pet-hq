@@ -21,7 +21,7 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     let aportes = 0;
     let atendimentosCount = 0;
 
-    indicators?.forEach(row => {
+    indicators?.forEach((row: any) => {
       const val = Number(row.valor || 0);
       switch (row.tipo) {
         case 'receita_servico':
@@ -52,7 +52,7 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     let vencido = 0;
     const today = new Date().toISOString().split('T')[0];
 
-    pendingReceivables?.forEach(p => {
+    pendingReceivables?.forEach((p: any) => {
       const saldo = Number(p.valor_total || 0) - Number(p.valor_pago || 0);
       if (saldo > 0) {
         aReceber += saldo;
