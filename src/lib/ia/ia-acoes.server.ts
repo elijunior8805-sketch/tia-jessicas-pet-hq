@@ -11,6 +11,9 @@ export const ValidarAgendamentoSchema = z.object({
   servicos: z.array(z.string()),
 });
 
+type AgendamentoStatus = Database["public"]["Enums"]["agendamento_status"];
+type LevaTrazModalidade = Database["public"]["Enums"]["leva_traz_modalidade"];
+
 export async function validarDisponibilidadeReal(
   sb: SupabaseClient<Database>,
   params: z.infer<typeof ValidarAgendamentoSchema>
@@ -61,6 +64,8 @@ export async function criarAgendamentoIA(
     observacoes?: string;
   }
 ) {
+  const modalidade: LevaTrazModalidade = params.transporte ? "buscar_entregar" : "nao_utilizar";
+
   // Criar o agendamento
   const { data: agendamento, error: errA } = await sb
     .from("agendamentos")
@@ -70,10 +75,10 @@ export async function criarAgendamentoIA(
       data: params.data,
       hora: params.hora,
       profissional_id: params.profissional_id,
-      leva_traz: params.transporte || false,
+      leva_traz_modalidade: modalidade,
       taxa_leva_traz: params.taxa_transporte || 0,
       observacoes: params.observacoes,
-      status: "agendado" as any
+      status: "agendado" as AgendamentoStatus
     })
     .select()
     .single();
@@ -126,7 +131,7 @@ export async function cancelarAgendamentoIA(
   const { data, error } = await sb
     .from("agendamentos")
     .update({
-      status: "cancelado" as any,
+      status: "cancelado" as AgendamentoStatus,
       observacoes: motivo ? `Cancelado via IA: ${motivo}` : "Cancelado via IA"
     })
     .eq("id", agendamento_id)
