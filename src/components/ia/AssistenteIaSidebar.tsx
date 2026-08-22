@@ -32,7 +32,8 @@ import { classificarIntencao } from '@/lib/ia/ia-agente.functions';
 import { registrarAuditoriaIA } from '@/lib/ia/ia-auditoria.functions';
 import { 
   consultarAgendaIA, 
-  consultarClientesPetsIA, 
+  buscarClientesIA,
+  buscarPetsDoClienteIA,
   consultarFinanceiroIA, 
   consultarResumoOperacionalIA,
   analisarRiscoEvasaoIA
@@ -186,11 +187,11 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         if (uploadError) throw uploadError;
 
         // 3. Buscar pendências automáticas
-        const searchRes = await consultarFinanceiroIA({
+        const response = await consultarFinanceiroIA({
           data: { termo: res.pagador, apenas_pendentes: true }
         });
 
-        const searchResList = searchRes as any[];
+        const searchResList = (response.result || []) as any[];
         const pendenciaExata = searchResList?.find((p: any) => 
           p.valor_total && Math.abs((Number(p.valor_total) - Number(p.valor_pago || 0)) - res.valor) < 0.01
         );
@@ -263,7 +264,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       setSearchResults(null);
 
       if (intent.intencao === 'consulta_agenda') {
-        dadosReais = await consultarAgendaIA({
+        const response = await consultarAgendaIA({
           data: {
             data: intent.data || undefined,
             pet_nome: intent.pet_nome || undefined,
@@ -271,6 +272,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           }
         });
         
+        dadosReais = response.result || [];
         if (dadosReais && dadosReais.length > 0) {
           respostaFinal = `Encontrei **${dadosReais.length} agendamentos**. Aqui estão os principais:\n\n` + 
             dadosReais.slice(0, 3).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)}`).join('\n');
@@ -279,7 +281,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         }
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
-        const results = await consultarClientesPetsIA({ data: { termo } });
+        const response = await buscarClientesIA({ data: { termo } });
+        const results = { clientes: (response.result || []) as any[], pets: [] as any[] };
         setSearchResults(results);
         
         if (results.clientes.length > 0 || results.pets.length > 0) {
@@ -288,10 +291,11 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           respostaFinal = `Não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar um novo?`;
         }
       } else if (intent.intencao === 'consulta_financeira') {
-        dadosReais = await consultarFinanceiroIA({
+        const response = await consultarFinanceiroIA({
           data: { apenas_pendentes: true }
         });
         
+        dadosReais = response.result || [];
         if (dadosReais && dadosReais.length > 0) {
           const searchResList = dadosReais as any[];
           const total = searchResList.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
@@ -300,7 +304,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           respostaFinal = "Não encontrei pendências financeiras em aberto.";
         }
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
-        const resumo = await consultarResumoOperacionalIA();
+        const response = await consultarResumoOperacionalIA();
+        const resumo = response.result || {};
         respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n- **Agendamentos**: ${resumo.total_agenda} (${resumo.confirmados} confirmados)\n- **Leva e Traz**: ${resumo.leva_traz} viagens\n- **Financeiro Pendente**: R$ ${resumo.valor_pendente.toFixed(2)}\n- **Promessas para Hoje**: ${resumo.promessas_hoje}`;
       }
 
@@ -367,7 +372,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       if (!servicosParaCriar.length) throw new Error("Não identifiquei os serviços solicitados no cadastro.");
 
       // Re-validar disponibilidade no backend antes de gravar
-      const validacao = await validarAgendamentoIA({
+      const response = await validarAgendamentoIA({
         data: {
           data: intent.data!,
           hora: intent.horario!,
@@ -377,8 +382,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         }
       });
 
-      if (!validacao.disponivel) {
-        throw new Error(validacao.motivo || "Horário indisponível.");
+      if (!response.success || !response.result?.disponivel) {
+        throw new Error(response.warnings?.[0] || response.result?.motivo || "Horário indisponível.");
       }
 
       await executarCriacaoAgendamento({
