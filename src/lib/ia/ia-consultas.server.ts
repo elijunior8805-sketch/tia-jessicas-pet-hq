@@ -124,7 +124,10 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
 }
 
 export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>) {
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
   
   // 1. Agendamentos do dia
   const { data: agenda } = await sb
@@ -132,11 +135,13 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     .select("status, hora, leva_traz_modalidade, pets(nome)")
     .eq("data", hoje);
 
-  // 2. Pendências financeiras
+  // 2. Pendências financeiras (mesma definição oficial de "A Receber")
   const { data: pendencias } = await sb
     .from("pagamentos")
     .select("valor_total, valor_pago")
-    .eq("status", "pendente");
+    .not("status", "in", '("pago","cancelado")')
+    .is("arquivado_em", null)
+    .or("is_teste.is.null,is_teste.eq.false");
 
   // 3. Promessas vencendo
   const { data: promessas } = await sb
