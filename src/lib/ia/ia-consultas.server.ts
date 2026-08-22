@@ -1,6 +1,7 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { format, subDays } from "date-fns";
+import { createIAResponse } from "./ia-retorno.server";
 
 export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: { data?: string; pet_nome?: string; cliente_nome?: string; profissional?: string }) {
   let query = sb
@@ -29,35 +30,83 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     result = result.filter(a => a.clientes?.nome?.toLowerCase().includes(filtros.cliente_nome!.toLowerCase()));
   }
   if (filtros.profissional) {
-    // Se profissional_id for UUID, idealmente buscaríamos o nome, mas aqui filtramos pelo ID se for o caso
     result = result.filter(a => a.profissional_id?.toLowerCase().includes(filtros.profissional!.toLowerCase()));
   }
 
-  return result;
+  return createIAResponse({
+    action: 'consulta_agenda',
+    result: result
+  });
 }
 
-export async function buscarDadosClientesPets(sb: SupabaseClient<Database>, termo: string) {
-  const { data: clientes, error: errC } = await sb
+export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
+  const { data, error } = await sb
     .from("clientes")
-    .select(`*, pets(*)`)
+    .select(`*, pets(id, nome, raca)`)
     .or(`nome.ilike.%${termo}%, telefone.ilike.%${termo}%`)
     .limit(10);
 
-  if (errC) throw errC;
+  if (error) throw error;
 
-  const { data: pets, error: errP } = await sb
+  return createIAResponse({
+    action: 'buscar_clientes',
+    result: data
+  });
+}
+
+export async function buscarPetsDoClienteIA(sb: SupabaseClient<Database>, clienteId: string) {
+  const { data, error } = await sb
     .from("pets")
-    .select(`*, clientes(*)`)
-    .ilike("nome", `%${termo}%`)
-    .limit(10);
+    .select(`*`)
+    .eq("cliente_id", clienteId);
 
-  if (errP) throw errP;
+  if (error) throw error;
 
-  return { clientes, pets };
+  return createIAResponse({
+    action: 'buscar_pets_do_cliente',
+    result: data
+  });
+}
+
+export async function buscarServicosIA(sb: SupabaseClient<Database>, termo?: string) {
+  let query = sb.from("servicos").select("*").eq("ativo", true);
+  
+  if (termo) {
+    query = query.ilike("nome", `%${termo}%`);
+  }
+
+  const { data, error } = await query.limit(20);
+  if (error) throw error;
+
+  return createIAResponse({
+    action: 'buscar_servicos',
+    result: data
+  });
+}
+
+export async function listarAtendimentosIA(sb: SupabaseClient<Database>, filtros: { finalizado?: boolean; pet_id?: string; data?: string }) {
+  let query = sb
+    .from("atendimentos")
+    .select(`
+      *,
+      pets(nome),
+      clientes(nome)
+    `);
+
+  if (filtros.pet_id) query = query.eq("pet_id", filtros.pet_id);
+  if (filtros.finalizado !== undefined) query = query.eq("finalizado", filtros.finalizado);
+  if (filtros.data) query = query.gte("data_inicio", `${filtros.data}T00:00:00`).lte("data_inicio", `${filtros.data}T23:59:59`);
+
+  const { data, error } = await query.order("data_inicio", { ascending: false }).limit(20);
+  if (error) throw error;
+
+  return createIAResponse({
+    action: 'listar_atendimentos',
+    result: data
+  });
 }
 
 export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; apenas_pendentes?: boolean; data?: string; period?: "hoje" | "mes" | "30dias"; termo?: string }) {
-  // Se for uma busca por termo (ex: nome do pagador no comprovante)
   if (filtros.termo) {
     const { data, error } = await sb
       .from("pagamentos")
@@ -74,10 +123,13 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
       .ilike("descricao", `%${filtros.termo}%`)
       .limit(50);
     if (error) throw error;
-    return data;
+    
+    return createIAResponse({
+      action: 'consulta_financeira',
+      result: data
+    });
   }
 
-  // Para consultas de KPIs financeiros globais
   if (!filtros.cliente_id && !filtros.data && !filtros.apenas_pendentes && !filtros.termo) {
     const now = new Date();
     let from = format(subDays(now, 29), "yyyy-MM-dd");
@@ -91,16 +143,18 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
       to = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
     }
 
-    // getFinancialKPIs é um server function, mas ia-consultas.server.ts já roda no servidor.
-    // Podemos chamar o handler diretamente se necessário ou simular a chamada.
-    // Como estamos no servidor, chamamos a lógica de consulta centralizada.
-    const { data: indicators } = await sb
+    const { data: indicators, error } = await sb
       .from("vw_financeiro_indicadores")
       .select("*")
       .gte("data_referencia", from)
       .lte("data_referencia", to);
 
-    return indicators;
+    if (error) throw error;
+
+    return createIAResponse({
+      action: 'consultar_resumo_financeiro',
+      result: indicators
+    });
   }
 
   let query = sb
@@ -132,7 +186,10 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
   const { data, error } = await query.order("vencimento", { ascending: true }).limit(50);
   if (error) throw error;
 
-  return data;
+  return createIAResponse({
+    action: 'consultar_pendencias',
+    result: data
+  });
 }
 
 export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params: { servico?: string; data: string; profissional?: string }) {
@@ -145,19 +202,16 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
   if (error) throw error;
 
   const slots = [];
-  let current = 8 * 60; // 08:00
-  const end = 18 * 60; // 18:00
-  const interval = 30; // 30 min slots
+  let current = 8 * 60; 
+  const end = 18 * 60; 
+  const interval = 30; 
 
   while (current < end) {
     const hour = Math.floor(current / 60).toString().padStart(2, '0');
     const min = (current % 60).toString().padStart(2, '0');
     const timeStr = `${hour}:${min}:00`;
     
-    const isOccupied = (agendamentos || []).some(a => {
-      const start = a.hora;
-      return start === timeStr;
-    });
+    const isOccupied = (agendamentos || []).some(a => a.hora === timeStr);
 
     if (!isOccupied) {
       slots.push(timeStr.slice(0, 5));
@@ -165,7 +219,10 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
     current += interval;
   }
 
-  return slots;
+  return createIAResponse({
+    action: 'consultar_disponibilidade',
+    result: slots
+  });
 }
 
 export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>) {
@@ -174,20 +231,17 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
   
-  // 1. Agendamentos do dia
   const { data: agenda } = await sb
     .from("agendamentos")
     .select("status, hora, leva_traz_modalidade, pets(nome)")
     .eq("data", hoje);
 
-  // 2. Pendências financeiras (USANDO FONTE CENTRAL)
   const { data: indicators } = await sb
     .from("vw_financeiro_indicadores")
     .select("*")
     .gte("data_referencia", hoje)
     .lte("data_referencia", hoje);
     
-  // A Receber total (não apenas de hoje)
   const { data: pendencias } = await sb
     .from("pagamentos")
     .select("valor_total, valor_pago")
@@ -196,7 +250,6 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     .or("is_teste.is.null,is_teste.eq.false")
     .or(`categoria_receita.is.null,and(categoria_receita.neq.aporte,categoria_receita.neq.ajuste)`);
 
-  // 3. Promessas vencendo
   const { data: promessas } = await sb
     .from("cobranca_promessas")
     .select("id")
@@ -213,29 +266,46 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
   const faturamentoHoje = indicators?.filter(i => i.tipo === 'receita_servico').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
   const recebidoHoje = indicators?.filter(i => i.tipo === 'receita_recebida').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
 
-  return {
-    data: hoje,
-    total_agenda: totalAgenda,
-    confirmados,
-    cancelados,
-    leva_traz: levaTraz,
-    valor_pendente: valorPendente,
-    faturamento_hoje: faturamentoHoje,
-    recebido_hoje: recebidoHoje,
-    promessas_hoje: promessas?.length || 0,
-    alertas: []
-  };
+  return createIAResponse({
+    action: 'consultar_resumo_operacional',
+    result: {
+      data: hoje,
+      total_agenda: totalAgenda,
+      confirmados,
+      cancelados,
+      leva_traz: levaTraz,
+      valor_pendente: valorPendente,
+      faturamento_hoje: faturamentoHoje,
+      recebido_hoje: recebidoHoje,
+      promessas_hoje: promessas?.length || 0,
+    }
+  });
+}
+
+export async function consultarHistoricoPetIA(sb: SupabaseClient<Database>, petId: string) {
+  const { data: atendimentos, error: errA } = await sb
+    .from("atendimentos")
+    .select("*, agendamento_servicos(nome, valor_unit)")
+    .eq("pet_id", petId)
+    .order("data_inicio", { ascending: false })
+    .limit(10);
+
+  if (errA) throw errA;
+
+  return createIAResponse({
+    action: 'consultar_historico_pet',
+    result: atendimentos
+  });
 }
 
 export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
-  // Busca últimos atendimentos de todos os pets
   const { data: atendimentos } = await sb
     .from("atendimentos")
     .select("pet_id, data_inicio, pets(nome, clientes(nome))")
     .eq("finalizado", true)
     .order("data_inicio", { ascending: false });
 
-  if (!atendimentos || atendimentos.length === 0) return [];
+  if (!atendimentos || atendimentos.length === 0) return createIAResponse({ action: 'analisar_risco_evasao', result: [] });
 
   const petStats: Record<string, { datas: Date[], nome: string, tutor: string }> = {};
 
@@ -255,9 +325,8 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
 
   for (const petId in petStats) {
     const stats = petStats[petId];
-    if (stats.datas.length < 2) continue; // Precisa de pelo menos 2 para calcular média
+    if (stats.datas.length < 2) continue; 
 
-    // Calcula intervalos em dias
     const intervalos = [];
     for (let i = 0; i < stats.datas.length - 1; i++) {
       const diff = Math.abs(stats.datas[i].getTime() - stats.datas[i+1].getTime());
@@ -267,7 +336,6 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
     const mediaIntervalo = intervalos.reduce((a, b) => a + b, 0) / intervalos.length;
     const diasDesdeUltimo = Math.ceil(Math.abs(hoje.getTime() - stats.datas[0].getTime()) / (1000 * 60 * 60 * 24));
 
-    // Risco se estiver 50% acima da média
     if (diasDesdeUltimo > mediaIntervalo * 1.5) {
       riscos.push({
         pet_id: petId,
@@ -280,5 +348,8 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
     }
   }
 
-  return riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10);
+  return createIAResponse({
+    action: 'analisar_risco_evasao',
+    result: riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10)
+  });
 }
