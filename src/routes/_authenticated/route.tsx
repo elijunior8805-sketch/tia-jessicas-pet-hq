@@ -12,6 +12,8 @@ import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 import { NotificationBell } from "@/components/notification-bell";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { SyncStatusBadge } from "@/components/sync-status";
+import { AssistenteIaBotao } from "@/components/ia/AssistenteIaBotao";
+
 
 
 
@@ -73,7 +75,9 @@ function AuthenticatedLayout() {
             <Outlet />
           </main>
           <MobileNav />
+          <AssistenteIaBotao />
         </SidebarInset>
+
       </div>
     </SidebarProvider>
   );
