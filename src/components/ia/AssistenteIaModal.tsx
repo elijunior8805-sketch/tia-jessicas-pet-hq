@@ -21,7 +21,10 @@ import {
   AlertTriangle,
   TrendingDown,
   Activity,
-  Zap
+  Zap,
+  Sparkles,
+  ChevronRight,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -55,6 +58,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
+
 
 
 interface AssistenteIaModalProps {
