@@ -14,6 +14,7 @@ export const IAIntentSchema = z.object({
     "cadastrar_pet",
     "registrar_pagamento",
     "analisar_comprovante",
+    "cancelar_pagamento",
     "solicitar_resumo_operacional",
     "solicitar_analise_reativacao",
     "disponibilidade",
@@ -55,7 +56,7 @@ export async function classificarComandoIA(texto: string, contexto?: { role: 'us
   
   const systemPrompt = `Você é a Assistente Operacional IA do Spa de Pet Tia Jéssica.
 Sua função agora é INTERPRETAR comandos, CONSULTAR dados e PREPARAR ações.
-Estamos na Fase 3: Agenda e Cadastros Inteligentes.
+Estamos na Fase 4: Financeiro e Comprovantes pela Assistente IA.
 
 DATA ATUAL: ${dataAtual}
 
@@ -70,6 +71,9 @@ INTENÇÕES POSSÍVEIS:
 - cancelar: Quando o usuário quer desmarcar um serviço.
 - cadastrar_cliente: Iniciar fluxo de novo tutor.
 - cadastrar_pet: Iniciar fluxo de novo animal.
+- registrar_pagamento: Quando o usuário quer dar baixa em uma dívida ("baixe o pagamento do Eli").
+- analisar_comprovante: Quando o usuário envia uma imagem de comprovante.
+- cancelar_pagamento: Estornar ou cancelar uma baixa financeira.
 - comando_nao_reconhecido: Quando não entender.
 
 REGRAS CRÍTICAS DE AGENDAMENTO:

@@ -1,6 +1,7 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { format } from "date-fns";
 
 export const ValidarAgendamentoSchema = z.object({
   data: z.string(),
@@ -135,6 +136,72 @@ export async function cancelarAgendamentoIA(
       observacoes: motivo ? `Cancelado via IA: ${motivo}` : "Cancelado via IA"
     })
     .eq("id", agendamento_id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function registrarPagamentoIA(
+  sb: SupabaseClient<Database>,
+  params: {
+    pagamento_id: string;
+    valor_pago: number;
+    forma: Database["public"]["Enums"]["pagamento_forma"];
+    data_pagamento?: string;
+    observacoes?: string;
+  }
+) {
+  // 1. Buscar o pagamento atual
+  const { data: pagamento, error: errP } = await sb
+    .from("pagamentos")
+    .select("*")
+    .eq("id", params.pagamento_id)
+    .single();
+
+  if (errP) throw errP;
+  if (!pagamento) throw new Error("Pagamento não localizado.");
+  if (pagamento.status === "pago") throw new Error("Este pagamento já foi baixado anteriormente.");
+
+  const novoValorPago = (pagamento.valor_pago || 0) + params.valor_pago;
+  const status: Database["public"]["Enums"]["pagamento_status"] = 
+    novoValorPago >= pagamento.valor_total ? "pago" : "pendente";
+
+  // 2. Atualizar o pagamento
+  const { data, error } = await sb
+    .from("pagamentos")
+    .update({
+      valor_pago: novoValorPago,
+      status,
+      forma: params.forma,
+      data_pagamento: params.data_pagamento || format(new Date(), 'yyyy-MM-dd'),
+      observacoes: params.observacoes ? `${pagamento.observacoes || ''}\nIA: ${params.observacoes}`.trim() : pagamento.observacoes,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", params.pagamento_id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
+
+export async function cancelarPagamentoIA(
+  sb: SupabaseClient<Database>,
+  pagamento_id: string,
+  motivo: string
+) {
+  const { data, error } = await sb
+    .from("pagamentos")
+    .update({
+      status: "pendente" as Database["public"]["Enums"]["pagamento_status"],
+      valor_pago: 0,
+      observacoes: `Estornado via IA: ${motivo}`,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", pagamento_id)
     .select()
     .single();
 
