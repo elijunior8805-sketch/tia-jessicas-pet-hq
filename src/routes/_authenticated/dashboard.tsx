@@ -500,13 +500,7 @@ const AuditNote = () => (
         CORREÇÃO FINANCEIRA CONTROLADA — SINCRONIZAÇÃO DASHBOARD
       </div>
       <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
-        {`Este painel agora consome a mesma fonte de dados unificada do Financeiro.
-
-PERÍODO DE TESTE
-01/07/2026 até 31/07/2026.
-
-DADOS UNIFICADOS
-Os valores de Faturamento, Recebido e Lucro são obtidos via backend a partir da view 'public.vw_financeiro_indicadores', garantindo que não existam divergências entre as telas do sistema.`}
+        {DASHBOARD_AUDIT_CONTENT}
       </div>
     </div>
   </div>
