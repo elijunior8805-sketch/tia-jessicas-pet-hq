@@ -1,0 +1,1 @@
+GRANT SELECT ON public.vw_financeiro_indicadores TO authenticated;
