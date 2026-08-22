@@ -1042,49 +1042,64 @@ function FinanceiroPage() {
 
   const periodoLabel = `${format(parseISO(inicio), "dd MMM", { locale: ptBR })} — ${format(parseISO(fim), "dd MMM yyyy", { locale: ptBR })}`;
 
+  const getExportData = () => {
+    const entradas = receitasFiltradas.map((p) => ({
+      data: p.data_pagamento,
+      vencimento: p.vencimento,
+      cliente: p.cliente?.nome || p.descricao || "—",
+      descricao:
+        p.descricao ||
+        p.observacoes ||
+        (p.atendimento?.pet?.nome ? `Atendimento · ${p.atendimento.pet.nome}` : "Recebimento"),
+      forma: FORMA_META[p.forma]?.label ?? p.forma,
+      status: p.status,
+      valor: valorTotalReceita(p),
+      valor_pago: Number(p.valor_pago || 0),
+    }));
+    const saidas = despesasFiltradas.map((p) => ({
+      data: p.data_pagamento,
+      vencimento: p.vencimento,
+      fornecedor: p.compra?.fornecedor?.nome || "—",
+      descricao:
+        p.compra?.descricao ||
+        p.compra?.numero_documento ||
+        `Parcela ${p.numero}/${p.total_parcelas}`,
+      categoria: p.compra?.categoria?.nome ?? null,
+      forma: p.forma_pagamento ? (FORMA_META[p.forma_pagamento]?.label ?? p.forma_pagamento) : "—",
+      status: p.status,
+      valor: Number(p.valor || 0),
+      valor_pago: Number(p.valor_pago || 0),
+    }));
+
+    return {
+      empresa: empresaInfo,
+      periodo: { de: inicio, ate: fim },
+      filtrosAtivos: filtrosAtivos.map((f) => f.label),
+      kpis,
+      porForma: porForma.map((r) => ({ label: r.label, valor: r.valor, qtd: r.qtd, pct: r.pct })),
+      entradas,
+      saidas,
+    };
+  };
+
   const exportarPDF = () => {
     try {
-      const entradas = receitasFiltradas.map((p) => ({
-        data: p.data_pagamento,
-        vencimento: p.vencimento,
-        cliente: p.cliente?.nome || p.descricao || "—",
-        descricao:
-          p.descricao ||
-          p.observacoes ||
-          (p.atendimento?.pet?.nome ? `Atendimento · ${p.atendimento.pet.nome}` : "Recebimento"),
-        forma: FORMA_META[p.forma]?.label ?? p.forma,
-        status: p.status,
-        valor: valorTotalReceita(p),
-        valor_pago: Number(p.valor_pago || 0),
-      }));
-      const saidas = despesasFiltradas.map((p) => ({
-        data: p.data_pagamento,
-        vencimento: p.vencimento,
-        fornecedor: p.compra?.fornecedor?.nome || "—",
-        descricao:
-          p.compra?.descricao ||
-          p.compra?.numero_documento ||
-          `Parcela ${p.numero}/${p.total_parcelas}`,
-        categoria: p.compra?.categoria?.nome ?? null,
-        forma: p.forma_pagamento ? (FORMA_META[p.forma_pagamento]?.label ?? p.forma_pagamento) : "—",
-        status: p.status,
-        valor: Number(p.valor || 0),
-        valor_pago: Number(p.valor_pago || 0),
-      }));
-      generateFinanceiroPDF({
-        empresa: empresaInfo,
-        periodo: { de: inicio, ate: fim },
-        filtrosAtivos: filtrosAtivos.map((f) => f.label),
-        kpis: kpis,
-        porForma: porForma.map((r) => ({ label: r.label, valor: r.valor, qtd: r.qtd, pct: r.pct })),
-        entradas,
-        saidas,
-      });
+      generateFinanceiroPDF(getExportData());
       toast.success("Relatório PDF gerado");
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao gerar PDF");
     }
   };
+
+  const exportarCSV = () => {
+    try {
+      generateFinanceiroCSV(getExportData());
+      toast.success("Arquivo CSV exportado");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao gerar CSV");
+    }
+  };
+
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -1105,11 +1120,17 @@ function FinanceiroPage() {
             <p className="text-sm text-muted-foreground">{periodoLabel}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="outline" onClick={exportarPDF} className="gap-2 rounded-xl">
-              <Download className="h-4 w-4" /> <span className="hidden sm:inline">Exportar PDF</span>
-            </Button>
+            <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+              <Button variant="ghost" size="sm" onClick={exportarPDF} className="h-8 gap-2 rounded-lg px-3">
+                <FileText className="h-4 w-4" /> <span className="hidden sm:inline">PDF</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={exportarCSV} className="h-8 gap-2 rounded-lg px-3">
+                <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">CSV</span>
+              </Button>
+            </div>
             <LancamentoManualDialog onCreated={refreshAll} />
           </div>
+
         </header>
 
 
