@@ -11,9 +11,9 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     data_pagamento: z.string().optional(),
     observacoes: z.string().optional()
   }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { supabase } = await import("@/integrations/supabase/client.server");
-    const sb = supabase();
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin;
     
     return registrarPagamentoIA(sb, {
       pagamento_id: data.pagamento_id,
@@ -29,9 +29,9 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
     pagamento_id: z.string(),
     motivo: z.string()
   }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { supabase } = await import("@/integrations/supabase/client.server");
-    const sb = supabase();
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin;
     return cancelarPagamentoIA(sb, data.pagamento_id, data.motivo);
   });
 
@@ -39,8 +39,8 @@ export const processarComprovanteIA = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     imagemBase64: z.string()
   }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { supabase } = await import("@/integrations/supabase/client.server");
-    const sb = supabase();
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin;
     return analisarComprovanteIA(sb, data.imagemBase64);
   });
