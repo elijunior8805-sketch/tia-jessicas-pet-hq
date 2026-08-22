@@ -47,11 +47,17 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       .select("valor_total, valor_pago, vencimento")
       .neq("status", "pago")
       .neq("status", "cancelado")
+      .is("arquivado_em", null)
+      .or("is_teste.is.null,is_teste.eq.false")
       .or(`categoria_receita.is.null,and(categoria_receita.neq.aporte,categoria_receita.neq.ajuste)`);
 
     let aReceber = 0;
     let vencido = 0;
-    const today = new Date().toISOString().split('T')[0];
+    // Data corrente no fuso oficial da operação (America/Sao_Paulo)
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
 
     pendingReceivables?.forEach((p: any) => {
       const saldo = Number(p.valor_total || 0) - Number(p.valor_pago || 0);

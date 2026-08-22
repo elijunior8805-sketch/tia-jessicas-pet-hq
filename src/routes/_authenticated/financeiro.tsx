@@ -590,7 +590,7 @@ function LancamentoManualDialog({ onCreated }: { onCreated: () => void }) {
 
 function FinanceiroPage() {
   const qc = useQueryClient();
-  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia", "fin-pag-ant"]);
+  useRealtimeFinanceiro(["fin-resumo", "fin-pag", "fin-parc", "fin-fat-competencia", "fin-pag-ant", "fin-unified-metrics", "dashboard-metrics-v3"]);
 
   const hoje = new Date();
   const hojeStr = format(hoje, "yyyy-MM-dd");
