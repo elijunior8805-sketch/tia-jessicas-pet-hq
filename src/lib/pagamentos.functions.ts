@@ -44,15 +44,9 @@ export type PagamentosResumo = {
 function valorTotalReceita(row: any) {
   const atendimento = row.atendimentos;
 
-  // Mantém a Central de Pagamentos em Aberto com a mesma regra do Financeiro:
-  // atendimento finalizado usa valor realizado + taxa de Leva e Traz - desconto.
+  // Usa a regra centralizada de totais de atendimento
   if (atendimento?.finalizado === true && Number(atendimento?.valor_executado ?? 0) > 0) {
-    return Math.max(
-      0,
-      Number(atendimento.valor_executado ?? 0) +
-        Number(atendimento.taxa_leva_traz ?? 0) -
-        Number(atendimento.desconto ?? 0),
-    );
+    return calcTotalExecutado(atendimento);
   }
 
   return Number(row.valor_total ?? 0);
