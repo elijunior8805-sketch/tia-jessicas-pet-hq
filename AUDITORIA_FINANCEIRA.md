@@ -1,39 +1,305 @@
-Não entendi. A gente tava falando sobre auditoria financeira que não tava batendo, eu te mandei os prints. Cê tá me respondendo sobre melhoria avançada dos cards múltiplos. O que eu te solicitei foi que eu fiz o mesmo, o mesmo histórico de período do dia 01/07 a 31/07 e a aba financeiro e a aba painel inicial mostram valores diferentes. Então, a gente precisa resolver isso
+AUDITORIA FINANCEIRA FORENSE — NÃO ALTERAR DADOS
 
 PROJETO
 
 Spa de Pet Tia Jéssica.
 
-NÍVEL DE PRIORIDADE
+PERÍODO ANALISADO
 
-Crítico.
+01/07/2026 até 31/07/2026, considerando o fuso horário oficial do sistema.
 
-OBJETIVO PRINCIPAL
+PROBLEMA
 
-Uma única fonte financeira de verdade. Divergências futuras são detectadas automaticamente.
+Com o mesmo período selecionado:
 
-RESULTADO OBRIGATÓRIO
+DASHBOARD
 
-1. Dashboard = Financeiro (Centavo por centavo).
-2. Auditoria = Relatório (Batimento 100%).
+Faturamento: R$ 607,00;
 
-MAPA COMPLETO DA ORIGEM DOS VALORES
+Despesas: R$ 90,00;
 
-Cada atendimento possui um valor financeiro rastreável. A chave primária é o agendamento_id.
+Lucro: R$ 517,00;
 
-DICIONÁRIO FINANCEIRO OFICIAL
+Ticket médio: R$ 67,44;
 
-VALOR BRUTO: Soma de todos os serviços.
-ACRÉSCIMOS: Taxas extras (Leva e Traz, Adicionais).
-DEDUÇÕES: Descontos manuais ou cupons.
-TICKET MÉDIO FATURADO: (Bruto + Acréscimos) - Deduções.
-VALOR RECUPERADO: Entradas de dívidas antigas.
-VALOR ESTORNADO: Devoluções de pagamentos.
-SALDO BANCÁRIO: Entradas reais - Saídas reais.
+Atendimentos: 9;
 
-REGRAS DE SEGURANÇA
+Aportes: R$ 0,00.
 
-1. Não apagar registros financeiros. Usar "Lixeira" com auditoria.
-2. Não zerar saldos sem justificativa registrada.
-3. Não inventar datas. Usar a data real da operação financeira.
-4. Mapa de linhagem financeira obrigatório em todas as consultas.
+FINANCEIRO
+
+Receita bruta: R$ 1.682,00;
+
+Total recebido: R$ 707,00;
+
+Despesas: R$ 90,00;
+
+Lucro estimado: R$ 1.592,00;
+
+Saldo do período: R$ 617,00;
+
+A receber: R$ 730,00;
+
+Vencidos: R$ 730,00;
+
+Ticket médio: R$ 67,44;
+
+Pendências: 7.
+
+OBJETIVO DESTA ETAPA
+
+Identificar exatamente a origem das divergências sem modificar dados, fórmulas, consultas, componentes, tabelas ou registros.
+
+PROIBIDO NESTA ETAPA
+
+Alterar valores;
+
+Corrigir status;
+
+Excluir duplicidades;
+
+Modificar consultas;
+
+Criar tabelas;
+
+Criar views;
+
+Modificar o frontend;
+
+Alterar os cards;
+
+Recalcular e gravar valores;
+
+Executar migração;
+
+Corrigir automaticamente.
+
+Esta etapa é exclusivamente de diagnóstico.
+
+MAPEAR A ORIGEM DOS INDICADORES
+
+Para cada indicador das duas telas, apresentar:
+
+Componente ou card;
+
+Consulta utilizada;
+
+Tabela ou view;
+
+Campos;
+
+Relacionamentos;
+
+Fórmula;
+
+Data utilizada;
+
+Status incluídos;
+
+Filtros;
+
+Tratamento de cancelamentos;
+
+Tratamento de exclusão lógica;
+
+Tratamento de pagamentos e estornos.
+
+EXPLICAR OS R$ 607,00
+
+Listar os nove atendimentos que formam os R$ 607,00:
+
+ID;
+
+Data;
+
+Cliente;
+
+Pet;
+
+Serviços;
+
+Valor bruto;
+
+Desconto;
+
+Taxa;
+
+Valor líquido;
+
+Status;
+
+Pagamentos vinculados.
+
+Confirmar matematicamente:
+
+Soma dos atendimentos;
+
+Quantidade;
+
+Ticket médio.
+
+EXPLICAR OS R$ 1.682,00
+
+Listar cada registro que compõe os R$ 1.682,00:
+
+ID;
+
+Tabela;
+
+Tipo;
+
+Data usada pelo filtro;
+
+Cliente;
+
+Atendimento;
+
+Valor;
+
+Status;
+
+Motivo de inclusão.
+
+EXPLICAR OS R$ 1.075,00 DE DIFERENÇA
+
+Comparar as duas listas e identificar exatamente os registros presentes nos R$ 1.682,00, mas ausentes nos R$ 607,00.
+
+Classificar cada registro:
+
+Atendimento realizado;
+
+Agendamento não realizado;
+
+Futuro;
+
+Cancelado;
+
+Duplicado;
+
+Registro de teste;
+
+Pagamento contabilizado como faturamento;
+
+Outro período;
+
+Excluído logicamente;
+
+Sem vínculo;
+
+Necessita validação humana.
+
+A soma desses registros deverá explicar exatamente R$ 1.075,00.
+
+EXPLICAR OS R$ 707,00 RECEBIDOS
+
+Listar todos os pagamentos:
+
+ID;
+
+Cliente;
+
+Atendimento;
+
+Competência;
+
+Data do pagamento;
+
+Valor;
+
+Forma;
+
+Status;
+
+Estorno;
+
+Comprovante.
+
+Separar:
+
+Pagamentos de atendimentos de julho;
+
+Pagamentos recebidos em julho referentes a outras competências.
+
+EXPLICAR OS R$ 730,00 PENDENTES
+
+Listar as sete pendências:
+
+ID;
+
+Cliente;
+
+Atendimento;
+
+Valor líquido;
+
+Valor recebido;
+
+Saldo;
+
+Vencimento;
+
+Status.
+
+Confirmar:
+
+Soma dos saldos;
+
+Se todas estão realmente vencidas;
+
+Se alguma está duplicada;
+
+Se pertencem à competência de julho ou ao total geral da carteira.
+
+VERIFICAR A DATA DO FILTRO
+
+Confirmar se cada tela utiliza:
+
+Data do atendimento;
+
+Data de competência;
+
+Data de criação;
+
+Data de vencimento;
+
+Data de pagamento.
+
+Informar se o filtro termina em:
+
+31/07/2026 23:59:59 no fuso do sistema;
+
+ou se existe erro de limite ou fuso horário.
+
+APRESENTAR A CAUSA
+
+Ao concluir, informar:
+
+Qual fonte o Dashboard utiliza;
+
+Qual fonte o Financeiro utiliza;
+
+Qual regra gera os R$ 607,00;
+
+Qual regra gera os R$ 1.682,00;
+
+Qual regra está incorreta;
+
+Quais registros são afetados;
+
+Qual é a correção mínima recomendada;
+
+Quais módulos serão impactados.
+
+RELATÓRIO OBRIGATÓRIO
+
+Apresentar:
+
+Indicador Dashboard Financeiro Fonte Dashboard Fonte Financeiro Causa da diferença Valor correto proposto
+
+PONTO DE PARADA OBRIGATÓRIO
+
+Depois de apresentar o relatório, interromper a execução.
+
+Não aplicar nenhuma correção.
+
+Aguardar autorização expressa para modificar o banco, as consultas ou os componentes.
