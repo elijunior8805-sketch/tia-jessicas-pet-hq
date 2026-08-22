@@ -861,68 +861,38 @@ function FinanceiroPage() {
   
 
   const kpis = useMemo(() => {
-    // Considera recebidos = data_pagamento no período E status pago/parcial (valor_pago real)
-    const recebidosRows = receitasFiltradas.filter(
-      (p) =>
-        p.data_pagamento &&
-        p.data_pagamento >= inicio &&
-        p.data_pagamento <= fim &&
-        p.status !== "cancelado",
-    );
-    const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    // 1. Recebido no caixa (pagamentos com data_pagamento no período)
+    // Usamos o unifiedMetrics para garantir sincronia com Dashboard
+    const totalRecebido = unifiedMetrics?.recebido ?? 0;
 
-    // Receita bruta por competência (mesma regra do Dashboard)
-    const receitaBruta = Number(faturamentoCompetencia);
+    // 2. Faturamento por competência (sincronizado)
+    const receitaBruta = unifiedMetrics?.faturamento ?? 0;
 
-    // Ticket Médio: total das receitas de serviços recebidas no período
-    // dividido pela quantidade de atendimentos únicos com pagamentos nesse período.
-    const receitasServicoPeriodo = pagamentos.filter(
-      (p) =>
-        (p.categoria_receita === "servico" || p.atendimento_id) &&
-        p.data_pagamento &&
-        p.data_pagamento >= inicio &&
-        p.data_pagamento <= fim &&
-        p.status !== "cancelado",
-    );
-    const valorTotalServicos = receitasServicoPeriodo.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
-    const atendimentosUnicosSet = new Set(receitasServicoPeriodo.map((p) => p.atendimento_id).filter(Boolean));
-    const ticketMedio = atendimentosUnicosSet.size > 0 ? valorTotalServicos / atendimentosUnicosSet.size : 0;
+    // 3. Ticket Médio (sincronizado)
+    const ticketMedio = unifiedMetrics?.ticketMedio ?? 0;
 
-    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste'
-    const aportesAjustes = pagamentos
-      .filter(
-        (p) =>
-          p.data_pagamento &&
-          p.data_pagamento >= inicio &&
-          p.data_pagamento <= fim &&
-          p.status !== "cancelado" &&
-          (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste"),
-      )
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    // 4. Aportes / Ajustes (sincronizado)
+    const aportesAjustes = unifiedMetrics?.aportes ?? 0;
 
-    // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
-    const emAberto = receitasFiltradas.filter((p) => {
+    // 5. A receber e Vencidos (sincronizados)
+    const totalAReceber = unifiedMetrics?.aReceber ?? 0;
+    const totalVencidos = unifiedMetrics?.vencido ?? 0;
+    
+    // 6. Pendentes (contagem filtrada localmente para a lista)
+    const emAbertoLocal = receitasFiltradas.filter((p) => {
       if (p.status === "pago" || p.status === "cancelado") return false;
       if (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste") return false;
       const saldo = saldoReceita(p);
       return saldo > 0.005;
     });
-    
-    // Total a receber e Vencidos baseados no saldo real
-    const totalAReceber = emAberto.reduce((s, p) => s + saldoReceita(p), 0);
-    const totalVencidos = emAberto
-      .filter((p) => p.vencimento && p.vencimento < hojeStr)
-      .reduce((s, p) => s + saldoReceita(p), 0);
-    const qtdPendentes = emAberto.length;
+    const qtdPendentes = emAbertoLocal.length;
 
-    // Despesas pagas no período
-    const despesasPagas = despesasFiltradas
-      .filter((p) => p.data_pagamento && p.data_pagamento >= inicio && p.data_pagamento <= fim && p.status !== "cancelado")
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    // 7. Despesas pagas no período (sincronizado)
+    const despesasPagas = unifiedMetrics?.despesas ?? 0;
 
-    // Lucro estimado: receita competência - despesas pagas
-    const lucroEstimado = receitaBruta - despesasPagas;
-    const saldoPeriodo = totalRecebido - despesasPagas;
+    // 8. Lucro e Saldo (sincronizados)
+    const lucroEstimado = unifiedMetrics?.lucro ?? 0;
+    const saldoPeriodo = unifiedMetrics?.saldoCaixa ?? 0;
 
     return {
       receitaBruta,
@@ -936,7 +906,7 @@ function FinanceiroPage() {
       qtdPendentes,
       aportesAjustes,
     };
-  }, [receitasFiltradas, despesasFiltradas, pagamentos, faturamentoCompetencia, inicio, fim, hojeStr]);
+  }, [receitasFiltradas, unifiedMetrics]);
 
   // Recebimentos por forma (do período atual)
   const porForma = useMemo(() => {
