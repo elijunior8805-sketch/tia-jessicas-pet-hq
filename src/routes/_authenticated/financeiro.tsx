@@ -86,7 +86,7 @@ function FinanceiroPage() {
     staleTime: 30000,
   });
 
-  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const brl = (v: number) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const formatDate = (dateStr: string) => {
     try {
