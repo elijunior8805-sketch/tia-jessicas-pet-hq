@@ -13,5 +13,5 @@ export const classificarIntencao = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // Importação dinâmica para evitar que o código de servidor vaze para o cliente
     const { classificarComandoIA } = await import("./ia-agente.server");
-    return classificarComandoIA(data.texto, data.contexto);
+    return classificarComandoIA(data.texto, data.contexto, context.supabase);
   });
