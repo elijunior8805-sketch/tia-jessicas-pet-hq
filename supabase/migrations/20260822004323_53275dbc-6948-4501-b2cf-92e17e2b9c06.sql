@@ -1,0 +1,1 @@
+ALTER FUNCTION public.clean_orphaned_cobrancas() SET search_path = public;
