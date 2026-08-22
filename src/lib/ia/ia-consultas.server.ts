@@ -41,8 +41,9 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
   }
 
   if (filtros.status) {
-    query = query.eq("status", filtros.status);
+    query = query.eq("status", filtros.status as any);
   }
+
 
   if (filtros.leva_e_traz !== undefined) {
     if (filtros.leva_e_traz) {
