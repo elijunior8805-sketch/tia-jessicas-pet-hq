@@ -35,7 +35,7 @@ function greeting(d = new Date()) {
   return "Boa noite";
 }
 
-const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brl = (v: number) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function valorRealExecutado(atendimento: any) {
   // O painel precisa bater com o total exibido nos atendimentos concluídos:
