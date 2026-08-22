@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { format } from "date-fns";
+import { calcTotalExecutado } from "./atendimento-totais";
 
 const StatusEnum = z.enum(["pendente", "parcial", "atrasado", "pago", "cancelado"]);
 
@@ -43,15 +44,9 @@ export type PagamentosResumo = {
 function valorTotalReceita(row: any) {
   const atendimento = row.atendimentos;
 
-  // Mantém a Central de Pagamentos em Aberto com a mesma regra do Financeiro:
-  // atendimento finalizado usa valor realizado + taxa de Leva e Traz - desconto.
+  // Usa a regra centralizada de totais de atendimento
   if (atendimento?.finalizado === true && Number(atendimento?.valor_executado ?? 0) > 0) {
-    return Math.max(
-      0,
-      Number(atendimento.valor_executado ?? 0) +
-        Number(atendimento.taxa_leva_traz ?? 0) -
-        Number(atendimento.desconto ?? 0),
-    );
+    return calcTotalExecutado(atendimento);
   }
 
   return Number(row.valor_total ?? 0);
@@ -79,6 +74,10 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     if (data.clienteId) query = query.eq("cliente_id", data.clienteId);
     if (data.vencimentoDe) query = query.gte("vencimento", data.vencimentoDe);
     if (data.vencimentoAte) query = query.lte("vencimento", data.vencimentoAte);
+
+    // Garantir que não mostramos pagamentos de atendimentos que foram excluídos/não existem
+    // Embora a limpeza de órfãos no DB cuide disso, reforçamos aqui.
+    query = query.not("atendimento_id", "is", null);
 
     const { data: rows, error } = await query;
     if (error) {

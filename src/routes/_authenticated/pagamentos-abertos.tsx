@@ -55,7 +55,7 @@ function PagamentosAbertosPage() {
   const registrarLote = useServerFn(registrarContatoCobrancaLote);
   const confirmarRec = useServerFn(confirmarRecebimento);
   const qc = useQueryClient();
-  useRealtimeFinanceiro(["pagamentos-abertos", "dashboard-metrics", "fin-resumo"]);
+  useRealtimeFinanceiro(["pagamentos-abertos", "dashboard-metrics", "fin-resumo", "cobrancas"]);
 
   const [busca, setBusca] = useState("");
   const [somenteAtrasados, setSomenteAtrasados] = useState(false);
