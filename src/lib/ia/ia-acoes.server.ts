@@ -1,6 +1,8 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { format } from "date-fns";
+
 
 export const ValidarAgendamentoSchema = z.object({
   data: z.string(),

@@ -1,0 +1,46 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { registrarPagamentoIA, cancelarPagamentoIA } from "./ia-acoes.server";
+import { analisarComprovanteIA } from "./ia-comprovante.server";
+
+export const executarBaixaPagamento = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    pagamento_id: z.string(),
+    valor_pago: z.number(),
+    forma: z.string(),
+    data_pagamento: z.string().optional(),
+    observacoes: z.string().optional()
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = await import("@/integrations/supabase/client.server");
+    const sb = supabase();
+    
+    return registrarPagamentoIA(sb, {
+      pagamento_id: data.pagamento_id,
+      valor_pago: data.valor_pago,
+      forma: data.forma as any,
+      data_pagamento: data.data_pagamento,
+      observacoes: data.observacoes
+    });
+  });
+
+export const executarEstornoIA = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    pagamento_id: z.string(),
+    motivo: z.string()
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = await import("@/integrations/supabase/client.server");
+    const sb = supabase();
+    return cancelarPagamentoIA(sb, data.pagamento_id, data.motivo);
+  });
+
+export const processarComprovanteIA = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    imagemBase64: z.string()
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = await import("@/integrations/supabase/client.server");
+    const sb = supabase();
+    return analisarComprovanteIA(sb, data.imagemBase64);
+  });

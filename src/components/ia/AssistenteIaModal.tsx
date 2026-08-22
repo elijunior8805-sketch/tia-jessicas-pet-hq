@@ -16,7 +16,9 @@ import {
   DollarSign,
   Clock,
   Truck,
-  Plus
+  Plus,
+  Receipt,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,6 +40,11 @@ import {
   executarRemarcacao,
   executarCancelamento
 } from '@/lib/ia/ia-acoes.functions';
+import { 
+  executarBaixaPagamento, 
+  executarEstornoIA, 
+  processarComprovanteIA 
+} from '@/lib/ia/ia-financeiro.functions';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -161,6 +168,33 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
         } else {
            respostaFinal = `Entendi. Você quer agendar **${intent.servicos?.join(' e ')}** para o pet **${intent.pet_nome}** do cliente **${intent.cliente_nome}**.\n\nData: **${intent.data}** às **${intent.horario}**.\n${intent.transporte ? 'Com Leva e Traz.' : 'Sem transporte.'}\n\nConfirma essas informações?`;
         }
+      } else if (intent.intencao === 'registrar_pagamento' && intent.nivel_confianca > 0.7) {
+        // Fluxo de baixa financeira
+        const termo = intent.cliente_nome || text;
+        dadosReais = await consultarFinanceiroIA({
+          data: { cliente_id: undefined, apenas_pendentes: true }
+        });
+
+        // Filtrar por nome do cliente extraído pela IA
+        const pendencias = dadosReais?.filter((p: any) => 
+          p.atendimentos?.clientes?.nome?.toLowerCase().includes(intent.cliente_nome?.toLowerCase() || '')
+        ) || [];
+
+        if (pendencias.length === 0) {
+          respostaFinal = `Não localizei pendências financeiras para **${intent.cliente_nome}**. Poderia confirmar o nome?`;
+        } else if (pendencias.length === 1) {
+          const p = pendencias[0];
+          setSelectedEntity(p);
+          respostaFinal = `Localizei uma pendência para **${p.atendimentos?.clientes?.nome}** referente ao pet **${p.atendimentos?.pets?.nome}**.\n\n` +
+            `- Valor Total: **R$ ${p.valor_total.toFixed(2)}**\n` +
+            `- Saldo Devedor: **R$ ${(p.valor_total - (p.valor_pago || 0)).toFixed(2)}**\n\n` +
+            `Deseja baixar o pagamento integral no valor de **R$ ${(p.valor_total - (p.valor_pago || 0)).toFixed(2)}**?`;
+        } else {
+          respostaFinal = `Localizei ${pendencias.length} pendências para **${intent.cliente_nome}**. Por favor, selecione qual deseja baixar:\n\n`;
+          pendencias.forEach((p: any, idx: number) => {
+            respostaFinal += `${idx + 1}. R$ ${(p.valor_total - (p.valor_pago || 0)).toFixed(2)} (${p.atendimentos?.pets?.nome} - ${format(new Date(p.vencimento), 'dd/MM')})\n`;
+          });
+        }
       }
 
       const assistantMessage: IAMessage = {
@@ -265,6 +299,42 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     }
   };
 
+  const handleConfirmarPagamento = async (pagamento: any, intent: IAIntent) => {
+    setIsProcessing(true);
+    try {
+      const valorParaBaixar = intent.valor || (pagamento.valor_total - (pagamento.valor_pago || 0));
+      
+      await executarBaixaPagamento({
+        data: {
+          pagamento_id: pagamento.id,
+          valor_pago: valorParaBaixar,
+          forma: intent.forma_pagamento || 'pix',
+          data_pagamento: intent.data || format(new Date(), 'yyyy-MM-dd'),
+          observacoes: "Baixa realizada via Assistente IA"
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Pagamento registrado com sucesso!**\n\nBaixa de **R$ ${valorParaBaixar.toFixed(2)}** confirmada para **${pagamento.atendimentos?.clientes?.nome}**.`,
+        timestamp: new Date().toISOString()
+      }]);
+      
+      setSelectedEntity(null);
+      setCurrentIntent(null);
+      toast.success("Pagamento baixado!");
+      
+      // Invalidar cache financeiro se o hook existir globalmente
+      // window.dispatchEvent(new CustomEvent('financeiro-updated'));
+
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao registrar pagamento.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const toggleVoice = () => {
     if (voiceStatus === 'listening') {
       recognizerRef.current?.stop();
@@ -284,7 +354,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
             </div>
             <div>
               <h2 className="font-display font-semibold text-lg leading-none">Assistente Operacional IA</h2>
-              <p className="text-xs text-muted-foreground mt-1">Fase 3: Agenda e Cadastros</p>
+              <p className="text-xs text-muted-foreground mt-1">Fase 4: Financeiro e Comprovantes</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -303,7 +373,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
                 <div className="max-w-xs mx-auto">
                   <p className="text-sm font-medium">Como posso ajudar hoje?</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Experimente: "Agende Eli Júnior para banho amanhã às 14h" ou "Remarque a Pipoca para segunda".
+                    Experimente: "Baixar pagamento do Eli Júnior", "Qual o saldo da Pipoca?" ou "Remarcar banho".
                   </p>
                 </div>
               </div>
@@ -368,6 +438,17 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
                             disabled={isProcessing}
                           >
                             <CheckCircle2 className="w-3 h-3 mr-1" /> Confirmar Agendamento
+                          </Button>
+                        )}
+                        {/* Ação de Confirmação para Pagamento */}
+                        {msg.intent.intencao === 'registrar_pagamento' && selectedEntity && (
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-[10px] bg-green-600 hover:bg-green-700 text-white border-none"
+                            onClick={() => handleConfirmarPagamento(selectedEntity, msg.intent!)}
+                            disabled={isProcessing}
+                          >
+                            <DollarSign className="w-3 h-3 mr-1" /> Confirmar Recebimento
                           </Button>
                         )}
                       </div>
