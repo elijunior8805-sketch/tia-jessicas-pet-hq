@@ -284,11 +284,9 @@ function DashboardPage() {
             kpis={metrics ? {
               receitaBruta: metrics.faturamento,
               totalRecebido: metrics.recebido,
-              aReceber: metrics.aReceber,
-              vencido: metrics.vencido,
               despesaTotal: metrics.despesas,
               lucroEstimado: metrics.lucro,
-              saldoPeriodo: metrics.recebido - metrics.despesas,
+              saldoPeriodo: metrics.saldoCaixa,
               ticketMedio: metrics.ticketMedio,
               pendenciasCount: metrics.atendimentos,
               aportes: metrics.aportes
