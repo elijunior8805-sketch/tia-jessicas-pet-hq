@@ -36,7 +36,8 @@ import {
   buscarPetsDoClienteIA,
   consultarFinanceiroIA, 
   consultarResumoOperacionalIA,
-  analisarRiscoEvasaoIA
+  analisarRiscoEvasaoIA,
+  buscarServicosIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
   validarAgendamentoIA,
