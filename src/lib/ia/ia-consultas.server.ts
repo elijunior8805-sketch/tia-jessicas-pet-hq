@@ -32,12 +32,12 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
 
-  if (filtros.data) {
+  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) {
     query = query.eq("data", filtros.data);
-  } else if (filtros.periodo_inicio && filtros.periodo_fim) {
+  } else if (filtros.periodo_inicio && filtros.periodo_fim && /^\d{4}-\d{2}-\d{2}$/.test(filtros.periodo_inicio)) {
     query = query.gte("data", filtros.periodo_inicio).lte("data", filtros.periodo_fim);
   } else {
-    // Default para hoje se nada for passado
+    // Default para hoje se nada for passado ou se o formato for inválido
     query = query.eq("data", hoje);
   }
 
@@ -136,7 +136,7 @@ export async function listarAtendimentosIA(sb: SupabaseClient<Database>, filtros
 
   if (filtros.pet_id) query = query.eq("pet_id", filtros.pet_id);
   if (filtros.finalizado !== undefined) query = query.eq("finalizado", filtros.finalizado);
-  if (filtros.data) query = query.gte("data_inicio", `${filtros.data}T00:00:00`).lte("data_inicio", `${filtros.data}T23:59:59`);
+  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) query = query.gte("data_inicio", `${filtros.data}T00:00:00`).lte("data_inicio", `${filtros.data}T23:59:59`);
 
   const { data, error } = await query.order("data_inicio", { ascending: false }).limit(20);
   if (error) throw error;
@@ -257,7 +257,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
       .is("arquivado_em", null)
       .or("is_teste.is.null,is_teste.eq.false");
   }
-  if (filtros.data) {
+  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) {
     query = query.eq("vencimento", filtros.data);
   }
 
