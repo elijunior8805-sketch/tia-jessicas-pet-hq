@@ -19,7 +19,7 @@ export const classificarIntencao = createServerFn({ method: "POST" })
     // Buscar perfil do usuário para contexto
     const { data: profile } = await context.supabase
       .from('profiles')
-      .select('nome, role')
+      .select('nome, perfil')
       .eq('id', context.userId)
       .maybeSingle();
 
@@ -29,8 +29,8 @@ export const classificarIntencao = createServerFn({ method: "POST" })
       context.supabase, 
       {
         id: context.userId,
-        nome: profile?.nome || 'Usuário',
-        perfil: profile?.role || 'user'
+        nome: (profile as any)?.nome || 'Usuário',
+        perfil: (profile as any)?.perfil || 'user'
       }
     );
   });
