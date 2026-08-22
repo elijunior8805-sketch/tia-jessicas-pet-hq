@@ -45,7 +45,6 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     });
 
     // 3. Pending values (Accrual balance)
-    // To maintain compatibility with Dashboard, we keep aReceber and vencido
     const { data: pendingReceivables, error: pendingError } = await supabaseAdmin
       .from("pagamentos")
       .select("valor_total, valor_pago, vencimento")
@@ -62,9 +61,9 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
 
     let aReceber = 0;
     let vencido = 0;
-    // Data corrente no fuso oficial da operação (America/Sao_Paulo)
+    const timezone = "America/Sao_Paulo";
     const today = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Sao_Paulo",
+      timeZone: timezone,
       year: "numeric", month: "2-digit", day: "2-digit",
     }).format(new Date());
 
@@ -80,14 +79,13 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     
     const saldoCaixa = recebidoPeriodo - despesasPagas + aportes;
     const lucroCompetencia = faturamentoCompetencia - despesasPagas;
-
     const ticketMedio = atendimentosCount > 0 ? faturamentoCompetencia / atendimentosCount : 0;
 
-    return {
+    const result = {
       faturamento: faturamentoCompetencia,
       recebido: recebidoPeriodo,
       despesas: despesasPagas,
-      lucro: lucroCompetencia, // Resultado por Competência
+      lucro: lucroCompetencia,
       saldoCaixa,
       ticketMedio,
       atendimentos: atendimentosCount,
@@ -95,4 +93,16 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
       aReceber,
       vencido
     };
+
+    // 4. Log audit data (fire and forget for performance)
+    supabaseAdmin.from("auditoria_financeira").insert({
+      periodo_de: from,
+      periodo_ate: to,
+      fuso_horario: timezone,
+      resultado: result
+    }).then(({ error }) => {
+      if (error) console.error("[getFinancialKPIs] Audit log error:", error);
+    });
+
+    return result;
   });
