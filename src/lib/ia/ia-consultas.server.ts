@@ -117,3 +117,100 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
 
   return slots;
 }
+
+export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>) {
+  const hoje = new Date().toISOString().split('T')[0];
+  
+  // 1. Agendamentos do dia
+  const { data: agenda } = await sb
+    .from("agendamentos")
+    .select("status, hora, leva_traz_modalidade, pets(nome)")
+    .eq("data", hoje);
+
+  // 2. Pendências financeiras
+  const { data: pendencias } = await sb
+    .from("pagamentos")
+    .select("valor_total, valor_pago")
+    .eq("status", "pendente");
+
+  // 3. Promessas vencendo
+  const { data: promessas } = await sb
+    .from("cobranca_promessas")
+    .select("id")
+    .eq("data_prometida", hoje)
+    .eq("status", "pendente");
+
+  const totalAgenda = agenda?.length || 0;
+  const confirmados = agenda?.filter(a => a.status === 'confirmado').length || 0;
+  const cancelados = agenda?.filter(a => a.status === 'cancelado').length || 0;
+  const levaTraz = agenda?.filter(a => a.leva_traz_modalidade !== 'nao_utilizar').length || 0;
+  
+  const valorPendente = pendencias?.reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0) || 0;
+
+  return {
+    data: hoje,
+    total_agenda: totalAgenda,
+    confirmados,
+    cancelados,
+    leva_traz: levaTraz,
+    valor_pendente: valorPendente,
+    promessas_hoje: promessas?.length || 0,
+    alertas: [] // Poderia adicionar lógica de atrasos aqui
+  };
+}
+
+export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
+  // Busca últimos atendimentos de todos os pets
+  const { data: atendimentos } = await sb
+    .from("atendimentos")
+    .select("pet_id, data_inicio, pets(nome, clientes(nome))")
+    .eq("finalizado", true)
+    .order("data_inicio", { ascending: false });
+
+  if (!atendimentos || atendimentos.length === 0) return [];
+
+  const petStats: Record<string, { datas: Date[], nome: string, tutor: string }> = {};
+
+  atendimentos.forEach(a => {
+    if (!petStats[a.pet_id]) {
+      petStats[a.pet_id] = { 
+        datas: [], 
+        nome: (a.pets as any)?.nome || 'Pet', 
+        tutor: (a.pets as any)?.clientes?.nome || 'Tutor' 
+      };
+    }
+    petStats[a.pet_id].datas.push(new Date(a.data_inicio));
+  });
+
+  const hoje = new Date();
+  const riscos = [];
+
+  for (const petId in petStats) {
+    const stats = petStats[petId];
+    if (stats.datas.length < 2) continue; // Precisa de pelo menos 2 para calcular média
+
+    // Calcula intervalos em dias
+    const intervalos = [];
+    for (let i = 0; i < stats.datas.length - 1; i++) {
+      const diff = Math.abs(stats.datas[i].getTime() - stats.datas[i+1].getTime());
+      intervalos.push(Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    }
+
+    const mediaIntervalo = intervalos.reduce((a, b) => a + b, 0) / intervalos.length;
+    const diasDesdeUltimo = Math.ceil(Math.abs(hoje.getTime() - stats.datas[0].getTime()) / (1000 * 60 * 60 * 24));
+
+    // Risco se estiver 50% acima da média
+    if (diasDesdeUltimo > mediaIntervalo * 1.5) {
+      riscos.push({
+        pet_id: petId,
+        nome: stats.nome,
+        tutor: stats.tutor,
+        media_dias: Math.round(mediaIntervalo),
+        dias_ausente: diasDesdeUltimo,
+        nivel_risco: diasDesdeUltimo > mediaIntervalo * 2.5 ? 'Alto' : 'Médio'
+      });
+    }
+  }
+
+  return riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10);
+}
