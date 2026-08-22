@@ -424,6 +424,14 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       setMessages(prev => [...prev, assistantMessage]);
       setCurrentIntent(intent);
 
+      // Scroll to bottom after state update
+      setTimeout(() => {
+        if (scrollRef.current) {
+          const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+      }, 100);
+
       await registrarAuditoriaIA({
         data: {
           comando_original: text,
