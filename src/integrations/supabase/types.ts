@@ -3704,6 +3704,15 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_financeiro_indicadores: {
+        Row: {
+          data_referencia: string | null
+          quantidade_atendimentos: number | null
+          tipo: string | null
+          valor: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       atualizar_agendamento_seguro: {
@@ -3765,6 +3774,10 @@ export type Database = {
       gerar_parcelas_compra: {
         Args: { _compra_id: string }
         Returns: undefined
+      }
+      get_atendimento_total_executado: {
+        Args: { atendimento_id: string }
+        Returns: number
       }
       get_recibo_publico: {
         Args: { _codigo: string }
