@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { format } from "date-fns";
+import { calcTotalExecutado } from "./atendimento-totais";
 
 const StatusEnum = z.enum(["pendente", "parcial", "atrasado", "pago", "cancelado"]);
 
