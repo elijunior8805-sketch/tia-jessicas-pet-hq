@@ -894,7 +894,7 @@ function FinanceiroPage() {
         p.data_pagamento <= fim &&
         p.status !== "cancelado",
     );
-    const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    const totalRecebido = recebidosRows.reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
 
     // 2. Receita Bruta (Competência)
     const receitaBruta = Number(faturamentoCompetencia);
@@ -908,7 +908,7 @@ function FinanceiroPage() {
         p.data_pagamento <= fim &&
         p.status !== "cancelado",
     );
-    const valorTotalServicos = receitasServicoPeriodo.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    const valorTotalServicos = receitasServicoPeriodo.reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
     const atendimentosUnicosSet = new Set(receitasServicoPeriodo.map((p) => p.atendimento_id).filter(Boolean));
     const ticketMedio = atendimentosUnicosSet.size > 0 ? valorTotalServicos / atendimentosUnicosSet.size : 0;
 
@@ -922,7 +922,7 @@ function FinanceiroPage() {
           p.status !== "cancelado" &&
           (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste"),
       )
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+      .reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
 
     // 5. Filtro para Pendentes/Vencidos
     const emAberto = receitasFiltradas.filter((p) => {
@@ -935,16 +935,16 @@ function FinanceiroPage() {
     });
 
     // 6. A Receber e Vencidos
-    const totalAReceber = emAberto.reduce((s, p) => s + saldoReceita(p), 0);
+    const totalAReceber = emAberto.reduce((s: number, p) => s + saldoReceita(p), 0);
     const totalVencidos = emAberto
       .filter((p) => p.vencimento && p.vencimento < hojeStr)
-      .reduce((s, p) => s + saldoReceita(p), 0);
+      .reduce((s: number, p) => s + saldoReceita(p), 0);
     const qtdPendentes = emAberto.length;
 
     // 7. Despesas pagas no período
     const despesasPagas = despesasFiltradas
       .filter((p) => p.data_pagamento && p.data_pagamento >= inicio && p.data_pagamento <= fim && p.status !== "cancelado")
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+      .reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
 
     // 8. Lucro estimado e Saldo
     const lucroEstimado = receitaBruta + aportesAjustes - despesasPagas;
