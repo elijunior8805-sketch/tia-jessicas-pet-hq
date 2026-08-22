@@ -93,6 +93,8 @@ ESTRUTURA DE INTENÇÃO (Obrigatória):
 - Use EXATAMENTE os campos do IAIntentSchema: intencao, acao, cliente_nome, cliente_id, pet_nome, pet_id, servicos, data, horario, profissional, periodo_inicio, periodo_fim, status, valor, forma_pagamento, filtros, informacoes_faltantes, nivel_confianca, ferramenta, exige_confirmacao.
 - No campo 'status', use: 'agendado', 'confirmado', 'em_atendimento', 'finalizado', 'cancelado', 'falta'.
 - No campo 'filtros', você pode incluir: 'leva_e_traz' (boolean), 'servico_nome'.
+- Se o horário estiver ocupado, verifique alternativas usando 'consultar_disponibilidade'.
+
 
 ROTEAMENTO DE INTENÇÕES:
 1. CONSULTAS DE AGENDA:
