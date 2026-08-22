@@ -1083,6 +1083,9 @@ export type Database = {
       compras: {
         Row: {
           anexo_url: string | null
+          arquivado_em: string | null
+          arquivado_motivo: string | null
+          arquivado_por: string | null
           categoria_id: string | null
           centro_custo_id: string | null
           created_at: string
@@ -1104,6 +1107,9 @@ export type Database = {
         }
         Insert: {
           anexo_url?: string | null
+          arquivado_em?: string | null
+          arquivado_motivo?: string | null
+          arquivado_por?: string | null
           categoria_id?: string | null
           centro_custo_id?: string | null
           created_at?: string
@@ -1125,6 +1131,9 @@ export type Database = {
         }
         Update: {
           anexo_url?: string | null
+          arquivado_em?: string | null
+          arquivado_motivo?: string | null
+          arquivado_por?: string | null
           categoria_id?: string | null
           centro_custo_id?: string | null
           created_at?: string
@@ -1170,6 +1179,9 @@ export type Database = {
       }
       compras_parcelas: {
         Row: {
+          arquivado_em: string | null
+          arquivado_motivo: string | null
+          arquivado_por: string | null
           compra_id: string
           comprovante_url: string | null
           created_at: string
@@ -1190,6 +1202,9 @@ export type Database = {
           vencimento: string
         }
         Insert: {
+          arquivado_em?: string | null
+          arquivado_motivo?: string | null
+          arquivado_por?: string | null
           compra_id: string
           comprovante_url?: string | null
           created_at?: string
@@ -1212,6 +1227,9 @@ export type Database = {
           vencimento: string
         }
         Update: {
+          arquivado_em?: string | null
+          arquivado_motivo?: string | null
+          arquivado_por?: string | null
           compra_id?: string
           comprovante_url?: string | null
           created_at?: string
@@ -1242,6 +1260,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      conciliacao_logs: {
+        Row: {
+          created_at: string | null
+          data_execucao: string | null
+          detalhes: Json | null
+          executado_por: string | null
+          id: string
+          resumo: Json | null
+          status: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_execucao?: string | null
+          detalhes?: Json | null
+          executado_por?: string | null
+          id?: string
+          resumo?: Json | null
+          status: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string | null
+          data_execucao?: string | null
+          detalhes?: Json | null
+          executado_por?: string | null
+          id?: string
+          resumo?: Json | null
+          status?: string
+          tipo?: string
+        }
+        Relationships: []
       }
       conversas_estado: {
         Row: {
@@ -2560,6 +2611,9 @@ export type Database = {
       }
       pagamentos: {
         Row: {
+          arquivado_em: string | null
+          arquivado_motivo: string | null
+          arquivado_por: string | null
           atendimento_id: string | null
           categoria_receita: string | null
           cliente_id: string | null
@@ -2581,6 +2635,9 @@ export type Database = {
           version: number
         }
         Insert: {
+          arquivado_em?: string | null
+          arquivado_motivo?: string | null
+          arquivado_por?: string | null
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
@@ -2602,6 +2659,9 @@ export type Database = {
           version?: number
         }
         Update: {
+          arquivado_em?: string | null
+          arquivado_motivo?: string | null
+          arquivado_por?: string | null
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null

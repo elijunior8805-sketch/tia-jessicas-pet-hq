@@ -75,9 +75,8 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     if (data.vencimentoDe) query = query.gte("vencimento", data.vencimentoDe);
     if (data.vencimentoAte) query = query.lte("vencimento", data.vencimentoAte);
 
-    // Garantir que não mostramos pagamentos de atendimentos que foram excluídos/não existem
-    // Embora a limpeza de órfãos no DB cuide disso, reforçamos aqui.
-    query = query.not("atendimento_id", "is", null);
+    // Garantir que não mostramos pagamentos arquivados ou de atendimentos excluídos
+    query = query.is("arquivado_em", null).not("atendimento_id", "is", null);
 
     const { data: rows, error } = await query;
     if (error) {
@@ -174,7 +173,7 @@ export const registrarContatoCobranca = createServerFn({ method: "POST" })
       .eq("id", data.pagamentoId);
     if (updErr) {
       console.error("[pagamentos] registrar contato erro:", updErr.message);
-      throw new Error("Não foi possível registrar o contato");
+      throw new Error("Não foi possível registrar the contato");
     }
     return { ok: true };
   });
@@ -354,4 +353,191 @@ export const confirmarRecebimento = createServerFn({ method: "POST" })
     }
 
     return { success: true };
+  });
+
+// ============= Lixeira Financeira (Soft Delete) =============
+
+export const arquivarPagamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({ 
+        pagamentoId: z.string().uuid(), 
+        motivo: z.string().max(300).optional() 
+      })
+      .parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { error } = await supabase
+      .from("pagamentos")
+      .update({
+        arquivado_em: new Date().toISOString(),
+        arquivado_por: userId,
+        arquivado_motivo: data.motivo ?? null,
+      })
+      .eq("id", data.pagamentoId);
+
+    if (error) {
+      console.error("[pagamentos] arquivar erro:", error.message);
+      throw new Error("Não foi possível arquivar o lançamento");
+    }
+
+    return { ok: true };
+  });
+
+export const restaurarPagamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ pagamentoId: z.string().uuid() }).parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { error } = await supabase
+      .from("pagamentos")
+      .update({
+        arquivado_em: null,
+        arquivado_por: null,
+        arquivado_motivo: null,
+      })
+      .eq("id", data.pagamentoId);
+
+    if (error) {
+      console.error("[pagamentos] restaurar erro:", error.message);
+      throw new Error("Não foi possível restaurar o lançamento");
+    }
+
+    return { ok: true };
+  });
+
+export type PagamentoArquivadoDTO = PagamentoAbertoDTO & {
+  arquivado_em: string;
+  arquivado_motivo: string | null;
+  arquivado_por_nome: string | null;
+};
+
+export const listarPagamentosArquivados = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PagamentoArquivadoDTO[]> => {
+    const { supabase } = context;
+
+    const { data: rows, error } = await supabase
+      .from("pagamentos")
+      .select(
+        `id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, observacoes, 
+         arquivado_em, arquivado_por, arquivado_motivo,
+         clientes:cliente_id(nome, whatsapp), 
+         atendimentos:atendimento_id(data_inicio, finalizado, valor_executado, taxa_leva_traz, desconto, pets:pet_id(nome))`
+      )
+      .not("arquivado_em", "is", null)
+      .order("arquivado_em", { ascending: false })
+      .limit(100);
+
+    if (error) throw new Error(error.message);
+
+    const autoresIds = Array.from(new Set((rows ?? []).map((r: any) => r.arquivado_por).filter(Boolean))) as string[];
+    const nomePorId = new Map<string, string>();
+    if (autoresIds.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", autoresIds);
+      for (const p of (profs ?? []) as any[]) nomePorId.set(p.id, p.nome ?? "");
+    }
+
+    const hoje = new Date();
+    hoje.setUTCHours(0, 0, 0, 0);
+    const hojeMs = hoje.getTime();
+
+    return (rows ?? []).map((r: any) => {
+      const valorTotal = valorTotalReceita(r);
+      const valorPago = Number(r.valor_pago ?? 0);
+      const saldo = Math.max(0, valorTotal - valorPago);
+      let diasAtraso = 0;
+      if (r.vencimento) {
+        const venc = new Date(r.vencimento + "T00:00:00Z").getTime();
+        diasAtraso = Math.floor((hojeMs - venc) / 86400000);
+      }
+      return {
+        id: r.id,
+        cliente_id: r.cliente_id,
+        cliente_nome: r.clientes?.nome ?? "Cliente",
+        cliente_whatsapp: r.clientes?.whatsapp ?? null,
+        pet_nome: r.atendimentos?.pets?.nome ?? null,
+        valor_total: valorTotal,
+        valor_pago: valorPago,
+        saldo,
+        vencimento: r.vencimento,
+        dias_atraso: diasAtraso,
+        status: r.status,
+        atendimento_id: r.atendimento_id,
+        data_atendimento: r.atendimentos?.data_inicio ?? null,
+        observacoes: r.observacoes,
+        arquivado_em: r.arquivado_em,
+        arquivado_motivo: r.arquivado_motivo,
+        arquivado_por_nome: r.arquivado_por ? nomePorId.get(r.arquivado_por) ?? null : null,
+      };
+    });
+  });
+
+// ============= Conciliação Financeira =============
+
+export const executarConciliacaoDiaria = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+
+    // 1. Buscar pagamentos abertos
+    const { data: pgs, error: pgsErr } = await supabase
+      .from("pagamentos")
+      .select("id, status, arquivado_em")
+      .is("arquivado_em", null)
+      .in("status", ["pendente", "parcial", "atrasado"]);
+
+    if (pgsErr) throw new Error("Falha ao ler pagamentos para conciliação");
+
+    // 2. Buscar cobranças ativas
+    const { data: cobs, error: cobsErr } = await supabase
+      .from("cobrancas")
+      .select("id, pagamento_id, arquivada_em")
+      .is("arquivada_em", null);
+
+    if (cobsErr) throw new Error("Falha ao ler cobranças para conciliação");
+
+    const pgIds = new Set(pgs.map(p => p.id));
+    const cobPgIds = new Set(cobs.map(c => c.pagamento_id));
+
+    const divergencias: any[] = [];
+    
+    // Pagamentos sem cobrança
+    pgs.forEach(p => {
+      if (!cobPgIds.has(p.id)) {
+        divergencias.push({ tipo: "pagamento_sem_cobranca", id: p.id });
+      }
+    });
+
+    // Cobranças órfãs
+    cobs.forEach(c => {
+      if (c.pagamento_id && !pgIds.has(c.pagamento_id)) {
+        divergencias.push({ tipo: "cobranca_orfa", id: c.id, pagamento_id: c.pagamento_id });
+      }
+    });
+
+    const status = divergencias.length > 0 ? "divergencia" : "sucesso";
+
+    await supabase.from("conciliacao_logs").insert({
+      tipo: "pagamentos_vs_cobrancas",
+      status,
+      resumo: { 
+        total_pagamentos: pgs.length, 
+        total_cobrancas: cobs.length, 
+        total_divergencias: divergencias.length 
+      },
+      detalhes: { divergencias },
+      executado_por: userId
+    });
+
+    return { status, total_divergencias: divergencias.length };
   });

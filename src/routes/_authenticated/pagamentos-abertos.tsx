@@ -7,9 +7,13 @@ import {
   registrarContatoCobranca,
   registrarContatoCobrancaLote,
   confirmarRecebimento,
+  arquivarPagamento,
+  executarConciliacaoDiaria,
   type PagamentoAbertoDTO,
   type CobrancaLoteItem,
 } from "@/lib/pagamentos.functions";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PagamentosLixeiraTab } from "@/components/financeiro/PagamentosLixeiraTab";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, TrendingDown, Wallet, XCircle } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, ExternalLink, MessageCircle, Search, Trash2, TrendingDown, Wallet, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 
@@ -54,6 +58,8 @@ function PagamentosAbertosPage() {
   const registrar = useServerFn(registrarContatoCobranca);
   const registrarLote = useServerFn(registrarContatoCobrancaLote);
   const confirmarRec = useServerFn(confirmarRecebimento);
+  const arquivar = useServerFn(arquivarPagamento);
+  const conciliar = useServerFn(executarConciliacaoDiaria);
   const qc = useQueryClient();
   useRealtimeFinanceiro(["pagamentos-abertos", "dashboard-metrics", "fin-resumo", "cobrancas"]);
 
@@ -158,6 +164,27 @@ function PagamentosAbertosPage() {
     onError: (e: any) => toast.error(e?.message ?? "Falha ao receber"),
   });
 
+  const arquivarMut = useMutation({
+    mutationFn: (vars: { id: string; motivo?: string }) => arquivar({ data: { pagamentoId: vars.id, motivo: vars.id } }),
+    onSuccess: () => {
+      toast.success("Lançamento arquivado");
+      qc.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+      qc.invalidateQueries({ queryKey: ["pagamentos-arquivados"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao arquivar"),
+  });
+
+  const conciliarMut = useMutation({
+    mutationFn: () => conciliar(),
+    onSuccess: (r) => {
+      if (r.status === "divergencia") {
+        toast.warning(`Conciliação concluída: ${r.total_divergencias} divergências encontradas.`);
+      } else {
+        toast.success("Conciliação concluída sem divergências.");
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao conciliar"),
+  });
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -171,6 +198,14 @@ function PagamentosAbertosPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => conciliarMut.mutate()}
+            disabled={conciliarMut.isPending}
+          >
+            <TrendingDown className="w-4 h-4 mr-2" />
+            Conciliar
+          </Button>
           <Button
             variant={somenteAtrasados ? "default" : "outline"}
             onClick={() => setSomenteAtrasados((v) => !v)}
@@ -204,7 +239,14 @@ function PagamentosAbertosPage() {
           value={String(resumo?.vence_7d ?? 0)} sub="parcelas" />
       </div>
 
-      <Card>
+      <Tabs defaultValue="ativos" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="ativos">Pagamentos Ativos</TabsTrigger>
+          <TabsTrigger value="lixeira">Lixeira</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ativos">
+          <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row md:items-center gap-2 md:justify-between">
             <CardTitle className="text-lg">Parcelas</CardTitle>
@@ -312,6 +354,18 @@ function PagamentosAbertosPage() {
                           <MessageCircle className="w-4 h-4 mr-1" />
                           Cobrar
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm("Deseja realmente arquivar este lançamento?")) {
+                              arquivarMut.mutate({ id: p.id });
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -320,7 +374,13 @@ function PagamentosAbertosPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="lixeira">
+          <PagamentosLixeiraTab />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={loteAberto} onOpenChange={setLoteAberto}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
