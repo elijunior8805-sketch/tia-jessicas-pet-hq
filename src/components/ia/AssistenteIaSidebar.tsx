@@ -307,16 +307,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         const count = dadosReais.length;
         
         if (intent.intencao === 'contar_atendimentos') {
-          let desc = `Você tem **${count} atendimento${count !== 1 ? 's' : ''}**`;
-          if (intent.status) desc += ` com status **${intent.status}**`;
-          if (intent.filtros?.servico_nome) desc += ` de **${intent.filtros.servico_nome}**`;
-          if (intent.data) desc += ` para o dia **${format(parseISO(intent.data), 'dd/MM')}**`;
-          respostaFinal = desc + ".";
-        } else if (count > 0) {
-          respostaFinal = `Encontrei **${count} agendamento${count !== 1 ? 's' : ''}**. Aqui estão os primeiros:\n\n` + 
-            dadosReais.slice(0, 10).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)} [${a.status}]`).join('\n');
+          const stats = {
+            total: dadosReais.length,
+            confirmados: dadosReais.filter((a: any) => a.status === 'confirmado').length,
+            em_atendimento: dadosReais.filter((a: any) => a.status === 'em_atendimento').length,
+            finalizados: dadosReais.filter((a: any) => a.status === 'finalizado').length,
+            pendentes: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            cancelados: dadosReais.filter((a: any) => a.status === 'cancelado').length,
+            faltas: dadosReais.filter((a: any) => a.status === 'falta').length,
+          };
+
+          respostaFinal = `Hoje existem **${stats.total} atendimentos** agendados:\n\n` +
+            `- ✅ **Confirmados**: ${stats.confirmados}\n` +
+            `- ⏳ **Aguardando**: ${stats.pendentes}\n` +
+            `- 🚿 **Em atendimento**: ${stats.em_atendimento}\n` +
+            `- ✨ **Finalizados**: ${stats.finalizados}\n` +
+            `- ❌ **Cancelados/Faltas**: ${stats.cancelados + stats.faltas}`;
+        } else if (dadosReais.length > 0) {
+          const dataFormatada = intent.data ? format(parseISO(intent.data), 'dd/MM') : 'hoje';
+          respostaFinal = `### 📅 Agenda de ${dataFormatada} (${dadosReais.length})\n\n` +
+            `| Horário | Pet | Serviço | Status |\n` +
+            `| :--- | :--- | :--- | :--- |\n` +
+            dadosReais.slice(0, 20).map((a: any) => 
+              `| ${a.hora.slice(0, 5)} | **${a.pets?.nome}** | ${a.servicos?.nome || 'Serviço'} | ${a.status === 'confirmado' ? '✅' : '⏳'} ${a.status} |`
+            ).join('\n');
+          
+          if (dadosReais.length > 20) {
+            respostaFinal += `\n\n*Exibindo os primeiros 20 de ${dadosReais.length} agendamentos.*`;
+          }
         } else {
-          respostaFinal = "Não encontrei agendamentos para este critério.";
+          respostaFinal = "Não existem agendamentos para o critério solicitado.";
         }
 
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
@@ -325,10 +345,18 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         const results = { clientes: (response.result || []) as any[], pets: [] as any[] };
         setSearchResults(results);
         
-        if (results.clientes.length > 0 || results.pets.length > 0) {
-          respostaFinal = "Localizei estes registros. **Selecione o correto** para prosseguirmos:";
+        if (results.clientes.length > 0) {
+          const c = results.clientes[0];
+          const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase());
+          
+          if (results.clientes.length === 1 && matchesTermo) {
+            respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
+          } else {
+            respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Você quis dizer algum destes clientes?\n\n` +
+              results.clientes.map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
+          }
         } else {
-          respostaFinal = `Não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar um novo?`;
+          respostaFinal = `Cliente não cadastrado. Deseja cadastrá-lo agora?`;
         }
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         const response = await consultarFinanceiroIA({
@@ -370,7 +398,20 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
         const response = await consultarResumoOperacionalIA();
         const resumo = response.result || {};
-        respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n- **Agendamentos**: ${resumo.total_agenda} (${resumo.confirmados} confirmados)\n- **Leva e Traz**: ${resumo.leva_traz} viagens\n- **Financeiro Pendente**: R$ ${resumo.valor_pendente.toFixed(2)}\n- **Promessas para Hoje**: ${resumo.promessas_hoje}`;
+        respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n` +
+          `#### 🕒 Próximo Atendimento\n` +
+          (resumo.proximo_atendimento 
+            ? `**${resumo.proximo_atendimento.hora}** — **${resumo.proximo_atendimento.pet}** (${resumo.proximo_atendimento.cliente}) — ${resumo.proximo_atendimento.servico}\n\n`
+            : `Nenhum agendamento futuro para hoje.\n\n`) +
+          `#### 📈 Indicadores\n` +
+          `- **Agendamentos**: ${resumo.total_agenda} (${resumo.confirmados} confirmados, ${resumo.em_atendimento} em curso)\n` +
+          `- **Finalizados**: ${resumo.finalizados}\n` +
+          `- **Leva e Traz**: ${resumo.leva_traz} viagens\n` +
+          `- **Promessas de Pagamento**: ${resumo.promessas_hoje}\n\n` +
+          `#### 💰 Financeiro (Hoje)\n` +
+          `- **Faturamento**: **R$ ${resumo.faturamento_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
+          `- **Recebido**: **R$ ${resumo.recebido_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
+          `- **Total Pendente (Geral)**: **R$ ${resumo.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**`;
       }
 
       const assistantMessage: IAMessage = {
@@ -382,6 +423,14 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       setMessages(prev => [...prev, assistantMessage]);
       setCurrentIntent(intent);
+
+      // Scroll to bottom after state update
+      setTimeout(() => {
+        if (scrollRef.current) {
+          const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+      }, 100);
 
       await registrarAuditoriaIA({
         data: {
@@ -649,10 +698,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             size="sm" 
                             variant="ghost" 
                             className={cn("h-8 text-[11px] font-bold rounded-lg px-3", msg.role === 'user' ? 'text-white hover:bg-white/10' : 'text-[#C99845] hover:bg-[#C99845]/5')}
-                            onClick={() => window.open('/dashboard', '_blank')}
+                            onClick={() => {
+                              if (msg.intent?.intencao?.includes('agenda')) window.open('/agenda', '_blank');
+                              else if (msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia')) window.open('/financeiro', '_blank');
+                              else window.open('/dashboard', '_blank');
+                            }}
                           >
-                            <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Sistema
+                            <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 
+                            {msg.intent?.intencao?.includes('agenda') ? 'Abrir Agenda' : 
+                             msg.intent?.intencao?.includes('financeiro') ? 'Abrir Financeiro' : 'Abrir Sistema'}
                           </Button>
+                          
+                          {msg.intent.intencao === 'consulta_cliente' && searchResults?.clientes && searchResults.clientes.length > 0 && (
+                             <Button 
+                               size="sm" 
+                               className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                               onClick={() => window.open(`/clientes?id=${searchResults.clientes[0].id}`, '_blank')}
+                             >
+                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes
+                             </Button>
+                          )}
+
+                          {msg.intent.intencao === 'comando_nao_reconhecido' && msg.content.includes('não cadastrado') && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => window.open('/clientes?novo=true', '_blank')}
+                            >
+                              <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
+                            </Button>
+                          )}
                           
                           {msg.intent.intencao === 'criar_agendamento' && msg.intent.cliente_nome && (
                             <Button 

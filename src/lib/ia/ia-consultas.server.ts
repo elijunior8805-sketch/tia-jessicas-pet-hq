@@ -36,8 +36,7 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     query = query.eq("data", filtros.data);
   } else if (filtros.periodo_inicio && filtros.periodo_fim && /^\d{4}-\d{2}-\d{2}$/.test(filtros.periodo_inicio)) {
     query = query.gte("data", filtros.periodo_inicio).lte("data", filtros.periodo_fim);
-  } else {
-    // Default para hoje se nada for passado ou se o formato for inválido
+  } else if (filtros.data === "hoje" || !filtros.data) {
     query = query.eq("data", hoje);
   }
 
@@ -81,10 +80,14 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
 
 
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
+  // Implementação de busca aproximada (Fuzzy Search simplificada no SQL)
+  // Remove espaços extras e lida com variações comuns
+  const termoLimpo = termo.trim();
+  
   const { data, error } = await sb
     .from("clientes")
     .select(`*, pets(id, nome, raca)`)
-    .or(`nome.ilike.%${termo}%, telefone.ilike.%${termo}%`)
+    .or(`nome.ilike.%${termoLimpo}%, telefone.ilike.%${termoLimpo}%, email.ilike.%${termoLimpo}%`)
     .limit(10);
 
   if (error) throw error;
@@ -313,21 +316,22 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
 
 
 export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>) {
+  const timezone = "America/Sao_Paulo";
   const hoje = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
+    timeZone: timezone,
     year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
   
   const { data: agenda } = await sb
     .from("agendamentos")
-    .select("status, hora, leva_traz_modalidade, pets(nome)")
-    .eq("data", hoje);
+    .select("status, hora, leva_traz_modalidade, pets(nome), clientes(nome), servicos(nome)")
+    .eq("data", hoje)
+    .not("status", "eq", "cancelado");
 
   const { data: indicators } = await sb
     .from("vw_financeiro_indicadores")
     .select("*")
-    .gte("data_referencia", hoje)
-    .lte("data_referencia", hoje);
+    .eq("data_referencia", hoje);
     
   const { data: pendencias } = await sb
     .from("pagamentos")
@@ -345,7 +349,8 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
 
   const totalAgenda = agenda?.length || 0;
   const confirmados = agenda?.filter(a => a.status === 'confirmado').length || 0;
-  const cancelados = agenda?.filter(a => a.status === 'cancelado').length || 0;
+  const emAtendimento = agenda?.filter(a => a.status === 'em_atendimento').length || 0;
+  const finalizados = agenda?.filter(a => a.status === 'finalizado').length || 0;
   const levaTraz = agenda?.filter(a => a.leva_traz_modalidade !== 'nao_utilizar').length || 0;
   
   const valorPendente = pendencias?.reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0) || 0;
@@ -353,18 +358,31 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
   const faturamentoHoje = indicators?.filter(i => i.tipo === 'receita_servico').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
   const recebidoHoje = indicators?.filter(i => i.tipo === 'receita_recebida').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
 
+  // Próximo atendimento
+  const agora = new Date().toLocaleTimeString("pt-BR", { timeZone: timezone, hour12: false });
+  const proximo = agenda
+    ?.filter(a => a.hora > agora)
+    .sort((a, b) => a.hora.localeCompare(b.hora))[0];
+
   return createIAResponse({
     action: 'consultar_resumo_operacional',
     result: {
       data: hoje,
       total_agenda: totalAgenda,
       confirmados,
-      cancelados,
+      em_atendimento: emAtendimento,
+      finalizados,
       leva_traz: levaTraz,
       valor_pendente: valorPendente,
       faturamento_hoje: faturamentoHoje,
       recebido_hoje: recebidoHoje,
       promessas_hoje: promessas?.length || 0,
+      proximo_atendimento: proximo ? {
+        hora: proximo.hora.slice(0, 5),
+        pet: proximo.pets?.nome,
+        cliente: proximo.clientes?.nome,
+        servico: proximo.servicos?.nome
+      } : null
     }
   });
 }
