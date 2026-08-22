@@ -897,11 +897,9 @@ function FinanceiroPage() {
     const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
     // 2. Receita Bruta (Competência)
-    // Mesma lógica de soma dos atendimentos encerrados no período
     const receitaBruta = Number(faturamentoCompetencia);
 
-    // 3. Ticket Médio
-    // Calculado sobre receitas de serviços efetivamente recebidas
+    // 3. Ticket Médio (sobre receitas de serviços recebidas)
     const receitasServicoPeriodo = pagamentos.filter(
       (p) =>
         (p.categoria_receita === "servico" || p.atendimento_id) &&
@@ -926,21 +924,7 @@ function FinanceiroPage() {
       )
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    // 5. Despesas Pagas no Período
-    const despesasPagas = despesasFiltradas
-      .filter(p => p.status === "pago" && p.data_pagamento && p.data_pagamento >= inicio && p.data_pagamento <= fim)
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
-
-    // 6. Lucro Estimado (Competência - Despesas Pagas)
-    const lucroEstimado = receitaBruta + aportesAjustes - despesasPagas;
-
-    // 7. Saldo do Período (Caixa Real)
-    const saldoPeriodo = totalRecebido - despesasPagas;
-
-    // 8. A Receber
-    const totalAReceber = pagamentos
-      .filter(p => p.status === "pendente" || p.status === "parcial")
-      .reduce((s, p) => s + (Number(p.valor || 0) - Number(p.valor_pago || 0)), 0);
+    // 5. Filtro para Pendentes/Vencidos
     const emAberto = receitasFiltradas.filter((p) => {
       if (p.status === "pago" || p.status === "cancelado") return false;
       if (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste") return false;
@@ -949,19 +933,21 @@ function FinanceiroPage() {
       const saldo = saldoReceita(p);
       return saldo > 0.005;
     });
+
+    // 6. A Receber e Vencidos
     const totalAReceber = emAberto.reduce((s, p) => s + saldoReceita(p), 0);
     const totalVencidos = emAberto
       .filter((p) => p.vencimento && p.vencimento < hojeStr)
       .reduce((s, p) => s + saldoReceita(p), 0);
     const qtdPendentes = emAberto.length;
 
-    // Despesas pagas no período
+    // 7. Despesas pagas no período
     const despesasPagas = despesasFiltradas
       .filter((p) => p.data_pagamento && p.data_pagamento >= inicio && p.data_pagamento <= fim && p.status !== "cancelado")
       .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    // Lucro estimado: receita competência - despesas pagas
-    const lucroEstimado = receitaBruta - despesasPagas;
+    // 8. Lucro estimado e Saldo
+    const lucroEstimado = receitaBruta + aportesAjustes - despesasPagas;
     const saldoPeriodo = totalRecebido - despesasPagas;
 
     return {

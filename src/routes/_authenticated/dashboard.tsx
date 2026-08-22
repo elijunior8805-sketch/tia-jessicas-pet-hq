@@ -168,7 +168,7 @@ function DashboardPage() {
       const pagamentosPeriodo = pagamentosRes.data ?? [];
       const novosClientes = novosClientesRes.data ?? [];
 
-      const despesas = compras.reduce((s, r: any) => {
+      const despesas = compras.reduce((s: number, r: any) => {
         if (r.status === "cancelado") return s;
         const pagaNoPeriodo = r.data_pagamento && r.data_pagamento >= from && r.data_pagamento <= to;
         const venceNoPeriodo = r.vencimento && r.vencimento >= from && r.vencimento <= to;
