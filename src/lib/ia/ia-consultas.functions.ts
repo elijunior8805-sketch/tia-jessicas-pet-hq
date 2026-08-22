@@ -83,3 +83,13 @@ export const buscarServicosIA = createServerFn({ method: "POST" })
     const { buscarServicosIA: buscarServicos } = await import("./ia-consultas.server");
     return buscarServicos(context.supabase, data.termo);
   });
+
+export const consultarHistoricoPetIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    pet_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { consultarHistoricoPetIA: consultarHistorico } = await import("./ia-consultas.server");
+    return consultarHistorico(context.supabase, data.pet_id);
+  });
