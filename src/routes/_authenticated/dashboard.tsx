@@ -290,7 +290,7 @@ function DashboardPage() {
               ticketMedio: metrics.ticketMedio,
               pendenciasCount: metrics.atendimentos,
               aportes: metrics.aportes
-            } : {}} 
+            } : { receitaBruta: 0, totalRecebido: 0, despesaTotal: 0, lucroEstimado: 0, saldoPeriodo: 0, ticketMedio: 0, pendenciasCount: 0, aportes: 0 }} 
           />
         </div>
       </div>
