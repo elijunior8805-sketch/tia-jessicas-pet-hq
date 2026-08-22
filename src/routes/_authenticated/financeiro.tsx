@@ -814,43 +814,14 @@ function FinanceiroPage() {
   // encerrado_em preenchido e valor_executado > 0). Valor planejado
   // de atendimentos abertos NÃO entra no faturamento.
   // Considera o período por encerrado_em (fallback data_inicio).
-  const { data: faturamentoCompetencia = 0 } = useQuery<number>({
-    queryKey: ["fin-fat-competencia", inicio, fim],
+  const fetchKPIs = useServerFn(getFinancialKPIs);
+  const { data: unifiedMetrics } = useQuery({
+    queryKey: ["fin-unified-metrics", inicio, fim],
+    queryFn: () => fetchKPIs({ data: { from: inicio, to: fim } }),
     staleTime: 30000,
-
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    queryFn: async () => {
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const shiftDay = (iso: string, delta: number) => {
-        const d = new Date(`${iso}T12:00:00`);
-        d.setDate(d.getDate() + delta);
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      };
-      const iniWide = shiftDay(inicio, -1);
-      const fimWide = shiftDay(fim, 1);
-      const toLocalDay = (v: any): string => {
-        if (!v) return "";
-        const d = new Date(v);
-        if (isNaN(d.getTime())) return String(v).slice(0, 10);
-        return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-      };
-      const { data } = await supabase
-        .from("atendimentos")
-        .select("valor_executado, taxa_leva_traz, desconto, encerrado_em, data_inicio, finalizado")
-        .or(
-          `and(data_inicio.gte.${iniWide}T00:00:00.000Z,data_inicio.lte.${fimWide}T23:59:59.999Z),and(encerrado_em.gte.${iniWide}T00:00:00.000Z,encerrado_em.lte.${fimWide}T23:59:59.999Z)`,
-        );
-      const rows = (data as any[]) || [];
-      return rows.reduce((s, r) => {
-        const exec = Number(r.valor_executado ?? 0);
-        if (!(exec > 0 && !!r.encerrado_em && r.finalizado === true)) return s;
-        const ref = toLocalDay(r.encerrado_em ?? r.data_inicio);
-        if (ref < inicio || ref > fim) return s;
-        return s + Math.max(0, exec + Number(r.taxa_leva_traz ?? 0) - Number(r.desconto ?? 0));
-      }, 0);
-    },
   });
+
+  const faturamentoCompetencia = unifiedMetrics?.faturamento ?? 0;
 
 
   const clientesUnicos = useMemo(() => {
