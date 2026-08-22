@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const classificarIntencao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({
+  .inputValidator((data) => z.object({
     texto: z.string(),
     contexto: z.array(z.object({
       role: z.enum(['user', 'assistant']),
