@@ -195,7 +195,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         );
 
         if (pendenciaExata) {
-          const petNome = (pendenciaExata.atendimentos as any)?.pets?.nome || 'Pet';
+          const petNome = (pendenciaExata.atendimentos as any)?.pets?.nome || 
+                         (pendenciaExata as any).atendimentos?.pets?.nome || 
+                         'Pet';
           setMessages(prev => [...prev, {
             role: 'assistant',
             content: `Encontrei uma pendência exata para **${petNome}** no valor de **R$ ${res.valor.toFixed(2)}**.\n\nDeseja confirmar a baixa agora?`,
