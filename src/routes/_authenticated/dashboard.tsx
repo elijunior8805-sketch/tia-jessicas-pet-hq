@@ -154,12 +154,12 @@ function DashboardPage() {
   });
 
   const kpis = [
-    { label: "Faturamento",   value: metrics ? brl(metrics.faturamento) : "—", hint: "Receitas de serviços",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Faturamento",   value: metrics ? brl(metrics.faturamento) : "—", hint: "Serviços realizados",     icon: TrendingUp, tone: KPI_TONES.esmeralda },
+    { label: "Recebido",      value: metrics ? brl(metrics.recebido)    : "—", hint: "Entradas no caixa",       icon: Coins,      tone: KPI_TONES.salvia    },
     { label: "Despesas",      value: metrics ? brl(metrics.despesas)    : "—", hint: "Saídas no período",       icon: Wallet,     tone: KPI_TONES.terracota },
-    { label: "Lucro",         value: metrics ? brl(metrics.lucro)       : "—", hint: "Saldo operacional",       icon: Sparkles,   tone: KPI_TONES.dourado   },
+    { label: "Lucro Real",    value: metrics ? brl(metrics.lucro)       : "—", hint: "Saldo de caixa",          icon: Sparkles,   tone: KPI_TONES.dourado   },
     { label: "Ticket Médio",  value: metrics ? brl(metrics.ticketMedio) : "—", hint: "Média por serviço",       icon: Receipt,    tone: KPI_TONES.ambar     },
-    { label: "Aportes",       value: metrics ? brl(metrics.aportes)    : "—", hint: "Entradas diversas",        icon: Coins,      tone: KPI_TONES.salvia    },
-    { label: "Atendimentos",  value: metrics?.atendimentos ?? "—",           hint: "Realizados no período",   icon: PawPrint,   tone: KPI_TONES.petroleo  },
+    { label: "Atendimentos",  value: metrics?.atendimentos ?? "—",           hint: "Total do período",        icon: PawPrint,   tone: KPI_TONES.petroleo  },
   ];
 
   const hoje = new Date();
@@ -293,24 +293,10 @@ function DashboardPage() {
               pendenciasCount: metrics.atendimentos,
               aportes: metrics.aportes
             } : {}} 
-            auditNote={DASHBOARD_AUDIT_CONTENT}
           />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full gap-2 border-[oklch(0.85_0.05_155)] hover:bg-[oklch(0.94_0.03_155)]"
-          onClick={() => recalc.mutate()}
-          disabled={recalc.isPending}
-          title="Recalcula históricos e agregados a partir dos lançamentos atuais (admin)"
-        >
-          <RefreshCw className={`h-4 w-4 ${recalc.isPending ? "animate-spin" : ""}`} />
-          {recalc.isPending ? "Recalculando…" : "Recalcular KPIs"}
-        </Button>
       </div>
 
-
-      {/* ============ KPI CARDS PREMIUM ============ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 mb-6">
         {kpis.map((k) => (
           <Card
@@ -480,32 +466,9 @@ function DashboardPage() {
           </Card>
         </div>
       </div>
-      <AuditNote />
     </PageShell>
   );
 }
-
-const DASHBOARD_AUDIT_CONTENT = `Este painel agora consome a mesma fonte de dados unificada do Financeiro.
-
-PERÍODO DE TESTE
-01/07/2026 até 31/07/2026.
-
-DADOS UNIFICADOS
-Os valores de Faturamento, Recebido e Lucro são obtidos via backend a partir da view 'public.vw_financeiro_indicadores', garantindo que não existam divergências entre as telas do sistema.`;
-
-const AuditNote = () => (
-  <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
-    <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
-      <div className="inline-flex items-center gap-2 rounded-full bg-[oklch(0.62_0.13_40/0.1)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.12_40)]">
-        CORREÇÃO FINANCEIRA CONTROLADA — SINCRONIZAÇÃO DASHBOARD
-      </div>
-      <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
-        {DASHBOARD_AUDIT_CONTENT}
-      </div>
-    </div>
-  </div>
-);
-
 type PeriodTuple = readonly [Period, string, string];
 
 function PeriodTabs({
