@@ -86,7 +86,7 @@ function FinanceiroPage() {
     staleTime: 30000,
   });
 
-  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const brl = (v: number) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const formatDate = (dateStr: string) => {
     try {
@@ -160,7 +160,7 @@ function FinanceiroPage() {
                 lucroEstimado: metrics.lucro,
                 ticketMedio: metrics.ticketMedio,
                 aportes: metrics.aportes
-              } : {}} 
+              } : { receitaBruta: 0, totalRecebido: 0, despesaTotal: 0, lucroEstimado: 0, ticketMedio: 0, aportes: 0 }} 
             />
             <Button size="sm" onClick={() => toast.info("Funcionalidade em desenvolvimento")} className="bg-primary hover:bg-primary/90 rounded-full px-4">
               <Plus className="h-4 w-4 mr-2" />
