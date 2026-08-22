@@ -330,6 +330,37 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
+  const handleConfirmarBaixaIA = async (msg: any) => {
+    setIsProcessing(true);
+    try {
+      const { meta, intent } = msg;
+      if (!meta?.pagamento_id) throw new Error("ID do pagamento não localizado no contexto.");
+
+      await executarBaixaPagamento({
+        data: {
+          pagamento_id: meta.pagamento_id,
+          valor_pago: intent.valor,
+          forma: intent.forma_pagamento || 'pix',
+          comprovante_path: meta.comprovante_path,
+          id_transacao: meta.id_transacao,
+          observacoes: intent.observacoes
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Baixa realizada com sucesso!** O comprovante foi vinculado e o financeiro atualizado.`,
+        timestamp: new Date().toISOString()
+      }]);
+      toast.success("Pagamento baixado!");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao realizar baixa.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const toggleVoice = () => {
     if (voiceStatus === 'listening') recognizerRef.current?.stop();
     else recognizerRef.current?.start();
@@ -457,6 +488,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                               disabled={isProcessing}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar
+                            </Button>
+                          )}
+                          {msg.intent.intencao === 'confirmar_baixa' && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-[#C99845] hover:bg-[#C99845]/90 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => handleConfirmarBaixaIA(msg)}
+                              disabled={isProcessing}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Baixa
                             </Button>
                           )}
                         </div>
