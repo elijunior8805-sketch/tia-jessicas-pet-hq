@@ -54,16 +54,30 @@ export interface IAMessage {
   timestamp: string;
 }
 
-export async function classificarComandoIA(texto: string, contexto?: { role: 'user' | 'assistant', content: string }[], sb?: any) {
+export async function classificarComandoIA(texto: string, contextoMsg?: { role: 'user' | 'assistant', content: string }[], sb?: any, userContext?: { id: string, nome: string, perfil: string, permissoes?: any }) {
   const { chamarIA } = await import("../ia-core.server");
   const { carregarIaConfig } = await import("../ia-core.server");
   
   const config = await carregarIaConfig(sb);
   const dataAtual = new Date().toLocaleDateString('pt-BR');
+  const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  
+  const contextHeader = userContext ? `
+USUÁRIO LOGADO:
+- ID: ${userContext.id}
+- NOME: ${userContext.nome}
+- PERFIL: ${userContext.perfil}
+- PERMISSÕES: ${JSON.stringify(userContext.permissoes || {})}
+- NEGÓCIO: ERP Spa de Pet Tia Jéssica
+- DATA/HORA: ${dataAtual} às ${horaAtual}
+- FUSO: America/Sao_Paulo (GMT-3)
+` : `DATA ATUAL: ${dataAtual}`;
   
   const systemPrompt = `Você é a Assistente Operacional interna do Spa de Pet Tia Jéssica.
 
 Seu usuário é o proprietário, administrador, gerente ou funcionário autorizado. Você não está conversando com o cliente final do Spa.
+
+${contextHeader}
 
 Sua função é ajudar o usuário interno a consultar informações e executar tarefas operacionais autorizadas dentro do sistema.
 
