@@ -18,6 +18,7 @@ import { useMyProfile, firstName } from "@/hooks/use-my-profile";
 import { recalcularAgregados } from "@/lib/agregados.functions";
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+import { RelatorioFinanceiroExport } from "@/components/RelatorioFinanceiroExport";
 
 
 
@@ -265,17 +266,36 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Filtro segmentado + Recalcular */}
+      {/* Filtro segmentado + Ações */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <PeriodTabs
-          period={period}
-          onChange={setPeriod}
-          periodos={periodos}
-          customFrom={customFrom}
-          customTo={customTo}
-          setCustomFrom={setCustomFrom}
-          setCustomTo={setCustomTo}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodTabs
+            period={period}
+            onChange={setPeriod}
+            periodos={periodos}
+            customFrom={customFrom}
+            customTo={customTo}
+            setCustomFrom={setCustomFrom}
+            setCustomTo={setCustomTo}
+          />
+          <RelatorioFinanceiroExport 
+            from={from} 
+            to={to} 
+            kpis={metrics ? {
+              receitaBruta: metrics.faturamento,
+              totalRecebido: metrics.recebido,
+              aReceber: metrics.aReceber,
+              vencido: metrics.vencido,
+              despesaTotal: metrics.despesas,
+              lucroEstimado: metrics.lucro,
+              saldoPeriodo: metrics.recebido - metrics.despesas,
+              ticketMedio: metrics.ticketMedio,
+              pendenciasCount: metrics.atendimentos,
+              aportes: metrics.aportes
+            } : {}} 
+            auditNote={DASHBOARD_AUDIT_CONTENT}
+          />
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -465,6 +485,14 @@ function DashboardPage() {
   );
 }
 
+const DASHBOARD_AUDIT_CONTENT = `Este painel agora consome a mesma fonte de dados unificada do Financeiro.
+
+PERÍODO DE TESTE
+01/07/2026 até 31/07/2026.
+
+DADOS UNIFICADOS
+Os valores de Faturamento, Recebido e Lucro são obtidos via backend a partir da view 'public.vw_financeiro_indicadores', garantindo que não existam divergências entre as telas do sistema.`;
+
 const AuditNote = () => (
   <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
     <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
@@ -472,13 +500,7 @@ const AuditNote = () => (
         CORREÇÃO FINANCEIRA CONTROLADA — SINCRONIZAÇÃO DASHBOARD
       </div>
       <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
-        {`Este painel agora consome a mesma fonte de dados unificada do Financeiro.
-
-PERÍODO DE TESTE
-01/07/2026 até 31/07/2026.
-
-DADOS UNIFICADOS
-Os valores de Faturamento, Recebido e Lucro são obtidos via backend a partir da view 'public.vw_financeiro_indicadores', garantindo que não existam divergências entre as telas do sistema.`}
+        {DASHBOARD_AUDIT_CONTENT}
       </div>
     </div>
   </div>

@@ -55,7 +55,7 @@ import {
 } from "lucide-react";
 import { ReciboDialog } from "@/components/recibo-dialog";
 import type { ReciboData } from "@/lib/recibo-pdf";
-import { generateFinanceiroPDF } from "@/lib/financeiro-pdf";
+import { RelatorioFinanceiroExport } from "@/components/RelatorioFinanceiroExport";
 import { toast } from "sonner";
 import {
   format,
@@ -349,9 +349,17 @@ function FinanceiroPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h1 className="text-2xl font-bold">Financeiro</h1>
-        <LancamentoManualDialog onCreated={() => qc.invalidateQueries()} />
+        <div className="flex items-center gap-2">
+          <RelatorioFinanceiroExport 
+            from={inicio} 
+            to={fim} 
+            kpis={kpis} 
+            auditNote={AUDIT_CONTENT}
+          />
+          <LancamentoManualDialog onCreated={() => qc.invalidateQueries()} />
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -366,14 +374,7 @@ function FinanceiroPage() {
   );
 }
 
-const AuditNote = () => (
-  <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
-    <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
-      <div className="inline-flex items-center gap-2 rounded-full bg-[oklch(0.62_0.13_40/0.1)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.12_40)]">
-        CORREÇÃO FINANCEIRA CONTROLADA — UTILIZAR O DIAGNÓSTICO ANTERIOR
-      </div>
-      <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
-        {`Utilize exclusivamente as evidências apresentadas na auditoria financeira forense do período de 01/07/2026 a 31/07/2026.
+const AUDIT_CONTENT = `Utilize exclusivamente as evidências apresentadas na auditoria financeira forense do período de 01/07/2026 a 31/07/2026.
 
 OBJETIVO
 Corrigir a causa comprovada da divergência entre Dashboard e Financeiro, centralizar os indicadores no backend e garantir sincronização permanente.
@@ -409,7 +410,16 @@ TESTES DE REGRESSÃO
 Testar: Pagamento integral; Pagamento parcial; Estorno; Cancelamento; Desconto; Taxa; Filtros; Relatórios; Desktop; Mobile; Atualização em tempo real.
 
 RELATÓRIO FINAL
-Apresentar: Causa confirmada; Correção realizada; Arquivos, funções, views ou consultas alteradas; Registros corrigidos; Valores anteriores; Valores posteriores; Resultado de cada teste; Confirmação de que todas as telas utilizam a fonte central.`}
+Apresentar: Causa confirmada; Correção realizada; Arquivos, funções, views ou consultas alteradas; Registros corrigidos; Valores anteriores; Valores posteriores; Resultado de cada teste; Confirmação de que todas as telas utilizam a fonte central.`;
+
+const AuditNote = () => (
+  <div className="mt-8 border-t border-border pt-6 pb-12 text-left">
+    <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-[oklch(0.62_0.13_40/0.3)] bg-[oklch(0.62_0.13_40/0.05)] p-6">
+      <div className="inline-flex items-center gap-2 rounded-full bg-[oklch(0.62_0.13_40/0.1)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[oklch(0.55_0.12_40)]">
+        CORREÇÃO FINANCEIRA CONTROLADA — UTILIZAR O DIAGNÓSTICO ANTERIOR
+      </div>
+      <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono">
+        {AUDIT_CONTENT}
       </div>
     </div>
   </div>

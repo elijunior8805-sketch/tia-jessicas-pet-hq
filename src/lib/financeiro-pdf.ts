@@ -74,6 +74,7 @@ export type FinPdfData = {
   porForma: FinPdfPorForma[];
   entradas: FinPdfEntrada[];
   saidas: FinPdfSaida[];
+  auditNote?: string;
 };
 
 export async function generateFinanceiroPDF(d: FinPdfData) {
@@ -278,6 +279,28 @@ export async function generateFinanceiroPDF(d: FinPdfData) {
     d.saidas.reduce((s, e) => s + (e.valor_pago || e.valor || 0), 0),
     "Total saídas",
   );
+
+  // ===== Auditoria =====
+  if (d.auditNote) {
+    ensureSpace(60);
+    doc.setFillColor(250, 245, 245);
+    doc.setDrawColor(220, 180, 180);
+    doc.rect(M, y, W - M * 2, 20, "FD");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(180, 60, 60);
+    doc.text("NOTA DE AUDITORIA E CONTROLE", M + 8, y + 13);
+    y += 20;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...C.mute);
+    const auditLines = doc.splitTextToSize(d.auditNote, W - M * 2 - 16);
+    ensureSpace(auditLines.length * 10 + 10);
+    doc.text(auditLines, M + 8, y + 12);
+    y += auditLines.length * 10 + 20;
+  }
 
   addFooter();
 
