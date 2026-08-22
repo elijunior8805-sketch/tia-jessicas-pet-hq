@@ -68,7 +68,7 @@ export const executarCriacaoCliente = createServerFn({ method: "POST" })
     nome: z.string(),
     telefone: z.string().optional(),
     email: z.string().optional(),
-    endereco: z.string().optional(),
+    observacoes: z.string().optional(),
   }).parse(data))
   .handler(async ({ data, context }) => {
     const { criarClienteIA } = await import("./ia-acoes.server");

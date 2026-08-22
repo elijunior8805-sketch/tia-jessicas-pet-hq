@@ -240,7 +240,7 @@ export async function estornarPagamentoIA(
 
 export async function criarClienteIA(
   sb: SupabaseClient<Database>,
-  params: { nome: string; telefone: string; email?: string; observacoes?: string }
+  params: { nome: string; telefone?: string; email?: string; observacoes?: string }
 ) {
   const { data, error } = await sb
     .from("clientes")
