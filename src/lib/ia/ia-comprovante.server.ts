@@ -32,12 +32,12 @@ Analise a imagem fornecida e extraia as seguintes informações em formato JSON:
 - pagador (string)
 - recebedor (string)
 - instituicao (string)
-- id_transacao (string, se visível)
+- id_transacao (string, se visível) - Extraia o Identificador, ID da Transação ou Código End-to-End.
 
 Regras:
 1. Se o valor não for legível, retorne sucesso: false.
 2. Identifique se o comprovante parece cortado ou ilegível.
-3. Não invente dados.
+3. Não invente dados. Se um campo não existir, retorne null.
 4. Responda APENAS o JSON.`;
 
   try {
@@ -48,9 +48,6 @@ Regras:
       json: true,
       origem: "ia_analise_comprovante",
       sb,
-      // Passar a imagem no formato esperado pelo Gateway para Visão
-      // Nota: A implementação atual do chamarIA precisa ser verificada se suporta multimodality.
-      // Se não, passamos a imagem no prompt seguindo o padrão de Visão do Gemini.
       extraContent: [
         {
           type: "image",
@@ -60,6 +57,27 @@ Regras:
     });
 
     const parsed = JSON.parse(res.texto);
+
+    // Verificação de duplicidade no banco
+    if (parsed.id_transacao) {
+      const { data: existente } = await sb
+        .from("pagamentos")
+        .select("id, status, data_pagamento")
+        .eq("id_transacao_bancaria", parsed.id_transacao)
+        .is("arquivado_em", null)
+        .maybeSingle();
+
+      if (existente) {
+        return {
+          ...parsed,
+          confianca: 1,
+          sucesso: false,
+          success: false,
+          mensagem: `Este comprovante já foi utilizado em outro pagamento (ID: ${existente.id}) em ${existente.data_pagamento}.`
+        };
+      }
+    }
+
     return {
       ...parsed,
       confianca: 0.95,
