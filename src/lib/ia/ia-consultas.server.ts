@@ -137,7 +137,7 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
   const { data: promessas } = await sb
     .from("cobranca_promessas")
     .select("id")
-    .eq("data_promessa", hoje)
+    .eq("data_prometida", hoje)
     .eq("status", "pendente");
 
   const totalAgenda = agenda?.length || 0;
