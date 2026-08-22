@@ -1,5 +1,6 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { format, subDays } from "date-fns";
 
 export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: { data?: string; pet_nome?: string; cliente_nome?: string; profissional?: string }) {
   let query = sb
@@ -55,7 +56,53 @@ export async function buscarDadosClientesPets(sb: SupabaseClient<Database>, term
   return { clientes, pets };
 }
 
-export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; apenas_pendentes?: boolean; data?: string }) {
+export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; apenas_pendentes?: boolean; data?: string; period?: "hoje" | "mes" | "30dias"; termo?: string }) {
+  // Se for uma busca por termo (ex: nome do pagador no comprovante)
+  if (filtros.termo) {
+    const { data, error } = await sb
+      .from("pagamentos")
+      .select(`
+        *,
+        atendimentos(
+          id,
+          data_inicio,
+          pet_id,
+          pets(nome),
+          clientes(nome)
+        )
+      `)
+      .ilike("descricao", `%${filtros.termo}%`)
+      .limit(50);
+    if (error) throw error;
+    return data;
+  }
+
+  // Para consultas de KPIs financeiros globais
+  if (!filtros.cliente_id && !filtros.data && !filtros.apenas_pendentes && !filtros.termo) {
+    const now = new Date();
+    let from = format(subDays(now, 29), "yyyy-MM-dd");
+    let to = format(now, "yyyy-MM-dd");
+
+    if (filtros.period === "hoje") {
+      from = format(now, "yyyy-MM-dd");
+      to = from;
+    } else if (filtros.period === "mes") {
+      from = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
+      to = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
+    }
+
+    // getFinancialKPIs é um server function, mas ia-consultas.server.ts já roda no servidor.
+    // Podemos chamar o handler diretamente se necessário ou simular a chamada.
+    // Como estamos no servidor, chamamos a lógica de consulta centralizada.
+    const { data: indicators } = await sb
+      .from("vw_financeiro_indicadores")
+      .select("*")
+      .gte("data_referencia", from)
+      .lte("data_referencia", to);
+
+    return indicators;
+  }
+
   let query = sb
     .from("pagamentos")
     .select(`
@@ -73,8 +120,6 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     query = query.eq("cliente_id", filtros.cliente_id);
   }
   if (filtros.apenas_pendentes) {
-    // Mesma definição oficial de "A Receber": saldo em aberto, não cancelado,
-    // não arquivado e sem registros de teste.
     query = query
       .not("status", "in", '("pago","cancelado")')
       .is("arquivado_em", null)
@@ -135,13 +180,21 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     .select("status, hora, leva_traz_modalidade, pets(nome)")
     .eq("data", hoje);
 
-  // 2. Pendências financeiras (mesma definição oficial de "A Receber")
+  // 2. Pendências financeiras (USANDO FONTE CENTRAL)
+  const { data: indicators } = await sb
+    .from("vw_financeiro_indicadores")
+    .select("*")
+    .gte("data_referencia", hoje)
+    .lte("data_referencia", hoje);
+    
+  // A Receber total (não apenas de hoje)
   const { data: pendencias } = await sb
     .from("pagamentos")
     .select("valor_total, valor_pago")
     .not("status", "in", '("pago","cancelado")')
     .is("arquivado_em", null)
-    .or("is_teste.is.null,is_teste.eq.false");
+    .or("is_teste.is.null,is_teste.eq.false")
+    .or(`categoria_receita.is.null,and(categoria_receita.neq.aporte,categoria_receita.neq.ajuste)`);
 
   // 3. Promessas vencendo
   const { data: promessas } = await sb
@@ -157,6 +210,9 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
   
   const valorPendente = pendencias?.reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0) || 0;
 
+  const faturamentoHoje = indicators?.filter(i => i.tipo === 'receita_servico').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
+  const recebidoHoje = indicators?.filter(i => i.tipo === 'receita_recebida').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
+
   return {
     data: hoje,
     total_agenda: totalAgenda,
@@ -164,8 +220,10 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     cancelados,
     leva_traz: levaTraz,
     valor_pendente: valorPendente,
+    faturamento_hoje: faturamentoHoje,
+    recebido_hoje: recebidoHoje,
     promessas_hoje: promessas?.length || 0,
-    alertas: [] // Poderia adicionar lógica de atrasos aqui
+    alertas: []
   };
 }
 

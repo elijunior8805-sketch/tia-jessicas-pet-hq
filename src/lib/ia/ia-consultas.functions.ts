@@ -31,6 +31,7 @@ export const consultarFinanceiroIA = createServerFn({ method: "POST" })
     cliente_id: z.string().optional(),
     apenas_pendentes: z.boolean().optional(),
     data: z.string().optional(),
+    termo: z.string().optional(),
   }).parse(data))
   .handler(async ({ data, context }) => {
     const { buscarDadosFinanceiros } = await import("./ia-consultas.server");
