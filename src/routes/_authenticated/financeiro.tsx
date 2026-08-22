@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getFinancialKPIs } from "@/lib/financial-kpis.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,11 +52,11 @@ import {
   Filter,
   MoreHorizontal,
   Info,
+  Download,
 } from "lucide-react";
 import { ReciboDialog } from "@/components/recibo-dialog";
 import type { ReciboData } from "@/lib/recibo-pdf";
 import { generateFinanceiroPDF } from "@/lib/financeiro-pdf";
-import { Download } from "lucide-react";
 import { toast } from "sonner";
 import {
   format,
