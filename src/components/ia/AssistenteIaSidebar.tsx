@@ -265,7 +265,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       const startTime = Date.now();
       setSearchResults(null);
 
-      if (intent.intencao === 'consulta_agenda') {
+      if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
         const response = await consultarAgendaIA({
           data: {
             data: intent.data || undefined,
@@ -275,9 +275,11 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
         
         dadosReais = response.result || [];
-        if (dadosReais && dadosReais.length > 0) {
+        if (intent.intencao === 'contar_atendimentos') {
+          respostaFinal = `Você tem **${dadosReais.length} atendimentos** agendados para este período.`;
+        } else if (dadosReais && dadosReais.length > 0) {
           respostaFinal = `Encontrei **${dadosReais.length} agendamentos**. Aqui estão os principais:\n\n` + 
-            dadosReais.slice(0, 3).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)}`).join('\n');
+            dadosReais.slice(0, 5).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)}`).join('\n');
         } else {
           respostaFinal = "Não encontrei agendamentos para este critério.";
         }
@@ -292,18 +294,25 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         } else {
           respostaFinal = `Não localizei nenhum cliente ou pet com "${termo}". Deseja cadastrar um novo?`;
         }
-      } else if (intent.intencao === 'consulta_financeira') {
+      } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         const response = await consultarFinanceiroIA({
-          data: { apenas_pendentes: true }
+          data: { 
+            apenas_pendentes: intent.intencao === 'consultar_pendencias' || intent.intencao === 'consulta_financeira',
+            termo: intent.cliente_nome || undefined
+          }
         });
         
         dadosReais = response.result || [];
-        if (dadosReais && dadosReais.length > 0) {
+        if (intent.intencao === 'consultar_resumo_financeiro') {
+          // Lógica simplificada para o faturamento no resumo financeiro
+          const faturamento = dadosReais.reduce((acc: number, p: any) => acc + Number(p.valor_total || 0), 0);
+          respostaFinal = `O faturamento identificado para este critério é de **R$ ${faturamento.toFixed(2)}**.`;
+        } else if (dadosReais && dadosReais.length > 0) {
           const searchResList = dadosReais as any[];
           const total = searchResList.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
-          respostaFinal = `Você tem **${dadosReais.length} pendências** totalizando **R$ ${total.toFixed(2)}**.`;
+          respostaFinal = `Identifiquei **${dadosReais.length} registros** totalizando **R$ ${total.toFixed(2)}** em aberto.`;
         } else {
-          respostaFinal = "Não encontrei pendências financeiras em aberto.";
+          respostaFinal = "Não encontrei registros financeiros para este critério.";
         }
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
         const response = await consultarResumoOperacionalIA();
