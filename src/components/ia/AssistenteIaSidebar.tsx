@@ -307,16 +307,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         const count = dadosReais.length;
         
         if (intent.intencao === 'contar_atendimentos') {
-          let desc = `Você tem **${count} atendimento${count !== 1 ? 's' : ''}**`;
-          if (intent.status) desc += ` com status **${intent.status}**`;
-          if (intent.filtros?.servico_nome) desc += ` de **${intent.filtros.servico_nome}**`;
-          if (intent.data) desc += ` para o dia **${format(parseISO(intent.data), 'dd/MM')}**`;
-          respostaFinal = desc + ".";
-        } else if (count > 0) {
-          respostaFinal = `Encontrei **${count} agendamento${count !== 1 ? 's' : ''}**. Aqui estão os primeiros:\n\n` + 
-            dadosReais.slice(0, 10).map((a: any) => `- **${a.pets?.nome}** (${a.clientes?.nome}) às ${a.hora.slice(0, 5)} [${a.status}]`).join('\n');
+          const stats = {
+            total: dadosReais.length,
+            confirmados: dadosReais.filter((a: any) => a.status === 'confirmado').length,
+            em_atendimento: dadosReais.filter((a: any) => a.status === 'em_atendimento').length,
+            finalizados: dadosReais.filter((a: any) => a.status === 'finalizado').length,
+            pendentes: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            cancelados: dadosReais.filter((a: any) => a.status === 'cancelado').length,
+            faltas: dadosReais.filter((a: any) => a.status === 'falta').length,
+          };
+
+          respostaFinal = `Hoje existem **${stats.total} atendimentos** agendados:\n\n` +
+            `- ✅ **Confirmados**: ${stats.confirmados}\n` +
+            `- ⏳ **Aguardando**: ${stats.pendentes}\n` +
+            `- 🚿 **Em atendimento**: ${stats.em_atendimento}\n` +
+            `- ✨ **Finalizados**: ${stats.finalizados}\n` +
+            `- ❌ **Cancelados/Faltas**: ${stats.cancelados + stats.faltas}`;
+        } else if (dadosReais.length > 0) {
+          const dataFormatada = intent.data ? format(parseISO(intent.data), 'dd/MM') : 'hoje';
+          respostaFinal = `### 📅 Agenda de ${dataFormatada} (${dadosReais.length})\n\n` +
+            `| Horário | Pet | Serviço | Status |\n` +
+            `| :--- | :--- | :--- | :--- |\n` +
+            dadosReais.slice(0, 20).map((a: any) => 
+              `| ${a.hora.slice(0, 5)} | **${a.pets?.nome}** | ${a.servicos?.nome || 'Serviço'} | ${a.status === 'confirmado' ? '✅' : '⏳'} ${a.status} |`
+            ).join('\n');
+          
+          if (dadosReais.length > 20) {
+            respostaFinal += `\n\n*Exibindo os primeiros 20 de ${dadosReais.length} agendamentos.*`;
+          }
         } else {
-          respostaFinal = "Não encontrei agendamentos para este critério.";
+          respostaFinal = "Não existem agendamentos para o critério solicitado.";
         }
 
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
