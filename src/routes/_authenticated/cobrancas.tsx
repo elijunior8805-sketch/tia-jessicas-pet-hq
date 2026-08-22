@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import {
   listarCobrancas,
   kpisCobrancas,
@@ -138,6 +139,9 @@ function CobrancasPage() {
         },
       }),
   });
+
+  // Ativa a sincronização em tempo real para KPIs e listas
+  useRealtimeFinanceiro(["cobrancas"]);
 
   const [selecionada, setSelecionada] = useState<CobrancaDTO | null>(null);
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
