@@ -136,7 +136,7 @@ export async function listarAtendimentosIA(sb: SupabaseClient<Database>, filtros
 
   if (filtros.pet_id) query = query.eq("pet_id", filtros.pet_id);
   if (filtros.finalizado !== undefined) query = query.eq("finalizado", filtros.finalizado);
-  if (filtros.data) query = query.gte("data_inicio", `${filtros.data}T00:00:00`).lte("data_inicio", `${filtros.data}T23:59:59`);
+  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) query = query.gte("data_inicio", `${filtros.data}T00:00:00`).lte("data_inicio", `${filtros.data}T23:59:59`);
 
   const { data, error } = await query.order("data_inicio", { ascending: false }).limit(20);
   if (error) throw error;
