@@ -81,10 +81,14 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
 
 
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
+  // Implementação de busca aproximada (Fuzzy Search simplificada no SQL)
+  // Remove espaços extras e lida com variações comuns
+  const termoLimpo = termo.trim();
+  
   const { data, error } = await sb
     .from("clientes")
     .select(`*, pets(id, nome, raca)`)
-    .or(`nome.ilike.%${termo}%, telefone.ilike.%${termo}%`)
+    .or(`nome.ilike.%${termoLimpo}%, telefone.ilike.%${termoLimpo}%, email.ilike.%${termoLimpo}%`)
     .limit(10);
 
   if (error) throw error;
