@@ -132,7 +132,7 @@ function DashboardPage() {
         return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       };
 
-      const [comprasRes, atendRes, novosClientesRes, proxAgRes, pagamentosRes] = await Promise.all([
+      const [comprasRes, pagamentosRes, novosClientesRes, proxAgRes] = await Promise.all([
         // Despesas do painel: considera parcelas pagas pela data de pagamento
         // e parcelas ainda em aberto pela data de vencimento. Assim o card não
         // some quando a compra foi lançada mas ainda não foi baixada/paga.
@@ -185,7 +185,7 @@ function DashboardPage() {
         (p: any) => p.categoria_receita === "servico" || p.atendimento_id
       );
 
-      const faturamento = receitasServico.reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      const faturamento = receitasServico.reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
       
       // Ticket Médio: Faturamento de serviços / Atendimentos únicos com pagamento no período
       const atendimentosUnicosSet = new Set(receitasServico.map((p: any) => p.atendimento_id).filter(Boolean));
@@ -195,7 +195,7 @@ function DashboardPage() {
       // Aportes e Ajustes: categorias específicas
       const aportesAjustes = pagamentosPeriodo
         .filter((p: any) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
-        .reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+        .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
       
       const lucro = faturamento + aportesAjustes - despesas;
 
