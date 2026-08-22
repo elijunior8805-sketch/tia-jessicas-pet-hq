@@ -163,16 +163,15 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         data: { imagemBase64: base64, contentType: selectedFile.type }
       });
 
-      const comprovanteData = res.result || res;
-      if (res.success || res.sucesso) {
-        setAnaliseResult(comprovanteData);
+      if (res.sucesso) {
+        setAnaliseResult(res);
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `Li o comprovante! Aqui estão os dados identificados:\n\n` +
-                   `- **Valor**: R$ ${comprovanteData.valor.toFixed(2)}\n` +
-                   `- **Data**: ${comprovanteData.data}\n` +
-                   `- **Pagador**: ${comprovanteData.pagador}\n` +
-                   `- **Instituição**: ${comprovanteData.instituicao}\n\n` +
+                   `- **Valor**: R$ ${res.valor.toFixed(2)}\n` +
+                   `- **Data**: ${res.data}\n` +
+                   `- **Pagador**: ${res.pagador}\n` +
+                   `- **Instituição**: ${res.instituicao}\n\n` +
                    `Estou procurando a pendência correspondente...`,
           timestamp: new Date().toISOString()
         }]);
