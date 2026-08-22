@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+
 
 export const IAIntentSchema = z.object({
   intencao: z.enum([
