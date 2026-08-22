@@ -5,6 +5,7 @@ import { createIAResponse } from "./ia-retorno.server";
 import { getFinancialKPIs } from "../financial-kpis.functions";
 
 
+
 export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: { 
   data?: string; 
   periodo_inicio?: string;
