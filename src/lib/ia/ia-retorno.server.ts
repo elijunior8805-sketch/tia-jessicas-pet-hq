@@ -32,12 +32,21 @@ export async function logIAAuditoria(
   erro?: string
 ) {
   try {
+    // Importação dinâmica para evitar problemas no bundling de cliente
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    
+    // Filtra dados sensíveis ou muito grandes antes de salvar
+    const dadosLimpos = dados ? JSON.parse(JSON.stringify(dados)) : {};
+    if (dadosLimpos.result && Array.isArray(dadosLimpos.result)) {
+      dadosLimpos.count = dadosLimpos.result.length;
+      dadosLimpos.result = dadosLimpos.result.slice(0, 3); // Apenas amostra
+    }
+
     await supabaseAdmin.from('ia_auditoria').insert({
       usuario_id: userId,
       comando_original: comando,
       intencao_identificada: intencao,
-      dados_extraidos: dados,
+      dados_extraidos: dadosLimpos,
       status: status,
       erro: erro,
       tempo_resposta_ms: dados?.tempo_processamento || 0
