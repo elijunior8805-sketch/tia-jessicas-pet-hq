@@ -373,189 +373,271 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     }
   };
 
-  const toggleVoice = () => {
-    if (voiceStatus === 'listening') {
-      recognizerRef.current?.stop();
-    } else {
-      recognizerRef.current?.start();
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-background border rounded-xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
-        {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between bg-muted/30">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-gold animate-pulse" />
-            </div>
-            <div>
-              <h2 className="font-display font-semibold text-lg leading-none">Assistente Operacional IA</h2>
-              <p className="text-xs text-muted-foreground mt-1">Fase 4: Financeiro e Comprovantes</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-
-        {/* Chat Area */}
-        <ScrollArea className="flex-1 p-6" ref={scrollRef}>
-          <div className="space-y-6">
-            {messages.length === 0 && (
-              <div className="text-center py-12 space-y-4">
-                <div className="w-16 h-16 bg-muted rounded-full mx-auto flex items-center justify-center">
-                  <Mic className="w-8 h-8 text-muted-foreground" />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-md" 
+            onClick={onClose} 
+          />
+          
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="bg-background border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] w-full max-w-2xl h-[700px] flex flex-col overflow-hidden relative z-10"
+          >
+            {/* Header */}
+            <div className="px-6 py-5 border-b flex items-center justify-between bg-gradient-to-r from-muted/50 to-background">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center border border-gold/20 shadow-inner">
+                  <Sparkles className="w-5 h-5 text-gold animate-pulse" />
                 </div>
-                <div className="max-w-xs mx-auto">
-                  <p className="text-sm font-medium">Como posso ajudar hoje?</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Experimente: "Baixar pagamento do Eli Júnior", "Qual o saldo da Pipoca?" ou "Remarcar banho".
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                  msg.role === 'user' 
-                    ? 'bg-gold text-white rounded-tr-none' 
-                    : 'bg-muted rounded-tl-none'
-                }`}>
-                  <div className="text-sm leading-relaxed prose prose-sm prose-invert max-w-none">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div>
+                  <h2 className="font-display font-semibold text-xl tracking-tight leading-none text-foreground">
+                    Assistente Operacional IA
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
+                      SPA DE PET TIA JÉSSICA • INTELIGÊNCIA ATIVA
+                    </p>
                   </div>
-                  
-                  {msg.intent && (
-                    <div className="mt-3 pt-3 border-t border-black/10 text-xs font-medium space-y-2">
-                      <div className="flex items-center gap-1.5 opacity-80">
-                        {msg.intent.intencao.startsWith('consulta_') ? (
-                          <>
-                            {msg.intent.intencao === 'consulta_agenda' && <Calendar className="w-3 h-3" />}
-                            {msg.intent.intencao === 'consulta_cliente' && <User className="w-3 h-3" />}
-                            {msg.intent.intencao === 'consulta_pet' && <Dog className="w-3 h-3" />}
-                            {msg.intent.intencao === 'consulta_financeira' && <DollarSign className="w-3 h-3" />}
-                            {msg.intent.intencao === 'solicitar_resumo_operacional' && <Activity className="w-3 h-3" />}
-                            {msg.intent.intencao === 'analisar_risco_evasao' && <TrendingDown className="w-3 h-3" />}
-                            {msg.intent.intencao === 'sugerir_otimizacao_agenda' && <Zap className="w-3 h-3" />}
-                            <span>{msg.intent.intencao.replace(/_/g, ' ')}</span>
-                          </>
-                        ) : (
-                          <>
-                            {msg.intent.intencao === 'criar_agendamento' && <Plus className="w-3 h-3" />}
-                            {msg.intent.intencao === 'remarcar' && <Clock className="w-3 h-3" />}
-                            <span>Ação: {msg.intent.intencao.replace('_', ' ')}</span>
-                          </>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {/* Ações de Atalho */}
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-7 text-[10px] bg-white/10 hover:bg-white/20 border-white/20"
-                          onClick={() => {
-                            const path = msg.intent?.intencao === 'consulta_agenda' ? '/agenda' : 
-                                       msg.intent?.intencao === 'consulta_financeira' ? '/financeiro' : 
-                                       msg.intent?.intencao === 'consulta_cliente' ? '/clientes' : '/dashboard';
-                            window.open(path, '_blank');
-                          }}
-                        >
-                          <ExternalLink className="w-3 h-3 mr-1" /> Ver no sistema
-                        </Button>
-
-                        {/* Ação de Confirmação para Criar Agendamento */}
-                        {msg.intent.intencao === 'criar_agendamento' && 
-                         msg.intent.cliente_nome && 
-                         msg.intent.pet_nome && 
-                         msg.intent.horario && (
-                          <Button 
-                            size="sm" 
-                            className="h-7 text-[10px] bg-green-600 hover:bg-green-700 text-white border-none"
-                            onClick={() => handleConfirmarAgendamento(msg.intent!)}
-                            disabled={isProcessing}
-                          >
-                            <CheckCircle2 className="w-3 h-3 mr-1" /> Confirmar Agendamento
-                          </Button>
-                        )}
-                        {/* Ação de Confirmação para Pagamento */}
-                        {msg.intent.intencao === 'registrar_pagamento' && selectedEntity && (
-                          <Button 
-                            size="sm" 
-                            className="h-7 text-[10px] bg-green-600 hover:bg-green-700 text-white border-none"
-                            onClick={() => handleConfirmarPagamento(selectedEntity, msg.intent!)}
-                            disabled={isProcessing}
-                          >
-                            <DollarSign className="w-3 h-3 mr-1" /> Confirmar Recebimento
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
-            ))}
-
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-gold" />
-                  <span className="text-sm text-muted-foreground">Pensando...</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-
-        {/* Input Area */}
-        <div className="p-4 border-t bg-muted/30">
-          <div className="flex gap-2 items-end">
-            <div className="flex-1 bg-background border rounded-lg overflow-hidden flex items-end">
-              <Textarea
-                placeholder="Ex: Agendar banho para Eli amanhã às 10h..."
-                className="min-h-[44px] max-h-[120px] border-none focus-visible:ring-0 resize-none py-3"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend(inputText);
-                  }
-                }}
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`h-11 w-11 shrink-0 ${voiceStatus === 'listening' ? 'text-red-500 bg-red-50' : ''}`}
-                onClick={toggleVoice}
-              >
-                {voiceStatus === 'listening' ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
               </Button>
             </div>
-            <Button 
-              className="h-11 w-11 shrink-0 bg-gold hover:bg-gold/90" 
-              size="icon"
-              onClick={() => handleSend(inputText)}
-              disabled={!inputText.trim() || isProcessing}
-            >
-              <Send className="w-5 h-5" />
-            </Button>
-          </div>
-          <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground px-1">
-            <div className="flex gap-3">
-              <span>Shift+Enter para nova linha</span>
-              <span>Comandos de voz ativos</span>
+
+            {/* Chat Area */}
+            <ScrollArea className="flex-1 p-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px] bg-muted/5" ref={scrollRef}>
+              <div className="space-y-8 max-w-[95%] mx-auto py-4">
+                {messages.map((msg, i) => (
+                  <motion.div 
+                    initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    key={i} 
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={cn(
+                      "group relative max-w-[85%] rounded-2xl px-5 py-4 shadow-sm transition-all hover:shadow-md",
+                      msg.role === 'user' 
+                        ? 'bg-gold text-white rounded-tr-none shadow-gold/20' 
+                        : 'bg-white border rounded-tl-none shadow-black/5'
+                    )}>
+                      {msg.role === 'assistant' && (
+                        <div className="absolute -left-10 top-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center border text-gold shadow-sm">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                      )}
+
+                      <div className={cn(
+                        "text-[15px] leading-relaxed prose prose-sm max-w-none",
+                        msg.role === 'user' ? 'prose-invert text-white' : 'text-foreground prose-headings:text-gold prose-a:text-gold'
+                      )}>
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+
+                      {/* Render Search Results for Confirmation */}
+                      {msg.role === 'assistant' && i === messages.length - 1 && searchResults && (
+                        <div className="mt-4 grid grid-cols-1 gap-2 border-t pt-4">
+                          {searchResults.clientes.map((c: any) => (
+                            <motion.button
+                              whileHover={{ scale: 1.02, backgroundColor: 'rgba(212, 175, 55, 0.05)' }}
+                              whileTap={{ scale: 0.98 }}
+                              key={c.id}
+                              onClick={() => {
+                                setCurrentIntent(prev => prev ? { ...prev, cliente_nome: c.nome } : null);
+                                setSearchResults(null);
+                                handleSend(`Selecionado: Cliente ${c.nome}`);
+                              }}
+                              className="flex items-center justify-between p-3 rounded-xl border bg-muted/30 hover:border-gold/30 transition-all text-left group/card"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-gold/10 flex items-center justify-center text-gold group-hover/card:bg-gold group-hover/card:text-white transition-colors">
+                                  <User className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-foreground">{c.nome}</p>
+                                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{c.telefone || '(00) 00000-0000'}</p>
+                                </div>
+                              </div>
+                              <div className="bg-gold/10 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                SELECIONAR
+                              </div>
+                            </motion.button>
+                          ))}
+                          {searchResults.pets.map((p: any) => (
+                            <motion.button
+                              whileHover={{ scale: 1.02, backgroundColor: 'rgba(212, 175, 55, 0.05)' }}
+                              whileTap={{ scale: 0.98 }}
+                              key={p.id}
+                              onClick={() => {
+                                setCurrentIntent(prev => prev ? { ...prev, pet_nome: p.nome, cliente_nome: p.clientes?.nome } : null);
+                                setSearchResults(null);
+                                handleSend(`Selecionado: Pet ${p.nome} de ${p.clientes?.nome}`);
+                              }}
+                              className="flex items-center justify-between p-3 rounded-xl border bg-muted/30 hover:border-gold/30 transition-all text-left group/card"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-gold/10 flex items-center justify-center text-gold group-hover/card:bg-gold group-hover/card:text-white transition-colors">
+                                  <Dog className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-foreground">{p.nome}</p>
+                                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Tutor: {p.clientes?.nome}</p>
+                                </div>
+                              </div>
+                              <div className="bg-gold/10 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                SELECIONAR
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {msg.intent && (
+                        <div className={cn(
+                          "mt-4 pt-4 border-t text-[11px] font-medium space-y-4",
+                          msg.role === 'user' ? 'border-white/20' : 'border-black/5'
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] uppercase tracking-widest px-2 py-0.5 border-gold/20",
+                              msg.role === 'user' ? 'bg-white/20 text-white border-white/30' : 'bg-gold/5 text-gold'
+                            )}>
+                              {msg.intent.intencao.replace(/_/g, ' ')}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2.5">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className={cn(
+                                "h-9 px-4 text-[11px] font-bold rounded-xl border-gold/20 shadow-sm transition-all",
+                                msg.role === 'user' ? 'bg-white/10 text-white hover:bg-white/20 hover:border-white/50' : 'bg-white hover:bg-gold/5 hover:border-gold/40'
+                              )}
+                              onClick={() => {
+                                const path = msg.intent?.intencao === 'consulta_agenda' ? '/agenda' : 
+                                           msg.intent?.intencao === 'consulta_financeira' ? '/financeiro' : 
+                                           msg.intent?.intencao === 'consulta_cliente' ? '/clientes' : '/dashboard';
+                                window.open(path, '_blank');
+                              }}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 mr-2" /> Acessar Sistema
+                            </Button>
+
+                            {msg.intent.intencao === 'criar_agendamento' && 
+                             msg.intent.cliente_nome && 
+                             msg.intent.pet_nome && 
+                             msg.intent.horario && (
+                              <Button 
+                                size="sm" 
+                                className="h-9 px-4 text-[11px] font-black bg-green-600 hover:bg-green-700 text-white border-none shadow-[0_4px_12px_rgba(22,163,74,0.3)] rounded-xl"
+                                onClick={() => handleConfirmarAgendamento(msg.intent!)}
+                                disabled={isProcessing}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Confirmar Agora
+                              </Button>
+                            )}
+
+                            {msg.intent.intencao === 'registrar_pagamento' && selectedEntity && (
+                              <Button 
+                                size="sm" 
+                                className="h-9 px-4 text-[11px] font-black bg-green-600 hover:bg-green-700 text-white border-none shadow-[0_4px_12px_rgba(22,163,74,0.3)] rounded-xl"
+                                onClick={() => handleConfirmarPagamento(selectedEntity, msg.intent!)}
+                                disabled={isProcessing}
+                              >
+                                <DollarSign className="w-3.5 h-3.5 mr-2" /> Efetuar Baixa
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+
+                {isProcessing && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start pl-2"
+                  >
+                    <div className="bg-white border rounded-2xl rounded-tl-none px-5 py-4 flex items-center gap-4 shadow-sm">
+                      <div className="flex gap-1.5">
+                        <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 rounded-full bg-gold" />
+                        <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 rounded-full bg-gold" />
+                        <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 rounded-full bg-gold" />
+                      </div>
+                      <span className="text-[13px] font-bold text-muted-foreground uppercase tracking-tighter">Analizando...</span>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Input Area */}
+            <div className="p-6 border-t bg-gradient-to-b from-background to-muted/20">
+              <div className="flex gap-4 items-end max-w-[98%] mx-auto">
+                <div className="flex-1 bg-white border-2 border-muted rounded-[20px] overflow-hidden focus-within:border-gold/30 transition-all shadow-sm flex items-end pr-2">
+                  <Textarea
+                    placeholder="Solicite agendamento, baixas ou consultas..."
+                    className="min-h-[56px] max-h-[160px] border-none focus-visible:ring-0 resize-none py-4 px-6 text-[15px] font-medium placeholder:text-muted-foreground/50"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend(inputText);
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2 p-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className={cn(
+                        "rounded-xl transition-all h-11 w-11",
+                        voiceStatus === 'listening' ? 'bg-red-50 text-red-600 shadow-inner' : 'hover:bg-muted'
+                      )}
+                      onClick={toggleVoice}
+                    >
+                      {voiceStatus === 'listening' ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      className="bg-gold hover:bg-gold-dark text-white rounded-xl shadow-[0_8px_16px_rgba(212,175,55,0.25)] h-11 w-11 disabled:opacity-50 transition-all active:scale-95"
+                      onClick={() => handleSend(inputText)}
+                      disabled={!inputText.trim() || isProcessing}
+                    >
+                      <Send className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-5 px-3 text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
+                <div className="flex gap-5">
+                  <span className="flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> INTELIGÊNCIA EM TEMPO REAL</span>
+                </div>
+                <button 
+                  onClick={() => setMessages([])} 
+                  className="flex items-center gap-2 hover:text-red-500 transition-colors py-1 px-2 rounded-lg hover:bg-red-50"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> REINICIAR FLUXO
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2 items-center">
-              <RotateCcw className="w-3 h-3 cursor-pointer hover:text-gold" onClick={() => setMessages([])} />
-              <span>Limpar conversa</span>
-            </div>
-          </div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }
+
