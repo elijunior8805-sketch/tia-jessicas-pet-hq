@@ -15,5 +15,22 @@ export const classificarIntencao = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // Importação dinâmica para evitar que o código de servidor vaze para o cliente
     const { classificarComandoIA } = await import("./ia-agente.server");
-    return classificarComandoIA(data.texto, data.contexto, context.supabase);
+    
+    // Buscar perfil do usuário para contexto
+    const { data: profile } = await context.supabase
+      .from('profiles')
+      .select('nome, perfil')
+      .eq('id', context.userId)
+      .maybeSingle();
+
+    return classificarComandoIA(
+      data.texto, 
+      data.contexto, 
+      context.supabase, 
+      {
+        id: context.userId,
+        nome: (profile as any)?.nome || 'Usuário',
+        perfil: (profile as any)?.perfil || 'user'
+      }
+    );
   });
