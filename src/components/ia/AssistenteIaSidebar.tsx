@@ -37,7 +37,8 @@ import {
   consultarFinanceiroIA, 
   consultarResumoOperacionalIA,
   analisarRiscoEvasaoIA,
-  buscarServicosIA
+  buscarServicosIA,
+  consultarHistoricoPetIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
   validarAgendamentoIA,
