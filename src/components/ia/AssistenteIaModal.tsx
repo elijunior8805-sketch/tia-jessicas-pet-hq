@@ -84,7 +84,7 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     if (isOpen && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Olá! Sou sua Assistente IA. Como posso ajudar no Spa da Tia Jéssica hoje?\n\n---\n*Nota da Auditoria:* AUDITORIA E CONCILIAÇÃO FINANCEIRA DEFINITIVA NO BANCO DE DADOS NO PROJETO Spa de Pet Tia Jéssica. NÍVEL DE PRIORIDADE: Crítico.`,
+        content: `Olá! Sou sua Assistente IA. Como posso ajudar no Spa da Tia Jéssica hoje?\n\n---\n*Nota da Auditoria:* Não entendi. A gente tava falando sobre auditoria financeira que não tava batendo, eu te mandei os prints. Cê tá me respondendo sobre melhoria avançada dos cards múltiplos. O que eu te solicitei foi que eu fiz o mesmo, o mesmo histórico de período do dia 01/07 a 31/07 e a aba financeiro e a aba painel inicial mostram valores diferentes. Então, a gente precisa resolver isso`,
         timestamp: new Date().toISOString()
       }]);
     }
