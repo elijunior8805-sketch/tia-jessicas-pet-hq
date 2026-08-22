@@ -44,47 +44,82 @@ export interface IAMessage {
   timestamp: string;
 }
 
-export async function classificarComandoIA(texto: string, contexto?: { role: 'user' | 'assistant', content: string }[]) {
-  const lowercaseText = texto.toLowerCase();
+export async function classificarComandoIA(texto: string, contexto?: { role: 'user' | 'assistant', content: string }[], sb?: any) {
+  const { chamarIA } = await import("../ia-core.server");
+  const { carregarIaConfig } = await import("../ia-core.server");
   
-  let intencao: IAIntent["intencao"] = "comando_nao_reconhecido";
-  let resumo = "";
-  let resumo_acao = "";
+  const config = await carregarIaConfig(sb);
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
+  
+  const systemPrompt = `Você é a Assistente Operacional IA do Spa de Pet Tia Jéssica.
+Sua função agora é INTERPRETAR comandos e CONSULTAR dados.
+Estamos na Fase 2: Consultas Inteligentes.
 
-  if (lowercaseText.includes("agenda") || lowercaseText.includes("horário") || lowercaseText.includes("atendimentos")) {
+DATA ATUAL: ${dataAtual}
+
+INTENÇÕES POSSÍVEIS:
+- consulta_agenda: Para perguntas sobre horários, quem vem hoje, próximos banhos, leva e traz.
+- consulta_cliente: Para buscar dados de tutores, endereços, telefones.
+- consulta_pet: Para buscar ficha do pet, raça, comportamento, último atendimento.
+- consulta_financeira: Para dívidas, quanto recebeu, pagamentos do dia.
+- disponibilidade: Para verificar horários livres.
+- comando_nao_reconhecido: Quando não entender.
+
+REGRAS CRÍTICAS:
+1. NÃO invente dados. Se não souber, diga que precisa buscar ou que não encontrou.
+2. Extraia nomes de pets e clientes com precisão.
+3. Se o usuário perguntar "Quem vem hoje?", a intenção é consulta_agenda e a data é ${dataAtual}.
+4. Responda SEMPRE em formato JSON seguindo o schema IAIntentSchema.
+
+Exemplo de saída:
+{
+  "intencao": "consulta_agenda",
+  "data": "2026-08-22",
+  "resposta_ia": "Vou verificar a agenda de hoje para você.",
+  "nivel_confianca": 0.98
+}`;
+
+  try {
+    const res = await chamarIA({
+      system: systemPrompt,
+      prompt: texto,
+      config,
+      json: true,
+      origem: "assistente_ia_classificador"
+    });
+
+    const parsed = JSON.parse(res.texto);
+    return {
+      ...parsed,
+      nivel_confianca: parsed.nivel_confianca || 0.9
+    } as IAIntent;
+  } catch (error) {
+    console.error("Erro na classificação IA:", error);
+    // Fallback para o classificador básico se a IA falhar
+    return fallbackClassificador(texto);
+  }
+}
+
+function fallbackClassificador(texto: string): IAIntent {
+  const lowercaseText = texto.toLowerCase();
+  let intencao: IAIntent["intencao"] = "comando_nao_reconhecido";
+  
+  if (lowercaseText.includes("agenda") || lowercaseText.includes("hoje") || lowercaseText.includes("amanhã")) {
     intencao = "consulta_agenda";
-    resumo = "Estou verificando os agendamentos no sistema para você.";
-    resumo_acao = "Consultar agenda de hoje";
-  } else if (lowercaseText.includes("cliente") || lowercaseText.includes("tutor")) {
+  } else if (lowercaseText.includes("cliente")) {
     intencao = "consulta_cliente";
-    resumo = "Localizando as informações do cliente solicitado.";
-    resumo_acao = "Buscar cliente";
-  } else if (lowercaseText.includes("pet") || lowercaseText.includes("cachorro") || lowercaseText.includes("gato")) {
+  } else if (lowercaseText.includes("pet")) {
     intencao = "consulta_pet";
-    resumo = "Buscando a ficha do pet no banco de dados.";
-    resumo_acao = "Buscar pet";
-  } else if (lowercaseText.includes("pagou") || lowercaseText.includes("receber") || lowercaseText.includes("financeiro")) {
+  } else if (lowercaseText.includes("financeiro") || lowercaseText.includes("pagamento")) {
     intencao = "consulta_financeira";
-    resumo = "Analisando o status financeiro e pagamentos pendentes.";
-    resumo_acao = "Consultar financeiro";
-  } else if (lowercaseText.includes("agendar") || lowercaseText.includes("marcar")) {
-    intencao = "criar_agendamento";
-    resumo = "Preparando para criar um novo agendamento. Preciso confirmar os detalhes.";
-    resumo_acao = "Criar novo agendamento";
-  } else if (lowercaseText.includes("cadastrar") && (lowercaseText.includes("pet") || lowercaseText.includes("cachorro"))) {
-    intencao = "cadastrar_pet";
-    resumo = "Iniciando o cadastro de um novo pet.";
-    resumo_acao = "Cadastrar pet";
-  } else {
-    resumo = "Entendi seu comando. Como deseja prosseguir com esta operação?";
   }
 
   return {
     intencao,
-    nivel_confianca: 0.95,
-    resposta_ia: resumo,
-    resumo_acao: resumo_acao || null
+    nivel_confianca: 0.5,
+    resposta_ia: "Estou processando sua solicitação..."
   } as IAIntent;
 }
+
 
 

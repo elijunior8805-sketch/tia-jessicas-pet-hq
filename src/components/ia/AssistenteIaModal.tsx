@@ -8,7 +8,12 @@ import {
   RotateCcw, 
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ExternalLink,
+  Calendar,
+  User,
+  Dog,
+  DollarSign
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,7 +23,17 @@ import { VoiceRecognizer, VoiceRecognitionStatus } from '@/lib/ia/ia-voz';
 import { IAMessage, IAIntent } from '@/lib/ia/ia-agente.server';
 import { classificarIntencao } from '@/lib/ia/ia-agente.functions';
 import { registrarAuditoriaIA } from '@/lib/ia/ia-auditoria.functions';
+import { 
+  consultarAgendaIA, 
+  consultarClientesPetsIA, 
+  consultarFinanceiroIA, 
+  consultarDisponibilidadeIA 
+} from '@/lib/ia/ia-consultas.functions';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import ReactMarkdown from 'react-markdown';
+
 
 interface AssistenteIaModalProps {
   isOpen: boolean;
@@ -70,29 +85,78 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     setIsProcessing(true);
 
     try {
-      const result = await classificarIntencao({
+      // 1. Interpretar Intenção
+      const intent = await classificarIntencao({
         data: {
           texto: text,
           contexto: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
         }
       });
 
+      let dadosReais: any = null;
+      let respostaFinal = intent.resposta_ia || "Processando sua solicitação...";
+
+      // 2. Executar Consulta Baseada na Intenção
+      if (intent.intencao === 'consulta_agenda') {
+        dadosReais = await consultarAgendaIA({
+          data: {
+            data: intent.data || undefined,
+            pet_nome: intent.pet_nome || undefined,
+            cliente_nome: intent.cliente_nome || undefined
+          }
+        });
+        
+        if (dadosReais && dadosReais.length > 0) {
+          respostaFinal = `Encontrei ${dadosReais.length} agendamentos. Aqui estão os principais:\n\n`;
+          dadosReais.forEach((a: any) => {
+            respostaFinal += `- **${a.hora.slice(0, 5)}**: ${a.pets?.nome} (${a.clientes?.nome}) - *${a.status}*\n`;
+          });
+        } else {
+          respostaFinal = "Não encontrei agendamentos para os critérios informados.";
+        }
+      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet') {
+        const termo = intent.cliente_nome || intent.pet_nome || text;
+        const { clientes, pets } = await consultarClientesPetsIA({ data: { termo } });
+        
+        if (clientes.length > 0 || pets.length > 0) {
+          respostaFinal = "Localizei os seguintes registros:\n\n";
+          clientes.forEach((c: any) => respostaFinal += `- 👤 **Cliente**: ${c.nome} (${c.telefone || 'Sem tel'})\n`);
+          pets.forEach((p: any) => respostaFinal += `- 🐾 **Pet**: ${p.nome} (Tutor: ${p.clientes?.nome})\n`);
+        } else {
+          respostaFinal = "Desculpe, não localizei nenhum cliente ou pet com esse nome.";
+        }
+      } else if (intent.intencao === 'consulta_financeira') {
+        dadosReais = await consultarFinanceiroIA({
+          data: { apenas_pendentes: true }
+        });
+        
+        if (dadosReais && dadosReais.length > 0) {
+          const total = dadosReais.reduce((acc: number, p: any) => acc + (p.valor_total || 0), 0);
+          respostaFinal = `Existem pendências financeiras totalizando **R$ ${total.toFixed(2)}**.\n\nPrincipais débitos:\n`;
+          dadosReais.slice(0, 5).forEach((p: any) => {
+            respostaFinal += `- ${p.atendimentos?.clientes?.nome}: R$ ${p.valor_total.toFixed(2)} (${p.vencimento ? format(new Date(p.vencimento), 'dd/MM') : 'S/ data'})\n`;
+          });
+        } else {
+          respostaFinal = "Não encontrei pendências financeiras no momento.";
+        }
+      }
+
       const assistantMessage: IAMessage = {
         role: 'assistant',
-        content: result.resposta_ia || 'Não entendi seu comando.',
-        intent: result,
+        content: respostaFinal,
+        intent: intent,
         timestamp: new Date().toISOString()
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      setCurrentIntent(result);
+      setCurrentIntent(intent);
 
       // Auditoria
       await registrarAuditoriaIA({
         data: {
           comando_original: text,
-          intencao_identificada: result.intencao,
-          dados_extraidos: result,
+          intencao_identificada: intent.intencao,
+          dados_extraidos: intent,
           status: 'sucesso'
         }
       });
@@ -100,10 +164,17 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
     } catch (error) {
       console.error('Erro ao processar IA:', error);
       toast.error('Falha ao processar comando.');
+      
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "Desculpe, ocorreu um erro técnico ao processar sua consulta. Por favor, tente novamente em instantes.",
+        timestamp: new Date().toISOString()
+      }]);
     } finally {
       setIsProcessing(false);
     }
   };
+
 
   const toggleVoice = () => {
     if (voiceStatus === 'listening') {
@@ -156,24 +227,36 @@ export function AssistenteIaModal({ isOpen, onClose }: AssistenteIaModalProps) {
                     ? 'bg-gold text-white rounded-tr-none' 
                     : 'bg-muted rounded-tl-none'
                 }`}>
-                  <p className="text-sm leading-relaxed">{msg.content}</p>
+                  <div className="text-sm leading-relaxed prose prose-sm prose-invert max-w-none">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
                   
-                  {msg.intent && msg.intent.resumo_acao && (
+                  {msg.intent && msg.intent.intencao !== 'comando_nao_reconhecido' && (
                     <div className="mt-3 pt-3 border-t border-black/10 text-xs font-medium space-y-2">
                       <div className="flex items-center gap-1.5 opacity-80">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Ação Sugerida: {msg.intent.resumo_acao}</span>
+                        {msg.intent.intencao === 'consulta_agenda' && <Calendar className="w-3 h-3" />}
+                        {msg.intent.intencao === 'consulta_cliente' && <User className="w-3 h-3" />}
+                        {msg.intent.intencao === 'consulta_pet' && <Dog className="w-3 h-3" />}
+                        {msg.intent.intencao === 'consulta_financeira' && <DollarSign className="w-3 h-3" />}
+                        <span>Consulta: {msg.intent.intencao.replace('consulta_', '')}</span>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-[10px] bg-white/10 hover:bg-white/20 border-white/20">
-                          Confirmar
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-[10px] hover:bg-white/10">
-                          Alterar
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 text-[10px] bg-white/10 hover:bg-white/20 border-white/20"
+                          onClick={() => {
+                            if (msg.intent?.intencao === 'consulta_agenda') window.location.href = '/agenda';
+                            if (msg.intent?.intencao === 'consulta_financeira') window.location.href = '/financeiro';
+                          }}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          Ver no Módulo
                         </Button>
                       </div>
                     </div>
                   )}
+
                 </div>
               </div>
             ))}
