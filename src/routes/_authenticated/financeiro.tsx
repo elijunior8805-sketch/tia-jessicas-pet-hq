@@ -53,11 +53,14 @@ import {
   MoreHorizontal,
   Info,
   Download,
+  FileSpreadsheet,
 } from "lucide-react";
 import { ReciboDialog } from "@/components/recibo-dialog";
 import type { ReciboData } from "@/lib/recibo-pdf";
 import { generateFinanceiroPDF } from "@/lib/financeiro-pdf";
+import { generateFinanceiroCSV } from "@/lib/financeiro-csv";
 import { toast } from "sonner";
+
 import {
   format,
   parseISO,
