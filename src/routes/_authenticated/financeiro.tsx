@@ -75,7 +75,7 @@ function FinanceiroPage() {
   const [customDe, setCustomDe] = useState(computePreset("30dias", hoje).de);
   const [customAte, setCustomAte] = useState(computePreset("30dias", hoje).ate);
 
-  const { from, to } = useMemo(() => {
+  const { de: from, ate: to } = useMemo(() => {
     if (periodo !== "personalizado") return computePreset(periodo, hoje);
     return { de: customDe, ate: customAte };
   }, [periodo, customDe, customAte]);
