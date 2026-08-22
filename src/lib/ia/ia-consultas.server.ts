@@ -257,7 +257,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
       .is("arquivado_em", null)
       .or("is_teste.is.null,is_teste.eq.false");
   }
-  if (filtros.data) {
+  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) {
     query = query.eq("vencimento", filtros.data);
   }
 
