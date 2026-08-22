@@ -3,15 +3,6 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { format } from "date-fns";
 import { createIAResponse } from "./ia-retorno.server";
 
-export const ValidarAgendamentoSchema = z.import("zod").then(z => z.object({
-  data: z.string(),
-  hora: z.string(),
-  pet_id: z.string(),
-  cliente_id: z.string(),
-  profissional_id: z.string().optional(),
-  servicos: z.array(z.string()),
-}));
-
 type AgendamentoStatus = Database["public"]["Enums"]["agendamento_status"];
 type LevaTrazModalidade = Database["public"]["Enums"]["leva_traz_modalidade"];
 
@@ -216,6 +207,32 @@ export async function registrarPagamentoIA(
 
   return createIAResponse({
     action: 'registrar_pagamento',
+    record_id: data.id,
+    result: data
+  });
+}
+
+export async function estornarPagamentoIA(
+  sb: SupabaseClient<Database>,
+  pagamento_id: string,
+  motivo: string
+) {
+  const { data, error } = await sb
+    .from("pagamentos")
+    .update({
+      status: "pendente" as Database["public"]["Enums"]["pagamento_status"],
+      valor_pago: 0,
+      observacoes: `Estornado via IA: ${motivo}`,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", pagamento_id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  
+  return createIAResponse({
+    action: 'estornar_pagamento',
     record_id: data.id,
     result: data
   });
