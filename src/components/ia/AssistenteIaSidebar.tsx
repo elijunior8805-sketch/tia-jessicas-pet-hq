@@ -333,46 +333,77 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const handleConfirmarAgendamento = async (intent: IAIntent) => {
     setIsProcessing(true);
     try {
-      const { data: cData } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).limit(1);
-      const { data: pData } = await supabase.from('pets').select('id').ilike('nome', `%${intent.pet_nome}%`).limit(1);
+      // Usar IDs se já vierem na intenção, senão buscar por nome
+      let clienteId = intent.cliente_id;
+      let petId = intent.pet_id;
+      let servicosIds = intent.servicos_ids;
+
+      if (!clienteId && intent.cliente_nome) {
+        const { data: cData } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).limit(1);
+        clienteId = cData?.[0]?.id;
+      }
       
-      if (!cData?.length || !pData?.length) throw new Error("Cliente ou Pet não encontrado.");
+      if (!petId && intent.pet_nome && clienteId) {
+        const { data: pData } = await supabase.from('pets').select('id').eq('cliente_id', clienteId).ilike('nome', `%${intent.pet_nome}%`).limit(1);
+        petId = pData?.[0]?.id;
+      }
+      
+      if (!clienteId || !petId) throw new Error("Cliente ou Pet não localizado. Por favor, seja mais específico.");
 
-      const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('nome', intent.servicos || []);
-      if (!sData?.length) throw new Error("Serviços não encontrados.");
+      let servicosParaCriar: { id: string, nome: string, valor: number }[] = [];
+      
+      if (servicosIds && servicosIds.length > 0) {
+        const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('id', servicosIds);
+        servicosParaCriar = sData || [];
+      } else if (intent.servicos && intent.servicos.length > 0) {
+        const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('nome', intent.servicos);
+        servicosParaCriar = sData || [];
+      }
 
-      await validarAgendamentoIA({
+      if (!servicosParaCriar.length) throw new Error("Não identifiquei os serviços solicitados no cadastro.");
+
+      // Re-validar disponibilidade no backend antes de gravar
+      const validacao = await validarAgendamentoIA({
         data: {
           data: intent.data!,
           hora: intent.horario!,
-          cliente_id: cData[0].id,
-          pet_id: pData[0].id,
-          servicos: sData.map(s => s.id)
+          cliente_id: clienteId,
+          pet_id: petId,
+          servicos: servicosParaCriar.map(s => s.id)
         }
       });
 
+      if (!validacao.disponivel) {
+        throw new Error(validacao.motivo || "Horário indisponível.");
+      }
+
       await executarCriacaoAgendamento({
         data: {
-          cliente_id: cData[0].id,
-          pet_id: pData[0].id,
+          cliente_id: clienteId,
+          pet_id: petId,
           data: intent.data!,
           hora: intent.horario!,
-          servicos: sData.map(s => ({ id: s.id, nome: s.nome, valor: s.valor || 0 })),
+          servicos: servicosParaCriar,
           transporte: intent.transporte || false,
-          taxa_transporte: 0,
-          observacoes: "Agendado via Assistente IA"
+          taxa_transporte: intent.taxa_transporte || 0,
+          observacoes: intent.observacoes || "Agendado via Agente IA"
         }
       });
 
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `✅ **Confirmado!** ${intent.pet_nome} em ${intent.data} às ${intent.horario}.`,
+        content: `✅ **Agendamento realizado!**\n\n- **Pet**: ${intent.pet_nome}\n- **Data**: ${intent.data}\n- **Hora**: ${intent.horario}\n- **Serviços**: ${servicosParaCriar.map(s => s.nome).join(', ')}`,
         timestamp: new Date().toISOString()
       }]);
       setCurrentIntent(null);
-      toast.success("Agendado!");
+      toast.success("Agendado com sucesso!");
     } catch (error: any) {
       toast.error(error.message);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ **Não consegui concluir:** ${error.message}`,
+        timestamp: new Date().toISOString()
+      }]);
     } finally {
       setIsProcessing(false);
     }
