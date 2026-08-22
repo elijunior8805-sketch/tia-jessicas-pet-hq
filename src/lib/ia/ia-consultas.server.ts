@@ -73,7 +73,12 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     query = query.eq("cliente_id", filtros.cliente_id);
   }
   if (filtros.apenas_pendentes) {
-    query = query.eq("status", "pendente");
+    // Mesma definição oficial de "A Receber": saldo em aberto, não cancelado,
+    // não arquivado e sem registros de teste.
+    query = query
+      .not("status", "in", '("pago","cancelado")')
+      .is("arquivado_em", null)
+      .or("is_teste.is.null,is_teste.eq.false");
   }
   if (filtros.data) {
     query = query.eq("vencimento", filtros.data);
