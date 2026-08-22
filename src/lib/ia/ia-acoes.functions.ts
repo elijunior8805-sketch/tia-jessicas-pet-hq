@@ -61,3 +61,31 @@ export const executarCancelamento = createServerFn({ method: "POST" })
     const { cancelarAgendamentoIA } = await import("./ia-acoes.server");
     return cancelarAgendamentoIA(context.supabase, data.agendamento_id, data.motivo || "");
   });
+
+export const executarCriacaoCliente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    nome: z.string(),
+    telefone: z.string().optional(),
+    email: z.string().optional(),
+    endereco: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { criarClienteIA } = await import("./ia-acoes.server");
+    return criarClienteIA(context.supabase, data);
+  });
+
+export const executarCriacaoPet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    cliente_id: z.string(),
+    nome: z.string(),
+    especie: z.string().optional(),
+    raca: z.string().optional(),
+    porte: z.string().optional(),
+    observacoes: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { criarPetIA } = await import("./ia-acoes.server");
+    return criarPetIA(context.supabase, data);
+  });
