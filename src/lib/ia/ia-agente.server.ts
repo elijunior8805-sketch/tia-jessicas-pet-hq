@@ -52,54 +52,36 @@ export type IAIntent = z.infer<typeof IAIntentSchema>;
 export interface IAMessage {
   role: 'user' | 'assistant';
   content: string;
-  intent?: IAIntent;
   timestamp: string;
 }
 
-export async function classificarComandoIA(texto: string, contextoMsg?: { role: 'user' | 'assistant', content: string }[], sb?: any, userContext?: { id: string, nome: string, perfil: string, permissoes?: any }) {
-  const { chamarIA } = await import("../ia-core.server");
-  const { carregarIaConfig } = await import("../ia-core.server");
+/**
+ * Classifica a intenção do usuário usando o modelo Gemini.
+ */
+export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
+  const { chamarIA } = await import("./ia-agente.functions");
   
-  const config = await carregarIaConfig(sb);
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
-  const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  
-  const contextHeader = userContext ? `
-USUÁRIO LOGADO:
-- ID: ${userContext.id}
-- NOME: ${userContext.nome}
-- PERFIL: ${userContext.perfil}
-- PERMISSÕES: ${JSON.stringify(userContext.permissoes || {})}
-- NEGÓCIO: ERP Spa de Pet Tia Jéssica
-- DATA/HORA: ${dataAtual} às ${horaAtual}
-- FUSO: America/Sao_Paulo (GMT-3)
-` : `DATA ATUAL: ${dataAtual}`;
-  
-  const systemPrompt = `Você é a Assistente Operacional interna do Spa de Pet Tia Jéssica.
+  const userContext = contexto?.user ? `
+  USUÁRIO LOGADO:
+  - Nome: ${contexto.user.nome}
+  - Cargo: ${contexto.user.cargo}
+  - Unidade: ${contexto.user.unidade || 'Matriz'}
+  ` : '';
 
-Seu usuário é o proprietário, administrador, gerente ou funcionário autorizado. Você não está conversando com o cliente final do Spa.
+  const systemPrompt = `Você é a Assistente Operacional da "Tia Jéssica Pet HQ".
+Seu papel é ajudar o PROPRIETÁRIO/GERENTE na gestão do Pet Shop.
 
-${contextHeader}
+${userContext}
 
-Sua função é ajudar o usuário interno a consultar informações e executar tarefas operacionais autorizadas dentro do sistema.
-
-Você deverá compreender comandos relacionados a agenda, atendimentos, clientes, pets, serviços, financeiro, cobranças, pagamentos e gestão.
-
-Você somente deverá falar como atendente para o tutor quando o usuário interno solicitar explicitamente a criação de uma mensagem para um cliente.
-
-Não invente dados. Não afirme que realizou uma consulta ou ação sem utilizar uma ferramenta real do sistema.
-
-CONTEXTO DO AMBIENTE:
-- DATA ATUAL: ${dataAtual}
-- SISTEMA: ERP Premium Spa de Pet Tia Jéssica.
-
-FERRAMENTAS DISPONÍVEIS (Intenções):
+INTENÇÕES DISPONÍVEIS:
 1. CONSULTAS:
-   - consulta_agenda: Ver ocupação e horários.
-   - consulta_cliente: Buscar dados de tutores.
-   - consulta_pet: Buscar dados de animais.
-   - consulta_financeira: Faturamento, pendências, devedores.
-   - solicitar_resumo_operacional: Visão geral do dia.
+    - consulta_agenda: Verificar horários, atendimentos do dia/período.
+    - consulta_cliente: Buscar cadastro, contatos, débitos.
+    - consulta_pet: Buscar dados de animais, raça, idade.
+    - consulta_historico_pet: Ver atendimentos passados de um animal específico.
+    - buscar_servicos: Listar serviços cadastrados e preços.
+    - consulta_financeira: Faturamento, pendências, devedores.
+    - solicitar_resumo_operacional: Visão geral do dia.
 
 2. AÇÕES (Exigem confirmação na UI):
    - criar_agendamento: Montar rascunho de novo atendimento.
@@ -123,24 +105,19 @@ REGRAS DE RESPOSTA (JSON):
     const res = await chamarIA({
       system: systemPrompt,
       prompt: texto,
-      config,
+      config: contexto?.config,
       json: true,
       origem: "assistente_ia_classificador"
     });
 
     const parsed = JSON.parse(res.texto);
     
-    // Se a intenção for 'registrar_pagamento' mas não houver valor, 
-    // e o contexto tiver 'analisar_comprovante', mantemos a intenção original
-    // da IA para processamento de comprovante se ela detectar dados de baixa.
-
     return {
       ...parsed,
       nivel_confianca: parsed.nivel_confianca || 0.9
     } as IAIntent;
   } catch (error) {
     console.error("Erro na classificação IA:", error);
-    // Fallback para o classificador básico se a IA falhar
     return fallbackClassificador(texto);
   }
 }
@@ -165,6 +142,3 @@ function fallbackClassificador(texto: string): IAIntent {
     resposta_ia: "Estou processando sua solicitação..."
   } as IAIntent;
 }
-
-
-
