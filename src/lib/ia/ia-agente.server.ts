@@ -14,6 +14,8 @@ export const IAIntentSchema = z.object({
     "cadastrar_pet",
     "registrar_pagamento",
     "analisar_comprovante",
+    "identificar_pendencia",
+    "confirmar_baixa",
     "cancelar_pagamento",
     "solicitar_resumo_operacional",
     "analisar_risco_evasao",
@@ -72,8 +74,10 @@ INTENÇÕES POSSÍVEIS:
 - cancelar: Quando o usuário quer desmarcar um serviço.
 - cadastrar_cliente: Iniciar fluxo de novo tutor.
 - cadastrar_pet: Iniciar fluxo de novo animal.
-- registrar_pagamento: Quando o usuário quer dar baixa em uma dívida ("baixe o pagamento do Eli").
-- analisar_comprovante: Quando o usuário envia uma imagem de comprovante.
+- registrar_pagamento: Quando o usuário quer dar baixa em uma dívida manualmente ("baixe o pagamento do Eli").
+- analisar_comprovante: Quando o usuário envia uma imagem/arquivo de comprovante para leitura.
+- identificar_pendencia: Quando a IA encontrou dados no comprovante e precisa localizar o cliente/atendimento.
+- confirmar_baixa: Quando o usuário confirma os dados e quer efetivar o pagamento no banco.
 - cancelar_pagamento: Estornar ou cancelar uma baixa financeira.
 - solicitar_resumo_operacional: Perguntas como "Como está meu dia?", "Quais as prioridades?", "Resumo da agenda".
 - analisar_risco_evasao: Identificar clientes sumidos ou que demoram a voltar.
@@ -118,6 +122,11 @@ Exemplo de saída:
     });
 
     const parsed = JSON.parse(res.texto);
+    
+    // Se a intenção for 'registrar_pagamento' mas não houver valor, 
+    // e o contexto tiver 'analisar_comprovante', mantemos a intenção original
+    // da IA para processamento de comprovante se ela detectar dados de baixa.
+
     return {
       ...parsed,
       nivel_confianca: parsed.nivel_confianca || 0.9

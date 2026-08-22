@@ -13,7 +13,14 @@ import {
   Sparkles,
   MessageSquare,
   Minus,
-  Maximize2
+  Maximize2,
+  Paperclip,
+  Image as ImageIcon,
+  FileText,
+  AlertCircle,
+  Loader2,
+  Trash2,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,6 +43,7 @@ import {
 } from '@/lib/ia/ia-acoes.functions';
 import { 
   executarBaixaPagamento, 
+  processarComprovanteIA,
 } from '@/lib/ia/ia-financeiro.functions';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -57,6 +65,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const [currentIntent, setCurrentIntent] = useState<IAIntent | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<any>(null); 
   const [searchResults, setSearchResults] = useState<{clientes: any[], pets: any[]} | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [analiseResult, setAnaliseResult] = useState<any>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
@@ -94,6 +108,132 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   }, [messages, isProcessing]);
 
   if (!isOpen) return null;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("O arquivo deve ter no máximo 5MB.");
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Formato não suportado. Use JPG, PNG, WEBP ou PDF.");
+      return;
+    }
+
+    setSelectedFile(file);
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (prev) => setFilePreview(prev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview('pdf');
+    }
+  };
+
+  const handleAnalizarComprovante = async () => {
+    if (!selectedFile || !filePreview) return;
+    
+    setIsProcessing(true);
+    setMessages(prev => [...prev, {
+      role: 'user',
+      content: `[Arquivo: ${selectedFile.name}] Analisar este comprovante.`,
+      timestamp: new Date().toISOString()
+    }]);
+
+    try {
+      // 1. Converter para Base64 para análise (IA Vision)
+      let base64 = "";
+      if (selectedFile.type.startsWith('image/')) {
+        base64 = filePreview.split(',')[1];
+      } else {
+        // PDF handling would go here - for now let's assume image
+        const reader = new FileReader();
+        base64 = await new Promise((resolve) => {
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.readAsDataURL(selectedFile);
+        });
+      }
+
+      const res = await processarComprovanteIA({
+        data: { imagemBase64: base64, contentType: selectedFile.type }
+      });
+
+      if (res.sucesso) {
+        setAnaliseResult(res);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Li o comprovante! Aqui estão os dados identificados:\n\n` +
+                   `- **Valor**: R$ ${res.valor.toFixed(2)}\n` +
+                   `- **Data**: ${res.data}\n` +
+                   `- **Pagador**: ${res.pagador}\n` +
+                   `- **Instituição**: ${res.instituicao}\n\n` +
+                   `Estou procurando a pendência correspondente...`,
+          timestamp: new Date().toISOString()
+        }]);
+
+        // 2. Upload para Storage Privado
+        const fileExt = selectedFile.name.split('.').pop();
+        const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('comprovantes')
+          .upload(filePath, selectedFile);
+          
+        if (uploadError) throw uploadError;
+
+        // 3. Buscar pendências automáticas
+        const searchRes = await consultarFinanceiroIA({
+          data: { termo: res.pagador, apenas_pendentes: true }
+        });
+
+        const pendenciaExata = searchRes?.find((p: any) => 
+          Math.abs((p.valor_total - (p.valor_pago || 0)) - res.valor) < 0.01
+        );
+
+        if (pendenciaExata) {
+          const petNome = (pendenciaExata.atendimentos as any)?.pets?.nome || 
+                         (pendenciaExata as any).atendimentos?.pets?.nome || 
+                         'Pet';
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Encontrei uma pendência exata para **${petNome}** no valor de **R$ ${res.valor.toFixed(2)}**.\n\nDeseja confirmar a baixa agora?`,
+            intent: {
+              intencao: 'confirmar_baixa',
+              valor: res.valor,
+              forma_pagamento: 'pix',
+              observacoes: `Baixa via comprovante (ID: ${res.id_transacao || 'N/A'})`,
+              nivel_confianca: 1
+            } as any,
+            timestamp: new Date().toISOString(),
+            meta: { 
+              pagamento_id: pendenciaExata.id, 
+              comprovante_path: filePath, 
+              id_transacao: res.id_transacao 
+            }
+          } as any]);
+        } else {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Não encontrei uma pendência automática de valor exato. Por favor, selecione o atendimento manualmente ou me dê mais detalhes.`,
+            timestamp: new Date().toISOString()
+          }]);
+        }
+      } else {
+        toast.error(res.mensagem || "Não consegui ler o comprovante.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao processar comprovante.");
+    } finally {
+      setIsProcessing(false);
+      setSelectedFile(null);
+      setFilePreview(null);
+    }
+  };
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
@@ -238,6 +378,37 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
+  const handleConfirmarBaixaIA = async (msg: any) => {
+    setIsProcessing(true);
+    try {
+      const { meta, intent } = msg;
+      if (!meta?.pagamento_id) throw new Error("ID do pagamento não localizado no contexto.");
+
+      await executarBaixaPagamento({
+        data: {
+          pagamento_id: meta.pagamento_id,
+          valor_pago: intent.valor,
+          forma: intent.forma_pagamento || 'pix',
+          comprovante_path: meta.comprovante_path,
+          id_transacao: meta.id_transacao,
+          observacoes: intent.observacoes
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Baixa realizada com sucesso!** O comprovante foi vinculado e o financeiro atualizado.`,
+        timestamp: new Date().toISOString()
+      }]);
+      toast.success("Pagamento baixado!");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao realizar baixa.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const toggleVoice = () => {
     if (voiceStatus === 'listening') recognizerRef.current?.stop();
     else recognizerRef.current?.start();
@@ -367,6 +538,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                               <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar
                             </Button>
                           )}
+                          {msg.intent.intencao === 'confirmar_baixa' && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-[#C99845] hover:bg-[#C99845]/90 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => handleConfirmarBaixaIA(msg)}
+                              disabled={isProcessing}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Baixa
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -388,12 +569,63 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               </div>
             </ScrollArea>
 
-            {/* Input Area */}
             <div className="p-6 border-t border-[#C99845]/10 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+              {/* File Preview Area */}
+              {filePreview && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 p-3 rounded-2xl bg-[#F5F2EA] border border-[#C99845]/20 flex items-center gap-3"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-white overflow-hidden flex items-center justify-center border border-[#C99845]/10">
+                    {filePreview === 'pdf' ? (
+                      <FileText className="w-6 h-6 text-[#C99845]" />
+                    ) : (
+                      <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-[#123F2A] truncate uppercase tracking-tight">
+                      {selectedFile?.name}
+                    </p>
+                    <p className="text-[9px] text-[#123F2A]/60 font-medium">
+                      {(selectedFile?.size || 0) / 1024 > 1024 
+                        ? `${((selectedFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB` 
+                        : `${((selectedFile?.size || 0) / 1024).toFixed(0)} KB`}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50"
+                      onClick={() => { setSelectedFile(null); setFilePreview(null); }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-lg text-[#123F2A] hover:bg-[#123F2A]/5"
+                      onClick={handleAnalizarComprovante}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
               <div className="relative group">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*,application/pdf"
+                  onChange={handleFileSelect}
+                />
                 <Textarea
                   placeholder="Como posso ajudar?"
-                  className="min-h-[56px] max-h-[160px] border-[#C99845]/20 focus-visible:ring-[#C99845]/30 resize-none py-4 px-5 pr-24 text-[14px] font-medium rounded-2xl bg-[#F5F2EA]/30 transition-all"
+                  className="min-h-[56px] max-h-[160px] border-[#C99845]/20 focus-visible:ring-[#C99845]/30 resize-none py-4 px-5 pr-32 text-[14px] font-medium rounded-2xl bg-[#F5F2EA]/30 transition-all"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
@@ -403,7 +635,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                     }
                   }}
                 />
-                <div className="absolute right-2 bottom-2 flex gap-1.5">
+                <div className="absolute right-2 bottom-2 flex gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-xl h-10 w-10 text-[#C99845] hover:bg-[#C99845]/10"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Anexar comprovante"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 

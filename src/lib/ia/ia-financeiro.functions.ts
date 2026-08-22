@@ -9,7 +9,9 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     valor_pago: z.number(),
     forma: z.string(),
     data_pagamento: z.string().optional(),
-    observacoes: z.string().optional()
+    observacoes: z.string().optional(),
+    comprovante_path: z.string().optional(),
+    id_transacao: z.string().optional()
   }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -20,7 +22,9 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
       valor_pago: data.valor_pago,
       forma: data.forma as any,
       data_pagamento: data.data_pagamento,
-      observacoes: data.observacoes
+      observacoes: data.observacoes,
+      comprovante_path: data.comprovante_path,
+      id_transacao: data.id_transacao
     });
   });
 
@@ -37,10 +41,11 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
 
 export const processarComprovanteIA = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
-    imagemBase64: z.string()
+    imagemBase64: z.string(),
+    contentType: z.string().optional()
   }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin;
-    return analisarComprovanteIA(sb, data.imagemBase64);
+    return analisarComprovanteIA(sb, data.imagemBase64, data.contentType);
   });

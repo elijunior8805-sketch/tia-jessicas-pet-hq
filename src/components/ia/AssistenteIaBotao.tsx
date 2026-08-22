@@ -8,9 +8,10 @@ export function AssistenteIaBotao() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: access } = useMyAccess();
 
-  // Apenas usuários com permissões específicas podem ver a assistente
-  // Por enquanto liberado para todos autenticados para testes da Fase 1
-  if (!access) return null;
+  // Apenas usuários com perfil admin ou proprietário podem ver a assistente
+  const canSeeAssistant = access?.isAdmin || access?.isProprietario;
+  
+  if (!canSeeAssistant) return null;
 
   return (
     <>

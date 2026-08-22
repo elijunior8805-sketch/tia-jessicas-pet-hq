@@ -151,6 +151,8 @@ export async function registrarPagamentoIA(
     forma: Database["public"]["Enums"]["pagamento_forma"];
     data_pagamento?: string;
     observacoes?: string;
+    comprovante_path?: string;
+    id_transacao?: string;
   }
 ) {
   // 1. Buscar o pagamento atual
@@ -177,7 +179,10 @@ export async function registrarPagamentoIA(
       forma: params.forma,
       data_pagamento: params.data_pagamento || format(new Date(), 'yyyy-MM-dd'),
       observacoes: params.observacoes ? `${pagamento.observacoes || ''}\nIA: ${params.observacoes}`.trim() : pagamento.observacoes,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      comprovante_path: params.comprovante_path,
+      id_transacao_bancaria: params.id_transacao,
+      ia_analisado: !!params.comprovante_path
     })
     .eq("id", params.pagamento_id)
     .select()

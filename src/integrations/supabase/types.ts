@@ -2617,12 +2617,16 @@ export type Database = {
           atendimento_id: string | null
           categoria_receita: string | null
           cliente_id: string | null
+          comprovante_path: string | null
           created_at: string
           created_by: string | null
           data_pagamento: string | null
           descricao: string | null
           forma: Database["public"]["Enums"]["pagamento_forma"]
+          ia_analisado: boolean | null
+          ia_meta_dados: Json | null
           id: string
+          id_transacao_bancaria: string | null
           is_teste: boolean
           observacoes: string | null
           responsavel_id: string | null
@@ -2641,12 +2645,16 @@ export type Database = {
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
+          comprovante_path?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
           descricao?: string | null
           forma?: Database["public"]["Enums"]["pagamento_forma"]
+          ia_analisado?: boolean | null
+          ia_meta_dados?: Json | null
           id?: string
+          id_transacao_bancaria?: string | null
           is_teste?: boolean
           observacoes?: string | null
           responsavel_id?: string | null
@@ -2665,12 +2673,16 @@ export type Database = {
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
+          comprovante_path?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
           descricao?: string | null
           forma?: Database["public"]["Enums"]["pagamento_forma"]
+          ia_analisado?: boolean | null
+          ia_meta_dados?: Json | null
           id?: string
+          id_transacao_bancaria?: string | null
           is_teste?: boolean
           observacoes?: string | null
           responsavel_id?: string | null

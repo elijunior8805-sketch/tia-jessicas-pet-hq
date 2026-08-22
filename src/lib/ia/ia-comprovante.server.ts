@@ -16,7 +16,8 @@ export interface ComprovanteAnalise {
 
 export async function analisarComprovanteIA(
   sb: SupabaseClient<Database>,
-  imagemBase64: string
+  imagemBase64: string,
+  contentType: string = "image/jpeg"
 ): Promise<ComprovanteAnalise> {
   const { chamarIA, carregarIaConfig } = await import("../ia-core.server");
   const config = await carregarIaConfig(sb);
@@ -40,11 +41,20 @@ Regras:
   try {
     const res = await chamarIA({
       system: systemPrompt,
-      prompt: "Analise este comprovante: [IMAGEM]",
+      prompt: "Analise este comprovante e extraia os dados financeiros.",
       config,
       json: true,
       origem: "ia_analise_comprovante",
-      // O chamarIA precisará suportar imagens, ou passamos como parte do prompt se o core suportar
+      sb,
+      // Passar a imagem no formato esperado pelo Gateway para Visão
+      // Nota: A implementação atual do chamarIA precisa ser verificada se suporta multimodality.
+      // Se não, passamos a imagem no prompt seguindo o padrão de Visão do Gemini.
+      extraContent: [
+        {
+          type: "image",
+          image_url: { url: `data:${contentType};base64,${imagemBase64}` }
+        }
+      ]
     });
 
     const parsed = JSON.parse(res.texto);
