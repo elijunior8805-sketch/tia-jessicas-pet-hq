@@ -85,7 +85,7 @@ function DashboardPage() {
   const { data: profile } = useMyProfile();
   const queryClient = useQueryClient();
   const recalcFn = useServerFn(recalcularAgregados);
-  useRealtimeFinanceiro(["dashboard-metrics", "agendamentos"]);
+  useRealtimeFinanceiro(["dashboard-metrics", "dashboard-metrics-v3", "dashboard-aux", "agendamentos", "fin-unified-metrics"]);
 
   const recalc = useMutation({
     mutationFn: () => recalcFn({ data: undefined as any }),
