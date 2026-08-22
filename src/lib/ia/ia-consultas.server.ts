@@ -7,36 +7,35 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     .select(`
       *,
       pets(nome, raca, porte, observacoes),
-      clientes(nome, telefone, endereco),
+      clientes(nome, telefone),
       servicos(nome, preco)
     `);
 
   if (filtros.data) {
     query = query.eq("data", filtros.data);
   }
-  if (filtros.profissional) {
-    // Busca aproximada para profissional se necessário
-    query = query.ilike("profissional_id", `%${filtros.profissional}%`);
-  }
-
+  
   const { data, error } = await query.order("hora", { ascending: true }).limit(50);
   
   if (error) throw error;
   
-  // Filtro manual para pet/cliente se o termo foi passado (para evitar joins complexos de busca difusa no supabase)
-  let result = data;
+  let result = (data || []) as any[];
+  
   if (filtros.pet_nome) {
     result = result.filter(a => a.pets?.nome?.toLowerCase().includes(filtros.pet_nome!.toLowerCase()));
   }
   if (filtros.cliente_nome) {
     result = result.filter(a => a.clientes?.nome?.toLowerCase().includes(filtros.cliente_nome!.toLowerCase()));
   }
+  if (filtros.profissional) {
+    // Se profissional_id for UUID, idealmente buscaríamos o nome, mas aqui filtramos pelo ID se for o caso
+    result = result.filter(a => a.profissional_id?.toLowerCase().includes(filtros.profissional!.toLowerCase()));
+  }
 
   return result;
 }
 
 export async function buscarDadosClientesPets(sb: SupabaseClient<Database>, termo: string) {
-  // Busca em clientes
   const { data: clientes, error: errC } = await sb
     .from("clientes")
     .select(`*, pets(*)`)
@@ -45,7 +44,6 @@ export async function buscarDadosClientesPets(sb: SupabaseClient<Database>, term
 
   if (errC) throw errC;
 
-  // Busca em pets
   const { data: pets, error: errP } = await sb
     .from("pets")
     .select(`*, clientes(*)`)
@@ -78,18 +76,16 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     query = query.eq("status", "pendente");
   }
   if (filtros.data) {
-    // Assumindo vencimento ou criação
-    query = query.eq("data_vencimento", filtros.data);
+    query = query.eq("vencimento", filtros.data);
   }
 
-  const { data, error } = await query.order("data_vencimento", { ascending: true }).limit(50);
+  const { data, error } = await query.order("vencimento", { ascending: true }).limit(50);
   if (error) throw error;
 
   return data;
 }
 
 export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params: { servico?: string; data: string; profissional?: string }) {
-  // 1. Buscar agendamentos do dia
   const { data: agendamentos, error } = await sb
     .from("agendamentos")
     .select("hora, duracao_min, profissional_id")
@@ -98,8 +94,6 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
 
   if (error) throw error;
 
-  // 2. Definir horário de funcionamento (Ex: 08:00 às 18:00)
-  // TODO: Buscar de uma tabela de configuração se existir
   const slots = [];
   let current = 8 * 60; // 08:00
   const end = 18 * 60; // 18:00
@@ -110,10 +104,8 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
     const min = (current % 60).toString().padStart(2, '0');
     const timeStr = `${hour}:${min}:00`;
     
-    // Verificar se o slot está ocupado
-    const isOccupied = agendamentos.some(a => {
+    const isOccupied = (agendamentos || []).some(a => {
       const start = a.hora;
-      // Lógica simplificada de ocupação
       return start === timeStr;
     });
 
