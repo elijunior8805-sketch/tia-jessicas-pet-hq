@@ -194,8 +194,9 @@ export async function registrarPagamentoIA(
   const { data, error } = await sb
     .from("pagamentos")
     .update({
-      valor_pago: novoValorPago,
+      valor_pago: novoValorTotalPago,
       status,
+
       forma: params.forma,
       data_pagamento: params.data_pagamento || format(new Date(), 'yyyy-MM-dd'),
       observacoes: params.observacoes ? `${pagamento.observacoes || ''}\nIA: ${params.observacoes}`.trim() : pagamento.observacoes,
