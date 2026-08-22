@@ -171,9 +171,54 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                    `- **Data**: ${res.data}\n` +
                    `- **Pagador**: ${res.pagador}\n` +
                    `- **Instituição**: ${res.instituicao}\n\n` +
-                   `Deseja que eu procure a pendência correspondente?`,
+                   `Estou procurando a pendência correspondente...`,
           timestamp: new Date().toISOString()
         }]);
+
+        // 2. Upload para Storage Privado
+        const fileExt = selectedFile.name.split('.').pop();
+        const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('comprovantes')
+          .upload(filePath, selectedFile);
+          
+        if (uploadError) throw uploadError;
+
+        // 3. Buscar pendências automáticas
+        const searchRes = await consultarFinanceiroIA({
+          data: { termo: res.pagador, apenas_pendentes: true }
+        });
+
+        const pendenciaExata = searchRes?.find((p: any) => 
+          Math.abs((p.valor_total - (p.valor_pago || 0)) - res.valor) < 0.01
+        );
+
+        if (pendenciaExata) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Encontrei uma pendência exata para **${pendenciaExata.pets?.nome || 'Pet'}** no valor de **R$ ${res.valor.toFixed(2)}**.\n\nDeseja confirmar a baixa agora?`,
+            intent: {
+              intencao: 'confirmar_baixa',
+              valor: res.valor,
+              forma_pagamento: 'pix',
+              observacoes: `Baixa via comprovante (ID: ${res.id_transacao || 'N/A'})`,
+              nivel_confianca: 1
+            } as any,
+            timestamp: new Date().toISOString(),
+            meta: { 
+              pagamento_id: pendenciaExata.id, 
+              comprovante_path: filePath, 
+              id_transacao: res.id_transacao 
+            }
+          } as any]);
+        } else {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Não encontrei uma pendência automática de valor exato. Por favor, selecione o atendimento manualmente ou me dê mais detalhes.`,
+            timestamp: new Date().toISOString()
+          }]);
+        }
       } else {
         toast.error(res.mensagem || "Não consegui ler o comprovante.");
       }
