@@ -132,7 +132,7 @@ function DashboardPage() {
         return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       };
 
-      const [comprasRes, atendRes, novosClientesRes, proxAgRes, pagamentosRes] = await Promise.all([
+      const [comprasRes, pagamentosRes, novosClientesRes, proxAgRes] = await Promise.all([
         // Despesas do painel: considera parcelas pagas pela data de pagamento
         // e parcelas ainda em aberto pela data de vencimento. Assim o card não
         // some quando a compra foi lançada mas ainda não foi baixada/paga.
@@ -143,15 +143,13 @@ function DashboardPage() {
             `and(data_pagamento.gte.${from},data_pagamento.lte.${to}),and(vencimento.gte.${from},vencimento.lte.${to})`,
           )
           .or("is_teste.is.false,is_teste.is.null"),
-        // Fonte única de faturamento: atendimentos finalizados com
-        // encerrado_em no período. Não usa `pagamentos` nem `valor_planejado`.
+        // KPIs Unificados com Financeiro (Fluxo de Caixa)
         supabase
-          .from("atendimentos")
-          .select("id,valor_executado,encerrado_em,finalizado,servicos_solicitados,servicos_planejados,servicos_extras,servicos_executados,taxa_leva_traz,desconto")
-          .eq("finalizado", true)
-          .not("encerrado_em", "is", null)
-          .gte("encerrado_em", `${fromWide}T00:00:00`)
-          .lte("encerrado_em", `${toWide}T23:59:59`),
+          .from("pagamentos")
+          .select("id, atendimento_id, valor_pago, data_pagamento, categoria_receita, status")
+          .eq("status", "pago")
+          .gte("data_pagamento", from)
+          .lte("data_pagamento", to),
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
           .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
@@ -160,14 +158,6 @@ function DashboardPage() {
           .order("data", { ascending: true })
           .order("hora_inicio", { ascending: true })
           .limit(6),
-        // Buscar aportes e ajustes (categorias específicas conforme solicitado)
-        supabase
-          .from("pagamentos")
-          .select("valor_pago, data_pagamento, categoria_receita")
-          .in("categoria_receita", ["aporte", "ajuste"])
-          .eq("status", "pago")
-          .gte("data_pagamento", from)
-          .lte("data_pagamento", to),
       ]);
 
       if (comprasRes.error) {
@@ -175,10 +165,10 @@ function DashboardPage() {
       }
 
       const compras = comprasRes.data ?? [];
-      const atendimentos = atendRes.data ?? [];
+      const pagamentosPeriodo = pagamentosRes.data ?? [];
       const novosClientes = novosClientesRes.data ?? [];
 
-      const despesas = compras.reduce((s, r: any) => {
+      const despesas = compras.reduce((s: number, r: any) => {
         if (r.status === "cancelado") return s;
         const pagaNoPeriodo = r.data_pagamento && r.data_pagamento >= from && r.data_pagamento <= to;
         const venceNoPeriodo = r.vencimento && r.vencimento >= from && r.vencimento <= to;
@@ -189,31 +179,23 @@ function DashboardPage() {
         }
         return s;
       }, 0);
-      // Faturamento / Atendimentos / Ticket Médio: 
-      // Padronizado para usar Receitas de Serviços recebidas (Fluxo de Caixa) 
-      // conforme solicitado, para bater com o Financeiro.
-      const pagamentosTodosRes = await supabase
-        .from("pagamentos")
-        .select("id, atendimento_id, valor_pago, data_pagamento, categoria_receita, status")
-        .eq("status", "pago")
-        .gte("data_pagamento", from)
-        .lte("data_pagamento", to);
-      
-      const pagamentosPeriodo = pagamentosTodosRes.data ?? [];
-      
+
+      // Faturamento: Receitas de Serviços + Taxas vinculadas a atendimentos
       const receitasServico = pagamentosPeriodo.filter(
         (p: any) => p.categoria_receita === "servico" || p.atendimento_id
       );
 
-      const faturamento = receitasServico.reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+      const faturamento = receitasServico.reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
+      
+      // Ticket Médio: Faturamento de serviços / Atendimentos únicos com pagamento no período
       const atendimentosUnicosSet = new Set(receitasServico.map((p: any) => p.atendimento_id).filter(Boolean));
       const atendCount = atendimentosUnicosSet.size;
       const bilhete = atendCount > 0 ? faturamento / atendCount : 0;
       
-      // Aportes e Ajustes: categorias específicas conforme solicitado
+      // Aportes e Ajustes: categorias específicas
       const aportesAjustes = pagamentosPeriodo
         .filter((p: any) => p.categoria_receita === "aporte" || p.categoria_receita === "ajuste")
-        .reduce((s, p: any) => s + Number(p.valor_pago || 0), 0);
+        .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
       
       const lucro = faturamento + aportesAjustes - despesas;
 

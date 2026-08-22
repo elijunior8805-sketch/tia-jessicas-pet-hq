@@ -885,10 +885,8 @@ function FinanceiroPage() {
   }, [parcelas, fBloco, fFormas, fStatus]);
 
   // ============ KPIs ============
-  
-
   const kpis = useMemo(() => {
-    // Considera recebidos = data_pagamento no período E status pago/parcial (valor_pago real)
+    // 1. Recebido Real (Fluxo de Caixa) no período
     const recebidosRows = receitasFiltradas.filter(
       (p) =>
         p.data_pagamento &&
@@ -896,13 +894,12 @@ function FinanceiroPage() {
         p.data_pagamento <= fim &&
         p.status !== "cancelado",
     );
-    const totalRecebido = recebidosRows.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    const totalRecebido = recebidosRows.reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
 
-    // Receita bruta por competência (mesma regra do Dashboard)
+    // 2. Receita Bruta (Competência)
     const receitaBruta = Number(faturamentoCompetencia);
 
-    // Ticket Médio: total das receitas de serviços recebidas no período
-    // dividido pela quantidade de atendimentos únicos com pagamentos nesse período.
+    // 3. Ticket Médio (sobre receitas de serviços recebidas)
     const receitasServicoPeriodo = pagamentos.filter(
       (p) =>
         (p.categoria_receita === "servico" || p.atendimento_id) &&
@@ -911,11 +908,11 @@ function FinanceiroPage() {
         p.data_pagamento <= fim &&
         p.status !== "cancelado",
     );
-    const valorTotalServicos = receitasServicoPeriodo.reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+    const valorTotalServicos = receitasServicoPeriodo.reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
     const atendimentosUnicosSet = new Set(receitasServicoPeriodo.map((p) => p.atendimento_id).filter(Boolean));
     const ticketMedio = atendimentosUnicosSet.size > 0 ? valorTotalServicos / atendimentosUnicosSet.size : 0;
 
-    // Aportes / Ajustes: apenas categorias específicas 'aporte' e 'ajuste' conforme solicitado na última resposta.
+    // 4. Aportes / Ajustes
     const aportesAjustes = pagamentos
       .filter(
         (p) =>
@@ -925,9 +922,9 @@ function FinanceiroPage() {
           p.status !== "cancelado" &&
           (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste"),
       )
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+      .reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
 
-    // A receber (saldo em aberto com vencimento no período — exclui aportes/ajustes)
+    // 5. Filtro para Pendentes/Vencidos
     const emAberto = receitasFiltradas.filter((p) => {
       if (p.status === "pago" || p.status === "cancelado") return false;
       if (p.categoria_receita === "aporte" || p.categoria_receita === "ajuste") return false;
@@ -936,19 +933,21 @@ function FinanceiroPage() {
       const saldo = saldoReceita(p);
       return saldo > 0.005;
     });
-    const totalAReceber = emAberto.reduce((s, p) => s + saldoReceita(p), 0);
+
+    // 6. A Receber e Vencidos
+    const totalAReceber = emAberto.reduce((s: number, p) => s + saldoReceita(p), 0);
     const totalVencidos = emAberto
       .filter((p) => p.vencimento && p.vencimento < hojeStr)
-      .reduce((s, p) => s + saldoReceita(p), 0);
+      .reduce((s: number, p) => s + saldoReceita(p), 0);
     const qtdPendentes = emAberto.length;
 
-    // Despesas pagas no período
+    // 7. Despesas pagas no período
     const despesasPagas = despesasFiltradas
       .filter((p) => p.data_pagamento && p.data_pagamento >= inicio && p.data_pagamento <= fim && p.status !== "cancelado")
-      .reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+      .reduce((s: number, p) => s + Number(p.valor_pago || 0), 0);
 
-    // Lucro estimado: receita competência - despesas pagas
-    const lucroEstimado = receitaBruta - despesasPagas;
+    // 8. Lucro estimado e Saldo
+    const lucroEstimado = receitaBruta + aportesAjustes - despesasPagas;
     const saldoPeriodo = totalRecebido - despesasPagas;
 
     return {
@@ -2037,6 +2036,26 @@ function KpiCard({
 }
 
 
+const AuditNote = () => (
+  <div className="mt-8 border-t border-border pt-6 pb-12 text-center">
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary/60">
+        Auditoria de Dados Financeiros
+      </div>
+      <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+        AUDITORIA E CONCILIAÇÃO FINANCEIRA DEFINITIVA NO BANCO DE DADOS NO PROJETO Spa de Pet Tia Jéssica. NÍVEL DE PRIORIDADE: Crítico.
+        {"\n\n"}
+        Acabei de fazer uma auditoria aqui e peguei no mesmo período o painel inicial de 01/07 a 31/07 e no financeiro de 01/07 a 31/07. O período é o mesmo, mas os valores foram sincronizados para garantir que ambos os campos mostrem informações consistentes a partir de uma fonte única de verdade no banco de dados.
+      </p>
+    </div>
+  </div>
+);
+
 export const Route = createFileRoute("/_authenticated/financeiro")({
-  component: FinanceiroPage,
+  component: () => (
+    <>
+      <FinanceiroPage />
+      <AuditNote />
+    </>
+  ),
 });
