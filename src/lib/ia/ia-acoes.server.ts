@@ -186,9 +186,10 @@ export async function registrarPagamentoIA(
   if (!pagamento) throw new Error("Pagamento não localizado.");
   if (pagamento.status === "pago") throw new Error("Este pagamento já foi baixado anteriormente.");
 
-  const novoValorPago = (pagamento.valor_pago || 0) + params.valor_pago;
+  const novoValorTotalPago = (pagamento.valor_pago || 0) + params.valor_pago;
   const status: Database["public"]["Enums"]["pagamento_status"] = 
-    novoValorPago >= pagamento.valor_total ? "pago" : "pendente";
+    novoValorTotalPago >= Number(pagamento.valor_total) ? "pago" : "pendente";
+
 
   const { data, error } = await sb
     .from("pagamentos")
