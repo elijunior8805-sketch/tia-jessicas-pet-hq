@@ -1491,6 +1491,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_auditoria: {
+        Row: {
+          comando_original: string
+          created_at: string | null
+          dados_extraidos: Json | null
+          erro: string | null
+          ferramentas_chamadas: Json | null
+          id: string
+          intencao_identificada: string | null
+          metadados: Json | null
+          status: string | null
+          tempo_resposta_ms: number | null
+          transcricao: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          comando_original: string
+          created_at?: string | null
+          dados_extraidos?: Json | null
+          erro?: string | null
+          ferramentas_chamadas?: Json | null
+          id?: string
+          intencao_identificada?: string | null
+          metadados?: Json | null
+          status?: string | null
+          tempo_resposta_ms?: number | null
+          transcricao?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          comando_original?: string
+          created_at?: string | null
+          dados_extraidos?: Json | null
+          erro?: string | null
+          ferramentas_chamadas?: Json | null
+          id?: string
+          intencao_identificada?: string | null
+          metadados?: Json | null
+          status?: string | null
+          tempo_resposta_ms?: number | null
+          transcricao?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
       ia_config: {
         Row: {
           assinatura: string
