@@ -16,7 +16,8 @@ export const IAIntentSchema = z.object({
     "analisar_comprovante",
     "cancelar_pagamento",
     "solicitar_resumo_operacional",
-    "solicitar_analise_reativacao",
+    "analisar_risco_evasao",
+    "sugerir_otimizacao_agenda",
     "disponibilidade",
     "comando_nao_reconhecido"
 
@@ -56,7 +57,7 @@ export async function classificarComandoIA(texto: string, contexto?: { role: 'us
   
   const systemPrompt = `Você é a Assistente Operacional IA do Spa de Pet Tia Jéssica.
 Sua função agora é INTERPRETAR comandos, CONSULTAR dados e PREPARAR ações.
-Estamos na Fase 4: Financeiro e Comprovantes pela Assistente IA.
+Estamos na Fase 5: Gestão Preditiva e Auditoria Final.
 
 DATA ATUAL: ${dataAtual}
 
@@ -74,6 +75,9 @@ INTENÇÕES POSSÍVEIS:
 - registrar_pagamento: Quando o usuário quer dar baixa em uma dívida ("baixe o pagamento do Eli").
 - analisar_comprovante: Quando o usuário envia uma imagem de comprovante.
 - cancelar_pagamento: Estornar ou cancelar uma baixa financeira.
+- solicitar_resumo_operacional: Perguntas como "Como está meu dia?", "Quais as prioridades?", "Resumo da agenda".
+- analisar_risco_evasao: Identificar clientes sumidos ou que demoram a voltar.
+- sugerir_otimizacao_agenda: Propor encaixes ou melhor distribuição de horários.
 - comando_nao_reconhecido: Quando não entender.
 
 REGRAS CRÍTICAS DE AGENDAMENTO:
