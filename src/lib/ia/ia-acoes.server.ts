@@ -1,25 +1,31 @@
 import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
 import { format } from "date-fns";
+import { createIAResponse } from "./ia-retorno.server";
 
-export const ValidarAgendamentoSchema = z.object({
+export const ValidarAgendamentoSchema = z.import("zod").then(z => z.object({
   data: z.string(),
   hora: z.string(),
   pet_id: z.string(),
   cliente_id: z.string(),
   profissional_id: z.string().optional(),
   servicos: z.array(z.string()),
-});
+}));
 
 type AgendamentoStatus = Database["public"]["Enums"]["agendamento_status"];
 type LevaTrazModalidade = Database["public"]["Enums"]["leva_traz_modalidade"];
 
 export async function validarDisponibilidadeReal(
   sb: SupabaseClient<Database>,
-  params: z.infer<typeof ValidarAgendamentoSchema>
+  params: {
+    data: string;
+    hora: string;
+    pet_id: string;
+    cliente_id: string;
+    profissional_id?: string;
+    servicos: string[];
+  }
 ) {
-  // 1. Verificar duplicidade (Mesmo cliente, pet, data e hora)
   const { data: duplicados, error: errD } = await sb
     .from("agendamentos")
     .select("id")
@@ -30,11 +36,15 @@ export async function validarDisponibilidadeReal(
     .not("status", "eq", "cancelado");
 
   if (errD) throw errD;
+  
   if (duplicados && duplicados.length > 0) {
-    return { disponivel: false, motivo: "Já existe um agendamento idêntico para este pet neste horário." };
+    return createIAResponse({
+      success: false,
+      action: 'validar_disponibilidade',
+      warnings: ["Já existe um agendamento idêntico para este pet neste horário."]
+    });
   }
 
-  // 2. Verificar ocupação do horário (Aviso, não bloqueio, conforme regra do projeto)
   const { data: ocupados, error: errO } = await sb
     .from("agendamentos")
     .select("id, pets(nome)")
@@ -44,11 +54,15 @@ export async function validarDisponibilidadeReal(
 
   if (errO) throw errO;
   
-  return {
-    disponivel: true,
-    conflitos: ocupados?.map(o => (o.pets as any)?.nome) || [],
-    aviso: ocupados && ocupados.length > 0 ? `Atenção: Já existem ${ocupados.length} agendamentos para este horário.` : null
-  };
+  return createIAResponse({
+    success: true,
+    action: 'validar_disponibilidade',
+    result: {
+      disponivel: true,
+      conflitos: ocupados?.map(o => (o.pets as any)?.nome) || [],
+      aviso: ocupados && ocupados.length > 0 ? `Atenção: Já existem ${ocupados.length} agendamentos para este horário.` : null
+    }
+  });
 }
 
 export async function criarAgendamentoIA(
@@ -67,7 +81,6 @@ export async function criarAgendamentoIA(
 ) {
   const modalidade: LevaTrazModalidade = params.transporte ? "buscar_entregar" : "nao_utilizar";
 
-  // Criar o agendamento
   const { data: agendamento, error: errA } = await sb
     .from("agendamentos")
     .insert({
@@ -86,7 +99,6 @@ export async function criarAgendamentoIA(
 
   if (errA) throw errA;
 
-  // Inserir os serviços
   const servicosInsert = params.servicos.map((s, idx) => ({
     agendamento_id: agendamento.id,
     servico_id: s.id,
@@ -101,7 +113,11 @@ export async function criarAgendamentoIA(
 
   if (errS) throw errS;
 
-  return agendamento;
+  return createIAResponse({
+    action: 'criar_agendamento',
+    record_id: agendamento.id,
+    result: agendamento
+  });
 }
 
 export async function remarcarAgendamentoIA(
@@ -121,7 +137,12 @@ export async function remarcarAgendamentoIA(
     .single();
 
   if (error) throw error;
-  return data;
+  
+  return createIAResponse({
+    action: 'remarcar_agendamento',
+    record_id: data.id,
+    result: data
+  });
 }
 
 export async function cancelarAgendamentoIA(
@@ -140,7 +161,12 @@ export async function cancelarAgendamentoIA(
     .single();
 
   if (error) throw error;
-  return data;
+  
+  return createIAResponse({
+    action: 'cancelar_agendamento',
+    record_id: data.id,
+    result: data
+  });
 }
 
 export async function registrarPagamentoIA(
@@ -155,7 +181,6 @@ export async function registrarPagamentoIA(
     id_transacao?: string;
   }
 ) {
-  // 1. Buscar o pagamento atual
   const { data: pagamento, error: errP } = await sb
     .from("pagamentos")
     .select("*")
@@ -170,7 +195,6 @@ export async function registrarPagamentoIA(
   const status: Database["public"]["Enums"]["pagamento_status"] = 
     novoValorPago >= pagamento.valor_total ? "pago" : "pendente";
 
-  // 2. Atualizar o pagamento
   const { data, error } = await sb
     .from("pagamentos")
     .update({
@@ -190,26 +214,59 @@ export async function registrarPagamentoIA(
 
   if (error) throw error;
 
-  return data;
+  return createIAResponse({
+    action: 'registrar_pagamento',
+    record_id: data.id,
+    result: data
+  });
 }
 
-export async function cancelarPagamentoIA(
+export async function criarClienteIA(
   sb: SupabaseClient<Database>,
-  pagamento_id: string,
-  motivo: string
+  params: { nome: string; telefone: string; email?: string; observacoes?: string }
 ) {
   const { data, error } = await sb
-    .from("pagamentos")
-    .update({
-      status: "pendente" as Database["public"]["Enums"]["pagamento_status"],
-      valor_pago: 0,
-      observacoes: `Estornado via IA: ${motivo}`,
-      updated_at: new Date().toISOString()
+    .from("clientes")
+    .insert({
+      nome: params.nome,
+      telefone: params.telefone,
+      email: params.email,
+      observacoes: params.observacoes
     })
-    .eq("id", pagamento_id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+
+  return createIAResponse({
+    action: 'criar_cliente',
+    record_id: data.id,
+    result: data
+  });
+}
+
+export async function criarPetIA(
+  sb: SupabaseClient<Database>,
+  params: { cliente_id: string; nome: string; especie: string; raca?: string; porte?: string; observacoes?: string }
+) {
+  const { data, error } = await sb
+    .from("pets")
+    .insert({
+      cliente_id: params.cliente_id,
+      nome: params.nome,
+      especie: params.especie,
+      raca: params.raca,
+      porte: params.porte,
+      observacoes: params.observacoes
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return createIAResponse({
+    action: 'criar_pet',
+    record_id: data.id,
+    result: data
+  });
 }
