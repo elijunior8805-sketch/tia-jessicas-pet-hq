@@ -717,8 +717,18 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
                                onClick={() => window.open(`/clientes?id=${searchResults.clientes[0].id}`, '_blank')}
                              >
-                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes
+                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes do Cliente
                              </Button>
+                          )}
+
+                          {msg.intent.intencao === 'consulta_cliente' && (!searchResults?.clientes || searchResults.clientes.length === 0) && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => window.open('/clientes?novo=true', '_blank')}
+                            >
+                              <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
+                            </Button>
                           )}
 
                           {msg.intent.intencao === 'comando_nao_reconhecido' && msg.content.includes('não cadastrado') && (
@@ -731,15 +741,27 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             </Button>
                           )}
                           
-                          {msg.intent.intencao === 'criar_agendamento' && msg.intent.cliente_nome && (
-                            <Button 
-                              size="sm" 
-                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                              onClick={() => handleConfirmarAgendamento(msg.intent!)}
-                              disabled={isProcessing}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar
-                            </Button>
+                          {msg.intent.intencao === 'criar_agendamento' && (
+                            <div className="flex gap-2">
+                              {msg.intent.cliente_nome && (
+                                <Button 
+                                  size="sm" 
+                                  className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                                  onClick={() => handleConfirmarAgendamento(msg.intent!)}
+                                  disabled={isProcessing}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Agendamento
+                                </Button>
+                              )}
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="h-8 text-[11px] font-bold rounded-lg px-3 border-[#C99845]/20 text-[#123F2A]"
+                                onClick={() => window.open('/agenda', '_blank')}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Agenda
+                              </Button>
+                            </div>
                           )}
                           {msg.intent.intencao === 'confirmar_baixa' && (
                             <Button 
