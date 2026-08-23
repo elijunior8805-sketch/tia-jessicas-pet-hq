@@ -352,8 +352,8 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
   // 1. Obter duração real do serviço se não for passada
   let duracao = params.duracao_min || 60;
   if (params.servico_id && !params.duracao_min) {
-    const { data: servico } = await sb.from("servicos").select("duracao_padrao").eq("id", params.servico_id).single();
-    if (servico) duracao = servico.duracao_padrao || 60;
+    const { data: servico } = await sb.from("servicos").select("duracao_min").eq("id", params.servico_id).single();
+    if (servico) duracao = servico.duracao_min || 60;
   }
 
   // 2. Buscar agendamentos do dia
