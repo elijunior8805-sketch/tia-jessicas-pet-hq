@@ -65,6 +65,13 @@ import {
   identificarAniversariantesIA,
   analisarReativacaoIA
 } from '@/lib/ia/ia-comunicacao.functions';
+import {
+  getEstoqueIA,
+  getComprasIA,
+  getFornecedoresIA,
+  getSugestoesCompraIA,
+  getAnomaliasEstoqueIA
+} from '@/lib/ia/ia-estoque.functions';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -363,6 +370,40 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           dadosReais = res.data;
           respostaFinal = `### 🔄 Risco de Evasão (Reativação)\n\n` +
             (dadosReais as any[]).map((c: any) => `- **${c.nome}** (${c.dias_inatividade} dias sem vir) - ${c.justificativa}`).join('\n');
+        }
+      }
+
+      // Especialista: Estoque & Compras (Parte 9)
+      if (intent.especialista === 'estoque_compras') {
+        setIaStatus('pesquisando');
+        if (intent.intencao === 'consulta_estoque') {
+          const res = await getEstoqueIA({ 
+            data: { 
+              termo: intent.parametros?.termo,
+              apenasBaixo: intent.parametros?.baixo_estoque 
+            } 
+          });
+          dadosReais = res;
+          if ((res as any[]).length > 0) {
+            respostaFinal = `### 📦 Saldo de Estoque\n\n` +
+              (res as any[]).map((p: any) => `- **${p.nome}**: ${p.quantidade} ${p.unidade || ''} (Mín: ${p.estoque_minimo || 0})`).join('\n');
+          } else {
+            respostaFinal = "Nenhum produto encontrado com esses critérios.";
+          }
+        } else if (intent.intencao === 'sugerir_reposicao') {
+          const res = await getSugestoesCompraIA();
+          dadosReais = res;
+          respostaFinal = `### 🛒 Sugestões de Reposição\n\n` +
+            (res as any[]).map((s: any) => `- **${s.nome}**: Sugerido comprar **${s.sugestao}** (Saldo: ${s.saldo}, Prioridade: ${s.prioridade})`).join('\n');
+        } else if (intent.intencao === 'detectar_anomalias_estoque') {
+          const res = await getAnomaliasEstoqueIA();
+          dadosReais = res;
+          if ((res as any[]).length > 0) {
+            respostaFinal = `### ⚠️ Anomalias Detectadas\n\n` +
+              (res as any[]).map((a: any) => `- **${a.tipo}**: ${a.produto} - ${a.detalhe}`).join('\n');
+          } else {
+            respostaFinal = "Não detectei anomalias no estoque no momento.";
+          }
         }
       }
 

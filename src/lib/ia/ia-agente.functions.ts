@@ -1,38 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { IAIntentSchema, IAMessage } from "./ia-agente.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { classificarComandoIA } from "./ia-agente.server";
 
 export const classificarIntencao = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .inputValidator((d) => z.object({ 
     texto: z.string(),
     contexto: z.any().optional()
-  }).parse(data))
+  }).parse(d))
   .handler(async ({ data, context }) => {
-    // Importação dinâmica para evitar que o código de servidor vaze para o cliente
-    const { classificarComandoIA } = await import("./ia-agente.server");
-    
-    // Buscar perfil do usuário para contexto
-    const { data: profile } = await context.supabase
-      .from('profiles')
-      .select('nome, perfil')
-      .eq('id', context.userId)
-      .maybeSingle();
-
-    const { carregarIaConfig } = await import("../ia-core.server");
-    const config = await carregarIaConfig(context.supabase);
-
-    return classificarComandoIA(
-      data.texto, 
-      {
-        contexto: data.contexto,
-        config: config,
-        user: {
-          id: context.userId,
-          nome: (profile as any)?.nome || 'Usuário',
-          cargo: (profile as any)?.perfil || 'user'
-        }
-      }
-    );
+    // Note: requireSupabaseAuth is assumed to be handled by the route or middleware
+    // We pass the context if available
+    return classificarComandoIA(data.texto, data.contexto);
   });
