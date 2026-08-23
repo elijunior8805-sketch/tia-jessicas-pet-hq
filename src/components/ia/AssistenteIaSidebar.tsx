@@ -60,6 +60,11 @@ import {
   executarBaixaPagamento, 
   processarComprovanteIA,
 } from '@/lib/ia/ia-financeiro.functions';
+import {
+  consultarMensagensIA,
+  identificarAniversariantesIA,
+  analisarReativacaoIA
+} from '@/lib/ia/ia-comunicacao.functions';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -333,6 +338,34 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       if (intent.informacoes_faltantes && intent.informacoes_faltantes.length > 0) {
         setIaStatus('aguardando_informacao');
       }
+
+      // Especialista: Comunicação & Reativação (Parte 8)
+      if (intent.especialista === 'comunicacao') {
+        setIaStatus('pesquisando');
+        if (intent.intencao === 'consultar_mensagens') {
+          const res = await consultarMensagensIA({ 
+            data: { cliente_id: intent.parametros?.cliente_id } 
+          });
+          dadosReais = res.data;
+          respostaFinal = \`### 💬 Mensagens Recentes\n\n\` +
+            dadosReais.map((m: any) => \`- [\${format(parseISO(m.created_at), 'dd/MM HH:mm')}] **\${m.clientes?.nome || 'Sistema'}**: \${m.mensagem}\`).join('\n');
+        } else if (intent.intencao === 'consultar_aniversariantes') {
+          const res = await identificarAniversariantesIA();
+          dadosReais = res.data;
+          if (dadosReais.length > 0) {
+            respostaFinal = \`### 🎂 Aniversariantes de Hoje!\n\n\` +
+              dadosReais.map((p: any) => \`- **\${p.nome}** (\${p.raca}) - Tutor: \${p.clientes?.nome}\`).join('\n');
+          } else {
+            respostaFinal = "Não encontrei aniversariantes para hoje.";
+          }
+        } else if (intent.intencao === 'analisar_reativacao') {
+          const res = await analisarReativacaoIA();
+          dadosReais = res.data;
+          respostaFinal = \`### 🔄 Risco de Evasão (Reativação)\n\n\` +
+            dadosReais.map((c: any) => \`- **\${c.nome}** (\${c.dias_inatividade} dias sem vir) - \${c.justificativa}\`).join('\n');
+        }
+      }
+
 
       if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
         setIaStatus('pesquisando');
