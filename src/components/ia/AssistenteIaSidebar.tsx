@@ -309,7 +309,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       const intent = await classificarIntencao({
         data: {
           texto: text,
-          contexto: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
+          contexto: {
+            mensagens: messages.slice(-5).map(m => ({ role: m.role, content: m.content })),
+            data_atual: new Date().toISOString()
+          }
         }
       });
 
