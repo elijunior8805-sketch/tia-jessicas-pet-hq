@@ -785,9 +785,18 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                     Assistente IA
                   </h2>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="flex h-1.5 w-1.5 rounded-full bg-[#C99845] animate-pulse" />
+                    <span className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === 'erro' ? 'bg-red-500' : 'bg-[#C99845]'}`} />
                     <p className="text-[9px] uppercase tracking-widest font-bold text-white/60">
-                      Spa Tia Jéssica • Online
+                      {iaStatus === 'idle' && 'Spa Tia Jéssica • Online'}
+                      {iaStatus === 'interpretando' && 'Pensando...'}
+                      {iaStatus === 'pesquisando' && 'Consultando base de dados...'}
+                      {iaStatus === 'aguardando_informacao' && 'Aguardando detalhes...'}
+                      {iaStatus === 'validando' && 'Validando dados...'}
+                      {iaStatus === 'aguardando_confirmacao' && 'Aguardando sua confirmação...'}
+                      {iaStatus === 'executando' && 'Executando operação real...'}
+                      {iaStatus === 'verificando' && 'Verificando resultado...'}
+                      {iaStatus === 'concluido' && 'Operação concluída'}
+                      {iaStatus === 'erro' && 'Ocorreu um erro'}
                     </p>
                   </div>
                 </div>
