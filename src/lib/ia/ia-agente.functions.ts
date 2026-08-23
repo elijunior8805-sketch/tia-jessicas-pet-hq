@@ -7,7 +7,7 @@ export const classificarIntencao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({
     texto: z.string(),
-    contexto: z.array(z.any()).optional()
+    contexto: z.any().optional()
   }).parse(data))
   .handler(async ({ data, context }) => {
     // Importação dinâmica para evitar que o código de servidor vaze para o cliente

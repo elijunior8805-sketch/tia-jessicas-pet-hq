@@ -327,16 +327,17 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
         setIaStatus('pesquisando');
+        const params = intent.parametros || {};
         const response = await consultarAgendaIA({
           data: {
-            data: intent.data || undefined,
-            periodo_inicio: intent.periodo_inicio || undefined,
-            periodo_fim: intent.periodo_fim || undefined,
-            status: intent.status || undefined,
-            pet_nome: intent.pet_nome || undefined,
-            cliente_nome: intent.cliente_nome || undefined,
-            servico_nome: intent.filtros?.servico_nome || undefined,
-            leva_e_traz: intent.filtros?.leva_e_traz
+            data: params.data || undefined,
+            periodo_inicio: params.periodo_inicio || undefined,
+            periodo_fim: params.periodo_fim || undefined,
+            status: params.status || undefined,
+            pet_nome: params.pet_nome || undefined,
+            cliente_nome: params.cliente_nome || undefined,
+            servico_nome: params.servico_nome || undefined,
+            leva_e_traz: params.leva_e_traz
           }
         });
         
@@ -363,7 +364,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             `- ✨ **Finalizados**: ${stats.finalizados}\n` +
             `- ❌ **Cancelados/Faltas**: ${stats.cancelados + stats.faltas}`;
         } else if (dadosReais.length > 0) {
-          const dataFormatada = intent.data ? format(parseISO(intent.data), 'dd/MM') : 'hoje';
+          const dataFormatada = (intent.parametros as any)?.data ? format(parseISO((intent.parametros as any).data), 'dd/MM') : 'hoje';
           respostaFinal = `### 📅 Agenda de ${dataFormatada} (${dadosReais.length})\n\n` +
             `| Horário | Pet | Serviço | Status |\n` +
             `| :--- | :--- | :--- | :--- |\n` +
@@ -380,7 +381,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
         setIaStatus('pesquisando');
-        const termo = intent.cliente_nome || intent.pet_nome || text;
+        const params = intent.parametros || {};
+        const termo = params.cliente_nome || params.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
         const results = { clientes: (response.data || []) as any[], pets: [] as any[] };
         setSearchResults(results);
@@ -406,7 +408,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                 data: { 
                   cliente_nome: c.nome, 
                   status: 'confirmado',
-                  data: intent.data || undefined
+                  data: (intent.parametros as any)?.data || undefined
                 } 
               });
               const agendamentos = agendaRes.data || [];
@@ -428,13 +430,14 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         }
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         setIaStatus('pesquisando');
+        const params = (intent.parametros as any) || {};
         const response = await consultarFinanceiroIA({
           data: { 
             apenas_pendentes: intent.intencao === 'consultar_pendencias',
-            termo: intent.cliente_nome || undefined,
-            period: (intent.filtros?.period || intent.status || intent.data) as any,
-            periodo_inicio: intent.periodo_inicio || undefined,
-            periodo_fim: intent.periodo_fim || undefined
+            termo: params.cliente_nome || params.termo || undefined,
+            period: (params.period || params.status || params.data) as any,
+            periodo_inicio: params.periodo_inicio || undefined,
+            periodo_fim: params.periodo_fim || undefined
           }
         });
         
@@ -524,21 +527,22 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setIsProcessing(true);
     setIaStatus('executando');
     try {
+      const params = (intent.parametros as any) || {};
       // 1. Resolver IDs
-      let clienteId = intent.cliente_id;
-      let petId = intent.pet_id;
-      let servicosIds = intent.servico_ids;
+      let clienteId = params.cliente_id;
+      let petId = params.pet_id;
+      let servicosIds = params.servico_ids;
 
-      if (!clienteId && intent.cliente_nome) {
-        const { data: cData } = await supabase.from('clientes').select('id, nome').ilike('nome', `%${intent.cliente_nome}%`).limit(2);
+      if (!clienteId && params.cliente_nome) {
+        const { data: cData } = await supabase.from('clientes').select('id, nome').ilike('nome', `%${params.cliente_nome}%`).limit(2);
         if (cData && cData.length > 1) {
-          throw new Error(`Encontrei mais de um cliente com o nome "${intent.cliente_nome}". Por favor, informe o nome completo ou telefone.`);
+          throw new Error(`Encontrei mais de um cliente com o nome "${params.cliente_nome}". Por favor, informe o nome completo ou telefone.`);
         }
         clienteId = cData?.[0]?.id;
       }
       
-      if (!petId && intent.pet_nome && clienteId) {
-        const { data: pData } = await supabase.from('pets').select('id').eq('cliente_id', clienteId).ilike('nome', `%${intent.pet_nome}%`).limit(1);
+      if (!petId && params.pet_nome && clienteId) {
+        const { data: pData } = await supabase.from('pets').select('id').eq('cliente_id', clienteId).ilike('nome', `%${params.pet_nome}%`).limit(1);
         petId = pData?.[0]?.id;
       }
       
@@ -551,8 +555,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       if (servicosIds && servicosIds.length > 0) {
         const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('id', servicosIds);
         servicosParaCriar = sData || [];
-      } else if (intent.servicos && intent.servicos.length > 0) {
-        const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('nome', intent.servicos);
+      } else if (params.servicos && params.servicos.length > 0) {
+        const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('nome', params.servicos);
         servicosParaCriar = sData || [];
       }
 
@@ -561,8 +565,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       // 3. Re-validar disponibilidade e duplicidade real (Server-side)
       const validation = await validarAgendamentoIA({
         data: {
-          data: intent.data!,
-          hora: intent.horario!,
+          data: params.data!,
+          hora: params.horario!,
           cliente_id: clienteId,
           pet_id: petId,
           servicos: servicosParaCriar.map(s => s.id)
@@ -578,12 +582,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         data: {
           cliente_id: clienteId,
           pet_id: petId,
-          data: intent.data!,
-          hora: intent.horario!,
+          data: params.data!,
+          hora: params.horario!,
           servicos: servicosParaCriar,
-          transporte: intent.transporte || false,
-          taxa_transporte: intent.taxa_transporte || 0,
-          observacoes: intent.observacoes || "Agendado via Agente IA",
+          transporte: params.transporte || false,
+          taxa_transporte: params.taxa_transporte || 0,
+          observacoes: params.observacoes || "Agendado via Agente IA",
           duracao_min: 60 // Valor padrão
         }
       });
@@ -592,7 +596,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `✅ **Agendamento confirmado com sucesso!**\n\n- **ID**: \`${recordId}\`\n- **Pet**: ${intent.pet_nome}\n- **Data**: ${intent.data}\n- **Hora**: ${intent.horario}\n- **Serviços**: ${servicosParaCriar.map(s => s.nome).join(', ')}\n\nO registro já está visível na Agenda.`,
+        content: `✅ **Agendamento confirmado com sucesso!**\n\n- **ID**: \`${recordId}\`\n- **Pet**: ${(intent.parametros as any)?.pet_nome}\n- **Data**: ${(intent.parametros as any)?.data}\n- **Hora**: ${(intent.parametros as any)?.horario}\n- **Serviços**: ${servicosParaCriar.map(s => s.nome).join(', ')}\n\nO registro já está visível na Agenda.`,
         timestamp: new Date().toISOString(),
         meta: { recordId }
       } as any]);
@@ -921,7 +925,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                           
                           {['criar_agendamento', 'remarcar_agendamento'].includes(msg.intent.intencao) && (
                             <div className="flex gap-2">
-                              {msg.intent.cliente_nome && (
+                              {(msg.intent.parametros as any)?.cliente_nome && (
                                 <Button 
                                   size="sm" 
                                   className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
