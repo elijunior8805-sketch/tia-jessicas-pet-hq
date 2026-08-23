@@ -7,7 +7,7 @@ export async function getResumoNegocioIA() {
     estoqueRes,
     petsRes
   ] = await Promise.all([
-    supabaseAdmin.from('atendimentos').select('id', { count: 'exact', head: true }).eq('data', new Date().toISOString().split('T')[0]),
+    supabaseAdmin.from('atendimentos').select('id', { count: 'exact', head: true }).eq('data' as any, new Date().toISOString().split('T')[0]),
     supabaseAdmin.from('pagamentos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
     supabaseAdmin.from('produtos_estoque').select('id', { count: 'exact', head: true }).lte('quantidade', 'estoque_minimo'),
     supabaseAdmin.from('pets').select('id', { count: 'exact', head: true })
