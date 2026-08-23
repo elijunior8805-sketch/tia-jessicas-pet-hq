@@ -327,16 +327,17 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
         setIaStatus('pesquisando');
+        const params = intent.parametros || {};
         const response = await consultarAgendaIA({
           data: {
-            data: intent.data || undefined,
-            periodo_inicio: intent.periodo_inicio || undefined,
-            periodo_fim: intent.periodo_fim || undefined,
-            status: intent.status || undefined,
-            pet_nome: intent.pet_nome || undefined,
-            cliente_nome: intent.cliente_nome || undefined,
-            servico_nome: intent.filtros?.servico_nome || undefined,
-            leva_e_traz: intent.filtros?.leva_e_traz
+            data: params.data || undefined,
+            periodo_inicio: params.periodo_inicio || undefined,
+            periodo_fim: params.periodo_fim || undefined,
+            status: params.status || undefined,
+            pet_nome: params.pet_nome || undefined,
+            cliente_nome: params.cliente_nome || undefined,
+            servico_nome: params.servico_nome || undefined,
+            leva_e_traz: params.leva_e_traz
           }
         });
         
@@ -380,7 +381,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
         setIaStatus('pesquisando');
-        const termo = intent.cliente_nome || intent.pet_nome || text;
+        const params = intent.parametros || {};
+        const termo = params.cliente_nome || params.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
         const results = { clientes: (response.data || []) as any[], pets: [] as any[] };
         setSearchResults(results);
@@ -406,7 +408,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                 data: { 
                   cliente_nome: c.nome, 
                   status: 'confirmado',
-                  data: intent.data || undefined
+                  data: (intent.parametros as any)?.data || undefined
                 } 
               });
               const agendamentos = agendaRes.data || [];
