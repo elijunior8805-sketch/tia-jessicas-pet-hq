@@ -72,6 +72,8 @@ export async function criarAgendamentoIA(
     idempotency_key?: string;
   }
 ) {
+  const { data: user } = await sb.auth.getUser();
+  const userId = user?.user?.id;
   // 1. Verificação de Idempotência
   if (params.idempotency_key) {
     const { data: existente } = await sb
@@ -85,7 +87,7 @@ export async function criarAgendamentoIA(
         source: 'criar_agendamento',
         affected_record_id: existente.id,
         data: existente,
-        warning: "Este agendamento já foi processado anteriormente."
+        message: "Este agendamento já foi processado anteriormente."
       });
     }
   }

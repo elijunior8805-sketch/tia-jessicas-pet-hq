@@ -636,7 +636,7 @@ export async function consultarRiscoFaltaIA(sb: SupabaseClient<Database>, client
   if (error) throw error;
 
   const total = agendamentos?.length || 0;
-  const faltas = agendamentos?.filter(a => a.status === 'falta').length || 0;
+  const faltas = agendamentos?.filter(a => a.status === 'nao_compareceu').length || 0;
   const cancelamentos = agendamentos?.filter(a => a.status === 'cancelado').length || 0;
   
   const score = total > 0 ? (faltas / total) * 100 : 0;
