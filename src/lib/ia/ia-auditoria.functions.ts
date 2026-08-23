@@ -1,29 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { 
-  getResumoNegocioIA,
-  getIndicadoresQualidadeIA,
-  getLogsAuditoriaIA,
-  registrarAuditoriaIA
-} from "./ia-auditoria.server";
+import * as auditoriaServer from "./ia-auditoria.server";
 
 export const getResumoProprietarioIA = createServerFn({ method: "GET" })
   .handler(async () => {
-    return getResumoNegocioIA();
+    return auditoriaServer.getResumoNegocioIA();
   });
 
 export const getQualidadeIA = createServerFn({ method: "GET" })
   .handler(async () => {
-    return getIndicadoresQualidadeIA();
+    return auditoriaServer.getIndicadoresQualidadeIA();
   });
 
 export const getAuditoriaIA = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ limit: z.number().optional() }).parse(d))
   .handler(async ({ data }) => {
-    return getLogsAuditoriaIA(data.limit);
+    return auditoriaServer.getLogsAuditoriaIA(data.limit);
   });
 
-export const registrarAuditoriaIAFn = createServerFn({ method: "POST" })
+export const registrarAuditoriaIA = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     comando_original: z.string(),
     intencao_detectada: z.string().optional(),
@@ -34,10 +29,11 @@ export const registrarAuditoriaIAFn = createServerFn({ method: "POST" })
     sucesso: z.boolean().optional(),
     tempo_resposta_ms: z.number().optional(),
   }).parse(d))
-  .handler(async ({ data, context }) => {
-    // We could extract user_id from context here if auth middleware is present
-    return registrarAuditoriaIA(data);
+  .handler(async ({ data }) => {
+    return auditoriaServer.registrarAuditoriaIA(data);
   });
 
-// Compatibility export
-export const registrarAuditoriaIA = registrarAuditoriaIAFn;
+export const realizarAuditoriaDadosIA = createServerFn({ method: "POST" })
+  .handler(async () => {
+    return auditoriaServer.realizarAuditoriaDadosIA();
+  });
