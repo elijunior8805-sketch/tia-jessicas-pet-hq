@@ -95,11 +95,22 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   useEffect(() => {
     if (typeof window !== 'undefined' && !recognizerRef.current) {
       recognizerRef.current = new VoiceRecognizer({
-        onResult: (text) => setInputText(text),
+        onResult: (text) => {
+          setInputText(text);
+          // Auto-enviar se o texto for significativo
+          if (text.length > 10) {
+            handleSend(text);
+          }
+        },
         onStatusChange: (status) => setVoiceStatus(status),
         onError: (err) => {
-          toast.error(`Erro de voz: ${err}`);
+          console.error("Erro de reconhecimento de voz:", err);
+          // Não mostrar toast de erro toda hora para não incomodar, mas logar
           setVoiceStatus('error');
+          // Tentar reiniciar após 2 segundos se falhar
+          setTimeout(() => {
+            if (voiceStatus === 'error') setVoiceStatus('idle');
+          }, 2000);
         }
       });
     }
@@ -351,10 +362,20 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         setSearchResults(results);
         
         if (results.clientes.length > 0) {
+          // Ordenar resultados por relevância (nome começando com o termo ganha prioridade)
+          results.clientes.sort((a, b) => {
+            const aStarts = a.nome.toLowerCase().startsWith(termo.toLowerCase()) ? 0 : 1;
+            const bStarts = b.nome.toLowerCase().startsWith(termo.toLowerCase()) ? 0 : 1;
+            return aStarts - bStarts;
+          });
+
           const c = results.clientes[0];
-          const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase());
           
-          if (results.clientes.length === 1 && matchesTermo) {
+          // Considerar match se for o único resultado ou se for muito parecido
+          const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase()) || 
+                              termo.toLowerCase().includes(c.nome.toLowerCase());
+          
+          if (results.clientes.length === 1 || (results.clientes.length > 1 && matchesTermo)) {
             if (intent.intencao === 'remarcar_agendamento' || intent.intencao === 'cancelar_agendamento') {
               // Buscar agendamentos do cliente para escolha
               const agendaRes = await consultarAgendaIA({ 
@@ -375,11 +396,11 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
             }
           } else {
-            respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Você quis dizer algum destes clientes?\n\n` +
-              results.clientes.map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
+            respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Encontrei estes clientes similares:\n\n` +
+              results.clientes.slice(0, 5).map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
           }
         } else {
-          respostaFinal = `Cliente não cadastrado. Deseja cadastrá-lo agora?`;
+          respostaFinal = `Não encontrei nenhum cliente chamado "${termo}". Deseja que eu tente buscar por outro nome ou realizar um novo cadastro?`;
         }
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         const response = await consultarFinanceiroIA({
