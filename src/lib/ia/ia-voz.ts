@@ -21,8 +21,8 @@ export class VoiceRecognizer {
 
     this.recognition = new SpeechRecognition();
     this.recognition.lang = 'pt-BR';
-    this.recognition.continuous = false;
-    this.recognition.interimResults = true;
+    this.recognition.continuous = false; // Mudar para true se quiser manter o microfone aberto
+    this.recognition.interimResults = false; // Desabilitar resultados parciais para evitar ruído no input final
 
     this.recognition.onstart = () => {
       this.status = 'listening';

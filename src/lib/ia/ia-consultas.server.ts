@@ -100,7 +100,10 @@ export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: stri
   // Implementação de busca aproximada (Fuzzy Search simplificada no SQL)
   const termoLimpo = termo.trim();
   
-  // Se o termo for Eli e quisermos Elis, ilike %Eli% já resolve
+  // Estratégia de busca mais agressiva:
+  // 1. Tentar por partes do nome (Eli Jr, Eli Junior, etc)
+  // 2. Tentar por telefone exato ou parcial
+  // 3. Tentar por nome completo
   const { data, error } = await sb
     .from("clientes")
     .select(`*, pets(id, nome, raca)`)
@@ -109,6 +112,27 @@ export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: stri
     .limit(10);
 
   if (error) throw error;
+
+  // Se não encontrar nada e o termo tiver espaços, tentar buscar por cada palavra
+  if ((!data || data.length === 0) && termoLimpo.includes(' ')) {
+    const palavras = termoLimpo.split(' ').filter(p => p.length > 2);
+    if (palavras.length > 0) {
+      const orString = palavras.map(p => `nome.ilike.%${p}%`).join(',');
+      const { data: dataFuzzy, error: errorFuzzy } = await sb
+        .from("clientes")
+        .select(`*, pets(id, nome, raca)`)
+        .or(orString)
+        .order('nome')
+        .limit(10);
+      
+      if (!errorFuzzy && dataFuzzy && dataFuzzy.length > 0) {
+        return createIAResponse({
+          action: 'buscar_clientes',
+          result: dataFuzzy
+        });
+      }
+    }
+  }
 
   return createIAResponse({
     action: 'buscar_clientes',
