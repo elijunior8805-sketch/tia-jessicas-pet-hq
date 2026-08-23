@@ -361,7 +361,7 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
     .from("agendamentos")
     .select("hora, duracao_min, profissional_id, status")
     .eq("data", params.data)
-    .not("status", "in", '("cancelado", "falta")');
+    .not("status", "in", '("cancelado", "nao_compareceu")');
 
   if (error) throw error;
 
