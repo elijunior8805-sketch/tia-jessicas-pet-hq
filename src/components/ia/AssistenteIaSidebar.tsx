@@ -390,45 +390,31 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         setSearchResults(results);
         
         if (results.clientes.length > 0) {
-          // Ordenar resultados por relevância (nome começando com o termo ganha prioridade)
-          results.clientes.sort((a, b) => {
-            const aStarts = a.nome.toLowerCase().startsWith(termo.toLowerCase()) ? 0 : 1;
-            const bStarts = b.nome.toLowerCase().startsWith(termo.toLowerCase()) ? 0 : 1;
-            return aStarts - bStarts;
-          });
-
-          const c = results.clientes[0];
-          
-          // Considerar match se for o único resultado ou se for muito parecido
-          const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase()) || 
-                              termo.toLowerCase().includes(c.nome.toLowerCase());
-          
-          if (results.clientes.length === 1 || (results.clientes.length > 1 && matchesTermo)) {
-            if (intent.intencao === 'remarcar_agendamento' || intent.intencao === 'cancelar_agendamento') {
-              // Buscar agendamentos do cliente para escolha
-              const agendaRes = await consultarAgendaIA({ 
-                data: { 
-                  cliente_nome: c.nome, 
-                  status: 'confirmado',
-                  data: (intent.parametros as any)?.data || undefined
-                } 
-              });
-              const agendamentos = agendaRes.data || [];
-              if (agendamentos.length > 0) {
-                respostaFinal = `Encontrei o cliente **${c.nome}**. Qual destes agendamentos você deseja ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}?\n\n` +
-                  agendamentos.map((a: any) => `- **${a.hora.slice(0, 5)}** - ${a.pets?.nome} (${a.servicos?.nome || 'Serviço'})`).join('\n');
-              } else {
-                respostaFinal = `O cliente **${c.nome}** não possui agendamentos ativos para ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}.`;
-              }
-            } else {
-              respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
-            }
+          // Se houver mais de um resultado ou se for uma busca ambígua
+          if (results.clientes.length > 1) {
+            setIaStatus('aguardando_confirmacao');
+            respostaFinal = `Encontrei **${results.clientes.length} clientes** similares. Por favor, selecione qual você deseja consultar:\n\n` +
+              results.clientes.map((c, i) => `${i + 1}. **${c.nome}** - ${c.pets?.map((p: any) => p.nome).join(', ') || 'Sem pets'} (${c.telefone || 'Sem tel'})`).join('\n');
           } else {
-            respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Encontrei estes clientes similares:\n\n` +
-              results.clientes.slice(0, 5).map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
+            // Apenas 1 cliente encontrado
+            const c = results.clientes[0];
+            setSelectedEntity({ type: 'cliente', data: c });
+            setIaStatus('pesquisando');
+            
+            // Buscar Visão 360° automaticamente
+            const v360 = await consultarVisao360ClienteIA({ data: { cliente_id: c.id } });
+            const d360 = v360.data;
+            
+            respostaFinal = `### 👤 Visão 360°: ${c.nome}\n\n` +
+              `**Pets:** ${c.pets?.map((p: any) => p.nome).join(', ') || 'Nenhum'}\n` +
+              `**Gastos Totais:** R$ ${d360.metricas.total_gasto.toLocaleString('pt-BR')}\n` +
+              `**Pendências:** ${d360.metricas.pendencias_financeiras > 0 ? `⚠️ ${d360.metricas.pendencias_financeiras} pendente(s)` : '✅ Tudo em dia'}\n\n` +
+              (d360.historico.ultimo ? `*Última Visita:* ${format(parseISO(d360.historico.ultimo.data), 'dd/MM/yy')} (${d360.historico.ultimo.servicos?.nome})\n` : '') +
+              (d360.historico.proximo ? `*Próximo Agendamento:* **${format(parseISO(d360.historico.proximo.data), 'dd/MM/yy')} às ${d360.historico.proximo.hora.slice(0,5)}**\n` : '\n*Sugestão:* Agendar um retorno?') +
+              `\n\nO que deseja fazer agora?`;
           }
         } else {
-          respostaFinal = `Não encontrei nenhum cliente chamado "${termo}". Deseja que eu tente buscar por outro nome ou realizar um novo cadastro?`;
+          respostaFinal = `Não encontrei nenhum cliente ou pet com o termo "${termo}". Deseja tentar buscar por outro nome ou telefone?`;
         }
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
         setIaStatus('pesquisando');
