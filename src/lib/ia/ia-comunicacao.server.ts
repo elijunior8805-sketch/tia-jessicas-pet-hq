@@ -6,11 +6,11 @@ import { format, subDays, startOfMonth, endOfMonth, isWithinInterval, parseISO }
 export async function consultarMensagensRecentes(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; pet_id?: string; limite?: number }) {
   let query = sb
     .from("notificacoes")
-    .select("`
+    .select(`
       *,
       clientes(nome, telefone),
       pets(nome)
-    `")
+    `)
     .order("created_at", { ascending: false });
 
   if (filtros.cliente_id) query = query.eq("cliente_id", filtros.cliente_id);
@@ -28,10 +28,10 @@ export async function consultarMensagensRecentes(sb: SupabaseClient<Database>, f
 export async function sugerirRespostaIA(sb: SupabaseClient<Database>, mensagemId: string) {
   const { data: msg, error } = await sb
     .from("notificacoes")
-    .select("`
+    .select(`
       *,
       clientes(*, pets(*))
-    `")
+    `)
     .eq("id", mensagemId)
     .single();
 
@@ -78,23 +78,26 @@ export async function analisarReativacaoIA(sb: SupabaseClient<Database>) {
   
   const { data: inativos, error } = await sb
     .from("clientes")
-    .select("`
+    .select(`
       *,
       pets(nome),
       agendamentos(data, status)
-    `")
+    `)
     .order("nome");
 
   const clientesRisco = inativos?.filter(c => {
-    const ags = c.agendamentos || [];
+    const ags = (c as any).agendamentos || [];
     if (ags.length === 0) return false; // Cliente novo
     const ultimaData = ags.sort((a: any, b: any) => b.data.localeCompare(a.data))[0].data;
     return ultimaData < limite;
-  }).map(c => ({
-    ...c,
-    dias_inatividade: Math.floor((new Date().getTime() - new Date(c.agendamentos[0].data).getTime()) / (1000 * 60 * 60 * 24)),
-    justificativa: "Mais de 45 dias desde o último atendimento."
-  })) || [];
+  }).map(c => {
+    const ags = (c as any).agendamentos || [];
+    return {
+      ...c,
+      dias_inatividade: Math.floor((new Date().getTime() - new Date(ags[0].data).getTime()) / (1000 * 60 * 60 * 24)),
+      justificativa: "Mais de 45 dias desde o último atendimento."
+    };
+  }) || [];
 
   return createIAResponse({
     source: 'analise_reativacao',
