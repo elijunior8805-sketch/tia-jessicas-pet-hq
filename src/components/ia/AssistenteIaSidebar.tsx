@@ -46,6 +46,11 @@ import {
   compararPeriodosFinanceirosIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
+  consultarFilaCobrancaIA,
+  gerarMensagensCobrancaIA,
+  registrarPromessaPagamentoIA
+} from '@/lib/ia/ia-cobranca.functions';
+import {
   validarAgendamentoIA,
   executarCriacaoAgendamento,
   executarRemarcacao,
@@ -491,7 +496,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           `**Período 1 (${comp.periodo_1?.from} até ${comp.periodo_1?.to}):** R$ ${comp.periodo_1?.kpis?.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
           `**Período 2 (${comp.periodo_2?.from} até ${comp.periodo_2?.to}):** R$ ${comp.periodo_2?.kpis?.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
           `**Variação:** ${comp.variacao_faturamento > 0 ? '🚀 +' : '🔻 '}${comp.variacao_faturamento.toFixed(2)}% no faturamento.`;
+      } else if (intent.intencao === 'consultar_fila_cobranca') {
+        setIaStatus('pesquisando');
+        const response = await consultarFilaCobrancaIA();
+        const { fila, total } = response.data || {};
+        
+        if (fila && fila.length > 0) {
+          respostaFinal = `### ⚖️ Central de Cobrança (${total} pendências)\n\n` +
+            `Identifiquei os casos prioritários para contato hoje:\n\n` +
+            `| Cliente | Valor | Atraso | Prioridade |\n` +
+            `| :--- | :--- | :--- | :--- |\n` +
+            fila.slice(0, 5).map((f: any) => 
+              `| **${f.clientes?.nome}** | R$ ${f.valorPendente.toLocaleString('pt-BR')} | ${f.diasAtraso}d | ${f.motivo_prioridade} |`
+            ).join('\n') +
+            `\n\nDeseja que eu gere as mensagens de cobrança para o primeiro da fila?`;
+        } else {
+          respostaFinal = "Ótimas notícias! Não identifiquei nenhuma pendência crítica na fila de cobrança agora.";
+        }
+      } else if (intent.intencao === 'gerar_mensagens_cobranca') {
+        setIaStatus('pesquisando');
+        const params = (intent.parametros as any) || {};
+        const response = await gerarMensagensCobrancaIA({ data: { pagamento_id: params.pagamento_id } });
+        const { opcoes, cliente } = response.data || {};
+        
+        respostaFinal = `### ✉️ Sugestões de Cobrança: ${cliente}\n\n` +
+          `**Opção 1 (Direta):**\n> ${opcoes.direta}\n\n` +
+          `**Opção 2 (Firme):**\n> ${opcoes.firme}\n\n` +
+          `**Opção 3 (Extra Firme):**\n> ${opcoes.extra_firme}\n\n` +
+          `Qual destas você deseja enviar? Você também pode pedir para eu ajustar o texto.`;
       }
+
 
       if (intent.exige_confirmacao) {
         setIaStatus('aguardando_confirmacao');
