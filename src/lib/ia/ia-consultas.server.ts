@@ -452,7 +452,7 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
     .eq("finalizado", true)
     .order("data_inicio", { ascending: false });
 
-  if (!atendimentos || atendimentos.length === 0) return createIAResponse({ action: 'analisar_risco_evasao', result: [] });
+  if (!atendimentos || atendimentos.length === 0) return createIAResponse({ source: 'analisar_risco_evasao', data: [] });
 
   const petStats: Record<string, { datas: Date[], nome: string, tutor: string }> = {};
 
