@@ -128,11 +128,11 @@ REGRAS DE FORMATAÇÃO DE RESPOSTA:
 - Se for erro/não encontrado: Informe claramente o que faltou.
 
 IMPORTANTE SOBRE COMANDOS RÁPIDOS:
-- "Agenda de hoje" -> intencao: consulta_agenda, data: "${new Date().toISOString().split('T')[0]}".
+- "Agenda de hoje" -> intencao: consulta_agenda, data: "hoje".
 - "Resumo do dia" -> intencao: solicitar_resumo_operacional.
 - "Faturamento do mês" -> intencao: consultar_resumo_financeiro, period: "mes".
 - "Valores a receber" -> intencao: consultar_pendencias, apenas_pendentes: true.
-- "Quantos atendimentos tenho" -> intencao: contar_atendimentos, data: "${new Date().toISOString().split('T')[0]}".
+- "Quantos atendimentos tenho" -> intencao: contar_atendimentos, data: "hoje".
 - "Criar agendamento" -> intencao: fluxo_agendamento_inicio.
 
 SOBRE DATAS INCOMPLETAS:
