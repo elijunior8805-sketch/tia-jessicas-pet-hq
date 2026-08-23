@@ -90,8 +90,8 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
   }
 
   return createIAResponse({
-    action: 'consulta_agenda',
-    result: result
+    source: 'consulta_agenda',
+    data: result
   });
 }
 
@@ -127,16 +127,16 @@ export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: stri
       
       if (!errorFuzzy && dataFuzzy && dataFuzzy.length > 0) {
         return createIAResponse({
-          action: 'buscar_clientes',
-          result: dataFuzzy
+          source: 'buscar_clientes',
+          data: dataFuzzy
         });
       }
     }
   }
 
   return createIAResponse({
-    action: 'buscar_clientes',
-    result: data
+    source: 'buscar_clientes',
+    data: data
   });
 }
 
@@ -149,8 +149,8 @@ export async function buscarPetsDoClienteIA(sb: SupabaseClient<Database>, client
   if (error) throw error;
 
   return createIAResponse({
-    action: 'buscar_pets_do_cliente',
-    result: data
+    source: 'buscar_pets_do_cliente',
+    data: data
   });
 }
 
@@ -165,8 +165,8 @@ export async function buscarServicosIA(sb: SupabaseClient<Database>, termo?: str
   if (error) throw error;
 
   return createIAResponse({
-    action: 'buscar_servicos',
-    result: data
+    source: 'buscar_servicos',
+    data: data
   });
 }
 
@@ -187,8 +187,8 @@ export async function listarAtendimentosIA(sb: SupabaseClient<Database>, filtros
   if (error) throw error;
 
   return createIAResponse({
-    action: 'listar_atendimentos',
-    result: data
+    source: 'listar_atendimentos',
+    data: data
   });
 }
 
@@ -224,8 +224,8 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     if (error) throw error;
     
     return createIAResponse({
-      action: 'consulta_financeira',
-      result: data
+      source: 'consulta_financeira',
+      data: data
     });
   }
 
@@ -271,8 +271,8 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     const indicators = await getFinancialKPIs({ data: { from, to } });
 
     return createIAResponse({
-      action: 'consultar_resumo_financeiro',
-      result: {
+      source: 'consultar_resumo_financeiro',
+      data: {
         periodo: { from, to },
         metricas: indicators
       }
@@ -310,8 +310,8 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
   if (error) throw error;
 
   return createIAResponse({
-    action: 'consultar_pendencias',
-    result: data
+    source: 'consultar_pendencias',
+    data: data
   });
 }
 
@@ -351,8 +351,8 @@ export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params
   }
 
   return createIAResponse({
-    action: 'consultar_disponibilidade',
-    result: slots.slice(0, 10) // Retornar as primeiras 10 opções
+    source: 'consultar_disponibilidade',
+    data: slots.slice(0, 10) // Retornar as primeiras 10 opções
   });
 }
 
@@ -407,8 +407,8 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     .sort((a, b) => a.hora.localeCompare(b.hora))[0];
 
   return createIAResponse({
-    action: 'consultar_resumo_operacional',
-    result: {
+    source: 'consultar_resumo_operacional',
+    data: {
       data: hoje,
       total_agenda: totalAgenda,
       confirmados,
@@ -440,8 +440,8 @@ export async function consultarHistoricoPetIA(sb: SupabaseClient<Database>, petI
   if (errA) throw errA;
 
   return createIAResponse({
-    action: 'consultar_historico_pet',
-    result: atendimentos
+    source: 'consultar_historico_pet',
+    data: atendimentos
   });
 }
 
@@ -452,7 +452,7 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
     .eq("finalizado", true)
     .order("data_inicio", { ascending: false });
 
-  if (!atendimentos || atendimentos.length === 0) return createIAResponse({ action: 'analisar_risco_evasao', result: [] });
+  if (!atendimentos || atendimentos.length === 0) return createIAResponse({ source: 'analisar_risco_evasao', data: [] });
 
   const petStats: Record<string, { datas: Date[], nome: string, tutor: string }> = {};
 
@@ -496,7 +496,7 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
   }
 
   return createIAResponse({
-    action: 'analisar_risco_evasao',
-    result: riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10)
+    source: 'analisar_risco_evasao',
+    data: riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10)
   });
 }

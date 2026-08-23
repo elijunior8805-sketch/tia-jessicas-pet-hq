@@ -2,13 +2,16 @@ import { z } from "zod";
 
 export const IAResponseSchema = z.object({
   success: z.boolean(),
-  action: z.string().optional(),
-  result: z.any().optional(),
-  record_id: z.string().optional().nullable(),
-  warnings: z.array(z.string()).optional(),
+  status: z.string().optional(),
+  message: z.string().optional(),
+  data: z.any().optional(),
+  error_code: z.string().optional().nullable(),
   validation_errors: z.array(z.string()).optional(),
+  affected_record_id: z.string().optional().nullable(),
+  source: z.string().optional(),
+  filters_applied: z.record(z.any()).optional(),
+  executed_at: z.string(),
   requires_confirmation: z.boolean().default(false),
-  timestamp: z.string(),
 });
 
 export type IAResponse = z.infer<typeof IAResponseSchema>;
@@ -16,10 +19,10 @@ export type IAResponse = z.infer<typeof IAResponseSchema>;
 export function createIAResponse(data: Partial<IAResponse>): IAResponse {
   return {
     success: true,
-    timestamp: new Date().toISOString(),
+    executed_at: new Date().toISOString(),
     requires_confirmation: false,
     ...data,
-  };
+  } as IAResponse;
 }
 
 export async function logIAAuditoria(

@@ -83,7 +83,7 @@ Regras:
       confianca: 0.95,
       sucesso: true,
       success: true,
-      result: parsed
+      data: parsed
     };
   } catch (error) {
     console.error("Erro ao analisar comprovante:", error);
