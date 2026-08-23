@@ -755,16 +755,24 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             </Button>
                           )}
                           
-                          {msg.intent.intencao === 'criar_agendamento' && (
+                          {['criar_agendamento', 'remarcar_agendamento'].includes(msg.intent.intencao) && (
                             <div className="flex gap-2">
                               {msg.intent.cliente_nome && (
                                 <Button 
                                   size="sm" 
                                   className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                                  onClick={() => handleConfirmarAgendamento(msg.intent!)}
+                                  onClick={() => {
+                                    if (msg.intent?.intencao === 'remarcar_agendamento') {
+                                      // Se for remarcação, precisamos do ID do agendamento que pode estar no texto ou meta
+                                      handleConfirmarRemarcacao(msg);
+                                    } else {
+                                      handleConfirmarAgendamento(msg.intent!);
+                                    }
+                                  }}
                                   disabled={isProcessing}
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Agendamento
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> 
+                                  {msg.intent.intencao === 'remarcar_agendamento' ? 'Confirmar Remarcação' : 'Confirmar Agendamento'}
                                 </Button>
                               )}
                               <Button 
@@ -776,6 +784,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                 <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Agenda
                               </Button>
                             </div>
+                          )}
+                          {msg.intent.intencao === 'cancelar_agendamento' && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => handleConfirmarCancelamento(msg)}
+                              disabled={isProcessing}
+                            >
+                              <XCircle className="w-3.5 h-3.5 mr-1.5" /> Confirmar Cancelamento
+                            </Button>
                           )}
                           {msg.intent.intencao === 'confirmar_baixa' && (
                             <Button 
