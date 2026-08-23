@@ -828,44 +828,78 @@ export type Database = {
       }
       cobranca_promessas: {
         Row: {
-          cobranca_id: string
+          cliente_id: string | null
           created_at: string | null
           data_prometida: string
           id: string
-          observacao: string | null
+          mensagem_enviada: string | null
+          pagamento_id: string | null
           responsavel_id: string | null
+          resposta_cliente: string | null
           status: string | null
           updated_at: string | null
-          valor: number
+          valor_prometido: number
         }
         Insert: {
-          cobranca_id: string
+          cliente_id?: string | null
           created_at?: string | null
           data_prometida: string
           id?: string
-          observacao?: string | null
+          mensagem_enviada?: string | null
+          pagamento_id?: string | null
           responsavel_id?: string | null
+          resposta_cliente?: string | null
           status?: string | null
           updated_at?: string | null
-          valor: number
+          valor_prometido: number
         }
         Update: {
-          cobranca_id?: string
+          cliente_id?: string | null
           created_at?: string | null
           data_prometida?: string
           id?: string
-          observacao?: string | null
+          mensagem_enviada?: string | null
+          pagamento_id?: string | null
           responsavel_id?: string | null
+          resposta_cliente?: string | null
           status?: string | null
           updated_at?: string | null
-          valor?: number
+          valor_prometido?: number
         }
         Relationships: [
           {
-            foreignKeyName: "cobranca_promessas_cobranca_id_fkey"
-            columns: ["cobranca_id"]
+            foreignKeyName: "cobranca_promessas_cliente_id_fkey"
+            columns: ["cliente_id"]
             isOneToOne: false
-            referencedRelation: "cobrancas"
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobranca_promessas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "cobranca_promessas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "cobranca_promessas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "cobranca_promessas_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
             referencedColumns: ["id"]
           },
         ]
@@ -2695,6 +2729,8 @@ export type Database = {
           atendimento_id: string | null
           categoria_receita: string | null
           cliente_id: string | null
+          cobranca_tentativas: number | null
+          cobranca_ultima_tentativa: string | null
           comprovante_path: string | null
           created_at: string
           created_by: string | null
@@ -2723,6 +2759,8 @@ export type Database = {
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
+          cobranca_tentativas?: number | null
+          cobranca_ultima_tentativa?: string | null
           comprovante_path?: string | null
           created_at?: string
           created_by?: string | null
@@ -2751,6 +2789,8 @@ export type Database = {
           atendimento_id?: string | null
           categoria_receita?: string | null
           cliente_id?: string | null
+          cobranca_tentativas?: number | null
+          cobranca_ultima_tentativa?: string | null
           comprovante_path?: string | null
           created_at?: string
           created_by?: string | null
