@@ -133,7 +133,10 @@ IMPORTANTE SOBRE COMANDOS RÁPIDOS:
 - "Faturamento do mês" -> intencao: consultar_resumo_financeiro, period: "mes".
 - "Valores a receber" -> intencao: consultar_pendencias, apenas_pendentes: true.
 - "Quantos atendimentos tenho" -> intencao: contar_atendimentos, data: "${new Intl.DateTimeFormat("en-CA", {timeZone: "America/Sao_Paulo"}).format(new Date())}".
-- "Criar agendamento" -> intencao: criar_agendamento.`;
+- "Criar agendamento" -> intencao: fluxo_agendamento_inicio.
+
+SOBRE DATAS INCOMPLETAS:
+- Se o usuário disser "dia 28" ou similar, passe apenas o número "28" no campo de data para a ferramenta `consultar_agenda`. O sistema backend tratará de encontrar a próxima ocorrência.`;
 
   try {
     const res = await chamarIA({
