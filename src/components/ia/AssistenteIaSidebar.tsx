@@ -347,24 +347,25 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             data: { cliente_id: intent.parametros?.cliente_id } 
           });
           dadosReais = res.data;
-          respostaFinal = \`### 💬 Mensagens Recentes\n\n\` +
-            dadosReais.map((m: any) => \`- [\${format(parseISO(m.created_at), 'dd/MM HH:mm')}] **\${m.clientes?.nome || 'Sistema'}**: \${m.mensagem}\`).join('\n');
+          respostaFinal = `### 💬 Mensagens Recentes\n\n` +
+            (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), 'dd/MM HH:mm')}] **${m.clientes?.nome || 'Sistema'}**: ${m.mensagem}`).join('\n');
         } else if (intent.intencao === 'consultar_aniversariantes') {
           const res = await identificarAniversariantesIA();
           dadosReais = res.data;
-          if (dadosReais.length > 0) {
-            respostaFinal = \`### 🎂 Aniversariantes de Hoje!\n\n\` +
-              dadosReais.map((p: any) => \`- **\${p.nome}** (\${p.raca}) - Tutor: \${p.clientes?.nome}\`).join('\n');
+          if ((dadosReais as any[]).length > 0) {
+            respostaFinal = `### 🎂 Aniversariantes de Hoje!\n\n` +
+              (dadosReais as any[]).map((p: any) => `- **${p.nome}** (${p.raca}) - Tutor: ${p.clientes?.nome}`).join('\n');
           } else {
             respostaFinal = "Não encontrei aniversariantes para hoje.";
           }
         } else if (intent.intencao === 'analisar_reativacao') {
           const res = await analisarReativacaoIA();
           dadosReais = res.data;
-          respostaFinal = \`### 🔄 Risco de Evasão (Reativação)\n\n\` +
-            dadosReais.map((c: any) => \`- **\${c.nome}** (\${c.dias_inatividade} dias sem vir) - \${c.justificativa}\`).join('\n');
+          respostaFinal = `### 🔄 Risco de Evasão (Reativação)\n\n` +
+            (dadosReais as any[]).map((c: any) => `- **${c.nome}** (${c.dias_inatividade} dias sem vir) - ${c.justificativa}`).join('\n');
         }
       }
+
 
 
       if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
