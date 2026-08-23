@@ -106,7 +106,7 @@ DATAS:
   try {
     const res = await chamarIA({
       system: systemPrompt,
-      prompt: texto,
+      prompt: `TEXTO DO USUÁRIO: "${texto}"\n\nCONTEXTO DO SISTEMA:\n- Data de Hoje: ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full' }).format(new Date())}\n- Histórico Recente: ${JSON.stringify(contexto?.mensagens || [])}`,
       config: contexto?.config,
       json: true,
       origem: "assistente_ia_classificador"
