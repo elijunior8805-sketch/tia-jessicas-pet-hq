@@ -15,9 +15,8 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     comprovante_path: z.string().optional(),
     id_transacao: z.string().optional()
   }).parse(d))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin;
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     
     return registrarPagamentoIA(sb, {
       pagamento_id: data.pagamento_id,
