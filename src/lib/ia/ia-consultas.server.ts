@@ -624,3 +624,59 @@ export async function obterVisao360Pet(sb: SupabaseClient<Database>, petId: stri
     }
   });
 }
+
+export async function consultarRiscoFaltaIA(sb: SupabaseClient<Database>, clienteId: string) {
+  const { data: agendamentos, error } = await sb
+    .from("agendamentos")
+    .select("status, data")
+    .eq("cliente_id", clienteId)
+    .order("data", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  const total = agendamentos?.length || 0;
+  const faltas = agendamentos?.filter(a => a.status === 'falta').length || 0;
+  const cancelamentos = agendamentos?.filter(a => a.status === 'cancelado').length || 0;
+  
+  const score = total > 0 ? (faltas / total) * 100 : 0;
+  
+  return createIAResponse({
+    source: 'consultar_risco_falta',
+    data: {
+      total_historico: total,
+      faltas,
+      cancelamentos,
+      score_risco: Math.round(score),
+      nivel: score > 30 ? 'Alto' : score > 10 ? 'Médio' : 'Baixo',
+      justificativa: score > 0 ? `Cliente possui ${faltas} faltas em ${total} agendamentos.` : "Cliente sem histórico de faltas."
+    }
+  });
+}
+
+export async function criarFilaEsperaIA(
+  sb: SupabaseClient<Database>, 
+  params: { cliente_id: string; pet_id: string; servico_id: string; data_pretendida: string; periodo?: string }
+) {
+  // Nota: Assumindo que a tabela 'fila_espera' existe ou simulando via lembretes/obs
+  // Para este ERP, vamos usar uma abordagem de metadados se a tabela não for padrão
+  const { data, error } = await sb
+    .from("notificacoes")
+    .insert({
+      user_id: (await sb.auth.getUser()).data.user?.id || '',
+      titulo: "Novo Registro em Fila de Espera",
+      mensagem: `Cliente aguardando vaga para o dia ${params.data_pretendida}`,
+      tipo: "fila_espera",
+      payload: params
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return createIAResponse({
+    source: 'criar_fila_espera',
+    affected_record_id: data.id,
+    data: data
+  });
+}

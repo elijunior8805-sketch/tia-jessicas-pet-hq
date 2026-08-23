@@ -121,3 +121,27 @@ export const consultarVisao360PetIA = createServerFn({ method: "POST" })
     const { obterVisao360Pet } = await import("./ia-consultas.server");
     return obterVisao360Pet(context.supabase, data.pet_id);
   });
+
+export const consultarRiscoFaltaIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    cliente_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { consultarRiscoFaltaIA: consultarRisco } = await import("./ia-consultas.server");
+    return consultarRisco(context.supabase, data.cliente_id);
+  });
+
+export const criarFilaEsperaIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    cliente_id: z.string(),
+    pet_id: z.string(),
+    servico_id: z.string(),
+    data_pretendida: z.string(),
+    periodo: z.string().optional(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { criarFilaEsperaIA: criarFila } = await import("./ia-consultas.server");
+    return criarFila(context.supabase, data);
+  });
