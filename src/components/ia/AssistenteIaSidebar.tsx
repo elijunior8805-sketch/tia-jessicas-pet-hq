@@ -312,14 +312,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             confirmados: dadosReais.filter((a: any) => a.status === 'confirmado').length,
             em_atendimento: dadosReais.filter((a: any) => a.status === 'em_atendimento').length,
             finalizados: dadosReais.filter((a: any) => a.status === 'finalizado').length,
-            pendentes: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            agendados: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            aguardando: dadosReais.filter((a: any) => a.status === 'aguardando').length,
             cancelados: dadosReais.filter((a: any) => a.status === 'cancelado').length,
             faltas: dadosReais.filter((a: any) => a.status === 'falta').length,
           };
 
           respostaFinal = `Hoje existem **${stats.total} atendimentos** agendados:\n\n` +
             `- ✅ **Confirmados**: ${stats.confirmados}\n` +
-            `- ⏳ **Aguardando**: ${stats.pendentes}\n` +
+            `- ⏳ **Agendados**: ${stats.agendados}\n` +
+            `- ⏳ **Aguardando Confirmação**: ${stats.aguardando}\n` +
             `- 🚿 **Em atendimento**: ${stats.em_atendimento}\n` +
             `- ✨ **Finalizados**: ${stats.finalizados}\n` +
             `- ❌ **Cancelados/Faltas**: ${stats.cancelados + stats.faltas}`;
@@ -701,12 +703,14 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             onClick={() => {
                               if (msg.intent?.intencao?.includes('agenda')) window.open('/agenda', '_blank');
                               else if (msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia')) window.open('/financeiro', '_blank');
+                              else if (msg.intent?.intencao === 'solicitar_resumo_operacional') window.open('/dashboard', '_blank');
                               else window.open('/dashboard', '_blank');
                             }}
                           >
                             <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 
                             {msg.intent?.intencao?.includes('agenda') ? 'Abrir Agenda' : 
-                             msg.intent?.intencao?.includes('financeiro') ? 'Abrir Financeiro' : 'Abrir Sistema'}
+                             msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia') ? 'Abrir Financeiro' : 
+                             msg.intent?.intencao === 'solicitar_resumo_operacional' ? 'Abrir Dashboard' : 'Abrir Sistema'}
                           </Button>
                           
                           {msg.intent.intencao === 'consulta_cliente' && searchResults?.clientes && searchResults.clientes.length > 0 && (
@@ -715,8 +719,18 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
                                onClick={() => window.open(`/clientes?id=${searchResults.clientes[0].id}`, '_blank')}
                              >
-                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes
+                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes do Cliente
                              </Button>
+                          )}
+
+                          {msg.intent.intencao === 'consulta_cliente' && (!searchResults?.clientes || searchResults.clientes.length === 0) && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => window.open('/clientes?novo=true', '_blank')}
+                            >
+                              <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
+                            </Button>
                           )}
 
                           {msg.intent.intencao === 'comando_nao_reconhecido' && msg.content.includes('não cadastrado') && (
@@ -729,15 +743,27 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             </Button>
                           )}
                           
-                          {msg.intent.intencao === 'criar_agendamento' && msg.intent.cliente_nome && (
-                            <Button 
-                              size="sm" 
-                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                              onClick={() => handleConfirmarAgendamento(msg.intent!)}
-                              disabled={isProcessing}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar
-                            </Button>
+                          {msg.intent.intencao === 'criar_agendamento' && (
+                            <div className="flex gap-2">
+                              {msg.intent.cliente_nome && (
+                                <Button 
+                                  size="sm" 
+                                  className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                                  onClick={() => handleConfirmarAgendamento(msg.intent!)}
+                                  disabled={isProcessing}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Agendamento
+                                </Button>
+                              )}
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="h-8 text-[11px] font-bold rounded-lg px-3 border-[#C99845]/20 text-[#123F2A]"
+                                onClick={() => window.open('/agenda', '_blank')}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Agenda
+                              </Button>
+                            </div>
                           )}
                           {msg.intent.intencao === 'confirmar_baixa' && (
                             <Button 

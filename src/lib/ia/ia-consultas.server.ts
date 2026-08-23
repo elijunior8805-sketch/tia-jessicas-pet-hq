@@ -27,16 +27,33 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     `);
 
   const timezone = "America/Sao_Paulo";
+  const now = new Date();
   const hoje = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
+  }).format(now);
 
-  if (filtros.data && /^\d{4}-\d{2}-\d{2}$/.test(filtros.data)) {
-    query = query.eq("data", filtros.data);
+  // Tratamento de data incompleta (ex: "dia 28")
+  let dataFinal = filtros.data;
+  if (dataFinal && /^\d{1,2}$/.test(dataFinal)) {
+    const diaAlvo = parseInt(dataFinal);
+    let dataAlvo = new Date(now.getFullYear(), now.getMonth(), diaAlvo);
+    // Se a data já passou no mês atual, mover para o próximo mês
+    if (dataAlvo < now) {
+      dataAlvo = new Date(now.getFullYear(), now.getMonth() + 1, diaAlvo);
+    }
+    dataFinal = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(dataAlvo);
+  }
+
+  if (dataFinal && /^\d{4}-\d{2}-\d{2}$/.test(dataFinal)) {
+    query = query.eq("data", dataFinal);
   } else if (filtros.periodo_inicio && filtros.periodo_fim && /^\d{4}-\d{2}-\d{2}$/.test(filtros.periodo_inicio)) {
     query = query.gte("data", filtros.periodo_inicio).lte("data", filtros.periodo_fim);
-  } else if (filtros.data === "hoje" || !filtros.data) {
+  } else {
+    // Default para hoje se nada for informado ou se for "hoje"
     query = query.eq("data", hoje);
   }
 
@@ -81,13 +98,14 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
 
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
   // Implementação de busca aproximada (Fuzzy Search simplificada no SQL)
-  // Remove espaços extras e lida com variações comuns
   const termoLimpo = termo.trim();
   
+  // Se o termo for Eli e quisermos Elis, ilike %Eli% já resolve
   const { data, error } = await sb
     .from("clientes")
     .select(`*, pets(id, nome, raca)`)
     .or(`nome.ilike.%${termoLimpo}%, telefone.ilike.%${termoLimpo}%, email.ilike.%${termoLimpo}%`)
+    .order('nome')
     .limit(10);
 
   if (error) throw error;
