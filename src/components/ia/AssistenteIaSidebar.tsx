@@ -703,12 +703,14 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             onClick={() => {
                               if (msg.intent?.intencao?.includes('agenda')) window.open('/agenda', '_blank');
                               else if (msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia')) window.open('/financeiro', '_blank');
+                              else if (msg.intent?.intencao === 'solicitar_resumo_operacional') window.open('/dashboard', '_blank');
                               else window.open('/dashboard', '_blank');
                             }}
                           >
                             <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 
                             {msg.intent?.intencao?.includes('agenda') ? 'Abrir Agenda' : 
-                             msg.intent?.intencao?.includes('financeiro') ? 'Abrir Financeiro' : 'Abrir Sistema'}
+                             msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia') ? 'Abrir Financeiro' : 
+                             msg.intent?.intencao === 'solicitar_resumo_operacional' ? 'Abrir Dashboard' : 'Abrir Sistema'}
                           </Button>
                           
                           {msg.intent.intencao === 'consulta_cliente' && searchResults?.clientes && searchResults.clientes.length > 0 && (
