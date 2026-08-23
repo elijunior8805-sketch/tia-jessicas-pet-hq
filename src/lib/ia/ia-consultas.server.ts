@@ -533,3 +533,74 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
     data: riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10)
   });
 }
+
+export async function obterVisao360Cliente(sb: SupabaseClient<Database>, clienteId: string) {
+  const { data: cliente, error: errC } = await sb
+    .from("clientes")
+    .select("*, pets(*)")
+    .eq("id", clienteId)
+    .single();
+
+  if (errC) throw errC;
+
+  const { data: pagamentos } = await sb
+    .from("pagamentos")
+    .select("*")
+    .eq("cliente_id", clienteId)
+    .order("vencimento", { ascending: false })
+    .limit(20);
+
+  const { data: agendamentos } = await sb
+    .from("agendamentos")
+    .select("*, pets(nome), servicos(nome)")
+    .eq("cliente_id", clienteId)
+    .order("data", { ascending: false })
+    .limit(10);
+
+  // Calcular métricas
+  const totalGasto = pagamentos?.filter(p => p.status === 'pago').reduce((acc, p) => acc + Number(p.valor_total), 0) || 0;
+  const pendencias = pagamentos?.filter(p => p.status !== 'pago' && p.status !== 'cancelado').length || 0;
+  const ultimoAtendimento = agendamentos?.find(a => a.status === 'finalizado');
+  const proximoAgendamento = agendamentos?.find(a => a.status === 'confirmado' || a.status === 'agendado');
+
+  return createIAResponse({
+    source: 'visao_360_cliente',
+    data: {
+      perfil: cliente,
+      metricas: {
+        total_gasto: totalGasto,
+        total_atendimentos: agendamentos?.length || 0,
+        pendencias_financeiras: pendencias,
+      },
+      historico: {
+        ultimo: ultimoAtendimento,
+        proximo: proximoAgendamento
+      }
+    }
+  });
+}
+
+export async function obterVisao360Pet(sb: SupabaseClient<Database>, petId: string) {
+  const { data: pet, error: errP } = await sb
+    .from("pets")
+    .select("*, clientes(*)")
+    .eq("id", petId)
+    .single();
+
+  if (errP) throw errP;
+
+  const { data: atendimentos } = await sb
+    .from("atendimentos")
+    .select("*, agendamento_servicos(nome, valor_unit)")
+    .eq("pet_id", petId)
+    .order("data_inicio", { ascending: false })
+    .limit(10);
+
+  return createIAResponse({
+    source: 'visao_360_pet',
+    data: {
+      perfil: pet,
+      atendimentos: atendimentos
+    }
+  });
+}
