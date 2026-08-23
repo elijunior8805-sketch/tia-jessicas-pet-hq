@@ -542,6 +542,48 @@ export type Database = {
         }
         Relationships: []
       }
+      auditoria_ia: {
+        Row: {
+          comando_original: string
+          created_at: string | null
+          especialista: string | null
+          ferramenta_utilizada: string | null
+          id: string
+          intencao_detectada: string | null
+          parametros: Json | null
+          resposta_ia: string | null
+          sucesso: boolean | null
+          tempo_resposta_ms: number | null
+          user_id: string | null
+        }
+        Insert: {
+          comando_original: string
+          created_at?: string | null
+          especialista?: string | null
+          ferramenta_utilizada?: string | null
+          id?: string
+          intencao_detectada?: string | null
+          parametros?: Json | null
+          resposta_ia?: string | null
+          sucesso?: boolean | null
+          tempo_resposta_ms?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          comando_original?: string
+          created_at?: string | null
+          especialista?: string | null
+          ferramenta_utilizada?: string | null
+          id?: string
+          intencao_detectada?: string | null
+          parametros?: Json | null
+          resposta_ia?: string | null
+          sucesso?: boolean | null
+          tempo_resposta_ms?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       campanhas: {
         Row: {
           agendada_para: string | null
