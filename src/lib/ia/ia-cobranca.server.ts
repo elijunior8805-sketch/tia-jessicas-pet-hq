@@ -21,19 +21,17 @@ export async function consultarFilaCobrancaIA(sb: SupabaseClient<Database>) {
     `)
     .neq("status", "pago")
     .neq("status", "cancelado")
-    .is("arquivado_em", null)
-    .or("is_teste.is.null,is_teste.eq.false");
+    .is("arquivado_em", null);
 
   if (error) throw error;
 
   const hoje = new Date();
 
   // Algoritmo de Priorização
-  const filaPriorizada = pendentes.map(p => {
+  const filaPriorizada = (pendentes as any[]).map(p => {
     const valorPendente = Number(p.valor_total) - (p.valor_pago || 0);
     const diasAtraso = p.vencimento ? differenceInDays(hoje, parseISO(p.vencimento)) : 0;
     
-    // Score simplificado: dias_atraso * 1.5 + (valor / 100) - (tentativas * 2)
     let score = (diasAtraso * 1.5) + (valorPendente / 100) - ((p.cobranca_tentativas || 0) * 2);
     
     let motivo = "";
@@ -49,7 +47,7 @@ export async function consultarFilaCobrancaIA(sb: SupabaseClient<Database>) {
     source: 'consultar_fila_cobranca',
     data: {
       total: filaPriorizada.length,
-      fila: filaPriorizada.slice(0, 10) // Retorna os top 10 para a IA
+      fila: filaPriorizada.slice(0, 10)
     }
   });
 }
@@ -61,9 +59,9 @@ export async function gerarMensagensCobrancaIA(
   sb: SupabaseClient<Database>,
   params: { pagamento_id: string; historico_mensagens?: any[] }
 ) {
-  const { chamarIA } = await import("../ia-core.server");
+  const { chamarIA, carregarIaConfig } = await import("../ia-core.server");
+  const config = await carregarIaConfig(sb);
   
-  // Buscar dados da pendência
   const { data: p } = await sb
     .from("pagamentos")
     .select(`
@@ -79,9 +77,9 @@ export async function gerarMensagensCobrancaIA(
 
   if (!p) throw new Error("Pagamento não localizado.");
 
-  const valor = (Number(p.valor_total) - (p.valor_pago || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const pet = (p.atendimentos as any)?.pets?.nome || "seu pet";
-  const cliente = (p.clientes as any)?.nome;
+  const valor = (Number((p as any).valor_total) - ((p as any).valor_pago || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const pet = ((p as any).atendimentos as any)?.pets?.nome || "seu pet";
+  const cliente = ((p as any).clientes as any)?.nome;
 
   const systemPrompt = `Você é um Especialista em Recuperação de Crédito do Spa de Pet Tia Jéssica.
 Sua missão é gerar TRÊS versões de mensagens de cobrança para o WhatsApp.
@@ -90,20 +88,19 @@ REGRAS GERAIS:
 1. NUNCA use "medidas administrativas", "providências cabíveis" ou qualquer ameaça.
 2. Seja firme, mas mantenha o profissionalismo.
 3. Mencione o valor (${valor}) e o serviço do ${pet}.
-4. Se houver tentativas anteriores (${p.cobranca_tentativas}), suba o tom.
+4. Se houver tentativas anteriores (${(p as any).cobranca_tentativas}), suba o tom.
 
 VERSÕES OBRIGATÓRIAS (Retorne um JSON com estas 3 chaves):
 - direta: Curta, objetiva, lembrete amigável.
 - firme: Mais enfática, pede posição concreta, cita vencimento.
-- extra_firme: Para casos reincidentes ou sem resposta. Exige comprovante ou data exata. Informa que ignorar não resolve a pendência.
-
-As mensagens devem ser ESTRUTURALMENTE diferentes (>50% de variação).`;
+- extra_firme: Para casos reincidentes ou sem resposta. Exige comprovante ou data exata. Informa que ignorar não resolve a pendência.`;
 
   const res = await chamarIA({
     system: systemPrompt,
     prompt: `Gere as mensagens para o cliente ${cliente} sobre a pendência de ${valor} do pet ${pet}.`,
     json: true,
-    origem: "ia_gerar_cobranca"
+    origem: "ia_gerar_cobranca",
+    config
   });
 
   const mensagens = JSON.parse(res.texto);
