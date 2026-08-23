@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { registrarPagamentoIA, estornarPagamentoIA } from "./ia-acoes.server";
 import { analisarComprovanteIA } from "./ia-comprovante.server";
 
