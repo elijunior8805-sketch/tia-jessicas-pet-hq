@@ -35,14 +35,12 @@ export async function logIAAuditoria(
   erro?: string
 ) {
   try {
-    // Importação dinâmica para evitar problemas no bundling de cliente
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     
-    // Filtra dados sensíveis ou muito grandes antes de salvar
     const dadosLimpos = dados ? JSON.parse(JSON.stringify(dados)) : {};
-    if (dadosLimpos.result && Array.isArray(dadosLimpos.result)) {
-      dadosLimpos.count = dadosLimpos.result.length;
-      dadosLimpos.result = dadosLimpos.result.slice(0, 3); // Apenas amostra
+    if (dadosLimpos.data && Array.isArray(dadosLimpos.data)) {
+      dadosLimpos.count = dadosLimpos.data.length;
+      dadosLimpos.data = dadosLimpos.data.slice(0, 5); 
     }
 
     const { data: logData, error: logError } = await supabaseAdmin.from('ia_auditoria').insert({
@@ -55,9 +53,10 @@ export async function logIAAuditoria(
       tempo_resposta_ms: dados?.tempo_processamento || 0
     }).select('id').single();
 
+    if (logError) console.error('[IA-AUDITORIA-LOG-ERROR]', logError);
     return logData?.id;
 
   } catch (e) {
-    console.error('[IA-AUDITORIA-ERRO]', e);
+    console.error('[IA-AUDITORIA-FATAL-ERROR]', e);
   }
 }

@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { registrarPagamentoIA, estornarPagamentoIA } from "./ia-acoes.server";
 import { analisarComprovanteIA } from "./ia-comprovante.server";
 
 export const executarBaixaPagamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     pagamento_id: z.string(),
     valor_pago: z.number(),
@@ -13,9 +15,8 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     comprovante_path: z.string().optional(),
     id_transacao: z.string().optional()
   }).parse(d))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin;
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     
     return registrarPagamentoIA(sb, {
       pagamento_id: data.pagamento_id,
@@ -29,23 +30,23 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
   });
 
 export const executarEstornoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     pagamento_id: z.string(),
     motivo: z.string()
   }).parse(d))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin;
-    return estornarPagamentoIA(sb, data.pagamento_id, data.motivo);
+  .handler(async ({ data, context }) => {
+    const { estornarPagamentoIA: estornar } = await import("./ia-acoes.server");
+    return estornar(context.supabase, data.pagamento_id, data.motivo);
   });
 
 export const processarComprovanteIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     imagemBase64: z.string(),
     contentType: z.string().optional()
   }).parse(d))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin;
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     return analisarComprovanteIA(sb, data.imagemBase64, data.contentType);
   });
