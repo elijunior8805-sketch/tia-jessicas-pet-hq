@@ -41,7 +41,9 @@ import {
   buscarServicosIA,
   consultarHistoricoPetIA,
   consultarVisao360ClienteIA,
-  consultarVisao360PetIA
+  consultarVisao360PetIA,
+  consultarAuditoriaDadosIA,
+  compararPeriodosFinanceirosIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
   validarAgendamentoIA,
@@ -472,6 +474,23 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           `- **Faturamento**: **R$ ${resumo.faturamento_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
           `- **Recebido**: **R$ ${resumo.recebido_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
           `- **Total Pendente (Geral)**: **R$ ${resumo.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**`;
+      } else if (intent.intencao === 'auditoria_financeira') {
+        const response = await consultarAuditoriaDadosIA();
+        const auditoria = response.data || {};
+        respostaFinal = `### 🔍 Auditoria de Dados\n\n` +
+          `Identifiquei **${auditoria.resumo?.alertas || 0} alertas** que precisam de atenção:\n\n` +
+          `- **Atendimentos sem pagamento**: ${auditoria.atendimentos_sem_pagamento?.length || 0}\n` +
+          `- **Pagamentos com valor zero**: ${auditoria.pagamentos_zerados?.length || 0}\n` +
+          `- **Prováveis duplicidades**: ${auditoria.provaveis_duplicidades?.length || 0}\n\n` +
+          `Deseja que eu liste os registros detalhados para correção?`;
+      } else if (intent.intencao === 'comparar_periodos_financeiros') {
+        const params = (intent.parametros as any) || {};
+        const response = await compararPeriodosFinanceirosIA(params);
+        const comp = response.data || {};
+        respostaFinal = `### 📈 Comparativo de Períodos\n\n` +
+          `**Período 1 (${comp.periodo_1?.from} até ${comp.periodo_1?.to}):** R$ ${comp.periodo_1?.kpis?.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `**Período 2 (${comp.periodo_2?.from} até ${comp.periodo_2?.to}):** R$ ${comp.periodo_2?.kpis?.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+          `**Variação:** ${comp.variacao_faturamento > 0 ? '🚀 +' : '🔻 '}${comp.variacao_faturamento.toFixed(2)}% no faturamento.`;
       }
 
       if (intent.exige_confirmacao) {

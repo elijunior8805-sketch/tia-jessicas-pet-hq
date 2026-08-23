@@ -145,3 +145,21 @@ export const criarFilaEsperaIA = createServerFn({ method: "POST" })
     const { criarFilaEsperaIA: criarFila } = await import("./ia-consultas.server");
     return criarFila(context.supabase, data);
   });
+
+export const consultarAuditoriaDadosIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { realizarAuditoriaDadosIA } = await import("./ia-auditoria.server");
+    return realizarAuditoriaDadosIA(context.supabase);
+  });
+
+export const compararPeriodosFinanceirosIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    p1: z.object({ from: z.string(), to: z.string() }),
+    p2: z.object({ from: z.string(), to: z.string() }),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { compararPeriodosIA } = await import("./ia-financeiro.server");
+    return compararPeriodosIA(context.supabase, data);
+  });
