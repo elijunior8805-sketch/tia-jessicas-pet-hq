@@ -583,20 +583,27 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
       if (!cliente) throw new Error("Cliente não localizado.");
 
-      const { data: agendamentos } = await supabase
+      // Tenta encontrar agendamento para o pet específico se informado, ou o mais próximo
+      let query = supabase
         .from('agendamentos')
-        .select('id')
+        .select('id, data, hora, pets(nome)')
         .eq('cliente_id', cliente.id)
         .eq('status', 'agendado')
-        .order('data', { ascending: true })
-        .limit(1);
+        .order('data', { ascending: true });
 
-      const agendamentoId = agendamentos?.[0]?.id;
-      if (!agendamentoId) throw new Error("Não encontrei agendamentos ativos para este cliente.");
+      if (intent.pet_nome) {
+        const { data: pet } = await supabase.from('pets').select('id').eq('cliente_id', cliente.id).ilike('nome', `%${intent.pet_nome}%`).maybeSingle();
+        if (pet) query = query.eq('pet_id', pet.id);
+      }
+
+      const { data: agendamentos } = await query.limit(1);
+      const agendamento = agendamentos?.[0];
+
+      if (!agendamento) throw new Error("Não encontrei agendamentos ativos para este cliente.");
 
       await executarRemarcacao({
         data: {
-          agendamento_id: agendamentoId,
+          agendamento_id: agendamento.id,
           nova_data: intent.data!,
           nova_hora: intent.horario!
         }
@@ -604,7 +611,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${intent.pet_nome || 'do cliente'}\n- **Nova Data**: ${intent.data}\n- **Novo Horário**: ${intent.horario}`,
+        content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${(agendamento.pets as any)?.nome}\n- **De**: ${format(parseISO(agendamento.data), 'dd/MM')} às ${agendamento.hora.slice(0, 5)}\n- **Para**: ${intent.data} às ${intent.horario}`,
         timestamp: new Date().toISOString()
       }]);
       toast.success("Agendamento alterado!");
@@ -615,6 +622,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
+
   const handleConfirmarCancelamento = async (msg: any) => {
     setIsProcessing(true);
     try {
@@ -622,27 +630,33 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
       if (!cliente) throw new Error("Cliente não localizado.");
 
-      const { data: agendamentos } = await supabase
+      let query = supabase
         .from('agendamentos')
-        .select('id')
+        .select('id, pets(nome)')
         .eq('cliente_id', cliente.id)
         .eq('status', 'agendado')
-        .order('data', { ascending: true })
-        .limit(1);
+        .order('data', { ascending: true });
 
-      const agendamentoId = agendamentos?.[0]?.id;
-      if (!agendamentoId) throw new Error("Não encontrei agendamentos ativos para este cliente.");
+      if (intent.pet_nome) {
+        const { data: pet } = await supabase.from('pets').select('id').eq('cliente_id', cliente.id).ilike('nome', `%${intent.pet_nome}%`).maybeSingle();
+        if (pet) query = query.eq('pet_id', pet.id);
+      }
+
+      const { data: agendamentos } = await query.limit(1);
+      const agendamento = agendamentos?.[0];
+
+      if (!agendamento) throw new Error("Não encontrei agendamentos ativos para este cliente.");
 
       await executarCancelamento({
         data: {
-          agendamento_id: agendamentoId,
+          agendamento_id: agendamento.id,
           motivo: intent.observacoes || "Cancelado via Assistente IA"
         }
       });
 
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `✅ **Agendamento cancelado com sucesso.**`,
+        content: `✅ **Agendamento do ${(agendamento.pets as any)?.nome} cancelado com sucesso.**`,
         timestamp: new Date().toISOString()
       }]);
       toast.success("Agendamento cancelado.");
@@ -652,6 +666,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       setIsProcessing(false);
     }
   };
+
 
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);
