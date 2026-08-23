@@ -67,6 +67,12 @@ CENTRAL DE MENSAGENS E COMUNICAÇÃO (PARTE 8):
 5. LEMBRETES: Criar lembretes para Confirmação, Retorno, Pagamento, Transporte. Exija confirmação.
 6. CAMPANHAS: Sugerir objetivo, público, oferta e canal. Nunca disparar sem revisão.
 
+ESTOQUE E COMPRAS (PARTE 9):
+1. CONSULTA: Sempre informar saldo e se está baixo do mínimo.
+2. ANOMALIAS: Alertar sobre saldos negativos ou produtos sem movimentação.
+3. COMPRAS: Classificar sugestões em Necessidade, Sugestão ou Previsão.
+4. SEGURANÇA: Nunca realizar baixa ou compra sem confirmação.
+
 REGRAS DE RESPOSTA:
 - Todas as sugestões de resposta devem ser NOVAS e personalizadas (mínimo 50% de variação).
 - Para Cobrança Extra Firme: Vá direto ao assunto, cite dívida e contatos anteriores. Não use "medidas administrativas".
@@ -119,6 +125,8 @@ function fallbackClassificador(texto: string): IAIntent {
     intencao = "consulta_pet";
   } else if (lowercaseText.includes("financeiro") || lowercaseText.includes("pagamento")) {
     intencao = "consulta_financeira";
+  } else if (lowercaseText.includes("estoque") || lowercaseText.includes("produto") || lowercaseText.includes("compra")) {
+    intencao = "consulta_estoque";
   }
 
   return {
