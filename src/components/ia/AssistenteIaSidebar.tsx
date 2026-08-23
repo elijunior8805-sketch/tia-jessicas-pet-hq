@@ -145,7 +145,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setSelectedFile(file);
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (prev) => setFilePreview(prev.target?.result as string);
+      reader.onload = (prev) => setFilePreview(prev.target?.data as string);
       reader.readAsDataURL(file);
     } else {
       setFilePreview('pdf');
@@ -171,7 +171,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         // PDF handling would go here - for now let's assume image
         const reader = new FileReader();
         base64 = await new Promise((resolve) => {
-          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onload = () => resolve((reader.data as string).split(',')[1]);
           reader.readAsDataURL(selectedFile);
         });
       }
@@ -209,7 +209,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           data: { termo: res.pagador, apenas_pendentes: true }
         });
 
-        const searchResList = (response.result || []) as any[];
+        const searchResList = (response.data || []) as any[];
         
         // Regra de Correspondência: Valor exato
         const pendenciasValorExato = searchResList?.filter((p: any) => {
@@ -317,7 +317,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           }
         });
         
-        dadosReais = response.result || [];
+        dadosReais = response.data || [];
         const count = dadosReais.length;
         
         if (intent.intencao === 'contar_atendimentos') {
@@ -358,7 +358,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
-        const results = { clientes: (response.result || []) as any[], pets: [] as any[] };
+        const results = { clientes: (response.data || []) as any[], pets: [] as any[] };
         setSearchResults(results);
         
         if (results.clientes.length > 0) {
@@ -385,7 +385,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   data: intent.data || undefined
                 } 
               });
-              const agendamentos = agendaRes.result || [];
+              const agendamentos = agendaRes.data || [];
               if (agendamentos.length > 0) {
                 respostaFinal = `Encontrei o cliente **${c.nome}**. Qual destes agendamentos você deseja ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}?\n\n` +
                   agendamentos.map((a: any) => `- **${a.hora.slice(0, 5)}** - ${a.pets?.nome} (${a.servicos?.nome || 'Serviço'})`).join('\n');
@@ -414,7 +414,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
         
         if (intent.intencao === 'consultar_resumo_financeiro') {
-          const { metricas, periodo } = response.result || {};
+          const { metricas, periodo } = response.data || {};
           if (metricas) {
             respostaFinal = `### 💰 Resumo Financeiro (${periodo.from} a ${periodo.to})\n\n` +
               `- **Faturamento (Competência)**: R$ ${metricas.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
@@ -430,7 +430,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             respostaFinal = "Não consegui extrair as métricas financeiras para este período.";
           }
         } else {
-          dadosReais = response.result || [];
+          dadosReais = response.data || [];
           if (dadosReais && dadosReais.length > 0) {
             const total = dadosReais.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
             respostaFinal = `Identifiquei **${dadosReais.length} registros** totalizando **R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** em aberto.`;
@@ -441,7 +441,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       } else if (intent.intencao === 'solicitar_resumo_operacional') {
         const response = await consultarResumoOperacionalIA();
-        const resumo = response.result || {};
+        const resumo = response.data || {};
         respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n` +
           `#### 🕒 Próximo Atendimento\n` +
           (resumo.proximo_atendimento 
@@ -563,7 +563,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         }
       });
 
-      const recordId = res.record_id || res.result?.id;
+      const recordId = res.affected_record_id || res.data?.id;
 
       setMessages(prev => [...prev, {
         role: 'assistant',
