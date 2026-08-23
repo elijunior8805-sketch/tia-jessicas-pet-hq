@@ -72,6 +72,10 @@ import {
   getSugestoesCompraIA,
   getAnomaliasEstoqueIA
 } from '@/lib/ia/ia-estoque.functions';
+import {
+  getResumoProprietarioIA,
+  getQualidadeIA
+} from '@/lib/ia/ia-auditoria.functions';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -370,6 +374,28 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           dadosReais = res.data;
           respostaFinal = `### 🔄 Risco de Evasão (Reativação)\n\n` +
             (dadosReais as any[]).map((c: any) => `- **${c.nome}** (${c.dias_inatividade} dias sem vir) - ${c.justificativa}`).join('\n');
+        }
+      }
+
+      // Especialista: Auditoria & Gestão (Parte 10)
+      if (intent.especialista === 'gestao_estrategica' || intent.especialista === 'relatorios') {
+        setIaStatus('pesquisando');
+        if (intent.intencao === 'resumo_negocio') {
+          const res = await getResumoProprietarioIA();
+          dadosReais = res;
+          respostaFinal = `### 📊 Resumo do Negócio (Visão Proprietário)\n\n` +
+            `- **Agenda**: ${res.agenda.hoje} atendimentos hoje.\n` +
+            `- **Financeiro**: ${res.financeiro.pendencias} pendências em aberto.\n` +
+            `- **Estoque**: ${res.estoque.itens_criticos} itens precisando de atenção.\n\n` +
+            (res.urgencias.length > 0 ? `⚠️ **Urgências**: ${res.urgencias.join(', ')}\n` : '') +
+            (res.oportunidades.length > 0 ? `💡 **Oportunidades**: ${res.oportunidades.join(', ')}` : '');
+        } else if (intent.intencao === 'consultar_qualidade_ia') {
+          const res = await getQualidadeIA();
+          dadosReais = res;
+          respostaFinal = `### 🛠️ Painel de Qualidade da IA\n\n` +
+            `- **Comandos Processados**: ${res.total_comandos}\n` +
+            `- **Taxa de Sucesso**: ${res.taxa_sucesso.toFixed(1)}%\n` +
+            `- **Tempo Médio**: ${res.tempo_medio_ms.toFixed(0)}ms`;
         }
       }
 
