@@ -101,3 +101,23 @@ export const consultarHistoricoPetIA = createServerFn({ method: "POST" })
     const { consultarHistoricoPetIA: consultarHistorico } = await import("./ia-consultas.server");
     return consultarHistorico(context.supabase, data.pet_id);
   });
+
+export const consultarVisao360ClienteIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    cliente_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { obterVisao360Cliente } = await import("./ia-consultas.server");
+    return obterVisao360Cliente(context.supabase, data.cliente_id);
+  });
+
+export const consultarVisao360PetIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({
+    pet_id: z.string(),
+  }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { obterVisao360Pet } = await import("./ia-consultas.server");
+    return obterVisao360Pet(context.supabase, data.pet_id);
+  });

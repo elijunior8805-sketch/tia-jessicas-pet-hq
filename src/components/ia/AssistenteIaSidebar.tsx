@@ -39,7 +39,9 @@ import {
   consultarResumoOperacionalIA,
   analisarRiscoEvasaoIA,
   buscarServicosIA,
-  consultarHistoricoPetIA
+  consultarHistoricoPetIA,
+  consultarVisao360ClienteIA,
+  consultarVisao360PetIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
   validarAgendamentoIA,
