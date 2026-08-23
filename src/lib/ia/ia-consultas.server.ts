@@ -348,44 +348,64 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
   });
 }
 
-export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params: { servico?: string; data: string; profissional?: string }) {
+export async function buscarDisponibilidade(sb: SupabaseClient<Database>, params: { servico_id?: string; data: string; profissional_id?: string; duracao_min?: number }) {
+  // 1. Obter duração real do serviço se não for passada
+  let duracao = params.duracao_min || 60;
+  if (params.servico_id && !params.duracao_min) {
+    const { data: servico } = await sb.from("servicos").select("duracao_min").eq("id", params.servico_id).single();
+    if (servico) duracao = servico.duracao_min || 60;
+  }
+
+  // 2. Buscar agendamentos do dia
   const { data: agendamentos, error } = await sb
     .from("agendamentos")
-    .select("hora, duracao_min, profissional_id")
+    .select("hora, duracao_min, profissional_id, status")
     .eq("data", params.data)
-    .not("status", "eq", "cancelado");
+    .not("status", "in", '("cancelado", "nao_compareceu")');
 
   if (error) throw error;
 
+  // 3. Configuração de funcionamento
+  const timezone = "America/Sao_Paulo";
+  const startHour = 8; // 08:00
+  const endHour = 19; // 19:00
   const slots = [];
-  let current = 8 * 60; // 08:00
-  const end = 19 * 60; // 19:00 (estendido para mais opções)
-  const interval = 30; 
+  
+  // 4. Gerar slots de 30 em 30 min
+  for (let h = startHour; h < endHour; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`;
+      const currentStart = h * 60 + m;
+      const currentEnd = currentStart + duracao;
 
-  while (current < end) {
-    const hour = Math.floor(current / 60).toString().padStart(2, '0');
-    const min = (current % 60).toString().padStart(2, '0');
-    const timeStr = `${hour}:${min}:00`;
-    
-    // Verifica se o slot está livre
-    const isOccupied = (agendamentos || []).some(a => {
-      const aTime = a.hora.split(':').map(Number);
-      const aStart = aTime[0] * 60 + aTime[1];
-      const aEnd = aStart + (a.duracao_min || 60);
-      const slotStart = current;
-      const slotEnd = current + 30; // Considerando slots de 30min para sugestão
-      return slotStart < aEnd && slotEnd > aStart;
-    });
+      // Verificar conflito com outros agendamentos
+      const isOccupied = (agendamentos || []).some(a => {
+        const [aH, aM] = a.hora.split(':').map(Number);
+        const aStart = aH * 60 + aM;
+        const aEnd = aStart + (a.duracao_min || 60);
+        
+        // Se profissional for especificado, só conta conflito se for o mesmo profissional
+        // Se não, assume que qualquer conflito bloqueia o slot (ou limite de capacidade)
+        if (params.profissional_id && a.profissional_id && a.profissional_id !== params.profissional_id) {
+          return false;
+        }
 
-    if (!isOccupied) {
-      slots.push(timeStr.slice(0, 5));
+        return (currentStart < aEnd && currentEnd > aStart);
+      });
+
+      if (!isOccupied) {
+        slots.push(timeStr.slice(0, 5));
+      }
     }
-    current += interval;
   }
 
   return createIAResponse({
     source: 'consultar_disponibilidade',
-    data: slots.slice(0, 10) // Retornar as primeiras 10 opções
+    data: {
+      data: params.data,
+      vagas_disponiveis: slots.slice(0, 15), // Retornar mais opções para a IA escolher
+      sugestao: slots.slice(0, 3) // Top 3 sugestões
+    }
   });
 }
 
@@ -602,5 +622,61 @@ export async function obterVisao360Pet(sb: SupabaseClient<Database>, petId: stri
       perfil: pet,
       atendimentos: atendimentos
     }
+  });
+}
+
+export async function consultarRiscoFaltaIA(sb: SupabaseClient<Database>, clienteId: string) {
+  const { data: agendamentos, error } = await sb
+    .from("agendamentos")
+    .select("status, data")
+    .eq("cliente_id", clienteId)
+    .order("data", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  const total = agendamentos?.length || 0;
+  const faltas = agendamentos?.filter(a => a.status === 'nao_compareceu').length || 0;
+  const cancelamentos = agendamentos?.filter(a => a.status === 'cancelado').length || 0;
+  
+  const score = total > 0 ? (faltas / total) * 100 : 0;
+  
+  return createIAResponse({
+    source: 'consultar_risco_falta',
+    data: {
+      total_historico: total,
+      faltas,
+      cancelamentos,
+      score_risco: Math.round(score),
+      nivel: score > 30 ? 'Alto' : score > 10 ? 'Médio' : 'Baixo',
+      justificativa: score > 0 ? `Cliente possui ${faltas} faltas em ${total} agendamentos.` : "Cliente sem histórico de faltas."
+    }
+  });
+}
+
+export async function criarFilaEsperaIA(
+  sb: SupabaseClient<Database>, 
+  params: { cliente_id: string; pet_id: string; servico_id: string; data_pretendida: string; periodo?: string }
+) {
+  // Nota: Assumindo que a tabela 'fila_espera' existe ou simulando via lembretes/obs
+  // Para este ERP, vamos usar uma abordagem de metadados se a tabela não for padrão
+  const { data, error } = await sb
+    .from("notificacoes")
+    .insert({
+      user_id: (await sb.auth.getUser()).data.user?.id || '',
+      titulo: "Novo Registro em Fila de Espera",
+      mensagem: `Cliente aguardando vaga para o dia ${params.data_pretendida}`,
+      tipo: "fila_espera",
+      payload: params
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return createIAResponse({
+    source: 'criar_fila_espera',
+    affected_record_id: data.id,
+    data: data
   });
 }

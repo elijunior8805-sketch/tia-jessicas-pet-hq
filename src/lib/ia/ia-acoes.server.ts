@@ -69,11 +69,35 @@ export async function criarAgendamentoIA(
     taxa_transporte?: number;
     observacoes?: string;
     duracao_min?: number;
+    idempotency_key?: string;
   }
 ) {
+  const { data: user } = await sb.auth.getUser();
+  const userId = user?.user?.id;
+  // 1. Verificação de Idempotência
+  if (params.idempotency_key) {
+    const { data: existente } = await sb
+      .from("agendamentos")
+      .select("id")
+      .eq("observacoes", `idempotency:${params.idempotency_key}`)
+      .single();
+    
+    if (existente) {
+      return createIAResponse({
+        source: 'criar_agendamento',
+        affected_record_id: existente.id,
+        data: existente,
+        message: "Este agendamento já foi processado anteriormente."
+      });
+    }
+  }
 
   const modalidade: LevaTrazModalidade = params.transporte ? "buscar_entregar" : "nao_utilizar";
+  const obsComIdempotencia = params.idempotency_key 
+    ? `${params.observacoes || ''}\nidempotency:${params.idempotency_key}`.trim()
+    : params.observacoes;
 
+  // 2. Criar Agendamento
   const { data: agendamento, error: errA } = await sb
     .from("agendamentos")
     .insert({
@@ -84,16 +108,16 @@ export async function criarAgendamentoIA(
       profissional_id: params.profissional_id,
       leva_traz_modalidade: modalidade,
       taxa_leva_traz: params.taxa_transporte || 0,
-      observacoes: params.observacoes,
+      observacoes: obsComIdempotencia,
       status: "agendado" as AgendamentoStatus,
       duracao_min: params.duracao_min || 60
     })
-
     .select()
     .single();
 
   if (errA) throw errA;
 
+  // 3. Inserir Serviços
   const servicosInsert = params.servicos.map((s, idx) => ({
     agendamento_id: agendamento.id,
     servico_id: s.id,
