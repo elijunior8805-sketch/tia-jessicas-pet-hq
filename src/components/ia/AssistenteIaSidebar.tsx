@@ -305,6 +305,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setIsProcessing(true);
 
     try {
+      setIaStatus('interpretando');
       const intent = await classificarIntencao({
         data: {
           texto: text,
@@ -316,8 +317,13 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       let respostaFinal = intent.resposta_ia || "Processando...";
       const startTime = Date.now();
       setSearchResults(null);
+      
+      if (intent.informacoes_faltantes && intent.informacoes_faltantes.length > 0) {
+        setIaStatus('aguardando_informacao');
+      }
 
       if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
+        setIaStatus('pesquisando');
         const response = await consultarAgendaIA({
           data: {
             data: intent.data || undefined,
@@ -370,6 +376,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         }
 
       } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
+        setIaStatus('pesquisando');
         const termo = intent.cliente_nome || intent.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
         const results = { clientes: (response.data || []) as any[], pets: [] as any[] };
@@ -417,6 +424,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           respostaFinal = `Não encontrei nenhum cliente chamado "${termo}". Deseja que eu tente buscar por outro nome ou realizar um novo cadastro?`;
         }
       } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
+        setIaStatus('pesquisando');
         const response = await consultarFinanceiroIA({
           data: { 
             apenas_pendentes: intent.intencao === 'consultar_pendencias',
