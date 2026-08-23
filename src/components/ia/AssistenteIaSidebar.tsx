@@ -429,7 +429,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           data: { 
             apenas_pendentes: intent.intencao === 'consultar_pendencias',
             termo: intent.cliente_nome || undefined,
-            period: intent.status as any || intent.data as any || undefined, // Mapeamento temporário
+            period: (intent.filtros?.period || intent.status || intent.data) as any,
             periodo_inicio: intent.periodo_inicio || undefined,
             periodo_fim: intent.periodo_fim || undefined
           }

@@ -75,7 +75,7 @@ ROTEAMENTO DE INTENÇÕES E FERRAMENTAS:
     - listar_atendimentos: "Quais são os atendimentos pendentes?".
     - disponibilidade: "Tem horário livre?".
 2. FINANCEIRO:
-    - consultar_resumo_financeiro: Faturamento, Lucro, Recebido.
+    - consultar_resumo_financeiro: Faturamento, Lucro, Recebido. Para "faturamento do mês", use period: "mes".
     - consultar_pendencias: Inadimplência, Contas a receber.
 3. CLIENTES E PETS:
     - consulta_cliente / consulta_pet / consulta_historico_pet.
