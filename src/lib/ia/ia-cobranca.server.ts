@@ -7,6 +7,7 @@ import { differenceInDays, parseISO } from "date-fns";
  * Consulta a fila de cobrança priorizada
  */
 export async function consultarFilaCobrancaIA(sb: SupabaseClient<Database>) {
+  // Usamos cast para any nas colunas novas para evitar erro de tipo até o gerador rodar
   const { data: pendentes, error } = await sb
     .from("pagamentos")
     .select(`
@@ -32,6 +33,7 @@ export async function consultarFilaCobrancaIA(sb: SupabaseClient<Database>) {
     const valorPendente = Number(p.valor_total) - (p.valor_pago || 0);
     const diasAtraso = p.vencimento ? differenceInDays(hoje, parseISO(p.vencimento)) : 0;
     
+    // Score simplificado: dias_atraso * 1.5 + (valor / 100) - (tentativas * 2)
     let score = (diasAtraso * 1.5) + (valorPendente / 100) - ((p.cobranca_tentativas || 0) * 2);
     
     let motivo = "";
@@ -47,7 +49,7 @@ export async function consultarFilaCobrancaIA(sb: SupabaseClient<Database>) {
     source: 'consultar_fila_cobranca',
     data: {
       total: filaPriorizada.length,
-      fila: filaPriorizada.slice(0, 10)
+      fila: filaPriorizada.slice(0, 10) // Retorna os top 10 para a IA
     }
   });
 }
@@ -62,6 +64,7 @@ export async function gerarMensagensCobrancaIA(
   const { chamarIA, carregarIaConfig } = await import("../ia-core.server");
   const config = await carregarIaConfig(sb);
   
+  // Buscar dados da pendência
   const { data: p } = await sb
     .from("pagamentos")
     .select(`
@@ -93,7 +96,9 @@ REGRAS GERAIS:
 VERSÕES OBRIGATÓRIAS (Retorne um JSON com estas 3 chaves):
 - direta: Curta, objetiva, lembrete amigável.
 - firme: Mais enfática, pede posição concreta, cita vencimento.
-- extra_firme: Para casos reincidentes ou sem resposta. Exige comprovante ou data exata. Informa que ignorar não resolve a pendência.`;
+- extra_firme: Para casos reincidentes ou sem resposta. Exige comprovante ou data exata. Informa que ignorar não resolve a pendência.
+
+As mensagens devem ser ESTRUTURALMENTE diferentes (>50% de variação).`;
 
   const res = await chamarIA({
     system: systemPrompt,
@@ -136,7 +141,7 @@ export async function registrarPromessaPagamentoIA(
       data_prometida: params.data_prometida,
       valor_prometido: params.valor_prometido,
       resposta_cliente: params.observacoes
-    })
+    } as any) // Cast to any because TS hasn't picked up the new table yet
     .select()
     .single();
 
