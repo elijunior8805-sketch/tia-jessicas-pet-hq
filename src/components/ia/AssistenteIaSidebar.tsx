@@ -519,6 +519,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarAgendamento = async (intent: IAIntent) => {
     setIsProcessing(true);
+    setIaStatus('executando');
     try {
       // 1. Resolver IDs
       let clienteId = intent.cliente_id;
@@ -594,8 +595,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       } as any]);
       
       setCurrentIntent(null);
+      setIaStatus('concluido');
       toast.success("Agendamento realizado!");
     } catch (error: any) {
+      setIaStatus('erro');
       toast.error(error.message);
       
       // Se for erro de horário ocupado, sugerir alternativas
@@ -620,6 +623,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarRemarcacao = async (msg: any) => {
     setIsProcessing(true);
+    setIaStatus('executando');
     try {
       const { intent } = msg;
       const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
@@ -656,6 +660,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${(agendamento.pets as any)?.nome}\n- **De**: ${format(parseISO(agendamento.data), 'dd/MM')} às ${agendamento.hora.slice(0, 5)}\n- **Para**: ${intent.data} às ${intent.horario}`,
         timestamp: new Date().toISOString()
       }]);
+      setIaStatus('concluido');
       toast.success("Agendamento alterado!");
     } catch (error: any) {
       toast.error(error.message);
@@ -667,6 +672,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarCancelamento = async (msg: any) => {
     setIsProcessing(true);
+    setIaStatus('executando');
     try {
       const { intent } = msg;
       const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
@@ -701,6 +707,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         content: `✅ **Agendamento do ${(agendamento.pets as any)?.nome} cancelado com sucesso.**`,
         timestamp: new Date().toISOString()
       }]);
+      setIaStatus('concluido');
       toast.success("Agendamento cancelado.");
     } catch (error: any) {
       toast.error(error.message);
@@ -712,6 +719,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);
+    setIaStatus('executando');
     try {
       const { meta, intent } = msg;
       if (!meta?.pagamento_id) throw new Error("ID do pagamento não localizado no contexto.");
@@ -732,6 +740,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         content: `✅ **Baixa realizada com sucesso!** O comprovante foi vinculado e o financeiro atualizado.`,
         timestamp: new Date().toISOString()
       }]);
+      setIaStatus('concluido');
       toast.success("Pagamento baixado!");
     } catch (error: any) {
       console.error(error);
