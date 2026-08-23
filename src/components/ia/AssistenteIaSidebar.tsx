@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
-  Eye
+  Eye,
+  XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,6 +44,8 @@ import {
 import {
   validarAgendamentoIA,
   executarCriacaoAgendamento,
+  executarRemarcacao,
+  executarCancelamento,
 } from '@/lib/ia/ia-acoes.functions';
 import { 
   executarBaixaPagamento, 
@@ -566,6 +569,83 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
+
+  const handleConfirmarRemarcacao = async (msg: any) => {
+    setIsProcessing(true);
+    try {
+      const { intent } = msg;
+      const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
+      if (!cliente) throw new Error("Cliente não localizado.");
+
+      const { data: agendamentos } = await supabase
+        .from('agendamentos')
+        .select('id')
+        .eq('cliente_id', cliente.id)
+        .eq('status', 'agendado')
+        .order('data', { ascending: true })
+        .limit(1);
+
+      const agendamentoId = agendamentos?.[0]?.id;
+      if (!agendamentoId) throw new Error("Não encontrei agendamentos ativos para este cliente.");
+
+      await executarRemarcacao({
+        data: {
+          agendamento_id: agendamentoId,
+          nova_data: intent.data!,
+          nova_hora: intent.horario!
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${intent.pet_nome || 'do cliente'}\n- **Nova Data**: ${intent.data}\n- **Novo Horário**: ${intent.horario}`,
+        timestamp: new Date().toISOString()
+      }]);
+      toast.success("Agendamento alterado!");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmarCancelamento = async (msg: any) => {
+    setIsProcessing(true);
+    try {
+      const { intent } = msg;
+      const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
+      if (!cliente) throw new Error("Cliente não localizado.");
+
+      const { data: agendamentos } = await supabase
+        .from('agendamentos')
+        .select('id')
+        .eq('cliente_id', cliente.id)
+        .eq('status', 'agendado')
+        .order('data', { ascending: true })
+        .limit(1);
+
+      const agendamentoId = agendamentos?.[0]?.id;
+      if (!agendamentoId) throw new Error("Não encontrei agendamentos ativos para este cliente.");
+
+      await executarCancelamento({
+        data: {
+          agendamento_id: agendamentoId,
+          motivo: intent.observacoes || "Cancelado via Assistente IA"
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Agendamento cancelado com sucesso.**`,
+        timestamp: new Date().toISOString()
+      }]);
+      toast.success("Agendamento cancelado.");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);
