@@ -14,8 +14,8 @@ export const IAIntentSchema = z.object({
     "consulta_historico_pet",
     "buscar_servicos",
     "criar_agendamento",
-    "remarcar",
-    "cancelar",
+    "remarcar_agendamento",
+    "cancelar_agendamento",
     "cadastrar_cliente",
     "cadastrar_pet",
     "registrar_pagamento",
@@ -119,6 +119,8 @@ ROTEAMENTO DE INTENÇÕES E FERRAMENTAS:
 
 4. AÇÕES OPERACIONAIS (Exigem confirmação):
     - criar_agendamento: "Agendar Thor para banho hoje às 10h".
+    - remarcar_agendamento: "Reagendar o Thor para dia 28", "Mudar horário da Mel".
+    - cancelar_agendamento: "Desmarcar o Thor".
     - registrar_pagamento: "Baixar pagamento da Mel".
     - cadastrar_cliente / cadastrar_pet.
 

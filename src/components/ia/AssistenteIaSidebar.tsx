@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
-  Eye
+  Eye,
+  XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,6 +44,8 @@ import {
 import {
   validarAgendamentoIA,
   executarCriacaoAgendamento,
+  executarRemarcacao,
+  executarCancelamento,
 } from '@/lib/ia/ia-acoes.functions';
 import { 
   executarBaixaPagamento, 
@@ -341,7 +344,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           respostaFinal = "Não existem agendamentos para o critério solicitado.";
         }
 
-      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
+      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
         const results = { clientes: (response.result || []) as any[], pets: [] as any[] };
@@ -352,7 +355,25 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase());
           
           if (results.clientes.length === 1 && matchesTermo) {
-            respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
+            if (intent.intencao === 'remarcar_agendamento' || intent.intencao === 'cancelar_agendamento') {
+              // Buscar agendamentos do cliente para escolha
+              const agendaRes = await consultarAgendaIA({ 
+                data: { 
+                  cliente_nome: c.nome, 
+                  status: 'confirmado',
+                  data: intent.data || undefined
+                } 
+              });
+              const agendamentos = agendaRes.result || [];
+              if (agendamentos.length > 0) {
+                respostaFinal = `Encontrei o cliente **${c.nome}**. Qual destes agendamentos você deseja ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}?\n\n` +
+                  agendamentos.map((a: any) => `- **${a.hora.slice(0, 5)}** - ${a.pets?.nome} (${a.servicos?.nome || 'Serviço'})`).join('\n');
+              } else {
+                respostaFinal = `O cliente **${c.nome}** não possui agendamentos ativos para ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}.`;
+              }
+            } else {
+              respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
+            }
           } else {
             respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Você quis dizer algum destes clientes?\n\n` +
               results.clientes.map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
@@ -555,6 +576,98 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   };
 
 
+  const handleConfirmarRemarcacao = async (msg: any) => {
+    setIsProcessing(true);
+    try {
+      const { intent } = msg;
+      const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
+      if (!cliente) throw new Error("Cliente não localizado.");
+
+      // Tenta encontrar agendamento para o pet específico se informado, ou o mais próximo
+      let query = supabase
+        .from('agendamentos')
+        .select('id, data, hora, pets(nome)')
+        .eq('cliente_id', cliente.id)
+        .eq('status', 'agendado')
+        .order('data', { ascending: true });
+
+      if (intent.pet_nome) {
+        const { data: pet } = await supabase.from('pets').select('id').eq('cliente_id', cliente.id).ilike('nome', `%${intent.pet_nome}%`).maybeSingle();
+        if (pet) query = query.eq('pet_id', pet.id);
+      }
+
+      const { data: agendamentos } = await query.limit(1);
+      const agendamento = agendamentos?.[0];
+
+      if (!agendamento) throw new Error("Não encontrei agendamentos ativos para este cliente.");
+
+      await executarRemarcacao({
+        data: {
+          agendamento_id: agendamento.id,
+          nova_data: intent.data!,
+          nova_hora: intent.horario!
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${(agendamento.pets as any)?.nome}\n- **De**: ${format(parseISO(agendamento.data), 'dd/MM')} às ${agendamento.hora.slice(0, 5)}\n- **Para**: ${intent.data} às ${intent.horario}`,
+        timestamp: new Date().toISOString()
+      }]);
+      toast.success("Agendamento alterado!");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+
+  const handleConfirmarCancelamento = async (msg: any) => {
+    setIsProcessing(true);
+    try {
+      const { intent } = msg;
+      const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
+      if (!cliente) throw new Error("Cliente não localizado.");
+
+      let query = supabase
+        .from('agendamentos')
+        .select('id, pets(nome)')
+        .eq('cliente_id', cliente.id)
+        .eq('status', 'agendado')
+        .order('data', { ascending: true });
+
+      if (intent.pet_nome) {
+        const { data: pet } = await supabase.from('pets').select('id').eq('cliente_id', cliente.id).ilike('nome', `%${intent.pet_nome}%`).maybeSingle();
+        if (pet) query = query.eq('pet_id', pet.id);
+      }
+
+      const { data: agendamentos } = await query.limit(1);
+      const agendamento = agendamentos?.[0];
+
+      if (!agendamento) throw new Error("Não encontrei agendamentos ativos para este cliente.");
+
+      await executarCancelamento({
+        data: {
+          agendamento_id: agendamento.id,
+          motivo: intent.observacoes || "Cancelado via Assistente IA"
+        }
+      });
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **Agendamento do ${(agendamento.pets as any)?.nome} cancelado com sucesso.**`,
+        timestamp: new Date().toISOString()
+      }]);
+      toast.success("Agendamento cancelado.");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);
     try {
@@ -743,16 +856,24 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                             </Button>
                           )}
                           
-                          {msg.intent.intencao === 'criar_agendamento' && (
+                          {['criar_agendamento', 'remarcar_agendamento'].includes(msg.intent.intencao) && (
                             <div className="flex gap-2">
                               {msg.intent.cliente_nome && (
                                 <Button 
                                   size="sm" 
                                   className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                                  onClick={() => handleConfirmarAgendamento(msg.intent!)}
+                                  onClick={() => {
+                                    if (msg.intent?.intencao === 'remarcar_agendamento') {
+                                      // Se for remarcação, precisamos do ID do agendamento que pode estar no texto ou meta
+                                      handleConfirmarRemarcacao(msg);
+                                    } else {
+                                      handleConfirmarAgendamento(msg.intent!);
+                                    }
+                                  }}
                                   disabled={isProcessing}
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Agendamento
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> 
+                                  {msg.intent.intencao === 'remarcar_agendamento' ? 'Confirmar Remarcação' : 'Confirmar Agendamento'}
                                 </Button>
                               )}
                               <Button 
@@ -764,6 +885,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                 <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Agenda
                               </Button>
                             </div>
+                          )}
+                          {msg.intent.intencao === 'cancelar_agendamento' && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 text-[11px] font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 shadow-md"
+                              onClick={() => handleConfirmarCancelamento(msg)}
+                              disabled={isProcessing}
+                            >
+                              <XCircle className="w-3.5 h-3.5 mr-1.5" /> Confirmar Cancelamento
+                            </Button>
                           )}
                           {msg.intent.intencao === 'confirmar_baixa' && (
                             <Button 
