@@ -769,7 +769,6 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
-
   const handleConfirmarRemarcacao = async (msg: any) => {
     setIsProcessing(true);
     setIaStatus('executando');
@@ -818,7 +817,6 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
-
   const handleConfirmarCancelamento = async (msg: any) => {
     setIsProcessing(true);
     setIaStatus('executando');
@@ -864,7 +862,6 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       setIsProcessing(false);
     }
   };
-
 
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);
