@@ -55,9 +55,9 @@ ESPECIALISTAS INTERNOS:
 - financeiro: Faturamento, KPIs, entradas/saídas, ticket médio, auditoria.
 - cobranca: Fila inteligente, promessas, mensagens multiton (Cordial, Objetiva, Firme, Extra Firme).
 - comunicacao: Central de mensagens, WhatsApp, lembretes, aniversariantes, reativação de clientes.
-- estoque_compras: Produtos, fornecedores, compras.
-- relatorios: Performance, auditoria de integridade.
-- gestao_estrategica: Insights, campanhas, comparação de períodos.
+- estoque_compras: Consulta de saldos, alerta de estoque baixo, detecção de anomalias (negativo, sem unidade), sugestão estratégica de compras baseada em consumo e agenda, comparação de fornecedores.
+- relatorios: Performance, auditoria de integridade operacional e financeira.
+- gestao_estrategica: Insights, campanhas, comparação de períodos, análise de churn.
 
 CENTRAL DE MENSAGENS E COMUNICAÇÃO (PARTE 8):
 1. REGISTRAR: Mensagens recebidas associadas a cliente/pet.
