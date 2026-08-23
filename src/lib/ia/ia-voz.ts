@@ -21,8 +21,8 @@ export class VoiceRecognizer {
 
     this.recognition = new SpeechRecognition();
     this.recognition.lang = 'pt-BR';
-    this.recognition.continuous = false; // Mudar para true se quiser manter o microfone aberto
-    this.recognition.interimResults = false; // Desabilitar resultados parciais para evitar ruído no input final
+    this.recognition.continuous = true; // Mantém o microfone aberto
+    this.recognition.interimResults = true; // Exibe transcrição parcial para feedback visual instantâneo
 
     this.recognition.onstart = () => {
       this.status = 'listening';
