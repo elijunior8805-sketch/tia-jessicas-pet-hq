@@ -159,7 +159,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setSelectedFile(file);
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (prev) => setFilePreview(prev.target?.data as string);
+      reader.onload = (prev) => setFilePreview(prev.target?.result as string);
       reader.readAsDataURL(file);
     } else {
       setFilePreview('pdf');
