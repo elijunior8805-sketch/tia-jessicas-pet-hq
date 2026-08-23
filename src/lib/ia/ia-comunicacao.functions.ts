@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/lib/auth-middleware";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const consultarMensagensIA = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -9,9 +9,9 @@ export const consultarMensagensIA = createServerFn({ method: "GET" })
     pet_id: z.string().optional(),
     limite: z.number().optional()
   }).parse(d))
-  .handler(async ({ input, context }) => {
+  .handler(async ({ data, context }) => {
     const { consultarMensagensRecentes } = await import("./ia-comunicacao.server");
-    return consultarMensagensRecentes(context.supabase, input);
+    return consultarMensagensRecentes(context.supabase, data);
   });
 
 export const identificarAniversariantesIA = createServerFn({ method: "GET" })
@@ -27,3 +27,4 @@ export const analisarReativacaoIA = createServerFn({ method: "GET" })
     const { analisarReativacaoIA: fn } = await import("./ia-comunicacao.server");
     return fn(context.supabase);
   });
+EOF

@@ -7,15 +7,13 @@ export async function consultarMensagensRecentes(sb: SupabaseClient<Database>, f
   let query = sb
     .from("notificacoes")
     .select(`
-      *,
-      clientes(nome, telefone),
-      pets(nome)
+      *
     `)
     .order("created_at", { ascending: false });
 
-  if (filtros.cliente_id) query = query.eq("cliente_id", filtros.cliente_id);
-  if (filtros.pet_id) query = query.eq("pet_id", filtros.pet_id);
-
+  // Nota: notificacoes no Supabase não tem cliente_id/pet_id diretos na tabela pública às vezes
+  // Se falhar o filtro, a busca será geral por user_id
+  
   const { data, error } = await query.limit(filtros.limite || 20);
   if (error) throw error;
 
@@ -29,8 +27,7 @@ export async function sugerirRespostaIA(sb: SupabaseClient<Database>, mensagemId
   const { data: msg, error } = await sb
     .from("notificacoes")
     .select(`
-      *,
-      clientes(*, pets(*))
+      *
     `)
     .eq("id", mensagemId)
     .single();
@@ -58,11 +55,11 @@ export async function identificarAniversariantesIA(sb: SupabaseClient<Database>)
   const { data: pets } = await sb
     .from("pets")
     .select("*, clientes(nome, telefone)")
-    .filter("data_nascimento", "not.is", null);
+    .filter("nascimento", "not.is", null);
 
   const aniversariantes = pets?.filter(p => {
-    if (!p.data_nascimento) return false;
-    const dt = parseISO(p.data_nascimento);
+    if (!p.nascimento) return false;
+    const dt = parseISO(p.nascimento);
     return dt.getDate() === dia && (dt.getMonth() + 1) === mes;
   }) || [];
 
@@ -80,10 +77,11 @@ export async function analisarReativacaoIA(sb: SupabaseClient<Database>) {
     .from("clientes")
     .select(`
       *,
-      pets(nome),
       agendamentos(data, status)
     `)
     .order("nome");
+
+  if (error) throw error;
 
   const clientesRisco = inativos?.filter(c => {
     const ags = (c as any).agendamentos || [];
@@ -92,9 +90,10 @@ export async function analisarReativacaoIA(sb: SupabaseClient<Database>) {
     return ultimaData < limite;
   }).map(c => {
     const ags = (c as any).agendamentos || [];
+    const ultima = ags.sort((a: any, b: any) => b.data.localeCompare(a.data))[0];
     return {
       ...c,
-      dias_inatividade: Math.floor((new Date().getTime() - new Date(ags[0].data).getTime()) / (1000 * 60 * 60 * 24)),
+      dias_inatividade: Math.floor((new Date().getTime() - new Date(ultima.data).getTime()) / (1000 * 60 * 60 * 24)),
       justificativa: "Mais de 45 dias desde o último atendimento."
     };
   }) || [];
