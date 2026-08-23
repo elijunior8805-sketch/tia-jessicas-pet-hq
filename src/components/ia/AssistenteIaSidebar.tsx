@@ -925,7 +925,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                           
                           {['criar_agendamento', 'remarcar_agendamento'].includes(msg.intent.intencao) && (
                             <div className="flex gap-2">
-                              {msg.intent.cliente_nome && (
+                              {(msg.intent.parametros as any)?.cliente_nome && (
                                 <Button 
                                   size="sm" 
                                   className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
