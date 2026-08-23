@@ -136,7 +136,7 @@ IMPORTANTE SOBRE COMANDOS RÁPIDOS:
 - "Criar agendamento" -> intencao: fluxo_agendamento_inicio.
 
 SOBRE DATAS INCOMPLETAS:
-- Se o usuário disser "dia 28" ou similar, passe apenas o número "28" no campo de data para a ferramenta `consultar_agenda`. O sistema backend tratará de encontrar a próxima ocorrência.`;
+- Se o usuário disser "dia 28" ou similar, passe apenas o número "28" no campo de data para a ferramenta consultar_agenda. O sistema backend tratará de encontrar a próxima ocorrência.`;
 
   try {
     const res = await chamarIA({
