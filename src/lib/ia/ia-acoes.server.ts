@@ -31,8 +31,8 @@ export async function validarDisponibilidadeReal(
   if (duplicados && duplicados.length > 0) {
     return createIAResponse({
       success: false,
-      action: 'validar_disponibilidade',
-      warnings: ["Já existe um agendamento idêntico para este pet neste horário."]
+      source: 'validar_disponibilidade',
+      validation_errors: ["Já existe um agendamento idêntico para este pet neste horário."]
     });
   }
 
@@ -47,8 +47,8 @@ export async function validarDisponibilidadeReal(
   
   return createIAResponse({
     success: true,
-    action: 'validar_disponibilidade',
-    result: {
+    source: 'validar_disponibilidade',
+    data: {
       disponivel: true,
       conflitos: ocupados?.map(o => (o.pets as any)?.nome) || [],
       aviso: ocupados && ocupados.length > 0 ? `Atenção: Já existem ${ocupados.length} agendamentos para este horário.` : null
@@ -109,9 +109,9 @@ export async function criarAgendamentoIA(
   if (errS) throw errS;
 
   return createIAResponse({
-    action: 'criar_agendamento',
-    record_id: agendamento.id,
-    result: agendamento
+    source: 'criar_agendamento',
+    affected_record_id: agendamento.id,
+    data: agendamento
   });
 }
 
@@ -134,9 +134,9 @@ export async function remarcarAgendamentoIA(
   if (error) throw error;
   
   return createIAResponse({
-    action: 'remarcar_agendamento',
-    record_id: data.id,
-    result: data
+    source: 'remarcar_agendamento',
+    affected_record_id: data.id,
+    data: data
   });
 }
 
@@ -158,9 +158,9 @@ export async function cancelarAgendamentoIA(
   if (error) throw error;
   
   return createIAResponse({
-    action: 'cancelar_agendamento',
-    record_id: data.id,
-    result: data
+    source: 'cancelar_agendamento',
+    affected_record_id: data.id,
+    data: data
   });
 }
 
@@ -212,9 +212,9 @@ export async function registrarPagamentoIA(
   if (error) throw error;
 
   return createIAResponse({
-    action: 'registrar_pagamento',
-    record_id: data.id,
-    result: data
+    source: 'registrar_pagamento',
+    affected_record_id: data.id,
+    data: data
   });
 }
 
@@ -238,9 +238,9 @@ export async function estornarPagamentoIA(
   if (error) throw error;
   
   return createIAResponse({
-    action: 'estornar_pagamento',
-    record_id: data.id,
-    result: data
+    source: 'estornar_pagamento',
+    affected_record_id: data.id,
+    data: data
   });
 }
 
@@ -262,9 +262,9 @@ export async function criarClienteIA(
   if (error) throw error;
 
   return createIAResponse({
-    action: 'criar_cliente',
-    record_id: data.id,
-    result: data
+    source: 'criar_cliente',
+    affected_record_id: data.id,
+    data: data
   });
 }
 
@@ -287,8 +287,8 @@ export async function criarPetIA(
   if (error) throw error;
 
   return createIAResponse({
-    action: 'criar_pet',
-    record_id: data.id,
-    result: data
+    source: 'criar_pet',
+    affected_record_id: data.id,
+    data: data
   });
 }
