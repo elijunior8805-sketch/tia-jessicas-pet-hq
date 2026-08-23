@@ -29,14 +29,14 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
   });
 
 export const executarEstornoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     pagamento_id: z.string(),
     motivo: z.string()
   }).parse(d))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin;
-    return estornarPagamentoIA(sb, data.pagamento_id, data.motivo);
+  .handler(async ({ data, context }) => {
+    const { estornarPagamentoIA: estornar } = await import("./ia-acoes.server");
+    return estornar(context.supabase, data.pagamento_id, data.motivo);
   });
 
 export const processarComprovanteIA = createServerFn({ method: "POST" })
