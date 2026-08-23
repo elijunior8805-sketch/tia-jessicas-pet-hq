@@ -341,7 +341,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           respostaFinal = "Não existem agendamentos para o critério solicitado.";
         }
 
-      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (intent.intencao === 'criar_agendamento' && !selectedEntity)) {
+      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
         const termo = intent.cliente_nome || intent.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
         const results = { clientes: (response.result || []) as any[], pets: [] as any[] };
@@ -352,7 +352,19 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           const matchesTermo = c.nome.toLowerCase().includes(termo.toLowerCase());
           
           if (results.clientes.length === 1 && matchesTermo) {
-            respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
+            if (intent.intencao === 'remarcar_agendamento' || intent.intencao === 'cancelar_agendamento') {
+              // Buscar agendamentos do cliente para escolha
+              const agendaRes = await consultarAgendaIA({ data: { cliente_nome: c.nome, status: 'confirmado' } });
+              const agendamentos = agendaRes.result || [];
+              if (agendamentos.length > 0) {
+                respostaFinal = `Encontrei o cliente **${c.nome}**. Qual destes agendamentos você deseja ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}?\n\n` +
+                  agendamentos.map((a: any) => `- **${a.hora.slice(0, 5)}** - ${a.pets?.nome} (${a.servicos?.nome || 'Serviço'})`).join('\n');
+              } else {
+                respostaFinal = `O cliente **${c.nome}** não possui agendamentos ativos para ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}.`;
+              }
+            } else {
+              respostaFinal = `Encontrei o cliente **${c.nome}**. Ele possui os seguintes pets: ${c.pets?.map((p: any) => p.nome).join(', ') || 'nenhum'}.\n\nO que deseja fazer?`;
+            }
           } else {
             respostaFinal = `Não encontrei uma correspondência exata para "${termo}". Você quis dizer algum destes clientes?\n\n` +
               results.clientes.map((c: any) => `- **${c.nome}** (${c.bairro || 'Sem bairro'})`).join('\n');
