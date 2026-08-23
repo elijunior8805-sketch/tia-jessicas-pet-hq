@@ -59,6 +59,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+type IAStatus = 
+  | 'idle' 
+  | 'interpretando' 
+  | 'pesquisando' 
+  | 'aguardando_informacao' 
+  | 'validando' 
+  | 'aguardando_confirmacao' 
+  | 'executando' 
+  | 'verificando' 
+  | 'concluido' 
+  | 'cancelado' 
+  | 'erro';
+
 interface AssistenteIaSidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -69,6 +82,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const [inputText, setInputText] = useState('');
   const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>('idle');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [iaStatus, setIaStatus] = useState<IAStatus>('idle');
   const [currentIntent, setCurrentIntent] = useState<IAIntent | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<any>(null); 
   const [searchResults, setSearchResults] = useState<{clientes: any[], pets: any[]} | null>(null);
