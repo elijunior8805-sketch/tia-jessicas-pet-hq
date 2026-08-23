@@ -1005,7 +1005,13 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   variant="outline"
                   size="sm"
                   className="rounded-full text-[10px] font-bold h-7 bg-white/50 border-[#C99845]/20 text-[#123F2A] hover:bg-[#C99845]/10 hover:border-[#C99845]/40 transition-all duration-300"
-                  onClick={() => handleSend(sugestao)}
+                  onClick={() => {
+                    if (sugestao === 'Faturamento do mês') {
+                      handleSend("Qual o faturamento do mês atual?");
+                    } else {
+                      handleSend(sugestao);
+                    }
+                  }}
                   disabled={isProcessing}
                 >
                   {sugestao}
