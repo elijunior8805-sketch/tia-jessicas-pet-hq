@@ -43,8 +43,8 @@ export type IaConfig = {
 export const IA_CONFIG_PADRAO: IaConfig = {
   ia_ativa: true,
   provedor: "lovable",
-  modelo_principal: "google/gemini-3.6-flash",
-  modelo_alternativo: "google/gemini-3.1-flash-lite",
+  modelo_principal: "google/gemini-1.5-flash",
+  modelo_alternativo: "google/gemini-1.5-flash",
   criatividade: 0.6,
   limite_caracteres: 600,
   timeout_ms: 25000,
