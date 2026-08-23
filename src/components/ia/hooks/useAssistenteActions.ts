@@ -227,8 +227,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setIsProcessing(true);
     setIaStatus("validando");
     try {
-      const resVal = await validarAgendamentoIA({ data: intent.parametros });
-      if (!resVal.disponivel) throw new Error(resVal.mensagem || "Horário indisponível");
+      const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
+      if (resVal.disponivel === false) throw new Error(resVal.mensagem || resVal.message || "Horário indisponível");
       
       setIaStatus("executando");
       await executarCriacaoAgendamento({ data: intent.parametros });
