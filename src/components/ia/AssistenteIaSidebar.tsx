@@ -357,7 +357,13 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           if (results.clientes.length === 1 && matchesTermo) {
             if (intent.intencao === 'remarcar_agendamento' || intent.intencao === 'cancelar_agendamento') {
               // Buscar agendamentos do cliente para escolha
-              const agendaRes = await consultarAgendaIA({ data: { cliente_nome: c.nome, status: 'confirmado' } });
+              const agendaRes = await consultarAgendaIA({ 
+                data: { 
+                  cliente_nome: c.nome, 
+                  status: 'confirmado',
+                  data: intent.data || undefined
+                } 
+              });
               const agendamentos = agendaRes.result || [];
               if (agendamentos.length > 0) {
                 respostaFinal = `Encontrei o cliente **${c.nome}**. Qual destes agendamentos você deseja ${intent.intencao === 'remarcar_agendamento' ? 'remarcar' : 'cancelar'}?\n\n` +
