@@ -1,44 +1,30 @@
 import { z } from "zod";
-
-
 export const IAIntentSchema = z.object({
-  intencao: z.string(),
-  especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica"]).optional().nullable(),
-  tipo_operacao: z.enum(["consulta", "acao"]),
-  parametros: z.record(z.any()).optional().nullable(),
-  informacoes_faltantes: z.array(z.string()).optional().nullable(),
-  ambiguidades: z.array(z.string()).optional().nullable(),
-  nivel_confianca: z.number().min(0).max(1),
-  ferramenta: z.string().optional().nullable(),
-  exige_confirmacao: z.boolean().default(false),
-  proxima_etapa: z.string().optional().nullable(),
-  resposta_ia: z.string().optional().nullable(),
-  resumo_acao: z.string().optional().nullable(),
+    intencao: z.string(),
+    especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica"]).optional().nullable(),
+    tipo_operacao: z.enum(["consulta", "acao"]),
+    parametros: z.record(z.any()).optional().nullable(),
+    informacoes_faltantes: z.array(z.string()).optional().nullable(),
+    ambiguidades: z.array(z.string()).optional().nullable(),
+    nivel_confianca: z.number().min(0).max(1),
+    ferramenta: z.string().optional().nullable(),
+    exige_confirmacao: z.boolean().default(false),
+    proxima_etapa: z.string().optional().nullable(),
+    resposta_ia: z.string().optional().nullable(),
+    resumo_acao: z.string().optional().nullable(),
 });
-
-export type IAIntent = z.infer<typeof IAIntentSchema>;
-
-export interface IAMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  intent?: IAIntent;
-}
-
 /**
  * Classifica a intenção do usuário usando o modelo Gemini.
  */
-export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
-  const { chamarIA } = await import("../ia-core.server");
-  
-  const userContext = contexto?.user ? `
+export async function classificarComandoIA(texto, contexto) {
+    const { chamarIA } = await import("../ia-core.server");
+    const userContext = contexto?.user ? `
   USUÁRIO LOGADO:
   - Nome: ${contexto.user.nome}
   - Cargo: ${contexto.user.cargo}
   - Unidade: ${contexto.user.unidade || 'Matriz'}
   ` : '';
-
-  const systemPrompt = `Você é a "Assistente Operacional e Estratégica do Proprietário — Spa de Pet Tia Jéssica". 
+    const systemPrompt = `Você é a "Assistente Operacional e Estratégica do Proprietário — Spa de Pet Tia Jéssica". 
 Você trabalha exclusivamente para o proprietário e funcionários autorizados para a gestão interna do Pet Shop. NUNCA se dirija ao usuário como se ele fosse um cliente final (tutor).
 
 COMPORTAMENTO:
@@ -96,49 +82,49 @@ ESTRUTURA DA INTERPRETAÇÃO (Retorne sempre este JSON):
 
 DATAS:
 - Use fuso America/Sao_Paulo. "hoje", "amanhã" -> Converter para YYYY-MM-DD.`;
-
-  try {
-    const res = await chamarIA({
-      system: systemPrompt,
-      prompt: `TEXTO DO USUÁRIO: "${texto}"\n\nCONTEXTO DO SISTEMA:\n- Data de Hoje: ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full' }).format(new Date())}\n- Histórico Recente: ${JSON.stringify(contexto?.mensagens || [])}`,
-      config: contexto?.config,
-      json: true,
-      origem: "assistente_ia_classificador"
-    });
-
-    const parsed = JSON.parse(res.texto);
-    
-    return {
-      ...parsed,
-      nivel_confianca: parsed.nivel_confianca || 0.9
-    } as IAIntent;
-  } catch (error) {
-    console.error("Erro na classificação IA:", error);
-    return fallbackClassificador(texto);
-  }
+    try {
+        const res = await chamarIA({
+            system: systemPrompt,
+            prompt: `TEXTO DO USUÁRIO: "${texto}"\n\nCONTEXTO DO SISTEMA:\n- Data de Hoje: ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full' }).format(new Date())}\n- Histórico Recente: ${JSON.stringify(contexto?.mensagens || [])}`,
+            config: contexto?.config,
+            json: true,
+            origem: "assistente_ia_classificador"
+        });
+        const parsed = JSON.parse(res.texto);
+        return {
+            ...parsed,
+            nivel_confianca: parsed.nivel_confianca || 0.9
+        };
+    }
+    catch (error) {
+        console.error("Erro na classificação IA:", error);
+        return fallbackClassificador(texto);
+    }
 }
-
-function fallbackClassificador(texto: string): IAIntent {
-  const lowercaseText = texto.toLowerCase();
-  let intencao: IAIntent["intencao"] = "comando_nao_reconhecido";
-  
-  if (lowercaseText.includes("agenda") || lowercaseText.includes("hoje") || lowercaseText.includes("amanhã")) {
-    intencao = "consulta_agenda";
-  } else if (lowercaseText.includes("cliente")) {
-    intencao = "consulta_cliente";
-  } else if (lowercaseText.includes("pet")) {
-    intencao = "consulta_pet";
-  } else if (lowercaseText.includes("financeiro") || lowercaseText.includes("pagamento")) {
-    intencao = "consulta_financeira";
-  } else if (lowercaseText.includes("estoque") || lowercaseText.includes("produto") || lowercaseText.includes("compra")) {
-    intencao = "consulta_estoque";
-  } else if (lowercaseText.includes("como está o negócio") || lowercaseText.includes("resumo")) {
-    intencao = "resumo_negocio";
-  }
-
-  return {
-    intencao,
-    nivel_confianca: 0.5,
-    resposta_ia: "Estou processando sua solicitação..."
-  } as IAIntent;
+function fallbackClassificador(texto) {
+    const lowercaseText = texto.toLowerCase();
+    let intencao = "comando_nao_reconhecido";
+    if (lowercaseText.includes("agenda") || lowercaseText.includes("hoje") || lowercaseText.includes("amanhã")) {
+        intencao = "consulta_agenda";
+    }
+    else if (lowercaseText.includes("cliente")) {
+        intencao = "consulta_cliente";
+    }
+    else if (lowercaseText.includes("pet")) {
+        intencao = "consulta_pet";
+    }
+    else if (lowercaseText.includes("financeiro") || lowercaseText.includes("pagamento")) {
+        intencao = "consulta_financeira";
+    }
+    else if (lowercaseText.includes("estoque") || lowercaseText.includes("produto") || lowercaseText.includes("compra")) {
+        intencao = "consulta_estoque";
+    }
+    else if (lowercaseText.includes("como está o negócio") || lowercaseText.includes("resumo")) {
+        intencao = "resumo_negocio";
+    }
+    return {
+        intencao,
+        nivel_confianca: 0.5,
+        resposta_ia: "Estou processando sua solicitação..."
+    };
 }
