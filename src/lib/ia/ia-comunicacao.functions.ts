@@ -27,4 +27,3 @@ export const analisarReativacaoIA = createServerFn({ method: "GET" })
     const { analisarReativacaoIA: fn } = await import("./ia-comunicacao.server");
     return fn(context.supabase);
   });
-EOF
