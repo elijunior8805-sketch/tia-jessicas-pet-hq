@@ -96,47 +96,80 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
 }
 
 
+function normalizarTermo(termo: string): string {
+  return termo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/[^\w\s]/gi, "") // Remove pontuação
+    .trim()
+    .toLowerCase();
+}
+
+function formatarTelefoneBusca(termo: string): string {
+  return termo.replace(/\D/g, ""); // Apenas números
+}
+
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
-  // Implementação de busca aproximada (Fuzzy Search simplificada no SQL)
-  const termoLimpo = termo.trim();
+  const termoOriginal = termo.trim();
+  const termoLimpo = normalizarTermo(termoOriginal);
+  const telefoneBusca = formatarTelefoneBusca(termoOriginal);
   
-  // Estratégia de busca mais agressiva:
-  // 1. Tentar por partes do nome (Eli Jr, Eli Junior, etc)
-  // 2. Tentar por telefone exato ou parcial
-  // 3. Tentar por nome completo
-  const { data, error } = await sb
+  // 1. Tentar ID exato se for UUID
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(termoOriginal)) {
+    const { data } = await sb.from("clientes").select("*, pets(id, nome, raca, porte)").eq("id", termoOriginal).single();
+    if (data) return createIAResponse({ source: 'buscar_clientes', data: [data] });
+  }
+
+  // 2. Busca em camadas
+  // Camada 1: Telefone (se tiver cara de telefone)
+  if (telefoneBusca.length >= 8) {
+    const { data } = await sb.from("clientes").select("*, pets(id, nome, raca, porte)").ilike("telefone", `%${telefoneBusca}%`);
+    if (data && data.length > 0) return createIAResponse({ source: 'buscar_clientes', data });
+  }
+
+  // Camada 2: Nome exato e ILIKE
+  const { data: dataNome, error: errorNome } = await sb
     .from("clientes")
-    .select(`*, pets(id, nome, raca)`)
-    .or(`nome.ilike.%${termoLimpo}%, telefone.ilike.%${termoLimpo}%, email.ilike.%${termoLimpo}%`)
+    .select(`*, pets(id, nome, raca, porte)`)
+    .or(`nome.ilike.%${termoLimpo}%, email.ilike.%${termoOriginal}%`)
     .order('nome')
     .limit(10);
 
-  if (error) throw error;
+  if (dataNome && dataNome.length > 0) return createIAResponse({ source: 'buscar_clientes', data: dataNome });
 
-  // Se não encontrar nada e o termo tiver espaços, tentar buscar por cada palavra
-  if ((!data || data.length === 0) && termoLimpo.includes(' ')) {
+  // Camada 3: Busca por nome do Pet
+  const { data: dataPets } = await sb
+    .from("pets")
+    .select(`cliente_id, clientes(*, pets(id, nome, raca, porte))`)
+    .ilike("nome", `%${termoLimpo}%`)
+    .limit(5);
+
+  if (dataPets && dataPets.length > 0) {
+    const clientesDosPets = dataPets.map(p => p.clientes).filter(Boolean);
+    if (clientesDosPets.length > 0) return createIAResponse({ source: 'buscar_clientes', data: clientesDosPets });
+  }
+
+  // Camada 4: Busca por partes do nome (se tiver espaços)
+  if (termoLimpo.includes(' ')) {
     const palavras = termoLimpo.split(' ').filter(p => p.length > 2);
     if (palavras.length > 0) {
       const orString = palavras.map(p => `nome.ilike.%${p}%`).join(',');
-      const { data: dataFuzzy, error: errorFuzzy } = await sb
+      const { data: dataFuzzy } = await sb
         .from("clientes")
-        .select(`*, pets(id, nome, raca)`)
+        .select(`*, pets(id, nome, raca, porte)`)
         .or(orString)
         .order('nome')
         .limit(10);
       
-      if (!errorFuzzy && dataFuzzy && dataFuzzy.length > 0) {
-        return createIAResponse({
-          source: 'buscar_clientes',
-          data: dataFuzzy
-        });
+      if (dataFuzzy && dataFuzzy.length > 0) {
+        return createIAResponse({ source: 'buscar_clientes', data: dataFuzzy });
       }
     }
   }
 
   return createIAResponse({
     source: 'buscar_clientes',
-    data: data
+    data: []
   });
 }
 
@@ -498,5 +531,76 @@ export async function analisarRiscoEvasaoIA(sb: SupabaseClient<Database>) {
   return createIAResponse({
     source: 'analisar_risco_evasao',
     data: riscos.sort((a, b) => b.dias_ausente - a.dias_ausente).slice(0, 10)
+  });
+}
+
+export async function obterVisao360Cliente(sb: SupabaseClient<Database>, clienteId: string) {
+  const { data: cliente, error: errC } = await sb
+    .from("clientes")
+    .select("*, pets(*)")
+    .eq("id", clienteId)
+    .single();
+
+  if (errC) throw errC;
+
+  const { data: pagamentos } = await sb
+    .from("pagamentos")
+    .select("*")
+    .eq("cliente_id", clienteId)
+    .order("vencimento", { ascending: false })
+    .limit(20);
+
+  const { data: agendamentos } = await sb
+    .from("agendamentos")
+    .select("*, pets(nome), servicos(nome)")
+    .eq("cliente_id", clienteId)
+    .order("data", { ascending: false })
+    .limit(10);
+
+  // Calcular métricas
+  const totalGasto = pagamentos?.filter(p => p.status === 'pago').reduce((acc, p) => acc + Number(p.valor_total), 0) || 0;
+  const pendencias = pagamentos?.filter(p => p.status !== 'pago' && p.status !== 'cancelado').length || 0;
+  const ultimoAtendimento = agendamentos?.find(a => a.status === 'finalizado');
+  const proximoAgendamento = agendamentos?.find(a => a.status === 'confirmado' || a.status === 'agendado');
+
+  return createIAResponse({
+    source: 'visao_360_cliente',
+    data: {
+      perfil: cliente,
+      metricas: {
+        total_gasto: totalGasto,
+        total_atendimentos: agendamentos?.length || 0,
+        pendencias_financeiras: pendencias,
+      },
+      historico: {
+        ultimo: ultimoAtendimento,
+        proximo: proximoAgendamento
+      }
+    }
+  });
+}
+
+export async function obterVisao360Pet(sb: SupabaseClient<Database>, petId: string) {
+  const { data: pet, error: errP } = await sb
+    .from("pets")
+    .select("*, clientes(*)")
+    .eq("id", petId)
+    .single();
+
+  if (errP) throw errP;
+
+  const { data: atendimentos } = await sb
+    .from("atendimentos")
+    .select("*, agendamento_servicos(nome, valor_unit)")
+    .eq("pet_id", petId)
+    .order("data_inicio", { ascending: false })
+    .limit(10);
+
+  return createIAResponse({
+    source: 'visao_360_pet',
+    data: {
+      perfil: pet,
+      atendimentos: atendimentos
+    }
   });
 }
