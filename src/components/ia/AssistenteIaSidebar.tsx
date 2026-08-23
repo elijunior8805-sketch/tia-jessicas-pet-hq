@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, 
-  Mic, 
-  MicOff, 
-  Send, 
-  RotateCcw, 
+import React, { useState, useEffect, useRef } from "react";
+import {
+  X,
+  Mic,
+  MicOff,
+  Send,
+  RotateCcw,
   CheckCircle2,
   ExternalLink,
   User,
@@ -21,21 +21,21 @@ import {
   Loader2,
   Trash2,
   Eye,
-  XCircle
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { VoiceRecognizer, VoiceRecognitionStatus } from '@/lib/ia/ia-voz';
-import { IAMessage, IAIntent } from '@/lib/ia/ia-agente.server';
-import { classificarIntencao } from '@/lib/ia/ia-agente.functions';
-import { registrarAuditoriaIA } from '@/lib/ia/ia-auditoria.functions';
-import { 
-  consultarAgendaIA, 
+  XCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { VoiceRecognizer, VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
+import { IAMessage, IAIntent } from "@/lib/ia/ia-agente.server";
+import { classificarIntencao } from "@/lib/ia/ia-agente.functions";
+import { registrarAuditoriaIA } from "@/lib/ia/ia-auditoria.functions";
+import {
+  consultarAgendaIA,
   buscarClientesIA,
   buscarPetsDoClienteIA,
-  consultarFinanceiroIA, 
+  consultarFinanceiroIA,
   consultarResumoOperacionalIA,
   analisarRiscoEvasaoIA,
   buscarServicosIA,
@@ -43,59 +43,53 @@ import {
   consultarVisao360ClienteIA,
   consultarVisao360PetIA,
   consultarAuditoriaDadosIA,
-  compararPeriodosFinanceirosIA
-} from '@/lib/ia/ia-consultas.functions';
+  compararPeriodosFinanceirosIA,
+} from "@/lib/ia/ia-consultas.functions";
 import {
   consultarFilaCobrancaIA,
   gerarMensagensCobrancaIA,
-  registrarPromessaPagamentoIA
-} from '@/lib/ia/ia-cobranca.functions';
+  registrarPromessaPagamentoIA,
+} from "@/lib/ia/ia-cobranca.functions";
 import {
   validarAgendamentoIA,
   executarCriacaoAgendamento,
   executarRemarcacao,
   executarCancelamento,
-} from '@/lib/ia/ia-acoes.functions';
-import { 
-  executarBaixaPagamento, 
-  processarComprovanteIA,
-} from '@/lib/ia/ia-financeiro.functions';
+} from "@/lib/ia/ia-acoes.functions";
+import { executarBaixaPagamento, processarComprovanteIA } from "@/lib/ia/ia-financeiro.functions";
 import {
   consultarMensagensIA,
   identificarAniversariantesIA,
-  analisarReativacaoIA
-} from '@/lib/ia/ia-comunicacao.functions';
+  analisarReativacaoIA,
+} from "@/lib/ia/ia-comunicacao.functions";
 import {
   getEstoqueIA,
   getComprasIA,
   getFornecedoresIA,
   getSugestoesCompraIA,
-  getAnomaliasEstoqueIA
-} from '@/lib/ia/ia-estoque.functions';
-import {
-  getResumoProprietarioIA,
-  getQualidadeIA
-} from '@/lib/ia/ia-auditoria.functions';
-import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
-import ReactMarkdown from 'react-markdown';
+  getAnomaliasEstoqueIA,
+} from "@/lib/ia/ia-estoque.functions";
+import { getResumoProprietarioIA, getQualidadeIA } from "@/lib/ia/ia-auditoria.functions";
+import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
+import ReactMarkdown from "react-markdown";
 
-import { supabase } from '@/integrations/supabase/client';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { supabase } from "@/integrations/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
-type IAStatus = 
-  | 'idle' 
-  | 'interpretando' 
-  | 'pesquisando' 
-  | 'aguardando_informacao' 
-  | 'validando' 
-  | 'aguardando_confirmacao' 
-  | 'executando' 
-  | 'verificando' 
-  | 'concluido' 
-  | 'cancelado' 
-  | 'erro';
+type IAStatus =
+  | "idle"
+  | "interpretando"
+  | "pesquisando"
+  | "aguardando_informacao"
+  | "validando"
+  | "aguardando_confirmacao"
+  | "executando"
+  | "verificando"
+  | "concluido"
+  | "cancelado"
+  | "erro";
 
 interface AssistenteIaSidebarProps {
   isOpen: boolean;
@@ -104,35 +98,37 @@ interface AssistenteIaSidebarProps {
 
 export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProps) {
   const [messages, setMessages] = useState<IAMessage[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>('idle');
+  const [inputText, setInputText] = useState("");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>("idle");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [iaStatus, setIaStatus] = useState<IAStatus>('idle');
+  const [iaStatus, setIaStatus] = useState<IAStatus>("idle");
   const [currentIntent, setCurrentIntent] = useState<IAIntent | null>(null);
-  const [selectedEntity, setSelectedEntity] = useState<any>(null); 
-  const [searchResults, setSearchResults] = useState<{clientes: any[], pets: any[]} | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<{ clientes: any[]; pets: any[] } | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [analiseResult, setAnaliseResult] = useState<any>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      setMessages([{
-        role: 'assistant',
-        content: `Olá! Sou a Assistente Operacional e Estratégica do Spa de Pet Tia Jéssica. Como posso ajudar você na gestão do Pet Shop agora?`,
-        timestamp: new Date().toISOString()
-      }]);
+      setMessages([
+        {
+          role: "assistant",
+          content: `Olá! Sou a Assistente Operacional e Estratégica do Spa de Pet Tia Jéssica. Como posso ajudar você na gestão do Pet Shop agora?`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     }
   }, [isOpen]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !recognizerRef.current) {
+    if (typeof window !== "undefined" && !recognizerRef.current) {
       recognizerRef.current = new VoiceRecognizer({
         onResult: (text) => {
           setInputText(text);
@@ -145,19 +141,19 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         onError: (err) => {
           console.error("Erro de reconhecimento de voz:", err);
           // Não mostrar toast de erro toda hora para não incomodar, mas logar
-          setVoiceStatus('error');
+          setVoiceStatus("error");
           // Tentar reiniciar após 2 segundos se falhar
           setTimeout(() => {
-            if (voiceStatus === 'error') setVoiceStatus('idle');
+            if (voiceStatus === "error") setVoiceStatus("idle");
           }, 2000);
-        }
+        },
       });
     }
   }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const scrollContainer = scrollRef.current.querySelector("[data-radix-scroll-area-viewport]");
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
@@ -175,81 +171,88 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       return;
     }
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     if (!allowedTypes.includes(file.type)) {
       toast.error("Formato não suportado. Use JPG, PNG, WEBP ou PDF.");
       return;
     }
 
     setSelectedFile(file);
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = (prev) => setFilePreview(prev.target?.result as string);
       reader.readAsDataURL(file);
     } else {
-      setFilePreview('pdf');
+      setFilePreview("pdf");
     }
   };
 
   const handleAnalizarComprovante = async () => {
     if (!selectedFile || !filePreview) return;
-    
+
     setIsProcessing(true);
-    setMessages(prev => [...prev, {
-      role: 'user',
-      content: `[Arquivo: ${selectedFile.name}] Analisar este comprovante.`,
-      timestamp: new Date().toISOString()
-    }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: `[Arquivo: ${selectedFile.name}] Analisar este comprovante.`,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
 
     try {
       // 1. Converter para Base64 para análise (IA Vision)
       let base64 = "";
-      if (selectedFile.type.startsWith('image/')) {
-        base64 = filePreview.split(',')[1];
+      if (selectedFile.type.startsWith("image/")) {
+        base64 = filePreview.split(",")[1];
       } else {
         // PDF handling would go here - for now let's assume image
         const reader = new FileReader();
         base64 = await new Promise((resolve) => {
-          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
           reader.readAsDataURL(selectedFile);
         });
       }
 
       const res = await processarComprovanteIA({
-        data: { imagemBase64: base64, contentType: selectedFile.type }
+        data: { imagemBase64: base64, contentType: selectedFile.type },
       });
 
       if (res.sucesso) {
         setAnaliseResult(res);
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `Li o comprovante! Aqui estão os dados identificados:\n\n` +
-                   `- **Valor**: R$ ${res.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-                   `- **Data**: ${res.data}\n` +
-                   `- **Pagador**: ${res.pagador}\n` +
-                   `- **Instituição**: ${res.instituicao}\n` +
-                   (res.id_transacao ? `- **ID Transação**: \`${res.id_transacao}\`\n` : '') +
-                   `\nEstou procurando a pendência correspondente...`,
-          timestamp: new Date().toISOString()
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              `Li o comprovante! Aqui estão os dados identificados:\n\n` +
+              `- **Valor**: R$ ${res.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Data**: ${res.data}\n` +
+              `- **Pagador**: ${res.pagador}\n` +
+              `- **Instituição**: ${res.instituicao}\n` +
+              (res.id_transacao ? `- **ID Transação**: \`${res.id_transacao}\`\n` : "") +
+              `\nEstou procurando a pendência correspondente...`,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
 
         // 2. Upload para Storage Privado
-        const fileExt = selectedFile.name.split('.').pop();
+        const fileExt = selectedFile.name.split(".").pop();
         const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        
+
         const { error: uploadError } = await supabase.storage
-          .from('comprovantes')
+          .from("comprovantes")
           .upload(filePath, selectedFile);
-          
+
         if (uploadError) throw uploadError;
 
         // 3. Buscar pendências automáticas
         const response = await consultarFinanceiroIA({
-          data: { termo: res.pagador, apenas_pendentes: true }
+          data: { termo: res.pagador, apenas_pendentes: true },
         });
 
         const searchResList = (response.data || []) as any[];
-        
+
         // Regra de Correspondência: Valor exato
         const pendenciasValorExato = searchResList?.filter((p: any) => {
           const saldo = Number(p.valor_total) - Number(p.valor_pago || 0);
@@ -258,54 +261,66 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
         if (pendenciasValorExato && pendenciasValorExato.length === 1) {
           const p = pendenciasValorExato[0];
-          const petNome = p.atendimentos?.pets?.nome || 'Pet';
+          const petNome = p.atendimentos?.pets?.nome || "Pet";
           const saldoAnterior = Number(p.valor_total) - Number(p.valor_pago || 0);
           const saldoPosterior = Math.max(0, saldoAnterior - res.valor);
 
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `Encontrei uma pendência exata para **${petNome}**!\n\n` +
-                     `- **Saldo Anterior**: R$ ${saldoAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-                     `- **Valor Comprovante**: R$ ${res.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-                     `- **Saldo Posterior**: R$ ${saldoPosterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
-                     `Deseja confirmar a baixa agora?`,
-            intent: {
-              intencao: 'confirmar_baixa',
-              valor: res.valor,
-              forma_pagamento: 'pix',
-              observacoes: `Baixa via comprovante IA (ID: ${res.id_transacao || 'N/A'})`,
-              nivel_confianca: 1
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content:
+                `Encontrei uma pendência exata para **${petNome}**!\n\n` +
+                `- **Saldo Anterior**: R$ ${saldoAnterior.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+                `- **Valor Comprovante**: R$ ${res.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+                `- **Saldo Posterior**: R$ ${saldoPosterior.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n` +
+                `Deseja confirmar a baixa agora?`,
+              intent: {
+                intencao: "confirmar_baixa",
+                valor: res.valor,
+                forma_pagamento: "pix",
+                observacoes: `Baixa via comprovante IA (ID: ${res.id_transacao || "N/A"})`,
+                nivel_confianca: 1,
+              } as any,
+              timestamp: new Date().toISOString(),
+              meta: {
+                pagamento_id: p.id,
+                comprovante_path: filePath,
+                id_transacao: res.id_transacao,
+              },
             } as any,
-            timestamp: new Date().toISOString(),
-            meta: { 
-              pagamento_id: p.id, 
-              comprovante_path: filePath, 
-              id_transacao: res.id_transacao 
-            }
-          } as any]);
+          ]);
         } else if (pendenciasValorExato && pendenciasValorExato.length > 1) {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `Encontrei **${pendenciasValorExato.length} pendências** com o mesmo valor para este pagador. Qual delas você deseja baixar?`,
-            timestamp: new Date().toISOString()
-          }]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `Encontrei **${pendenciasValorExato.length} pendências** com o mesmo valor para este pagador. Qual delas você deseja baixar?`,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
           // Aqui poderíamos exibir uma lista para seleção
         } else {
           // Tentar busca por valor parcial ou simplesmente informar que não achou
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `Não encontrei uma pendência automática de valor exato (R$ ${res.valor.toFixed(2)}) para "${res.pagador}".\n\nPor favor, selecione o atendimento manualmente ou verifique se o valor está correto.`,
-            timestamp: new Date().toISOString()
-          }]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `Não encontrei uma pendência automática de valor exato (R$ ${res.valor.toFixed(2)}) para "${res.pagador}".\n\nPor favor, selecione o atendimento manualmente ou verifique se o valor está correto.`,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
         }
       } else {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ **Erro na análise**: ${res.mensagem || "Não consegui ler o comprovante."}`,
-          timestamp: new Date().toISOString()
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `❌ **Erro na análise**: ${res.mensagem || "Não consegui ler o comprovante."}`,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
       }
-
     } catch (error) {
       console.error(error);
       toast.error("Erro ao processar comprovante.");
@@ -320,79 +335,98 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     if (!text.trim()) return;
 
     const userMessage: IAMessage = {
-      role: 'user',
+      role: "user",
       content: text,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
+    setMessages((prev) => [...prev, userMessage]);
+    setInputText("");
     setIsProcessing(true);
 
     try {
-      setIaStatus('interpretando');
+      setIaStatus("interpretando");
       const intent = await classificarIntencao({
         data: {
           texto: text,
           contexto: {
-            mensagens: messages.slice(-5).map(m => ({ role: m.role, content: m.content })),
-            data_atual: new Date().toISOString()
-          }
-        }
+            mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
+            data_atual: new Date().toISOString(),
+          },
+        },
       });
 
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Processando...";
       const startTime = Date.now();
       setSearchResults(null);
-      
+
       if (intent.informacoes_faltantes && intent.informacoes_faltantes.length > 0) {
-        setIaStatus('aguardando_informacao');
+        setIaStatus("aguardando_informacao");
       }
 
       // Especialista: Comunicação & Reativação (Parte 8)
-      if (intent.especialista === 'comunicacao') {
-        setIaStatus('pesquisando');
-        if (intent.intencao === 'consultar_mensagens') {
-          const res = await consultarMensagensIA({ 
-            data: { cliente_id: intent.parametros?.cliente_id } 
+      if (intent.especialista === "comunicacao") {
+        setIaStatus("pesquisando");
+        if (intent.intencao === "consultar_mensagens") {
+          const res = await consultarMensagensIA({
+            data: { cliente_id: intent.parametros?.cliente_id },
           });
           dadosReais = res.data;
-          respostaFinal = `### 💬 Mensagens Recentes\n\n` +
-            (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), 'dd/MM HH:mm')}] **${m.clientes?.nome || 'Sistema'}**: ${m.mensagem}`).join('\n');
-        } else if (intent.intencao === 'consultar_aniversariantes') {
+          respostaFinal =
+            `### 💬 Mensagens Recentes\n\n` +
+            (dadosReais as any[])
+              .map(
+                (m: any) =>
+                  `- [${format(parseISO(m.created_at), "dd/MM HH:mm")}] **${m.clientes?.nome || "Sistema"}**: ${m.mensagem}`,
+              )
+              .join("\n");
+        } else if (intent.intencao === "consultar_aniversariantes") {
           const res = await identificarAniversariantesIA();
           dadosReais = res.data;
           if ((dadosReais as any[]).length > 0) {
-            respostaFinal = `### 🎂 Aniversariantes de Hoje!\n\n` +
-              (dadosReais as any[]).map((p: any) => `- **${p.nome}** (${p.raca}) - Tutor: ${p.clientes?.nome}`).join('\n');
+            respostaFinal =
+              `### 🎂 Aniversariantes de Hoje!\n\n` +
+              (dadosReais as any[])
+                .map((p: any) => `- **${p.nome}** (${p.raca}) - Tutor: ${p.clientes?.nome}`)
+                .join("\n");
           } else {
             respostaFinal = "Não encontrei aniversariantes para hoje.";
           }
-        } else if (intent.intencao === 'analisar_reativacao') {
+        } else if (intent.intencao === "analisar_reativacao") {
           const res = await analisarReativacaoIA();
           dadosReais = res.data;
-          respostaFinal = `### 🔄 Risco de Evasão (Reativação)\n\n` +
-            (dadosReais as any[]).map((c: any) => `- **${c.nome}** (${c.dias_inatividade} dias sem vir) - ${c.justificativa}`).join('\n');
+          respostaFinal =
+            `### 🔄 Risco de Evasão (Reativação)\n\n` +
+            (dadosReais as any[])
+              .map(
+                (c: any) =>
+                  `- **${c.nome}** (${c.dias_inatividade} dias sem vir) - ${c.justificativa}`,
+              )
+              .join("\n");
         }
       }
 
       // Especialista: Auditoria & Gestão (Parte 10)
-      if (intent.especialista === 'gestao_estrategica' || intent.especialista === 'relatorios') {
-        setIaStatus('pesquisando');
-        if (intent.intencao === 'resumo_negocio') {
+      if (intent.especialista === "gestao_estrategica" || intent.especialista === "relatorios") {
+        setIaStatus("pesquisando");
+        if (intent.intencao === "resumo_negocio") {
           const res = await getResumoProprietarioIA();
           dadosReais = res;
-          respostaFinal = `### 📊 Resumo do Negócio (Visão Proprietário)\n\n` +
+          respostaFinal =
+            `### 📊 Resumo do Negócio (Visão Proprietário)\n\n` +
             `- **Agenda**: ${res.agenda.hoje} atendimentos hoje.\n` +
             `- **Financeiro**: ${res.financeiro.pendencias} pendências em aberto.\n` +
             `- **Estoque**: ${res.estoque.itens_criticos} itens precisando de atenção.\n\n` +
-            (res.urgencias.length > 0 ? `⚠️ **Urgências**: ${res.urgencias.join(', ')}\n` : '') +
-            (res.oportunidades.length > 0 ? `💡 **Oportunidades**: ${res.oportunidades.join(', ')}` : '');
-        } else if (intent.intencao === 'consultar_qualidade_ia') {
+            (res.urgencias.length > 0 ? `⚠️ **Urgências**: ${res.urgencias.join(", ")}\n` : "") +
+            (res.oportunidades.length > 0
+              ? `💡 **Oportunidades**: ${res.oportunidades.join(", ")}`
+              : "");
+        } else if (intent.intencao === "consultar_qualidade_ia") {
           const res = await getQualidadeIA();
           dadosReais = res;
-          respostaFinal = `### 🛠️ Painel de Qualidade da IA\n\n` +
+          respostaFinal =
+            `### 🛠️ Painel de Qualidade da IA\n\n` +
             `- **Comandos Processados**: ${res.total_comandos}\n` +
             `- **Taxa de Sucesso**: ${res.taxa_sucesso.toFixed(1)}%\n` +
             `- **Tempo Médio**: ${res.tempo_medio_ms.toFixed(0)}ms`;
@@ -400,43 +434,60 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       }
 
       // Especialista: Estoque & Compras (Parte 9)
-      if (intent.especialista === 'estoque_compras') {
-        setIaStatus('pesquisando');
-        if (intent.intencao === 'consulta_estoque') {
-          const res = await getEstoqueIA({ 
-            data: { 
+      if (intent.especialista === "estoque_compras") {
+        setIaStatus("pesquisando");
+        if (intent.intencao === "consulta_estoque") {
+          const res = await getEstoqueIA({
+            data: {
               termo: intent.parametros?.termo,
-              apenasBaixo: intent.parametros?.baixo_estoque 
-            } 
+              apenasBaixo: intent.parametros?.baixo_estoque,
+            },
           });
           dadosReais = res;
           if ((res as any[]).length > 0) {
-            respostaFinal = `### 📦 Saldo de Estoque\n\n` +
-              (res as any[]).map((p: any) => `- **${p.nome}**: ${p.quantidade} ${p.unidade || ''} (Mín: ${p.estoque_minimo || 0})`).join('\n');
+            respostaFinal =
+              `### 📦 Saldo de Estoque\n\n` +
+              (res as any[])
+                .map(
+                  (p: any) =>
+                    `- **${p.nome}**: ${p.quantidade} ${p.unidade || ""} (Mín: ${p.estoque_minimo || 0})`,
+                )
+                .join("\n");
           } else {
             respostaFinal = "Nenhum produto encontrado com esses critérios.";
           }
-        } else if (intent.intencao === 'sugerir_reposicao') {
+        } else if (intent.intencao === "sugerir_reposicao") {
           const res = await getSugestoesCompraIA();
           dadosReais = res;
-          respostaFinal = `### 🛒 Sugestões de Reposição\n\n` +
-            (res as any[]).map((s: any) => `- **${s.nome}**: Sugerido comprar **${s.sugestao}** (Saldo: ${s.saldo}, Prioridade: ${s.prioridade})`).join('\n');
-        } else if (intent.intencao === 'detectar_anomalias_estoque') {
+          respostaFinal =
+            `### 🛒 Sugestões de Reposição\n\n` +
+            (res as any[])
+              .map(
+                (s: any) =>
+                  `- **${s.nome}**: Sugerido comprar **${s.sugestao}** (Saldo: ${s.saldo}, Prioridade: ${s.prioridade})`,
+              )
+              .join("\n");
+        } else if (intent.intencao === "detectar_anomalias_estoque") {
           const res = await getAnomaliasEstoqueIA();
           dadosReais = res;
           if ((res as any[]).length > 0) {
-            respostaFinal = `### ⚠️ Anomalias Detectadas\n\n` +
-              (res as any[]).map((a: any) => `- **${a.tipo}**: ${a.produto} - ${a.detalhe}`).join('\n');
+            respostaFinal =
+              `### ⚠️ Anomalias Detectadas\n\n` +
+              (res as any[])
+                .map((a: any) => `- **${a.tipo}**: ${a.produto} - ${a.detalhe}`)
+                .join("\n");
           } else {
             respostaFinal = "Não detectei anomalias no estoque no momento.";
           }
         }
       }
 
-
-
-      if (intent.intencao === 'consulta_agenda' || intent.intencao === 'listar_atendimentos' || intent.intencao === 'contar_atendimentos') {
-        setIaStatus('pesquisando');
+      if (
+        intent.intencao === "consulta_agenda" ||
+        intent.intencao === "listar_atendimentos" ||
+        intent.intencao === "contar_atendimentos"
+      ) {
+        setIaStatus("pesquisando");
         const params = intent.parametros || {};
         const response = await consultarAgendaIA({
           data: {
@@ -447,26 +498,27 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             pet_nome: params.pet_nome || undefined,
             cliente_nome: params.cliente_nome || undefined,
             servico_nome: params.servico_nome || undefined,
-            leva_e_traz: params.leva_e_traz
-          }
+            leva_e_traz: params.leva_e_traz,
+          },
         });
-        
+
         dadosReais = response.data || [];
         const count = dadosReais.length;
-        
-        if (intent.intencao === 'contar_atendimentos') {
+
+        if (intent.intencao === "contar_atendimentos") {
           const stats = {
             total: dadosReais.length,
-            confirmados: dadosReais.filter((a: any) => a.status === 'confirmado').length,
-            em_atendimento: dadosReais.filter((a: any) => a.status === 'em_atendimento').length,
-            finalizados: dadosReais.filter((a: any) => a.status === 'finalizado').length,
-            agendados: dadosReais.filter((a: any) => a.status === 'agendado').length,
-            aguardando: dadosReais.filter((a: any) => a.status === 'aguardando').length,
-            cancelados: dadosReais.filter((a: any) => a.status === 'cancelado').length,
-            faltas: dadosReais.filter((a: any) => a.status === 'falta').length,
+            confirmados: dadosReais.filter((a: any) => a.status === "confirmado").length,
+            em_atendimento: dadosReais.filter((a: any) => a.status === "em_atendimento").length,
+            finalizados: dadosReais.filter((a: any) => a.status === "finalizado").length,
+            agendados: dadosReais.filter((a: any) => a.status === "agendado").length,
+            aguardando: dadosReais.filter((a: any) => a.status === "aguardando").length,
+            cancelados: dadosReais.filter((a: any) => a.status === "cancelado").length,
+            faltas: dadosReais.filter((a: any) => a.status === "falta").length,
           };
 
-          respostaFinal = `Hoje existem **${stats.total} atendimentos** agendados:\n\n` +
+          respostaFinal =
+            `Hoje existem **${stats.total} atendimentos** agendados:\n\n` +
             `- ✅ **Confirmados**: ${stats.confirmados}\n` +
             `- ⏳ **Agendados**: ${stats.agendados}\n` +
             `- ⏳ **Aguardando Confirmação**: ${stats.aguardando}\n` +
@@ -474,81 +526,110 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             `- ✨ **Finalizados**: ${stats.finalizados}\n` +
             `- ❌ **Cancelados/Faltas**: ${stats.cancelados + stats.faltas}`;
         } else if (dadosReais.length > 0) {
-          const dataFormatada = (intent.parametros as any)?.data ? format(parseISO((intent.parametros as any).data), 'dd/MM') : 'hoje';
-          respostaFinal = `### 📅 Agenda de ${dataFormatada} (${dadosReais.length})\n\n` +
+          const dataFormatada = (intent.parametros as any)?.data
+            ? format(parseISO((intent.parametros as any).data), "dd/MM")
+            : "hoje";
+          respostaFinal =
+            `### 📅 Agenda de ${dataFormatada} (${dadosReais.length})\n\n` +
             `| Horário | Pet | Serviço | Status |\n` +
             `| :--- | :--- | :--- | :--- |\n` +
-            dadosReais.slice(0, 20).map((a: any) => 
-              `| ${a.hora.slice(0, 5)} | **${a.pets?.nome}** | ${a.servicos?.nome || 'Serviço'} | ${a.status === 'confirmado' ? '✅' : '⏳'} ${a.status} |`
-            ).join('\n');
-          
+            dadosReais
+              .slice(0, 20)
+              .map(
+                (a: any) =>
+                  `| ${a.hora.slice(0, 5)} | **${a.pets?.nome}** | ${a.servicos?.nome || "Serviço"} | ${a.status === "confirmado" ? "✅" : "⏳"} ${a.status} |`,
+              )
+              .join("\n");
+
           if (dadosReais.length > 20) {
             respostaFinal += `\n\n*Exibindo os primeiros 20 de ${dadosReais.length} agendamentos.*`;
           }
         } else {
           respostaFinal = "Não existem agendamentos para o critério solicitado.";
         }
-
-      } else if (intent.intencao === 'consulta_cliente' || intent.intencao === 'consulta_pet' || (['criar_agendamento', 'remarcar_agendamento', 'cancelar_agendamento'].includes(intent.intencao) && !selectedEntity)) {
-        setIaStatus('pesquisando');
+      } else if (
+        intent.intencao === "consulta_cliente" ||
+        intent.intencao === "consulta_pet" ||
+        (["criar_agendamento", "remarcar_agendamento", "cancelar_agendamento"].includes(
+          intent.intencao,
+        ) &&
+          !selectedEntity)
+      ) {
+        setIaStatus("pesquisando");
         const params = intent.parametros || {};
         const termo = params.cliente_nome || params.pet_nome || text;
         const response = await buscarClientesIA({ data: { termo } });
         const results = { clientes: (response.data || []) as any[], pets: [] as any[] };
         setSearchResults(results);
-        
+
         if (results.clientes.length > 0) {
           // Se houver mais de um resultado ou se for uma busca ambígua
           if (results.clientes.length > 1) {
-            setIaStatus('aguardando_confirmacao');
-            respostaFinal = `Encontrei **${results.clientes.length} clientes** similares. Por favor, selecione qual você deseja consultar:\n\n` +
-              results.clientes.map((c, i) => `${i + 1}. **${c.nome}** - ${c.pets?.map((p: any) => p.nome).join(', ') || 'Sem pets'} (${c.telefone || 'Sem tel'})`).join('\n');
+            setIaStatus("aguardando_confirmacao");
+            respostaFinal =
+              `Encontrei **${results.clientes.length} clientes** similares. Por favor, selecione qual você deseja consultar:\n\n` +
+              results.clientes
+                .map(
+                  (c, i) =>
+                    `${i + 1}. **${c.nome}** - ${c.pets?.map((p: any) => p.nome).join(", ") || "Sem pets"} (${c.telefone || "Sem tel"})`,
+                )
+                .join("\n");
           } else {
             // Apenas 1 cliente encontrado
             const c = results.clientes[0];
-            setSelectedEntity({ type: 'cliente', data: c });
-            setIaStatus('pesquisando');
-            
+            setSelectedEntity({ type: "cliente", data: c });
+            setIaStatus("pesquisando");
+
             // Buscar Visão 360° automaticamente
             const v360 = await consultarVisao360ClienteIA({ data: { cliente_id: c.id } });
             const d360 = v360.data;
-            
-            respostaFinal = `### 👤 Visão 360°: ${c.nome}\n\n` +
-              `**Pets:** ${c.pets?.map((p: any) => p.nome).join(', ') || 'Nenhum'}\n` +
-              `**Gastos Totais:** R$ ${d360.metricas.total_gasto.toLocaleString('pt-BR')}\n` +
-              `**Pendências:** ${d360.metricas.pendencias_financeiras > 0 ? `⚠️ ${d360.metricas.pendencias_financeiras} pendente(s)` : '✅ Tudo em dia'}\n\n` +
-              (d360.historico.ultimo ? `*Última Visita:* ${format(parseISO(d360.historico.ultimo.data), 'dd/MM/yy')} (${d360.historico.ultimo.servicos?.nome})\n` : '') +
-              (d360.historico.proximo ? `*Próximo Agendamento:* **${format(parseISO(d360.historico.proximo.data), 'dd/MM/yy')} às ${d360.historico.proximo.hora.slice(0,5)}**\n` : '\n*Sugestão:* Agendar um retorno?') +
+
+            respostaFinal =
+              `### 👤 Visão 360°: ${c.nome}\n\n` +
+              `**Pets:** ${c.pets?.map((p: any) => p.nome).join(", ") || "Nenhum"}\n` +
+              `**Gastos Totais:** R$ ${d360.metricas.total_gasto.toLocaleString("pt-BR")}\n` +
+              `**Pendências:** ${d360.metricas.pendencias_financeiras > 0 ? `⚠️ ${d360.metricas.pendencias_financeiras} pendente(s)` : "✅ Tudo em dia"}\n\n` +
+              (d360.historico.ultimo
+                ? `*Última Visita:* ${format(parseISO(d360.historico.ultimo.data), "dd/MM/yy")} (${d360.historico.ultimo.servicos?.nome})\n`
+                : "") +
+              (d360.historico.proximo
+                ? `*Próximo Agendamento:* **${format(parseISO(d360.historico.proximo.data), "dd/MM/yy")} às ${d360.historico.proximo.hora.slice(0, 5)}**\n`
+                : "\n*Sugestão:* Agendar um retorno?") +
               `\n\nO que deseja fazer agora?`;
           }
         } else {
           respostaFinal = `Não encontrei nenhum cliente ou pet com o termo "${termo}". Deseja tentar buscar por outro nome ou telefone?`;
         }
-      } else if (intent.intencao === 'consulta_financeira' || intent.intencao === 'consultar_resumo_financeiro' || intent.intencao === 'consultar_pendencias') {
-        setIaStatus('pesquisando');
+      } else if (
+        intent.intencao === "consulta_financeira" ||
+        intent.intencao === "consultar_resumo_financeiro" ||
+        intent.intencao === "consultar_pendencias"
+      ) {
+        setIaStatus("pesquisando");
         const params = (intent.parametros as any) || {};
         const response = await consultarFinanceiroIA({
-          data: { 
-            apenas_pendentes: intent.intencao === 'consultar_pendencias',
+          data: {
+            apenas_pendentes: intent.intencao === "consultar_pendencias",
             termo: params.cliente_nome || params.termo || undefined,
             period: (params.period || params.status || params.data) as any,
             periodo_inicio: params.periodo_inicio || undefined,
-            periodo_fim: params.periodo_fim || undefined
-          }
+            periodo_fim: params.periodo_fim || undefined,
+          },
         });
-        
-        if (intent.intencao === 'consultar_resumo_financeiro') {
+
+        if (intent.intencao === "consultar_resumo_financeiro") {
           const { metricas, periodo } = response.data || {};
           if (metricas) {
-            respostaFinal = `### 💰 Resumo Financeiro (${periodo.from} a ${periodo.to})\n\n` +
-              `- **Faturamento (Competência)**: R$ ${metricas.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **Recebido (Caixa)**: R$ ${metricas.recebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **Despesas**: R$ ${metricas.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **Resultado (Lucro)**: R$ ${metricas.lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **Saldo em Caixa**: R$ ${metricas.saldoCaixa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **Ticket Médio**: R$ ${metricas.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **A Receber Total**: R$ ${metricas.aReceber.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-              `- **Vencidos**: R$ ${metricas.vencido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+            respostaFinal =
+              `### 💰 Resumo Financeiro (${periodo.from} a ${periodo.to})\n\n` +
+              `- **Faturamento (Competência)**: R$ ${metricas.faturamento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Recebido (Caixa)**: R$ ${metricas.recebido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Despesas**: R$ ${metricas.despesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Resultado (Lucro)**: R$ ${metricas.lucro.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Saldo em Caixa**: R$ ${metricas.saldoCaixa.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Ticket Médio**: R$ ${metricas.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **A Receber Total**: R$ ${metricas.aReceber.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+              `- **Vencidos**: R$ ${metricas.vencido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n` +
               `*Fonte: Financeiro Oficial.*`;
           } else {
             respostaFinal = "Não consegui extrair as métricas financeiras para este período.";
@@ -556,19 +637,23 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         } else {
           dadosReais = response.data || [];
           if (dadosReais && dadosReais.length > 0) {
-            const total = dadosReais.reduce((acc: number, p: any) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
-            respostaFinal = `Identifiquei **${dadosReais.length} registros** totalizando **R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** em aberto.`;
+            const total = dadosReais.reduce(
+              (acc: number, p: any) =>
+                acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)),
+              0,
+            );
+            respostaFinal = `Identifiquei **${dadosReais.length} registros** totalizando **R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}** em aberto.`;
           } else {
             respostaFinal = "Não encontrei registros financeiros pendentes.";
           }
         }
-
-      } else if (intent.intencao === 'solicitar_resumo_operacional') {
+      } else if (intent.intencao === "solicitar_resumo_operacional") {
         const response = await consultarResumoOperacionalIA();
         const resumo = response.data || {};
-        respostaFinal = `### 📊 Resumo Operacional (${resumo.data})\n\n` +
+        respostaFinal =
+          `### 📊 Resumo Operacional (${resumo.data})\n\n` +
           `#### 🕒 Próximo Atendimento\n` +
-          (resumo.proximo_atendimento 
+          (resumo.proximo_atendimento
             ? `**${resumo.proximo_atendimento.hora}** — **${resumo.proximo_atendimento.pet}** (${resumo.proximo_atendimento.cliente}) — ${resumo.proximo_atendimento.servico}\n\n`
             : `Nenhum agendamento futuro para hoje.\n\n`) +
           `#### 📈 Indicadores\n` +
@@ -577,71 +662,81 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           `- **Leva e Traz**: ${resumo.leva_traz} viagens\n` +
           `- **Promessas de Pagamento**: ${resumo.promessas_hoje}\n\n` +
           `#### 💰 Financeiro (Hoje)\n` +
-          `- **Faturamento**: **R$ ${resumo.faturamento_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
-          `- **Recebido**: **R$ ${resumo.recebido_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n` +
-          `- **Total Pendente (Geral)**: **R$ ${resumo.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**`;
-      } else if (intent.intencao === 'auditoria_financeira') {
+          `- **Faturamento**: **R$ ${resumo.faturamento_hoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**\n` +
+          `- **Recebido**: **R$ ${resumo.recebido_hoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**\n` +
+          `- **Total Pendente (Geral)**: **R$ ${resumo.valor_pendente.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`;
+      } else if (intent.intencao === "auditoria_financeira") {
         const response = await consultarAuditoriaDadosIA();
         const auditoria = response.data || {};
-        respostaFinal = `### 🔍 Auditoria de Dados\n\n` +
+        respostaFinal =
+          `### 🔍 Auditoria de Dados\n\n` +
           `Identifiquei **${auditoria.resumo?.alertas || 0} alertas** que precisam de atenção:\n\n` +
           `- **Atendimentos sem pagamento**: ${auditoria.atendimentos_sem_pagamento?.length || 0}\n` +
           `- **Pagamentos com valor zero**: ${auditoria.pagamentos_zerados?.length || 0}\n` +
           `- **Prováveis duplicidades**: ${auditoria.provaveis_duplicidades?.length || 0}\n\n` +
           `Deseja que eu liste os registros detalhados para correção?`;
-      } else if (intent.intencao === 'comparar_periodos_financeiros') {
+      } else if (intent.intencao === "comparar_periodos_financeiros") {
         const params = (intent.parametros as any) || {};
         const response = await compararPeriodosFinanceirosIA(params);
         const comp = response.data || {};
-        respostaFinal = `### 📈 Comparativo de Períodos\n\n` +
-          `**Período 1 (${comp.periodo_1?.from} até ${comp.periodo_1?.to}):** R$ ${comp.periodo_1?.kpis?.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-          `**Período 2 (${comp.periodo_2?.from} até ${comp.periodo_2?.to}):** R$ ${comp.periodo_2?.kpis?.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
-          `**Variação:** ${comp.variacao_faturamento > 0 ? '🚀 +' : '🔻 '}${comp.variacao_faturamento.toFixed(2)}% no faturamento.`;
-      } else if (intent.intencao === 'consultar_fila_cobranca') {
-        setIaStatus('pesquisando');
+        respostaFinal =
+          `### 📈 Comparativo de Períodos\n\n` +
+          `**Período 1 (${comp.periodo_1?.from} até ${comp.periodo_1?.to}):** R$ ${comp.periodo_1?.kpis?.faturamento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n` +
+          `**Período 2 (${comp.periodo_2?.from} até ${comp.periodo_2?.to}):** R$ ${comp.periodo_2?.kpis?.faturamento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n` +
+          `**Variação:** ${comp.variacao_faturamento > 0 ? "🚀 +" : "🔻 "}${comp.variacao_faturamento.toFixed(2)}% no faturamento.`;
+      } else if (intent.intencao === "consultar_fila_cobranca") {
+        setIaStatus("pesquisando");
         const response = await consultarFilaCobrancaIA();
         const { fila, total } = response.data || {};
-        
+
         if (fila && fila.length > 0) {
-          respostaFinal = `### ⚖️ Central de Cobrança (${total} pendências)\n\n` +
+          respostaFinal =
+            `### ⚖️ Central de Cobrança (${total} pendências)\n\n` +
             `Identifiquei os casos prioritários para contato hoje:\n\n` +
             `| Cliente | Valor | Atraso | Prioridade |\n` +
             `| :--- | :--- | :--- | :--- |\n` +
-            fila.slice(0, 5).map((f: any) => 
-              `| **${f.clientes?.nome}** | R$ ${f.valorPendente.toLocaleString('pt-BR')} | ${f.diasAtraso}d | ${f.motivo_prioridade} |`
-            ).join('\n') +
+            fila
+              .slice(0, 5)
+              .map(
+                (f: any) =>
+                  `| **${f.clientes?.nome}** | R$ ${f.valorPendente.toLocaleString("pt-BR")} | ${f.diasAtraso}d | ${f.motivo_prioridade} |`,
+              )
+              .join("\n") +
             `\n\nDeseja que eu gere as mensagens de cobrança para o primeiro da fila?`;
         } else {
-          respostaFinal = "Ótimas notícias! Não identifiquei nenhuma pendência crítica na fila de cobrança agora.";
+          respostaFinal =
+            "Ótimas notícias! Não identifiquei nenhuma pendência crítica na fila de cobrança agora.";
         }
-      } else if (intent.intencao === 'gerar_mensagens_cobranca') {
-        setIaStatus('pesquisando');
+      } else if (intent.intencao === "gerar_mensagens_cobranca") {
+        setIaStatus("pesquisando");
         const params = (intent.parametros as any) || {};
-        const response = await gerarMensagensCobrancaIA({ data: { pagamento_id: params.pagamento_id } });
+        const response = await gerarMensagensCobrancaIA({
+          data: { pagamento_id: params.pagamento_id },
+        });
         const { opcoes, cliente } = response.data || {};
-        
-        respostaFinal = `### ✉️ Sugestões de Cobrança: ${cliente}\n\n` +
+
+        respostaFinal =
+          `### ✉️ Sugestões de Cobrança: ${cliente}\n\n` +
           `**Opção 1 (Direta):**\n> ${opcoes.direta}\n\n` +
           `**Opção 2 (Firme):**\n> ${opcoes.firme}\n\n` +
           `**Opção 3 (Extra Firme):**\n> ${opcoes.extra_firme}\n\n` +
           `Qual destas você deseja enviar? Você também pode pedir para eu ajustar o texto.`;
       }
 
-
       if (intent.exige_confirmacao) {
-        setIaStatus('aguardando_confirmacao');
+        setIaStatus("aguardando_confirmacao");
       } else {
-        setIaStatus('concluido');
+        setIaStatus("concluido");
       }
 
       const assistantMessage: IAMessage = {
-        role: 'assistant',
+        role: "assistant",
         content: respostaFinal,
         intent: intent,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
       setCurrentIntent(intent);
 
       await registrarAuditoriaIA({
@@ -649,17 +744,20 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           comando_original: text,
           intencao_identificada: intent.intencao,
           dados_extraidos: { ...intent, tempo_processamento: Date.now() - startTime },
-          status: 'sucesso'
-        }
+          status: "sucesso",
+        },
       });
     } catch (error) {
-      console.error('Erro IA:', error);
-      setIaStatus('erro');
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Aconteceu um erro. Tente novamente.",
-        timestamp: new Date().toISOString()
-      }]);
+      console.error("Erro IA:", error);
+      setIaStatus("erro");
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Aconteceu um erro. Tente novamente.",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setIsProcessing(false);
     }
@@ -667,7 +765,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarAgendamento = async (intent: IAIntent) => {
     setIsProcessing(true);
-    setIaStatus('executando');
+    setIaStatus("executando");
     try {
       const params = (intent.parametros as any) || {};
       // 1. Resolver IDs
@@ -676,33 +774,51 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       let servicosIds = params.servico_ids;
 
       if (!clienteId && params.cliente_nome) {
-        const { data: cData } = await supabase.from('clientes').select('id, nome').ilike('nome', `%${params.cliente_nome}%`).limit(2);
+        const { data: cData } = await supabase
+          .from("clientes")
+          .select("id, nome")
+          .ilike("nome", `%${params.cliente_nome}%`)
+          .limit(2);
         if (cData && cData.length > 1) {
-          throw new Error(`Encontrei mais de um cliente com o nome "${params.cliente_nome}". Por favor, informe o nome completo ou telefone.`);
+          throw new Error(
+            `Encontrei mais de um cliente com o nome "${params.cliente_nome}". Por favor, informe o nome completo ou telefone.`,
+          );
         }
         clienteId = cData?.[0]?.id;
       }
-      
+
       if (!petId && params.pet_nome && clienteId) {
-        const { data: pData } = await supabase.from('pets').select('id').eq('cliente_id', clienteId).ilike('nome', `%${params.pet_nome}%`).limit(1);
+        const { data: pData } = await supabase
+          .from("pets")
+          .select("id")
+          .eq("cliente_id", clienteId)
+          .ilike("nome", `%${params.pet_nome}%`)
+          .limit(1);
         petId = pData?.[0]?.id;
       }
-      
+
       if (!clienteId) throw new Error("Cliente não localizado. Deseja cadastrá-lo?");
       if (!petId) throw new Error("Pet não localizado para este cliente.");
 
       // 2. Resolver Serviços e Valores
-      let servicosParaCriar: { id: string, nome: string, valor: number }[] = [];
-      
+      let servicosParaCriar: { id: string; nome: string; valor: number }[] = [];
+
       if (servicosIds && servicosIds.length > 0) {
-        const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('id', servicosIds);
+        const { data: sData } = await supabase
+          .from("servicos")
+          .select("id, nome, valor")
+          .in("id", servicosIds);
         servicosParaCriar = sData || [];
       } else if (params.servicos && params.servicos.length > 0) {
-        const { data: sData } = await supabase.from('servicos').select('id, nome, valor').in('nome', params.servicos);
+        const { data: sData } = await supabase
+          .from("servicos")
+          .select("id, nome, valor")
+          .in("nome", params.servicos);
         servicosParaCriar = sData || [];
       }
 
-      if (!servicosParaCriar.length) throw new Error("Não identifiquei os serviços solicitados no cadastro oficial.");
+      if (!servicosParaCriar.length)
+        throw new Error("Não identifiquei os serviços solicitados no cadastro oficial.");
 
       // 3. Re-validar disponibilidade e duplicidade real (Server-side)
       const validation = await validarAgendamentoIA({
@@ -711,8 +827,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           hora: params.horario!,
           cliente_id: clienteId,
           pet_id: petId,
-          servicos: servicosParaCriar.map(s => s.id)
-        }
+          servicos: servicosParaCriar.map((s) => s.id),
+        },
       });
 
       if (!validation.success) {
@@ -730,39 +846,48 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           transporte: params.transporte || false,
           taxa_transporte: params.taxa_transporte || 0,
           observacoes: params.observacoes || "Agendado via Agente IA",
-          duracao_min: 60 // Valor padrão
-        }
+          duracao_min: 60, // Valor padrão
+        },
       });
 
       const recordId = res.affected_record_id || res.data?.id;
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ **Agendamento confirmado com sucesso!**\n\n- **ID**: \`${recordId}\`\n- **Pet**: ${(intent.parametros as any)?.pet_nome}\n- **Data**: ${(intent.parametros as any)?.data}\n- **Hora**: ${(intent.parametros as any)?.horario}\n- **Serviços**: ${servicosParaCriar.map(s => s.nome).join(', ')}\n\nO registro já está visível na Agenda.`,
-        timestamp: new Date().toISOString(),
-        meta: { recordId }
-      } as any]);
-      
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ **Agendamento confirmado com sucesso!**\n\n- **ID**: \`${recordId}\`\n- **Pet**: ${(intent.parametros as any)?.pet_nome}\n- **Data**: ${(intent.parametros as any)?.data}\n- **Hora**: ${(intent.parametros as any)?.horario}\n- **Serviços**: ${servicosParaCriar.map((s) => s.nome).join(", ")}\n\nO registro já está visível na Agenda.`,
+          timestamp: new Date().toISOString(),
+          meta: { recordId },
+        } as any,
+      ]);
+
       setCurrentIntent(null);
-      setIaStatus('concluido');
+      setIaStatus("concluido");
       toast.success("Agendamento realizado!");
     } catch (error: any) {
-      setIaStatus('erro');
+      setIaStatus("erro");
       toast.error(error.message);
-      
+
       // Se for erro de horário ocupado, sugerir alternativas
       if (error.message.includes("indisponível") || error.message.includes("ocupado")) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ **Horário ocupado.** Deseja tentar em outro horário?`,
-          timestamp: new Date().toISOString()
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `❌ **Horário ocupado.** Deseja tentar em outro horário?`,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
       } else {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ **Não consegui concluir:** ${error.message}`,
-          timestamp: new Date().toISOString()
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `❌ **Não consegui concluir:** ${error.message}`,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
       }
     } finally {
       setIsProcessing(false);
@@ -771,23 +896,32 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarRemarcacao = async (msg: any) => {
     setIsProcessing(true);
-    setIaStatus('executando');
+    setIaStatus("executando");
     try {
       const { intent } = msg;
-      const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
+      const { data: cliente } = await supabase
+        .from("clientes")
+        .select("id")
+        .ilike("nome", `%${intent.cliente_nome}%`)
+        .maybeSingle();
       if (!cliente) throw new Error("Cliente não localizado.");
 
       // Tenta encontrar agendamento para o pet específico se informado, ou o mais próximo
       let query = supabase
-        .from('agendamentos')
-        .select('id, data, hora, pets(nome)')
-        .eq('cliente_id', cliente.id)
-        .eq('status', 'agendado')
-        .order('data', { ascending: true });
+        .from("agendamentos")
+        .select("id, data, hora, pets(nome)")
+        .eq("cliente_id", cliente.id)
+        .eq("status", "agendado")
+        .order("data", { ascending: true });
 
       if (intent.pet_nome) {
-        const { data: pet } = await supabase.from('pets').select('id').eq('cliente_id', cliente.id).ilike('nome', `%${intent.pet_nome}%`).maybeSingle();
-        if (pet) query = query.eq('pet_id', pet.id);
+        const { data: pet } = await supabase
+          .from("pets")
+          .select("id")
+          .eq("cliente_id", cliente.id)
+          .ilike("nome", `%${intent.pet_nome}%`)
+          .maybeSingle();
+        if (pet) query = query.eq("pet_id", pet.id);
       }
 
       const { data: agendamentos } = await query.limit(1);
@@ -799,16 +933,19 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         data: {
           agendamento_id: agendamento.id,
           nova_data: intent.data!,
-          nova_hora: intent.horario!
-        }
+          nova_hora: intent.horario!,
+        },
       });
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${(agendamento.pets as any)?.nome}\n- **De**: ${format(parseISO(agendamento.data), 'dd/MM')} às ${agendamento.hora.slice(0, 5)}\n- **Para**: ${intent.data} às ${intent.horario}`,
-        timestamp: new Date().toISOString()
-      }]);
-      setIaStatus('concluido');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ **Reagendamento concluído!**\n\n- **Pet**: ${(agendamento.pets as any)?.nome}\n- **De**: ${format(parseISO(agendamento.data), "dd/MM")} às ${agendamento.hora.slice(0, 5)}\n- **Para**: ${intent.data} às ${intent.horario}`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+      setIaStatus("concluido");
       toast.success("Agendamento alterado!");
     } catch (error: any) {
       toast.error(error.message);
@@ -819,22 +956,31 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarCancelamento = async (msg: any) => {
     setIsProcessing(true);
-    setIaStatus('executando');
+    setIaStatus("executando");
     try {
       const { intent } = msg;
-      const { data: cliente } = await supabase.from('clientes').select('id').ilike('nome', `%${intent.cliente_nome}%`).maybeSingle();
+      const { data: cliente } = await supabase
+        .from("clientes")
+        .select("id")
+        .ilike("nome", `%${intent.cliente_nome}%`)
+        .maybeSingle();
       if (!cliente) throw new Error("Cliente não localizado.");
 
       let query = supabase
-        .from('agendamentos')
-        .select('id, pets(nome)')
-        .eq('cliente_id', cliente.id)
-        .eq('status', 'agendado')
-        .order('data', { ascending: true });
+        .from("agendamentos")
+        .select("id, pets(nome)")
+        .eq("cliente_id", cliente.id)
+        .eq("status", "agendado")
+        .order("data", { ascending: true });
 
       if (intent.pet_nome) {
-        const { data: pet } = await supabase.from('pets').select('id').eq('cliente_id', cliente.id).ilike('nome', `%${intent.pet_nome}%`).maybeSingle();
-        if (pet) query = query.eq('pet_id', pet.id);
+        const { data: pet } = await supabase
+          .from("pets")
+          .select("id")
+          .eq("cliente_id", cliente.id)
+          .ilike("nome", `%${intent.pet_nome}%`)
+          .maybeSingle();
+        if (pet) query = query.eq("pet_id", pet.id);
       }
 
       const { data: agendamentos } = await query.limit(1);
@@ -845,16 +991,19 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       await executarCancelamento({
         data: {
           agendamento_id: agendamento.id,
-          motivo: intent.observacoes || "Cancelado via Assistente IA"
-        }
+          motivo: intent.observacoes || "Cancelado via Assistente IA",
+        },
       });
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ **Agendamento do ${(agendamento.pets as any)?.nome} cancelado com sucesso.**`,
-        timestamp: new Date().toISOString()
-      }]);
-      setIaStatus('concluido');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ **Agendamento do ${(agendamento.pets as any)?.nome} cancelado com sucesso.**`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+      setIaStatus("concluido");
       toast.success("Agendamento cancelado.");
     } catch (error: any) {
       toast.error(error.message);
@@ -865,7 +1014,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleConfirmarBaixaIA = async (msg: any) => {
     setIsProcessing(true);
-    setIaStatus('executando');
+    setIaStatus("executando");
     try {
       const { meta, intent } = msg;
       if (!meta?.pagamento_id) throw new Error("ID do pagamento não localizado no contexto.");
@@ -874,19 +1023,22 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         data: {
           pagamento_id: meta.pagamento_id,
           valor_pago: intent.valor,
-          forma: intent.forma_pagamento || 'pix',
+          forma: intent.forma_pagamento || "pix",
           comprovante_path: meta.comprovante_path,
           id_transacao: meta.id_transacao,
-          observacoes: intent.observacoes
-        }
+          observacoes: intent.observacoes,
+        },
       });
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ **Baixa realizada com sucesso!** O comprovante foi vinculado e o financeiro atualizado.`,
-        timestamp: new Date().toISOString()
-      }]);
-      setIaStatus('concluido');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ **Baixa realizada com sucesso!** O comprovante foi vinculado e o financeiro atualizado.`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+      setIaStatus("concluido");
       toast.success("Pagamento baixado!");
     } catch (error: any) {
       console.error(error);
@@ -897,7 +1049,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   };
 
   const toggleVoice = () => {
-    if (voiceStatus === 'listening') recognizerRef.current?.stop();
+    if (voiceStatus === "listening") recognizerRef.current?.stop();
     else recognizerRef.current?.start();
   };
 
@@ -905,19 +1057,19 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/20 backdrop-blur-[2px] md:bg-black/40" 
-            onClick={onClose} 
+            className="absolute inset-0 bg-black/20 backdrop-blur-[2px] md:bg-black/40"
+            onClick={onClose}
           />
-          
-          <motion.div 
-            initial={{ x: '100%' }}
+
+          <motion.div
+            initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="bg-[#F5F2EA] w-full md:w-[480px] h-full flex flex-col shadow-2xl relative z-10 border-l border-white/20"
           >
             {/* Premium Header */}
@@ -931,27 +1083,38 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                     Assistente IA
                   </h2>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === 'erro' ? 'bg-red-500' : 'bg-[#C99845]'}`} />
+                    <span
+                      className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === "erro" ? "bg-red-500" : "bg-[#C99845]"}`}
+                    />
                     <p className="text-[9px] uppercase tracking-widest font-bold text-white/60">
-                      {iaStatus === 'idle' && 'Spa Tia Jéssica • Online'}
-                      {iaStatus === 'interpretando' && 'Pensando...'}
-                      {iaStatus === 'pesquisando' && 'Consultando base de dados...'}
-                      {iaStatus === 'aguardando_informacao' && 'Aguardando detalhes...'}
-                      {iaStatus === 'validando' && 'Validando dados...'}
-                      {iaStatus === 'aguardando_confirmacao' && 'Aguardando sua confirmação...'}
-                      {iaStatus === 'executando' && 'Executando operação real...'}
-                      {iaStatus === 'verificando' && 'Verificando resultado...'}
-                      {iaStatus === 'concluido' && 'Operação concluída'}
-                      {iaStatus === 'erro' && 'Ocorreu um erro'}
+                      {iaStatus === "idle" && "Spa Tia Jéssica • Online"}
+                      {iaStatus === "interpretando" && "Pensando..."}
+                      {iaStatus === "pesquisando" && "Consultando base de dados..."}
+                      {iaStatus === "aguardando_informacao" && "Aguardando detalhes..."}
+                      {iaStatus === "validando" && "Validando dados..."}
+                      {iaStatus === "aguardando_confirmacao" && "Aguardando sua confirmação..."}
+                      {iaStatus === "executando" && "Executando operação real..."}
+                      {iaStatus === "verificando" && "Verificando resultado..."}
+                      {iaStatus === "concluido" && "Operação concluída"}
+                      {iaStatus === "erro" && "Ocorreu um erro"}
                     </p>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 hidden md:flex">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white/70 hover:text-white hover:bg-white/10 hidden md:flex"
+                >
                   <Minus className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="text-white/70 hover:text-white hover:bg-white/10"
+                >
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -961,27 +1124,34 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             <ScrollArea className="flex-1 p-6" ref={scrollRef}>
               <div className="space-y-6 max-w-full mx-auto">
                 {messages.map((msg, i) => (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    key={i} 
-                    className={cn("flex w-full", msg.role === 'user' ? 'justify-end' : 'justify-start')}
+                    key={i}
+                    className={cn(
+                      "flex w-full",
+                      msg.role === "user" ? "justify-end" : "justify-start",
+                    )}
                   >
-                    <div className={cn(
-                      "group relative max-w-[85%] rounded-2xl px-5 py-4 shadow-sm",
-                      msg.role === 'user' 
-                        ? 'bg-[#C99845] text-white rounded-tr-none' 
-                        : 'bg-white text-[#123F2A] border border-[#C99845]/10 rounded-tl-none shadow-black/5'
-                    )}>
-                      <div className={cn(
-                        "text-[14px] leading-relaxed prose prose-sm max-w-none",
-                        msg.role === 'user' ? 'prose-invert text-white' : 'text-[#123F2A]'
-                      )}>
+                    <div
+                      className={cn(
+                        "group relative max-w-[85%] rounded-2xl px-5 py-4 shadow-sm",
+                        msg.role === "user"
+                          ? "bg-[#C99845] text-white rounded-tr-none"
+                          : "bg-white text-[#123F2A] border border-[#C99845]/10 rounded-tl-none shadow-black/5",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "text-[14px] leading-relaxed prose prose-sm max-w-none",
+                          msg.role === "user" ? "prose-invert text-white" : "text-[#123F2A]",
+                        )}
+                      >
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
 
                       {/* Search Results */}
-                      {msg.role === 'assistant' && i === messages.length - 1 && searchResults && (
+                      {msg.role === "assistant" && i === messages.length - 1 && searchResults && (
                         <div className="mt-4 grid grid-cols-1 gap-2 border-t border-[#C99845]/10 pt-4">
                           {searchResults.clientes.map((c: any) => (
                             <button
@@ -993,7 +1163,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                 <User className="w-4 h-4 text-[#C99845]" />
                                 <span className="text-sm font-bold">{c.nome}</span>
                               </div>
-                              <Badge variant="outline" className="text-[9px] border-[#C99845]/30 text-[#C99845]">CLIENTE</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] border-[#C99845]/30 text-[#C99845]"
+                              >
+                                CLIENTE
+                              </Badge>
                             </button>
                           ))}
                           {searchResults.pets.map((p: any) => (
@@ -1006,7 +1181,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                 <Dog className="w-4 h-4 text-[#C99845]" />
                                 <span className="text-sm font-bold">{p.nome}</span>
                               </div>
-                              <Badge variant="outline" className="text-[9px] border-[#C99845]/30 text-[#C99845]">PET</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] border-[#C99845]/30 text-[#C99845]"
+                              >
+                                PET
+                              </Badge>
                             </button>
                           ))}
                         </div>
@@ -1015,61 +1195,88 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                       {/* Intent Actions */}
                       {msg.intent && i === messages.length - 1 && (
                         <div className="mt-4 pt-4 border-t border-current/10 flex flex-wrap gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className={cn("h-8 text-[11px] font-bold rounded-lg px-3", msg.role === 'user' ? 'text-white hover:bg-white/10' : 'text-[#C99845] hover:bg-[#C99845]/5')}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={cn(
+                              "h-8 text-[11px] font-bold rounded-lg px-3",
+                              msg.role === "user"
+                                ? "text-white hover:bg-white/10"
+                                : "text-[#C99845] hover:bg-[#C99845]/5",
+                            )}
                             onClick={() => {
-                              if (msg.intent?.intencao?.includes('agenda')) window.open('/agenda', '_blank');
-                              else if (msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia')) window.open('/financeiro', '_blank');
-                              else if (msg.intent?.intencao === 'solicitar_resumo_operacional') window.open('/dashboard', '_blank');
-                              else window.open('/dashboard', '_blank');
+                              if (msg.intent?.intencao?.includes("agenda"))
+                                window.open("/agenda", "_blank");
+                              else if (
+                                msg.intent?.intencao?.includes("financeiro") ||
+                                msg.intent?.intencao?.includes("pendencia")
+                              )
+                                window.open("/financeiro", "_blank");
+                              else if (msg.intent?.intencao === "solicitar_resumo_operacional")
+                                window.open("/dashboard", "_blank");
+                              else window.open("/dashboard", "_blank");
                             }}
                           >
-                            <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 
-                            {msg.intent?.intencao?.includes('agenda') ? 'Abrir Agenda' : 
-                             msg.intent?.intencao?.includes('financeiro') || msg.intent?.intencao?.includes('pendencia') ? 'Abrir Financeiro' : 
-                             msg.intent?.intencao === 'solicitar_resumo_operacional' ? 'Abrir Dashboard' : 'Abrir Sistema'}
+                            <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                            {msg.intent?.intencao?.includes("agenda")
+                              ? "Abrir Agenda"
+                              : msg.intent?.intencao?.includes("financeiro") ||
+                                  msg.intent?.intencao?.includes("pendencia")
+                                ? "Abrir Financeiro"
+                                : msg.intent?.intencao === "solicitar_resumo_operacional"
+                                  ? "Abrir Dashboard"
+                                  : "Abrir Sistema"}
                           </Button>
-                          
-                          {msg.intent.intencao === 'consulta_cliente' && searchResults?.clientes && searchResults.clientes.length > 0 && (
-                             <Button 
-                               size="sm" 
-                               className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                               onClick={() => window.open(`/clientes?id=${searchResults.clientes[0].id}`, '_blank')}
-                             >
-                               <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes do Cliente
-                             </Button>
-                          )}
 
-                          {msg.intent.intencao === 'consulta_cliente' && (!searchResults?.clientes || searchResults.clientes.length === 0) && (
-                            <Button 
-                              size="sm" 
-                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                              onClick={() => window.open('/clientes?novo=true', '_blank')}
-                            >
-                              <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
-                            </Button>
-                          )}
+                          {msg.intent.intencao === "consulta_cliente" &&
+                            searchResults?.clientes &&
+                            searchResults.clientes.length > 0 && (
+                              <Button
+                                size="sm"
+                                className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                                onClick={() =>
+                                  window.open(
+                                    `/clientes?id=${searchResults.clientes[0].id}`,
+                                    "_blank",
+                                  )
+                                }
+                              >
+                                <User className="w-3.5 h-3.5 mr-1.5" /> Ver Detalhes do Cliente
+                              </Button>
+                            )}
 
-                          {msg.intent.intencao === 'comando_nao_reconhecido' && msg.content.includes('não cadastrado') && (
-                            <Button 
-                              size="sm" 
-                              className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
-                              onClick={() => window.open('/clientes?novo=true', '_blank')}
-                            >
-                              <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
-                            </Button>
-                          )}
-                          
-                          {['criar_agendamento', 'remarcar_agendamento'].includes(msg.intent.intencao) && (
+                          {msg.intent.intencao === "consulta_cliente" &&
+                            (!searchResults?.clientes || searchResults.clientes.length === 0) && (
+                              <Button
+                                size="sm"
+                                className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                                onClick={() => window.open("/clientes?novo=true", "_blank")}
+                              >
+                                <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
+                              </Button>
+                            )}
+
+                          {msg.intent.intencao === "comando_nao_reconhecido" &&
+                            msg.content.includes("não cadastrado") && (
+                              <Button
+                                size="sm"
+                                className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
+                                onClick={() => window.open("/clientes?novo=true", "_blank")}
+                              >
+                                <User className="w-3.5 h-3.5 mr-1.5" /> Cadastrar Cliente
+                              </Button>
+                            )}
+
+                          {["criar_agendamento", "remarcar_agendamento"].includes(
+                            msg.intent.intencao,
+                          ) && (
                             <div className="flex gap-2">
                               {(msg.intent.parametros as any)?.cliente_nome && (
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
                                   onClick={() => {
-                                    if (msg.intent?.intencao === 'remarcar_agendamento') {
+                                    if (msg.intent?.intencao === "remarcar_agendamento") {
                                       // Se for remarcação, precisamos do ID do agendamento que pode estar no texto ou meta
                                       handleConfirmarRemarcacao(msg);
                                     } else {
@@ -1078,23 +1285,25 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                                   }}
                                   disabled={isProcessing}
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> 
-                                  {msg.intent.intencao === 'remarcar_agendamento' ? 'Confirmar Remarcação' : 'Confirmar Agendamento'}
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                                  {msg.intent.intencao === "remarcar_agendamento"
+                                    ? "Confirmar Remarcação"
+                                    : "Confirmar Agendamento"}
                                 </Button>
                               )}
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="h-8 text-[11px] font-bold rounded-lg px-3 border-[#C99845]/20 text-[#123F2A]"
-                                onClick={() => window.open('/agenda', '_blank')}
+                                onClick={() => window.open("/agenda", "_blank")}
                               >
                                 <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Abrir Agenda
                               </Button>
                             </div>
                           )}
-                          {msg.intent.intencao === 'cancelar_agendamento' && (
-                            <Button 
-                              size="sm" 
+                          {msg.intent.intencao === "cancelar_agendamento" && (
+                            <Button
+                              size="sm"
                               className="h-8 text-[11px] font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 shadow-md"
                               onClick={() => handleConfirmarCancelamento(msg)}
                               disabled={isProcessing}
@@ -1102,9 +1311,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                               <XCircle className="w-3.5 h-3.5 mr-1.5" /> Confirmar Cancelamento
                             </Button>
                           )}
-                          {msg.intent.intencao === 'confirmar_baixa' && (
-                            <Button 
-                              size="sm" 
+                          {msg.intent.intencao === "confirmar_baixa" && (
+                            <Button
+                              size="sm"
                               className="h-8 text-[11px] font-bold bg-[#C99845] hover:bg-[#C99845]/90 text-white rounded-lg px-3 shadow-md"
                               onClick={() => handleConfirmarBaixaIA(msg)}
                               disabled={isProcessing}
@@ -1122,11 +1331,25 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   <div className="flex justify-start">
                     <div className="bg-white border border-[#C99845]/10 rounded-2xl rounded-tl-none px-5 py-3 flex items-center gap-3 shadow-sm">
                       <div className="flex gap-1">
-                        <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 rounded-full bg-[#C99845]" />
-                        <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-[#C99845]" />
-                        <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 rounded-full bg-[#C99845]" />
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                          className="w-1.5 h-1.5 rounded-full bg-[#C99845]"
+                        />
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+                          className="w-1.5 h-1.5 rounded-full bg-[#C99845]"
+                        />
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+                          className="w-1.5 h-1.5 rounded-full bg-[#C99845]"
+                        />
                       </div>
-                      <span className="text-[11px] font-bold text-[#123F2A]/60 uppercase tracking-widest">Processando</span>
+                      <span className="text-[11px] font-bold text-[#123F2A]/60 uppercase tracking-widest">
+                        Processando
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1141,7 +1364,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                 "Criar agendamento",
                 "Faturamento do mês",
                 "Valores a receber",
-                "Resumo do dia"
+                "Resumo do dia",
               ].map((sugestao) => (
                 <Button
                   key={sugestao}
@@ -1149,7 +1372,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   size="sm"
                   className="rounded-full text-[10px] font-bold h-7 bg-white/50 border-[#C99845]/20 text-[#123F2A] hover:bg-[#C99845]/10 hover:border-[#C99845]/40 transition-all duration-300"
                   onClick={() => {
-                    if (sugestao === 'Faturamento do mês') {
+                    if (sugestao === "Faturamento do mês") {
                       handleSend("Qual o faturamento do mês atual?");
                     } else {
                       handleSend(sugestao);
@@ -1165,13 +1388,13 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             <div className="p-6 border-t border-[#C99845]/10 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
               {/* File Preview Area */}
               {filePreview && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="mb-4 p-3 rounded-2xl bg-[#F5F2EA] border border-[#C99845]/20 flex items-center gap-3"
                 >
                   <div className="w-12 h-12 rounded-lg bg-white overflow-hidden flex items-center justify-center border border-[#C99845]/10">
-                    {filePreview === 'pdf' ? (
+                    {filePreview === "pdf" ? (
                       <FileText className="w-6 h-6 text-[#C99845]" />
                     ) : (
                       <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
@@ -1182,23 +1405,26 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                       {selectedFile?.name}
                     </p>
                     <p className="text-[9px] text-[#123F2A]/60 font-medium">
-                      {(selectedFile?.size || 0) / 1024 > 1024 
-                        ? `${((selectedFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB` 
+                      {(selectedFile?.size || 0) / 1024 > 1024
+                        ? `${((selectedFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB`
                         : `${((selectedFile?.size || 0) / 1024).toFixed(0)} KB`}
                     </p>
                   </div>
                   <div className="flex gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50"
-                      onClick={() => { setSelectedFile(null); setFilePreview(null); }}
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setFilePreview(null);
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-8 w-8 rounded-lg text-[#123F2A] hover:bg-[#123F2A]/5"
                       onClick={handleAnalizarComprovante}
                     >
@@ -1209,10 +1435,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               )}
 
               <div className="relative group">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
                   accept="image/*,application/pdf"
                   onChange={handleFileSelect}
                 />
@@ -1222,35 +1448,41 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSend(inputText);
                     }
                   }}
                 />
                 <div className="absolute right-2 bottom-2 flex gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="rounded-xl h-10 w-10 text-[#C99845] hover:bg-[#C99845]/10"
                     onClick={() => fileInputRef.current?.click()}
                     title="Anexar comprovante"
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className={cn(
                       "rounded-xl h-10 w-10 transition-all",
-                      voiceStatus === 'listening' ? 'bg-red-50 text-red-600' : 'hover:bg-[#C99845]/10 text-[#C99845]'
+                      voiceStatus === "listening"
+                        ? "bg-red-50 text-red-600"
+                        : "hover:bg-[#C99845]/10 text-[#C99845]",
                     )}
                     onClick={toggleVoice}
                   >
-                    {voiceStatus === 'listening' ? <MicOff className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4" />}
+                    {voiceStatus === "listening" ? (
+                      <MicOff className="w-4 h-4 animate-pulse" />
+                    ) : (
+                      <Mic className="w-4 h-4" />
+                    )}
                   </Button>
-                  <Button 
-                    size="icon" 
+                  <Button
+                    size="icon"
                     className="bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-xl shadow-lg h-10 w-10 disabled:opacity-50 transition-all"
                     onClick={() => handleSend(inputText)}
                     disabled={!inputText.trim() || isProcessing}
@@ -1259,11 +1491,13 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   </Button>
                 </div>
               </div>
-              
+
               <div className="flex justify-between items-center mt-4 px-1 text-[9px] text-[#123F2A]/40 font-bold uppercase tracking-[0.2em]">
-                <span className="flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> INTELIGÊNCIA OPERACIONAL</span>
-                <button 
-                  onClick={() => setMessages([])} 
+                <span className="flex items-center gap-1.5">
+                  <MessageSquare className="w-3 h-3" /> INTELIGÊNCIA OPERACIONAL
+                </span>
+                <button
+                  onClick={() => setMessages([])}
                   className="flex items-center gap-1.5 hover:text-[#C99845] transition-colors"
                 >
                   <RotateCcw className="w-3 h-3" /> REINICIAR
