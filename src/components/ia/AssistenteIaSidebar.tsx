@@ -171,7 +171,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         // PDF handling would go here - for now let's assume image
         const reader = new FileReader();
         base64 = await new Promise((resolve) => {
-          reader.onload = () => resolve((reader.data as string).split(',')[1]);
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
           reader.readAsDataURL(selectedFile);
         });
       }
@@ -502,7 +502,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       // 1. Resolver IDs
       let clienteId = intent.cliente_id;
       let petId = intent.pet_id;
-      let servicosIds = intent.servicos_ids;
+      let servicosIds = intent.servico_ids;
 
       if (!clienteId && intent.cliente_nome) {
         const { data: cData } = await supabase.from('clientes').select('id, nome').ilike('nome', `%${intent.cliente_nome}%`).limit(2);
@@ -545,7 +545,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       });
 
       if (!validation.success) {
-        throw new Error(validation.warnings?.[0] || "Horário indisponível.");
+        throw new Error(validation.validation_errors?.[0] || "Horário indisponível.");
       }
 
       // 4. Executar Gravação Real
