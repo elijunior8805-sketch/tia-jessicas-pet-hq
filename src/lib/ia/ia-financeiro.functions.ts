@@ -5,6 +5,7 @@ import { registrarPagamentoIA, estornarPagamentoIA } from "./ia-acoes.server";
 import { analisarComprovanteIA } from "./ia-comprovante.server";
 
 export const executarBaixaPagamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     pagamento_id: z.string(),
     valor_pago: z.number(),
