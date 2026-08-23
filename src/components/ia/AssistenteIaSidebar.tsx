@@ -41,7 +41,9 @@ import {
   buscarServicosIA,
   consultarHistoricoPetIA,
   consultarVisao360ClienteIA,
-  consultarVisao360PetIA
+  consultarVisao360PetIA,
+  consultarAuditoriaDadosIA,
+  compararPeriodosFinanceirosIA
 } from '@/lib/ia/ia-consultas.functions';
 import {
   validarAgendamentoIA,
