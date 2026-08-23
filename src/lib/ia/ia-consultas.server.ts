@@ -251,7 +251,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
           break;
         case "mes":
           from = format(startOfMonth(now), "yyyy-MM-dd");
-          to = hojeStr;
+          to = format(endOfMonth(now), "yyyy-MM-dd");
           break;
         case "mes_passado":
           const firstOfLastMonth = startOfMonth(subDays(startOfMonth(now), 1));
