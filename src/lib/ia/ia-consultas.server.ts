@@ -36,7 +36,8 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     query = query.eq("data", filtros.data);
   } else if (filtros.periodo_inicio && filtros.periodo_fim && /^\d{4}-\d{2}-\d{2}$/.test(filtros.periodo_inicio)) {
     query = query.gte("data", filtros.periodo_inicio).lte("data", filtros.periodo_fim);
-  } else if (filtros.data === "hoje" || !filtros.data) {
+  } else {
+    // Default para hoje se nada for informado ou se for "hoje"
     query = query.eq("data", hoje);
   }
 
@@ -81,13 +82,14 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
 
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
   // Implementação de busca aproximada (Fuzzy Search simplificada no SQL)
-  // Remove espaços extras e lida com variações comuns
   const termoLimpo = termo.trim();
   
+  // Se o termo for Eli e quisermos Elis, ilike %Eli% já resolve
   const { data, error } = await sb
     .from("clientes")
     .select(`*, pets(id, nome, raca)`)
     .or(`nome.ilike.%${termoLimpo}%, telefone.ilike.%${termoLimpo}%, email.ilike.%${termoLimpo}%`)
+    .order('nome')
     .limit(10);
 
   if (error) throw error;
