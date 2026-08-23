@@ -480,6 +480,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           `- **Total Pendente (Geral)**: **R$ ${resumo.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**`;
       }
 
+      if (intent.exige_confirmacao) {
+        setIaStatus('aguardando_confirmacao');
+      } else {
+        setIaStatus('concluido');
+      }
+
       const assistantMessage: IAMessage = {
         role: 'assistant',
         content: respostaFinal,
@@ -489,14 +495,6 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       setMessages(prev => [...prev, assistantMessage]);
       setCurrentIntent(intent);
-
-      // Scroll to bottom after state update
-      setTimeout(() => {
-        if (scrollRef.current) {
-          const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-          if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
-      }, 100);
 
       await registrarAuditoriaIA({
         data: {
@@ -508,6 +506,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       });
     } catch (error) {
       console.error('Erro IA:', error);
+      setIaStatus('erro');
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: "Aconteceu um erro. Tente novamente.",
