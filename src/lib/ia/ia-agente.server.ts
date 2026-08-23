@@ -131,7 +131,9 @@ IMPORTANTE SOBRE COMANDOS RÁPIDOS:
 - "Agenda de hoje" -> intencao: consulta_agenda, data: "${new Intl.DateTimeFormat("en-CA", {timeZone: "America/Sao_Paulo"}).format(new Date())}".
 - "Resumo do dia" -> intencao: solicitar_resumo_operacional.
 - "Faturamento do mês" -> intencao: consultar_resumo_financeiro, period: "mes".
-- "Valores a receber" -> intencao: consultar_pendencias, apenas_pendentes: true.`;
+- "Valores a receber" -> intencao: consultar_pendencias, apenas_pendentes: true.
+- "Quantos atendimentos tenho" -> intencao: contar_atendimentos, data: "${new Intl.DateTimeFormat("en-CA", {timeZone: "America/Sao_Paulo"}).format(new Date())}".
+- "Criar agendamento" -> intencao: criar_agendamento.`;
 
   try {
     const res = await chamarIA({
