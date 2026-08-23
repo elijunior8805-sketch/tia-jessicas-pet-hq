@@ -312,14 +312,16 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
             confirmados: dadosReais.filter((a: any) => a.status === 'confirmado').length,
             em_atendimento: dadosReais.filter((a: any) => a.status === 'em_atendimento').length,
             finalizados: dadosReais.filter((a: any) => a.status === 'finalizado').length,
-            pendentes: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            agendados: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            aguardando: dadosReais.filter((a: any) => a.status === 'aguardando').length,
             cancelados: dadosReais.filter((a: any) => a.status === 'cancelado').length,
             faltas: dadosReais.filter((a: any) => a.status === 'falta').length,
           };
 
           respostaFinal = `Hoje existem **${stats.total} atendimentos** agendados:\n\n` +
             `- ✅ **Confirmados**: ${stats.confirmados}\n` +
-            `- ⏳ **Aguardando**: ${stats.pendentes}\n` +
+            `- ⏳ **Agendados**: ${stats.agendados}\n` +
+            `- ⏳ **Aguardando Confirmação**: ${stats.aguardando}\n` +
             `- 🚿 **Em atendimento**: ${stats.em_atendimento}\n` +
             `- ✨ **Finalizados**: ${stats.finalizados}\n` +
             `- ❌ **Cancelados/Faltas**: ${stats.cancelados + stats.faltas}`;
