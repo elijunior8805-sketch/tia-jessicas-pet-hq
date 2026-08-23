@@ -47,7 +47,7 @@ export const consultarFinanceiroIA = createServerFn({ method: "POST" })
     apenas_pendentes: z.boolean().optional(),
     data: z.string().optional(),
     termo: z.string().optional(),
-    period: z.string().optional(),
+    period: z.enum(["hoje", "ontem", "semana", "mes", "mes_passado", "30dias"]).optional(),
     periodo_inicio: z.string().optional(),
     periodo_fim: z.string().optional(),
   }).parse(data))
