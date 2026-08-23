@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { VoiceRecognizer, VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
 import { IAMessage, IAIntent } from "@/lib/ia/ia-agente.server";
-import { IAStatus, IAResults } from "./types";
+import { IAStatus, IAResults } from "../types";
 import { toast } from "sonner";
 import { classificarIntencao } from "@/lib/ia/ia-agente.functions";
 import { registrarAuditoriaIA } from "@/lib/ia/ia-auditoria.functions";
