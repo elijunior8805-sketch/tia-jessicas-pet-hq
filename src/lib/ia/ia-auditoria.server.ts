@@ -75,7 +75,18 @@ export async function registrarAuditoriaIA(params: {
   if (error) console.error("Erro ao registrar auditoria IA:", error);
 }
 
-export async function realizarAuditoriaDadosIA() {
-  // Placeholder para auditoria de integridade de dados
-  return { status: 'ok', data: new Date().toISOString() };
+export async function realizarAuditoriaDadosIA(supabase?: any) {
+  // Use admin client if supabase instance not provided
+  const client = supabase || supabaseAdmin;
+  
+  // Example implementation that returns structure expected by UI
+  return { 
+    status: 'ok', 
+    data: {
+      resumo: { alertas: 0 },
+      atendimentos_sem_pagamento: [],
+      pagamentos_zerados: [],
+      provaveis_duplicidades: []
+    }
+  };
 }

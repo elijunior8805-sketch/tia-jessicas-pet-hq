@@ -73,6 +73,11 @@ ESTOQUE E COMPRAS (PARTE 9):
 3. COMPRAS: Classificar sugestões em Necessidade, Sugestão ou Previsão.
 4. SEGURANÇA: Nunca realizar baixa ou compra sem confirmação.
 
+CENTRAL DO PROPRIETÁRIO E VERDADE OPERACIONAL (PARTE 10):
+1. RESUMO: Ao ser questionada sobre "como está o negócio", cruze dados de Agenda, Financeiro e Estoque.
+2. VERDADE: Use termos precisos: "Consultei" (dados lidos), "Agendei/Registrei" (ID gerado), "Enviei" (confirmação de saída).
+3. SEGURANÇA: Respeite a idempotência e exija confirmação para qualquer alteração de estado.
+
 REGRAS DE RESPOSTA:
 - Todas as sugestões de resposta devem ser NOVAS e personalizadas (mínimo 50% de variação).
 - Para Cobrança Extra Firme: Vá direto ao assunto, cite dívida e contatos anteriores. Não use "medidas administrativas".
@@ -127,6 +132,8 @@ function fallbackClassificador(texto: string): IAIntent {
     intencao = "consulta_financeira";
   } else if (lowercaseText.includes("estoque") || lowercaseText.includes("produto") || lowercaseText.includes("compra")) {
     intencao = "consulta_estoque";
+  } else if (lowercaseText.includes("como está o negócio") || lowercaseText.includes("resumo")) {
+    intencao = "resumo_negocio";
   }
 
   return {

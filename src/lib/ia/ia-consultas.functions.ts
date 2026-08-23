@@ -150,7 +150,7 @@ export const consultarAuditoriaDadosIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { realizarAuditoriaDadosIA } = await import("./ia-auditoria.server");
-    return realizarAuditoriaDadosIA(context.supabase);
+    return realizarAuditoriaDadosIA();
   });
 
 export const compararPeriodosFinanceirosIA = createServerFn({ method: "POST" })
