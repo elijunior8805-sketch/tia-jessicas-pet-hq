@@ -100,7 +100,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     if (isOpen && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `volte para versão anterior`,
+        content: `Olá, Eli! Sou sua Assistente Operacional IA. Como posso ajudar na gestão do Spa de Pet hoje?`,
         timestamp: new Date().toISOString()
       }]);
     }
