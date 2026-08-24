@@ -434,10 +434,55 @@ function ProgramasCuidadoPage() {
               <CardDescription>Histórico detalhado de todas as movimentações de saldo.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="py-10 text-center text-muted-foreground">
-                <Wallet className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p>Nenhuma movimentação de crédito registrada.</p>
-              </div>
+              {movimentacoes && movimentacoes.length > 0 ? (
+                <div className="relative overflow-x-auto rounded-lg border border-sidebar-border/40">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/50 text-muted-foreground uppercase font-bold tracking-wider border-b border-sidebar-border/40">
+                      <tr>
+                        <th className="px-4 py-3">Data</th>
+                        <th className="px-4 py-3">Pet</th>
+                        <th className="px-4 py-3">Tipo</th>
+                        <th className="px-4 py-3 text-right">Qtd</th>
+                        <th className="px-4 py-3">Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-sidebar-border/40">
+                      {movimentacoes.map((m: any) => (
+                        <tr key={m.id} className="hover:bg-muted/5 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                            {format(new Date(m.created_at), 'dd/MM/yy HH:mm')}
+                          </td>
+                          <td className="px-4 py-3 font-medium">{m.pets?.nome}</td>
+                          <td className="px-4 py-3">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[9px] px-1 h-4 ${
+                                m.tipo === 'credito_criado' ? 'border-green-200 text-green-600 bg-green-50/50' :
+                                m.tipo === 'credito_reservado' ? 'border-amber-200 text-amber-600 bg-amber-50/50' :
+                                m.tipo === 'credito_consumido' ? 'border-red-200 text-red-600 bg-red-50/50' :
+                                'border-gray-200 text-gray-600'
+                              }`}
+                            >
+                              {m.tipo.replace('credito_', '').toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td className={`px-4 py-3 text-right font-bold ${m.quantidade > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
+                            {m.motivo || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-10 text-center text-muted-foreground">
+                  <Wallet className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>Nenhuma movimentação de crédito registrada.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
