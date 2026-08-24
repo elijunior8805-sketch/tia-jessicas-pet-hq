@@ -7,9 +7,11 @@ import { classificarIntencao } from "@/lib/ia/ia-agente.functions";
 import { registrarAuditoriaIA } from "@/lib/ia/ia-auditoria.functions";
 import {
   consultarAgendaIA,
+} from "@/lib/ia/ia-consultas.functions";
+import {
   validarAgendamentoIA,
   executarCriacaoAgendamento,
-} from "@/lib/ia/ia-consultas.functions"; // Note: simplified imports for brevity, will fix real ones below
+} from "@/lib/ia/ia-acoes.functions";
 import { 
   consultarMensagensIA, 
   identificarAniversariantesIA, 
@@ -43,6 +45,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  const [analiseResult, setAnaliseResult] = useState<any>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
@@ -282,6 +285,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     interimTranscript,
     finalTranscript,
     isReviewingVoice,
-    setFinalTranscript
+    setFinalTranscript,
+    analiseResult,
+    setAnaliseResult
   };
 }
