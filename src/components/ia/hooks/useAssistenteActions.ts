@@ -293,31 +293,44 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consultar_valores_a_receber") {
         setIaStatus("processing");
-        const res = await consultarFinanceiroIA({ data: { apenas_pendentes: true, comando_original: text, intencao: "consultar_valores_a_receber" } as any });
-        const pendencias = res.data as any[];
-        const total = pendencias.reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0);
-        const vencidos = pendencias.filter(p => new Date(p.vencimento) < new Date()).reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0);
-        
-        respostaFinal = `### 💸 Valores a Receber\n\n` +
-          `- **Total Pendente**: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-          `- **Vencidos**: R$ ${vencidos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-          `- **A Vencer**: R$ ${(total - vencidos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-          `- **Clientes Pendentes**: ${new Set(pendencias.map(p => p.cliente_id)).size}\n\n` +
-          `Deseja ver a lista detalhada ou iniciar uma cobrança?`;
+        try {
+          const res = await consultarFinanceiroIA({ data: { apenas_pendentes: true, comando_original: text, intencao: "consultar_valores_a_receber" } as any });
+          const pendencias = (res.data as any[]) || [];
+          const total = pendencias.reduce((acc, p) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
+          const vencidos = pendencias.filter(p => p.vencimento && new Date(p.vencimento) < new Date()).reduce((acc, p) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
+          
+          respostaFinal = `### 💸 Valores a Receber\n\n` +
+            `- **Total Pendente**: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+            `- **Vencidos**: R$ ${vencidos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+            `- **A Vencer**: R$ ${(total - vencidos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+            `- **Clientes Pendentes**: ${new Set(pendencias.map(p => p.cliente_id)).size}\n\n` +
+            `Deseja ver a lista detalhada ou iniciar uma cobrança?`;
+        } catch (err) {
+          console.error("Erro ao processar valores a receber na IA:", err);
+          respostaFinal = "Não consegui recuperar as pendências financeiras agora.";
+        }
       }
 
       if (intent.intencao === "consultar_resumo_operacional") {
         setIaStatus("processing");
-        const res = await consultarResumoOperacionalIA();
-        const r = res.data as any;
-        respostaFinal = `### 🚀 Resumo Operacional (${format(parseISO(r.data), "dd/MM")})\n\n` +
-          `**Agenda:**\n` +
-          `- Atendimentos: ${r.total_agenda} (${r.confirmados} conf.)\n` +
-          `- Leva e Traz: ${r.leva_traz} pets\n\n` +
-          `**Financeiro:**\n` +
-          `- Recebido Hoje: R$ ${r.recebido_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-          `- Pendências: R$ ${r.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
-          (r.proximo_atendimento ? `**Próximo:** ${r.proximo_atendimento.hora} - ${r.proximo_atendimento.pet} (${r.proximo_atendimento.servico})` : "");
+        try {
+          const res = await consultarResumoOperacionalIA();
+          const r = (res.data as any) || {};
+          const recebidoHoje = r.recebido_hoje || 0;
+          const valorPendente = r.valor_pendente || 0;
+
+          respostaFinal = `### 🚀 Resumo Operacional (${r.data ? format(parseISO(r.data), "dd/MM") : ""})\n\n` +
+            `**Agenda:**\n` +
+            `- Atendimentos: ${r.total_agenda || 0} (${r.confirmados || 0} conf.)\n` +
+            `- Leva e Traz: ${r.leva_traz || 0} pets\n\n` +
+            `**Financeiro:**\n` +
+            `- Recebido Hoje: R$ ${recebidoHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+            `- Pendências: R$ ${valorPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+            (r.proximo_atendimento ? `**Próximo:** ${r.proximo_atendimento.hora} - ${r.proximo_atendimento.pet} (${r.proximo_atendimento.servico})` : "");
+        } catch (err) {
+          console.error("Erro ao processar resumo operacional na IA:", err);
+          respostaFinal = "Erro ao gerar o resumo operacional do dia.";
+        }
       }
 
 
