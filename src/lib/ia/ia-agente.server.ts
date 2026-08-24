@@ -190,13 +190,13 @@ DATAS:
         parametrosNormalizados[key] = undefined;
       }
       // 2. Tentar converter números que chegam como string
-      if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val) && !key.endsWith('_id') && key !== 'telefone') {
+      else if (typeof val === 'string' && /^-?\d+(\.\d+)?$/.test(val) && !key.endsWith('_id') && key !== 'telefone') {
         const num = Number(val);
         if (!isNaN(num)) parametrosNormalizados[key] = num;
       }
       // 3. Garantir booleanos
-      if (val === 'true') parametrosNormalizados[key] = true;
-      if (val === 'false') parametrosNormalizados[key] = false;
+      else if (val === 'true') parametrosNormalizados[key] = true;
+      else if (val === 'false') parametrosNormalizados[key] = false;
     });
     
     return {

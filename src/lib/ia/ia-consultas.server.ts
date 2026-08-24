@@ -303,13 +303,14 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     // Mas buscarDadosFinanceiros é exportada como helper, então deve funcionar se o client sb tiver as permissões
     const indicators = await getFinancialKPIs({ data: { from, to } });
     
-    // Garantir que todos os valores sejam convertidos para string formatada ou número antes de retornar
-    // Isso evita o erro "toLocaleString of undefined" se o indicador não tiver valor
-    const dataRetorno = indicators ? Object.keys(indicators).reduce((acc, key) => {
-      const val = (indicators as any)[key];
-      acc[key] = val !== undefined && val !== null ? val : 0;
-      return acc;
-    }, {} as any) : {};
+    // Garantir que todos os valores existam para evitar "toLocaleString of undefined"
+    const fallbackIndicators = {
+      faturamento: 0, recebido: 0, despesas: 0, lucro: 0, 
+      saldoCaixa: 0, ticketMedio: 0, atendimentos: 0, 
+      aportes: 0, aReceber: 0, vencido: 0
+    };
+
+    const metricas = { ...fallbackIndicators, ...indicators };
 
     return createIAResponse({
       source: 'consultar_resumo_financeiro',
