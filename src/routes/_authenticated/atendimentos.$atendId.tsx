@@ -532,6 +532,9 @@ function AtendimentoDetalhe() {
         desconto: Number(desc || 0),
       } as never).eq("id", atendId);
       if (error) throw error;
+      
+      // Consome a reserva de créditos do programa de cuidado, se houver
+      await consumirReserva({ data: { agendamento_id: (atendimento as any).agendamento_id } });
 
       if ((atendimento as any).agendamento_id) {
         await supabase.from("agendamentos")
