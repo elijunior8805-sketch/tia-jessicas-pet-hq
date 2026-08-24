@@ -75,9 +75,15 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       recognizerRef.current = new VoiceRecognizer({
         onResult: (text, isFinal) => {
           if (isFinal) {
-            setFinalTranscript(prev => (prev + " " + text).trim());
+            // Consolidar transcrição final removendo duplicações simples
+            setFinalTranscript(prev => {
+              const cleaned = text.trim();
+              if (prev.endsWith(cleaned)) return prev;
+              return (prev + " " + cleaned).trim();
+            });
             setInterimTranscript("");
           } else {
+            // A transcrição parcial aparece apenas como prévia
             setInterimTranscript(text);
           }
         },
@@ -85,13 +91,22 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           setVoiceStatus(status);
           if (status === 'reviewing') {
             setIsReviewingVoice(true);
+            setIaStatus("reviewing_transcription");
+          } else if (status === 'listening') {
+            setIaStatus("listening");
+          } else if (status === 'requesting_permission') {
+            setIaStatus("requesting_permission");
           }
         },
         onError: (err) => {
           console.error("Erro de reconhecimento de voz:", err);
           setVoiceStatus("error");
+          setIaStatus("error");
           toast.error("Erro no microfone: " + err);
-          setTimeout(() => setVoiceStatus("idle"), 2000);
+          setTimeout(() => {
+            setVoiceStatus("idle");
+            setIaStatus("idle");
+          }, 2000);
         },
       });
     }
@@ -99,6 +114,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     return () => {
       if (recognizerRef.current) {
         recognizerRef.current.stop();
+        // Garantir limpeza total da instância
+        recognizerRef.current = null;
       }
     };
   }, []);
@@ -158,7 +175,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       // --- Especialistas ---
       if (intent.especialista === "comunicacao") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         if (intent.intencao === "consultar_mensagens") {
           const res = await consultarMensagensIA({ data: { cliente_id: intent.parametros?.cliente_id, comando_original: text } });
           dadosReais = res.data;
@@ -177,7 +194,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       if (intent.especialista === "gestao_estrategica" || intent.especialista === "relatorios") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         if (intent.intencao === "resumo_negocio") {
           const res = await getResumoProprietarioIA();
           dadosReais = res;
@@ -190,7 +207,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       if (intent.especialista === "estoque_compras") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         if (intent.intencao === "consulta_estoque") {
           const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque, comando_original: text } });
           dadosReais = res;
@@ -203,7 +220,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), comando_original: text } });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
@@ -220,6 +237,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setIaStatus(intent.informacoes_faltantes?.length ? "aguardando_informacao" : "concluido");
+      activeCommandRef.current = null; // Libera trava após sucesso
 
       await registrarAuditoriaIA({
         data: {
@@ -259,6 +277,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setInterimTranscript("");
     setIsReviewingVoice(false);
     setVoiceStatus("idle");
+    setIaStatus("cancelado");
+    setTimeout(() => setIaStatus("idle"), 1500);
   };
 
   const handleConfirmarAgendamento = async (intent: any) => {
