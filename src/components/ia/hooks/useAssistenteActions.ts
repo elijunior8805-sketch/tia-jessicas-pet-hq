@@ -243,7 +243,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           intencao: intent.intencao,
           sucesso: true,
           tempo_ms: Date.now() - startTime,
-          metadata: { intent, dados: dadosReais, ...activeCommandRef.current },
+          metadata: { intent, dados: dadosReais, ...(activeCommandRef.current || {}) },
         },
       });
       activeCommandRef.current = null; // Libera trava após auditoria
@@ -251,7 +251,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     } catch (error: any) {
       console.error(error);
       setIaStatus("error");
-      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${activeCommandRef.current?.correlationId}`;
+      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${activeCommandRef.current?.correlationId || 'N/A'}`;
       setMessages((prev) => [...prev, { role: "assistant", content: errorMessage, timestamp: new Date().toISOString() }]);
     } finally {
       setIsProcessing(false);
