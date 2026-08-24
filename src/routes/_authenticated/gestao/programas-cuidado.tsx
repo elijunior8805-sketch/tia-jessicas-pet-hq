@@ -205,10 +205,11 @@ function ProgramasCuidadoPage() {
           </p>
         </div>
         
-        <Button className="bg-gold hover:bg-gold/90 text-white font-medium shadow-sm transition-all active:scale-95" onClick={() => toast.info("Funcionalidade de criação será expandida em breve")}>
+        <Button className="bg-gold hover:bg-gold/90 text-white font-medium shadow-sm transition-all active:scale-95" onClick={() => setIsProgramaModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Programa
         </Button>
+
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
