@@ -820,7 +820,13 @@ function ProgramasCuidadoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ProgramaFormDialog 
+        open={isProgramaModalOpen} 
+        onOpenChange={setIsProgramaModalOpen}
+        initial={editingPrograma}
+      />
     </div>
+
   );
 }
 
