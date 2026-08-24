@@ -388,18 +388,84 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     processingRef.current = true;
     setIsProcessing(true);
     setIaStatus("processing");
+    const inicio = Date.now();
+    const commandId = activeCommandRef.current?.commandId || crypto.randomUUID();
     try {
       const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
       if (resVal.disponivel === false) throw new Error(resVal.mensagem || "Horário indisponível");
-      
+
+      // FASE 1 — Observação: a ação é apenas simulada, nada é gravado.
+      if (faseLiberacao === "observacao") {
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `🔍 **Modo Observação (Fase 1)**\n\nNenhum registro foi gravado. O que eu faria:\n\n- Criar agendamento com os dados confirmados\n- Validar disponibilidade (já validada: horário livre)\n\nPara executar de verdade, altere a fase de liberação em **Qualidade da IA**.`,
+          timestamp: new Date().toISOString(),
+        }]);
+        setIaStatus("concluido");
+        await registrarEventoIA({
+          data: {
+            command_id: commandId,
+            comando_original: intent?.parametros?.comando_original || "criar_agendamento",
+            intencao_detectada: "criar_agendamento",
+            especialista: "agenda",
+            ferramenta_utilizada: "executarCriacaoAgendamento",
+            tipo_operacao: "acao",
+            parametros: intent.parametros,
+            sucesso: true,
+            simulado: true,
+            confirmado: true,
+            tempo_resposta_ms: Date.now() - inicio,
+          },
+        }).catch(() => {});
+        return;
+      }
+
       setIaStatus("executando");
-      await executarCriacaoAgendamento({ data: intent.parametros });
-      
-      setMessages((prev) => [...prev, { role: "assistant", content: `✅ **Agendamento realizado com sucesso!**`, timestamp: new Date().toISOString() }]);
+      const res = (await executarCriacaoAgendamento({ data: intent.parametros })) as any;
+      const registroId = res?.affected_record_id || res?.data?.id || null;
+
+      setIaStatus("verificando");
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: `✅ **Agendamento realizado com sucesso!**${registroId ? `\n\nID do registro: \`${registroId}\`` : ""}`,
+        timestamp: new Date().toISOString(),
+      }]);
       setIaStatus("concluido");
+      await registrarEventoIA({
+        data: {
+          command_id: commandId,
+          idempotency_key: activeCommandRef.current?.idempotencyKey,
+          comando_original: intent?.parametros?.comando_original || "criar_agendamento",
+          intencao_detectada: "criar_agendamento",
+          especialista: "agenda",
+          ferramenta_utilizada: "executarCriacaoAgendamento",
+          tipo_operacao: "acao",
+          parametros: intent.parametros,
+          resultado: res ?? null,
+          registro_afetado_id: registroId ? String(registroId) : undefined,
+          duplicidade_bloqueada: !!res?.duplicado,
+          sucesso: true,
+          confirmado: true,
+          tempo_resposta_ms: Date.now() - inicio,
+        },
+      }).catch(() => {});
     } catch (error: any) {
       toast.error(error.message);
       setIaStatus("error");
+      await registrarEventoIA({
+        data: {
+          command_id: commandId,
+          comando_original: intent?.parametros?.comando_original || "criar_agendamento",
+          intencao_detectada: "criar_agendamento",
+          tipo_operacao: "acao",
+          parametros: intent?.parametros,
+          sucesso: false,
+          confirmado: true,
+          erro: String(error?.message || error).slice(0, 2000),
+          erro_tipo: /timeout/i.test(String(error?.message)) ? "timeout" : "execucao",
+          tempo_resposta_ms: Date.now() - inicio,
+        },
+      }).catch(() => {});
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
