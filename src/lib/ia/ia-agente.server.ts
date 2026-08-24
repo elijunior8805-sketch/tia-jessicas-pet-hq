@@ -31,7 +31,7 @@ export interface IAMessage {
  * Classifica a intenção do usuário usando o modelo Gemini.
  */
 export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
-  const lowercaseTexto = texto.toLowerCase().trim();
+  const lowercaseTexto = (texto || "").toLowerCase().trim();
   
   // Mapeamento direto para intenções fixas dos comandos rápidos
   const mapeamentoDireto: Record<string, any> = {
@@ -39,7 +39,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       intencao: "consulta_agenda",
       especialista: "agenda",
       tipo_operacao: "consulta",
-      parametros: { comando_original: texto, data: "hoje" },
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
       nivel_confianca: 1,
       exige_confirmacao: false,
       resposta_ia: "Consultando a agenda de hoje..."
@@ -61,7 +61,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       especialista: "agenda",
       tipo_operacao: "consulta",
 
-      parametros: { comando_original: texto, data: "hoje" },
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
       nivel_confianca: 1,
       exige_confirmacao: false,
       resposta_ia: "Contando atendimentos de hoje..."
@@ -80,7 +80,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       intencao: "consultar_faturamento",
       especialista: "financeiro",
       tipo_operacao: "consulta",
-      parametros: { comando_original: texto, period: "mes" },
+      parametros: { comando_original: texto, period: "mes", data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
       nivel_confianca: 1,
       exige_confirmacao: false,
       resposta_ia: "Buscando o faturamento do mês atual..."
