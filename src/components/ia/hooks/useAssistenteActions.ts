@@ -94,38 +94,28 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   useEffect(() => {
     if (typeof window !== "undefined" && !recognizerRef.current) {
       recognizerRef.current = new VoiceRecognizer({
-        onResult: (text, isFinal) => {
-          if (isFinal) {
-            setFinalTranscript(prev => {
-              const cleaned = text.trim();
-              if (prev.toLowerCase().includes(cleaned.toLowerCase())) return prev;
-              return (prev + " " + cleaned).trim();
-            });
-            setInterimTranscript("");
-          } else {
-            setInterimTranscript(text);
-          }
+        // Somente trechos FINAIS consolidados chegam aqui (nunca dispara backend)
+        onFinal: (textoAcumulado) => {
+          setFinalTranscript(textoAcumulado);
+          if (textoAcumulado) sessionStorage.setItem("ia_draft_transcript", textoAcumulado);
         },
+        onInterim: (texto) => setInterimTranscript(texto),
         onStatusChange: (status) => {
           setVoiceStatus(status);
-          
-          if (status === 'listening') {
+
+          if (status === "listening") {
             setIaStatus("listening");
             setIsReviewingVoice(false);
-          } else if (status === 'reviewing') {
+          } else if (status === "reviewing") {
             setIaStatus("idle");
             setIsReviewingVoice(true);
-            // Salvar no sessionStorage para persistência
-            setFinalTranscript(current => {
-              if (current) {
-                sessionStorage.setItem('ia_draft_transcript', current);
-              }
-              return current;
-            });
-          } else if (status === 'requesting_permission') {
+          } else if (status === "requesting_permission") {
             setIaStatus("requesting_permission");
-          } else if (status === 'finalizing') {
+          } else if (status === "finalizing") {
             setIaStatus("processing");
+          } else if (status === "idle") {
+            setIaStatus("idle");
+            setInterimTranscript("");
           }
         },
         onError: (err) => {
@@ -140,14 +130,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         },
       });
     }
-    
-    // Carregar rascunho se existir
-    const savedDraft = sessionStorage.getItem('ia_draft_transcript');
-    if (savedDraft && !finalTranscript) {
-      setFinalTranscript(savedDraft);
+
+    // Carregar rascunho se existir (a transcrição nunca se perde)
+    const savedDraft = sessionStorage.getItem("ia_draft_transcript");
+    if (savedDraft) {
+      setFinalTranscript((prev) => prev || savedDraft);
       setIsReviewingVoice(true);
     }
-    
+
     return () => {
       if (recognizerRef.current) {
         recognizerRef.current.stop();
@@ -156,6 +146,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     };
 
   }, []);
+
 
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
