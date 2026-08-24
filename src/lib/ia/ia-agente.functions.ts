@@ -6,7 +6,7 @@ export const classificarIntencao = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({ 
     texto: z.string(),
     contexto: z.any().optional(),
-    original: z.string().default("classificacao"),
+    comando_original: z.string().optional(),
   }).parse(input || { texto: "" }))
   .handler(async ({ data, context }) => {
     // Note: requireSupabaseAuth is assumed to be handled by the route or middleware

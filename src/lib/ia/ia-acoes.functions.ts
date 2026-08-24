@@ -11,7 +11,7 @@ export const validarAgendamentoIA = createServerFn({ method: "POST" })
     cliente_id: z.string().optional().default(""),
     profissional_id: z.string().optional(),
     servicos: z.array(z.string()).optional().default([]),
-    comando_original: z.string().default("acao"),
+    comando_original: z.string().optional(),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { validarDisponibilidadeReal } = await import("./ia-acoes.server");
