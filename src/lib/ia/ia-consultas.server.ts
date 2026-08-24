@@ -316,7 +316,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
       source: 'consultar_resumo_financeiro',
       data: {
         periodo: { from, to },
-        metricas: dataRetorno
+        metricas
       }
     });
   }
