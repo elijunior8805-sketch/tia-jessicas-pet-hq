@@ -17,6 +17,14 @@ export async function validarDisponibilidadeReal(
     servicos: string[];
   }
 ) {
+  if (!params.cliente_id || !params.pet_id) {
+    return createIAResponse({
+      success: false,
+      source: 'validar_disponibilidade',
+      validation_errors: ["ID do cliente ou pet não fornecido."]
+    });
+  }
+
   const { data: duplicados, error: errD } = await sb
     .from("agendamentos")
     .select("id")
