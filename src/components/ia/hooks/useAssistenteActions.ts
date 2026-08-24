@@ -418,13 +418,15 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       processingRef.current = false;
       
       // Salvar transcrição original se for vinda de voz (Parte 2 & 3)
-      if (text.trim() && voiceStatus === "reviewing") {
+      // Ajustado para capturar a mensagem que foi efetivamente enviada (text)
+      if (text.trim() && (voiceStatus === "reviewing" || voiceStatus === "listening")) {
         salvarTranscricaoIA({ 
           data: { 
             texto: text,
             metadata: { 
               origem: "voz",
-              correlation_id: correlationId
+              correlation_id: correlationId,
+              execucao_direta: true
             }
           } 
         }).catch(err => console.error("[IA-VOZ] Erro silenciado ao salvar transcrição:", err));
