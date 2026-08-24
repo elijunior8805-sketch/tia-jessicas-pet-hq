@@ -2,6 +2,8 @@ import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { createIAResponse } from "./ia-retorno.server";
+import { compararNome } from "./ia-nomes";
+
 import { getFinancialKPIs } from "../financial-kpis.functions";
 
 
