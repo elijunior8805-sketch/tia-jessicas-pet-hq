@@ -316,22 +316,46 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setIaStatus(intent.informacoes_faltantes?.length ? "aguardando_informacao" : "concluido");
-      await registrarAuditoriaIA({
+      await registrarEventoIA({
         data: {
-          comando: text,
-          intencao: intent.intencao,
+          command_id: commandId,
+          correlation_id: correlationId,
+          session_id: sessionId,
+          idempotency_key: idempotencyKey,
+          comando_original: text,
+          intencao_detectada: intent.intencao,
+          especialista: intent.especialista || undefined,
+          ferramenta_utilizada: intent.ferramenta || intent.intencao,
+          tipo_operacao: intent.tipo_operacao || "consulta",
+          parametros: intent.parametros || {},
+          resposta_ia: respostaFinal.slice(0, 4000),
+          resultado: { dados: dadosReais },
           sucesso: true,
-          tempo_ms: Date.now() - startTime,
-          metadata: { intent, dados: dadosReais, ...(activeCommandRef.current || {}) },
+          retry_count: 0,
+          confirmado: false,
+          tempo_resposta_ms: Date.now() - startTime,
         },
-      });
+      }).catch(() => {});
       activeCommandRef.current = null; // Libera trava após auditoria
 
     } catch (error: any) {
       console.error(error);
       setIaStatus("error");
-      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${activeCommandRef.current?.correlationId || 'N/A'}`;
+      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${correlationId}`;
       setMessages((prev) => [...prev, { role: "assistant", content: errorMessage, timestamp: new Date().toISOString() }]);
+      await registrarEventoIA({
+        data: {
+          command_id: commandId,
+          correlation_id: correlationId,
+          session_id: sessionId,
+          idempotency_key: idempotencyKey,
+          comando_original: text,
+          sucesso: false,
+          erro: String(error?.message || error).slice(0, 2000),
+          erro_tipo: /timeout|abort/i.test(String(error?.message)) ? "timeout" : "execucao",
+          tempo_resposta_ms: Date.now() - startTime,
+        },
+      }).catch(() => {});
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
