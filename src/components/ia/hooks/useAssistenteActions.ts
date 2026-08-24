@@ -126,7 +126,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
             data_atual: new Date().toISOString(),
           },
-          comando_original: text
+          original: text
         },
       });
 
@@ -189,7 +189,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
         setIaStatus("pesquisando");
-        const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), comando_original: text } });
+        const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), original: text } });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
           ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`

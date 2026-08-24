@@ -6,7 +6,7 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     data: z.string().optional(),
-    comando_original: z.string().default("consulta"),
+    original: z.string().default("consulta"),
     periodo_inicio: z.string().optional(),
     periodo_fim: z.string().optional(),
     status: z.string().optional(),
