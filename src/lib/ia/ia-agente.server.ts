@@ -5,7 +5,9 @@ export const IAIntentSchema = z.object({
   intencao: z.string(),
   especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica"]).optional().nullable(),
   tipo_operacao: z.enum(["consulta", "acao"]),
-  parametros: z.record(z.any()).optional().nullable(),
+  parametros: z.object({
+    comando_original: z.string().optional(),
+  }).catchall(z.any()).optional().nullable(),
   informacoes_faltantes: z.array(z.string()).optional().nullable(),
   ambiguidades: z.array(z.string()).optional().nullable(),
   nivel_confianca: z.number().min(0).max(1),
