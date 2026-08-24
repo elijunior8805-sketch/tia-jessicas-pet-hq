@@ -131,8 +131,11 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       });
 
       // Normalizar parâmetros para evitar Zod Errors em funções subsequentes
-      if (!intent.parametros) intent.parametros = {};
-      if (!intent.parametros.comando_original) intent.parametros.comando_original = text;
+      if (!intent.parametros) {
+        (intent as any).parametros = { comando_original: text };
+      } else if (!(intent.parametros as any).comando_original) {
+        (intent.parametros as any).comando_original = text;
+      }
 
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Operação concluída.";
