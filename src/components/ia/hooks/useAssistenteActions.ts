@@ -37,7 +37,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [iaStatus, setIaStatus] = useState<IAStatus>("idle");
   const [searchResults, setSearchResults] = useState<IAResults | null>(null);
   
-  // Novos estados para Voz
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
   const [isReviewingVoice, setIsReviewingVoice] = useState(false);
@@ -49,6 +48,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
+  
+  const activeCommandRef = useRef<{
+    commandId: string;
+    idempotencyKey: string;
+    sessionId: string;
+    correlationId: string;
+  } | null>(null);
+
   const processingRef = useRef(false);
 
   useEffect(() => {
@@ -99,13 +106,21 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || processingRef.current) return;
 
+    // Idempotency and Session IDs
+    const commandId = crypto.randomUUID();
+    const idempotencyKey = `idemp-${commandId}`;
+    const correlationId = `corr-${Date.now()}`;
+    const sessionId = activeCommandRef.current?.sessionId || crypto.randomUUID();
+
+    activeCommandRef.current = { commandId, idempotencyKey, sessionId, correlationId };
+
     processingRef.current = true;
     setIsProcessing(true);
+    setIaStatus("sending");
     setIsReviewingVoice(false);
     setFinalTranscript("");
     setInterimTranscript("");
 
-    const commandId = crypto.randomUUID();
     const startTime = Date.now();
 
     const userMessage: IAMessage = {
