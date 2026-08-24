@@ -794,3 +794,70 @@ function ProgramasCuidadoPage() {
     </div>
   );
 }
+
+function AuditoriaProgramasTab() {
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["auditoria-programas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("auditoria_programas" as any)
+        .select("*, clientes(nome), pets(nome)")
+        .order("criado_em", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data as any[];
+    }
+  });
+
+  if (isLoading) return <div className="p-8 text-center animate-pulse">Carregando auditoria...</div>;
+
+  return (
+    <Card className="border-sidebar-border/60 overflow-hidden">
+      <CardHeader className="bg-muted/30 pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <History className="h-5 w-5 text-gold" />
+          Log de Auditoria
+        </CardTitle>
+        <CardDescription>Histórico detalhado de ações no módulo de programas.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-sidebar-border/40 text-left">
+              <tr>
+                <th className="p-4">Data</th>
+                <th className="p-4">Ação</th>
+                <th className="p-4">Cliente/Pet</th>
+                <th className="p-4">Motivo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-sidebar-border/30">
+              {logs && logs.length > 0 ? logs.map((log) => (
+                <tr key={log.id} className="hover:bg-muted/10 transition-colors">
+                  <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">
+                    {format(new Date(log.criado_em), 'dd/MM/yy HH:mm')}
+                  </td>
+                  <td className="p-4">
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold border-gold/30 text-gold-foreground bg-gold/5">
+                      {log.acao.replace('_', ' ')}
+                    </Badge>
+                  </td>
+                  <td className="p-4">
+                    <div className="font-semibold text-xs">{log.clientes?.nome || '-'}</div>
+                    <div className="text-[10px] text-muted-foreground">{log.pets?.nome || '-'}</div>
+                  </td>
+                  <td className="p-4 text-xs italic text-muted-foreground/80">{log.motivo || '-'}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={4} className="p-12 text-center text-muted-foreground italic">Nenhum registro de auditoria encontrado.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
