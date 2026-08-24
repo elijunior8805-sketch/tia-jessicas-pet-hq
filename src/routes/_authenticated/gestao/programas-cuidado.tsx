@@ -152,11 +152,11 @@ function ProgramasCuidadoPage() {
     queryKey: ["programas-ativos"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("programas_contratados")
+        .from("programas_contratados" as any)
         .select("*, clientes(nome), pets(nome, raca)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
@@ -164,12 +164,12 @@ function ProgramasCuidadoPage() {
     queryKey: ["creditos-movimentacoes"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("programas_creditos_movimentacoes")
+        .from("programas_creditos_movimentacoes" as any)
         .select("*, pets(nome)")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
