@@ -529,7 +529,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     const commandId = activeCommandRef.current?.commandId || crypto.randomUUID();
     try {
       const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
-      if (resVal.disponivel === false) throw new Error(resVal.mensagem || "Horário indisponível");
+      if (resVal.disponivel === false) {
+        // Mantém o rascunho para o usuário apenas trocar o horário
+        if (agendaDraftRef.current) {
+          agendaDraftRef.current = { ...agendaDraftRef.current, etapa: "hora", hora: null };
+        }
+        throw new Error(resVal.mensagem || "Horário indisponível");
+      }
+
 
       // FASE 1 — Observação: a ação é apenas simulada, nada é gravado.
       if (faseLiberacao === "observacao") {
