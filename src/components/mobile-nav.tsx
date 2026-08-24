@@ -22,6 +22,7 @@ import {
   Settings,
   PawPrint,
   Cake,
+  PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -50,13 +51,14 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Agenda", url: "/agenda", icon: Calendar },
       { title: "Atendimentos", url: "/atendimentos", icon: ClipboardList },
       { title: "Clientes e Pets", url: "/clientes", icon: Users },
-      { title: "Serviços", url: "/servicos", icon: Scissors },
-      { title: "Leva e Traz", url: "/leva-traz", icon: Truck },
     ],
   },
   {
     label: "Gestão",
     items: [
+      { title: "Serviços", url: "/servicos", icon: Scissors },
+      { title: "Programas de Cuidado", url: "/gestao/programas-cuidado", icon: PackageCheck },
+      { title: "Leva e Traz", url: "/leva-traz", icon: Truck },
       { title: "Financeiro", url: "/financeiro", icon: Wallet },
       { title: "Pagamentos em aberto", url: "/pagamentos-abertos", icon: Receipt },
       { title: "Estoque", url: "/estoque", icon: Package },
