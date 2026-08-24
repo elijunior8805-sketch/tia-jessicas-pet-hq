@@ -109,8 +109,8 @@ export async function criarAgendamentoIA(
   const { data: agendamento, error: errA } = await sb
     .from("agendamentos")
     .insert({
-      cliente_id: params.cliente_id,
-      pet_id: params.pet_id,
+      cliente_id: params.cliente_id!,
+      pet_id: params.pet_id!,
       data: params.data,
       hora: params.hora,
       profissional_id: params.profissional_id,
