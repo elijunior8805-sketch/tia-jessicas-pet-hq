@@ -33,19 +33,23 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
     year: "numeric", month: "2-digit", day: "2-digit",
   }).format(now);
 
-  // Tratamento de data incompleta (ex: "dia 28")
+  // Tratamento de data incompleta (ex: "dia 28" ou "28")
   let dataFinal = filtros.data;
-  if (dataFinal && /^\d{1,2}$/.test(dataFinal)) {
-    const diaAlvo = parseInt(dataFinal);
-    let dataAlvo = new Date(now.getFullYear(), now.getMonth(), diaAlvo);
-    // Se a data já passou no mês atual, mover para o próximo mês
-    if (dataAlvo < now) {
-      dataAlvo = new Date(now.getFullYear(), now.getMonth() + 1, diaAlvo);
+  if (dataFinal && (/^\d{1,2}$/.test(dataFinal) || dataFinal.toLowerCase().includes("dia "))) {
+    const diaApenas = dataFinal.replace(/\D/g, "");
+    const diaAlvo = parseInt(diaApenas);
+    if (!isNaN(diaAlvo)) {
+      let dataAlvo = new Date(now.getFullYear(), now.getMonth(), diaAlvo);
+      // Se a data alvo (no fuso local) for anterior ao início do dia de hoje, mover para o próximo mês
+      const hojeInicio = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (dataAlvo < hojeInicio) {
+        dataAlvo = new Date(now.getFullYear(), now.getMonth() + 1, diaAlvo);
+      }
+      dataFinal = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(dataAlvo);
     }
-    dataFinal = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(dataAlvo);
   }
 
   if (dataFinal && /^\d{4}-\d{2}-\d{2}$/.test(dataFinal)) {
