@@ -24,7 +24,7 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
 export const buscarClientesIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    termo: z.string(),
+    termo: z.string().optional().default(""),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -35,7 +35,7 @@ export const buscarClientesIA = createServerFn({ method: "POST" })
 export const buscarPetsDoClienteIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string(),
+    cliente_id: z.string().optional().default(""),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -64,7 +64,7 @@ export const consultarDisponibilidadeIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     servico: z.string().optional(),
-    data: z.string(),
+    data: z.string().optional().default("hoje"),
     profissional: z.string().optional(),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
@@ -101,7 +101,7 @@ export const buscarServicosIA = createServerFn({ method: "POST" })
 export const consultarHistoricoPetIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    pet_id: z.string(),
+    pet_id: z.string().optional().default(""),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -112,7 +112,7 @@ export const consultarHistoricoPetIA = createServerFn({ method: "POST" })
 export const consultarVisao360ClienteIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string(),
+    cliente_id: z.string().optional().default(""),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -123,7 +123,7 @@ export const consultarVisao360ClienteIA = createServerFn({ method: "POST" })
 export const consultarVisao360PetIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    pet_id: z.string(),
+    pet_id: z.string().optional().default(""),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -134,7 +134,7 @@ export const consultarVisao360PetIA = createServerFn({ method: "POST" })
 export const consultarRiscoFaltaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string(),
+    cliente_id: z.string().optional().default(""),
     comando_original: z.string().optional().default("consulta"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -145,12 +145,13 @@ export const consultarRiscoFaltaIA = createServerFn({ method: "POST" })
 export const criarFilaEsperaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string(),
-    pet_id: z.string(),
-    servico_id: z.string(),
-    data_pretendida: z.string(),
+    cliente_id: z.string().optional().default(""),
+    pet_id: z.string().optional().default(""),
+    servico_id: z.string().optional().default(""),
+    data_pretendida: z.string().optional().default(""),
     periodo: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("fila_espera"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { criarFilaEsperaIA: criarFila } = await import("./ia-consultas.server");
     return criarFila(context.supabase, data);
@@ -166,9 +167,10 @@ export const consultarAuditoriaDadosIA = createServerFn({ method: "POST" })
 export const compararPeriodosFinanceirosIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    p1: z.object({ from: z.string(), to: z.string() }),
-    p2: z.object({ from: z.string(), to: z.string() }),
-  }).parse(input))
+    p1: z.object({ from: z.string(), to: z.string() }).optional(),
+    p2: z.object({ from: z.string(), to: z.string() }).optional(),
+    comando_original: z.string().optional().default("comparacao"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { compararPeriodosIA } = await import("./ia-financeiro.server");
     return compararPeriodosIA(context.supabase, data);

@@ -5,8 +5,9 @@ import { classificarComandoIA } from "./ia-agente.server";
 export const classificarIntencao = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({ 
     texto: z.string(),
-    contexto: z.any().optional()
-  }).parse(input))
+    contexto: z.any().optional(),
+    comando_original: z.string().optional().default("classificacao"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     // Note: requireSupabaseAuth is assumed to be handled by the route or middleware
     // We pass the context if available
