@@ -7,6 +7,8 @@ import { classificarIntencao } from "@/lib/ia/ia-agente.functions";
 import { registrarAuditoriaIA } from "@/lib/ia/ia-auditoria.functions";
 import {
   consultarAgendaIA,
+  consultarFinanceiroIA,
+  consultarResumoOperacionalIA,
 } from "@/lib/ia/ia-consultas.functions";
 import {
   validarAgendamentoIA,
