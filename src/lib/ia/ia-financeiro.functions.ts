@@ -14,6 +14,7 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     observacoes: z.string().optional(),
     comprovante_path: z.string().optional(),
     id_transacao: z.string().optional(),
+    comprovante_hash: z.string().optional(),
     comando_original: z.string().optional().default("pagamento"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
@@ -26,7 +27,8 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
       data_pagamento: data.data_pagamento,
       observacoes: data.observacoes,
       comprovante_path: data.comprovante_path,
-      id_transacao: data.id_transacao
+      id_transacao: data.id_transacao,
+      comprovante_hash: data.comprovante_hash
     });
   });
 
