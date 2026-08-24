@@ -121,7 +121,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   }, []);
 
   const handleSend = useCallback(async (text: string) => {
-    if (!text.trim() || processingRef.current) return;
+    if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
 
     // Idempotency and Session IDs
     const commandId = crypto.randomUUID();
