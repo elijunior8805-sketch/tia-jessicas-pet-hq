@@ -34,7 +34,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
   const lowercaseTexto = texto.toLowerCase().trim();
   
   // Mapeamento direto para intenções fixas dos comandos rápidos
-  const mapeamentoDireto: Record<string, IAIntent> = {
+  const mapeamentoDireto: Record<string, any> = {
     "consultar_agenda": {
       intencao: "consulta_agenda",
       especialista: "agenda",
