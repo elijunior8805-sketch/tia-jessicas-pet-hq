@@ -183,6 +183,58 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
     try {
       setIaStatus("interpretando");
+
+      // ---- Fluxo determinístico de agendamento (voz e texto no MESMO caminho) ----
+      const pre = preInterpretar(text);
+      if (agendaDraftRef.current || pre.intencao === "criar_agendamento") {
+        const passo = agendaDraftRef.current
+          ? await avancarFluxo(agendaDraftRef.current, text)
+          : await iniciarFluxo(text);
+
+        agendaDraftRef.current = passo.draft;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: passo.mensagem,
+            timestamp: new Date().toISOString(),
+            intent: passo.pronto
+              ? ({
+                  intencao: "criar_agendamento",
+                  especialista: "agenda",
+                  tipo_operacao: "acao",
+                  parametros: { ...passo.parametros, idempotency_key: idempotencyKey },
+                  informacoes_faltantes: [],
+                  nivel_confianca: 1,
+                  exige_confirmacao: true,
+                } as any)
+              : undefined,
+          },
+        ]);
+
+        setIaStatus(passo.pronto ? "aguardando_confirmacao" : "aguardando_informacao");
+        await registrarEventoIA({
+          data: {
+            command_id: commandId,
+            correlation_id: correlationId,
+            session_id: sessionId,
+            idempotency_key: idempotencyKey,
+            comando_original: text,
+            intencao_detectada: "criar_agendamento",
+            especialista: "agenda",
+            ferramenta_utilizada: "fluxo_agendamento",
+            tipo_operacao: "acao",
+            parametros: (passo.parametros || passo.draft || {}) as any,
+            resposta_ia: passo.mensagem.slice(0, 4000),
+            sucesso: true,
+            confirmado: false,
+            tempo_resposta_ms: Date.now() - startTime,
+          },
+        }).catch(() => {});
+        return;
+      }
+
       const intent = await classificarIntencao({
         data: {
           texto: text,
@@ -193,6 +245,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           comando_original: text
         },
       });
+
 
       // Normalizar parâmetros para evitar Zod Errors em funções subsequentes
       if (!intent.parametros) {
