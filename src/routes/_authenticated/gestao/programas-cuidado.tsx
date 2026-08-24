@@ -14,8 +14,10 @@ import {
   CheckCircle2,
   Trash2,
   Calendar,
-  Wallet
+  Wallet,
+  Pencil
 } from "lucide-react";
+
 import { useState, useMemo } from "react";
 import { 
   getProgramasCatalogo, 
