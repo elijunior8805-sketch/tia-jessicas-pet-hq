@@ -35,8 +35,11 @@ import {
   getQualidadeIA 
 } from "@/lib/ia/ia-auditoria.functions";
 import { processarComprovanteIA } from "@/lib/ia/ia-financeiro.functions";
+import { preInterpretar } from "@/lib/ia/ia-nlp";
+import { iniciarFluxo, avancarFluxo, AgendaDraft } from "@/lib/ia/ia-fluxo-agendamento";
 import { format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [messages, setMessages] = useState<IAMessage[]>([]);
