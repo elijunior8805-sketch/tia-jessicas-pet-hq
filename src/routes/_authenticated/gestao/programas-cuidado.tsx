@@ -249,8 +249,8 @@ function ProgramasCuidadoPage() {
           {programas && programas.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {programas.map((programa: any) => (
-                <Card key={programa.id} className="group overflow-hidden border-sidebar-border/60 hover:shadow-lg hover:shadow-gold/5 transition-all duration-300">
-                  <CardHeader className="pb-3 border-b border-sidebar-border/40 bg-muted/20">
+                <Card key={programa.id} className="group overflow-hidden border-sidebar-border/60 hover:shadow-lg hover:shadow-gold/10 transition-all duration-300 bg-white dark:bg-zinc-950">
+                  <CardHeader className="pb-3 border-b border-sidebar-border/40 bg-zinc-50/50 dark:bg-zinc-900/50">
                     <div className="flex justify-between items-start mb-2">
                       {getStatusBadge(programa.status)}
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -261,31 +261,30 @@ function ProgramasCuidadoPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold" onClick={() => duplicarMutation.mutate(programa.id)}>
-
                           <Plus className="h-4 w-4 rotate-45" />
                         </Button>
                       </div>
                     </div>
-                    <CardTitle className="text-lg font-display text-sidebar-foreground group-hover:text-gold transition-colors">
+                    <CardTitle className="text-xl font-display text-zinc-900 dark:text-zinc-100 group-hover:text-gold transition-colors">
                       {programa.nome}
                     </CardTitle>
-                    <CardDescription className="line-clamp-2 min-h-[2.5rem] mt-1 italic text-xs">
+                    <CardDescription className="line-clamp-2 min-h-[2.5rem] mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                       {programa.descricao || "Sem descrição definida."}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="pt-4 space-y-4 pb-4">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                  <CardContent className="pt-5 space-y-5 pb-5">
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                         Serviços Incluídos
                       </p>
-                      <ul className="space-y-1.5">
+                      <ul className="space-y-2">
                         {programa.itens?.map((item: any) => (
-                          <li key={item.id} className="flex items-center justify-between text-sm bg-muted/30 px-2 py-1.5 rounded-md border border-sidebar-border/30">
+                          <li key={item.id} className="flex items-center justify-between text-sm bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
                             <span className="flex items-center gap-2">
-                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold bg-white border-sidebar-border/50">
+                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-gold">
                                 {item.quantidade}x
                               </Badge>
-                              <span className="font-medium text-sidebar-foreground/90">
+                              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
                                 {item.servico?.nome || "Serviço"}
                               </span>
                             </span>
@@ -294,39 +293,40 @@ function ProgramasCuidadoPage() {
                       </ul>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-gold/5 border border-gold/10 p-2.5 rounded-lg">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-gold/80">Validade</p>
-                        <p className="text-sm font-semibold text-sidebar-foreground">{programa.validade_em_dias} dias</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gold/5 border border-gold/10 p-3 rounded-xl">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gold/70">Validade</p>
+                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{programa.validade_em_dias} dias</p>
                       </div>
-                      <div className="bg-muted/50 p-2.5 rounded-lg border border-sidebar-border/40">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Transporte</p>
-                        <p className="text-sm font-semibold text-sidebar-foreground">
+                      <div className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Transporte</p>
+                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                           {programa.inclui_transporte ? "Incluso" : "Não incluso"}
                         </p>
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex flex-col gap-3 pt-4 border-t border-sidebar-border/40 bg-muted/10">
+                  <CardFooter className="flex flex-col gap-4 pt-5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/30">
                     <div className="w-full flex justify-between items-end">
                       <div className="space-y-0.5">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 line-through">
+                        <p className="text-xs font-bold text-zinc-400 dark:text-zinc-600 line-through decoration-zinc-300 dark:decoration-zinc-700">
                           R$ {Number(programa.valor_normal_dos_servicos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
-                        <p className="text-2xl font-display font-bold text-gold">
-                          R$ {Number(programa.preco_do_programa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <p className="text-3xl font-display font-bold text-gold">
+                          <span className="text-sm font-normal mr-1">R$</span>
+                          {Number(programa.preco_do_programa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                       {programa.economia > 0 && (
-                        <Badge className="bg-green-600 text-white border-none shadow-sm">
-                          Economia de R$ {Number(programa.economia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </Badge>
+                        <div className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm mb-1 animate-pulse">
+                          ECONOMIZE R$ {Number(programa.economia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </div>
                       )}
                     </div>
                     
-                    <div className="w-full flex gap-2 pt-1">
+                    <div className="w-full flex gap-2">
                       <Button 
-                        className="flex-1 bg-gold hover:bg-gold/90 text-white font-medium"
+                        className="flex-1 bg-gold hover:bg-gold/90 text-white font-bold h-11 rounded-xl shadow-lg shadow-gold/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                         onClick={() => handleOpenVenda(programa)}
                       >
                         Vender Agora
@@ -334,17 +334,18 @@ function ProgramasCuidadoPage() {
                       <Button 
                         variant="secondary" 
                         size="icon"
-                        className={`${programa.status === 'ativo' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                        className={`h-11 w-11 rounded-xl shadow-sm ${programa.status === 'ativo' ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
                         onClick={() => toggleStatusMutation.mutate({ 
                           id: programa.id, 
                           status: programa.status === 'ativo' ? 'inativo' : 'ativo' 
                         })}
                       >
-                        <Plus className={`h-4 w-4 ${programa.status === 'ativo' ? 'rotate-45' : ''}`} />
+                        <Plus className={`h-5 w-5 ${programa.status === 'ativo' ? 'rotate-45' : ''}`} />
                       </Button>
                     </div>
                   </CardFooter>
                 </Card>
+
               ))}
             </div>
           ) : (
