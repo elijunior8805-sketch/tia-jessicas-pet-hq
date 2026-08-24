@@ -143,12 +143,22 @@ export async function criarAgendamentoIA(
 
   if (errS) throw errS;
 
+  // 4. Verificação de Sucesso (Read-back)
+  const { data: conferido } = await sb
+    .from("agendamentos")
+    .select("id, status")
+    .eq("id", agendamento.id)
+    .single();
+
   return createIAResponse({
     source: 'criar_agendamento',
     affected_record_id: agendamento.id,
-    data: agendamento
+    data: agendamento,
+    success: !!conferido,
+    message: conferido ? "Agendamento confirmado no banco de dados." : "Falha na verificação pós-criação."
   });
 }
+
 
 export async function remarcarAgendamentoIA(
   sb: SupabaseClient<Database>,
