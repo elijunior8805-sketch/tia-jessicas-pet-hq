@@ -114,10 +114,14 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
     }
   };
 
-  if (mapeamentoDireto[lowercaseTexto]) {
-     console.log(`[IA] Comando rápido detectado: ${lowercaseTexto}`);
-     return mapeamentoDireto[lowercaseTexto];
+  // Checagem de prefixos para o mapeamentoDireto
+  for (const key in mapeamentoDireto) {
+    if (lowercaseTexto.startsWith(key)) {
+      console.log(`[IA] Comando rápido detectado (prefixo): ${key}`);
+      return IAIntentSchema.parse(mapeamentoDireto[key]);
+    }
   }
+
 
   const { chamarIA, IA_CONFIG_PADRAO } = await import("../ia-core.server");
   
