@@ -218,7 +218,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
     } catch (error: any) {
       console.error(error);
-      setIaStatus("erro");
+      setIaStatus("error");
       setMessages((prev) => [...prev, { role: "assistant", content: `A resposta foi interrompida ou ocorreu um erro: ${error.message}`, timestamp: new Date().toISOString() }]);
     } finally {
       setIsProcessing(false);
@@ -249,7 +249,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     if (processingRef.current) return;
     processingRef.current = true;
     setIsProcessing(true);
-    setIaStatus("validando");
+    setIaStatus("processing");
     try {
       const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
       if (resVal.disponivel === false) throw new Error(resVal.mensagem || "Horário indisponível");
@@ -261,7 +261,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       setIaStatus("concluido");
     } catch (error: any) {
       toast.error(error.message);
-      setIaStatus("erro");
+      setIaStatus("error");
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
