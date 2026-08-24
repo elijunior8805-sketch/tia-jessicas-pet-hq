@@ -774,6 +774,10 @@ function AgendamentoRow({
       const nota = motivoCancel.trim()
         ? `${obsAntes ? obsAntes + "\n" : ""}[Cancelado em ${stamp}] ${motivoCancel.trim()}`
         : obsAntes || null;
+      
+      // Liberar reserva se existir
+      await liberarReserva({ data: { agendamento_id: row.id } });
+
       const { error } = await supabase
         .from("agendamentos")
         .update({ status: "cancelado", observacoes: nota })
