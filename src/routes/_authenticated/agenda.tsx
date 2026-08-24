@@ -2079,6 +2079,13 @@ function EditarServicosDialog({
     },
   });
 
+  const { data: creditosPet } = useQuery({
+    queryKey: ["creditos-pet", agendamento?.pet_id],
+    enabled: !!agendamento?.pet_id,
+    queryFn: () => getCreditosDisponiveis({ data: { pet_id: agendamento.pet_id } }),
+  });
+
+
   const totalValor = useMemo(() => itens.reduce((s, it) => s + Number(it.valor_unit ?? 0), 0), [itens]);
   const totalDuracao = useMemo(() => itens.reduce((s, it) => s + Number(it.duracao_min ?? 0), 0), [itens]);
   const totalComTaxa = totalValor + Number(taxa || 0);
