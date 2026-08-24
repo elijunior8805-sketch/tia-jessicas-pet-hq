@@ -24,6 +24,7 @@ import {
 
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+import { getCreditosDisponiveis } from "@/lib/programas-cuidado.functions";
 
 import { z } from "zod";
 import {
