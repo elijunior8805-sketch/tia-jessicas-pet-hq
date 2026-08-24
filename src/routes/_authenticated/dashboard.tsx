@@ -8,6 +8,8 @@ import { PageShell } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   TrendingUp, Wallet, Sparkles, PawPrint, Receipt, Users, Calendar, Search, Plus, LineChart as LineChartIcon, Clock, AlertCircle, RefreshCw, Coins,
 } from "lucide-react";
@@ -23,6 +25,16 @@ import { RelatorioFinanceiroExport } from "@/components/RelatorioFinanceiroExpor
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  head: () => ({
+    meta: [
+      { title: "Dashboard — Spa de Pet Tia Jéssica" },
+      { name: "description", content: "Painel operacional e financeiro do Spa de Pet Tia Jéssica." },
+      { property: "og:title", content: "Dashboard — Spa de Pet Tia Jéssica" },
+      { property: "og:description", content: "Painel operacional e financeiro do Spa de Pet Tia Jéssica." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: DashboardPage,
 });
 
@@ -72,6 +84,11 @@ function DashboardPage() {
   const [period, setPeriod] = useState<Period>("30dias");
   const [customFrom, setCustomFrom] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [quickClienteId, setQuickClienteId] = useState("");
+  const [quickPetId, setQuickPetId] = useState("");
+  const [quickServicoId, setQuickServicoId] = useState("");
+  const [quickData, setQuickData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [quickHora, setQuickHora] = useState("09:00");
 
   const { from, to } = useMemo(() => {
     const now = new Date();
@@ -151,6 +168,76 @@ function DashboardPage() {
         serie
       };
     },
+  });
+
+  const { data: quickClientes = [] } = useQuery({
+    queryKey: ["dashboard-quick-clientes"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clientes").select("id,nome").eq("ativo", true).order("nome").limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: quickPets = [] } = useQuery({
+    queryKey: ["dashboard-quick-pets", quickClienteId],
+    enabled: Boolean(quickClienteId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("pets").select("id,nome").eq("cliente_id", quickClienteId).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: quickServicos = [] } = useQuery({
+    queryKey: ["dashboard-quick-servicos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("servicos").select("id,nome,valor,duracao_min").eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const quickSchedule = useMutation({
+    mutationFn: async () => {
+      if (!quickClienteId || !quickPetId || !quickServicoId || !quickData || !quickHora) {
+        throw new Error("Preencha cliente, pet, serviço, data e horário.");
+      }
+      const servico = quickServicos.find((item) => item.id === quickServicoId);
+      if (!servico) throw new Error("Serviço não encontrado.");
+      const payload = {
+        cliente_id: quickClienteId,
+        pet_id: quickPetId,
+        servico_id: quickServicoId,
+        data: quickData,
+        hora: quickHora,
+        duracao_min: servico.duracao_min ?? null,
+        valor_previsto: Number(servico.valor ?? 0),
+        taxa_leva_traz: 0,
+        status: "agendado",
+        leva_traz_modalidade: "nao_utilizar",
+      };
+      const { data: agendamentoId, error } = await supabase.rpc("criar_agendamento_seguro", { _payload: payload as any });
+      if (error) throw error;
+      const { error: itemError } = await supabase.from("agendamento_servicos").insert({
+        agendamento_id: agendamentoId as string,
+        servico_id: servico.id,
+        nome: servico.nome,
+        valor_unit: Number(servico.valor ?? 0),
+        duracao_min: servico.duracao_min ?? null,
+        ordem: 0,
+      });
+      if (itemError) throw itemError;
+    },
+    onSuccess: async () => {
+      toast.success("Agendamento criado com sucesso.");
+      setQuickClienteId("");
+      setQuickPetId("");
+      setQuickServicoId("");
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-aux"] });
+      await queryClient.invalidateQueries({ queryKey: ["agendamentos"] });
+    },
+    onError: (error: Error) => toast.error(error.message || "Não foi possível criar o agendamento."),
   });
 
   const kpis = [
@@ -265,6 +352,52 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <Card className="mb-6 border-border/60 bg-card p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+            <Calendar className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="font-display text-lg font-semibold text-primary">Agendamento rápido</h2>
+            <p className="text-xs text-muted-foreground">Cadastre o próximo atendimento sem sair do painel.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1.25fr_0.8fr_0.7fr_auto] xl:items-end">
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-cliente">Cliente</Label>
+            <Select value={quickClienteId || undefined} onValueChange={(value) => { setQuickClienteId(value); setQuickPetId(""); }}>
+              <SelectTrigger id="quick-cliente"><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+              <SelectContent>{quickClientes.map((cliente) => <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-pet">Pet</Label>
+            <Select value={quickPetId || undefined} onValueChange={setQuickPetId} disabled={!quickClienteId}>
+              <SelectTrigger id="quick-pet"><SelectValue placeholder="Selecionar pet" /></SelectTrigger>
+              <SelectContent>{quickPets.map((pet) => <SelectItem key={pet.id} value={pet.id}>{pet.nome}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-servico">Serviço</Label>
+            <Select value={quickServicoId || undefined} onValueChange={setQuickServicoId}>
+              <SelectTrigger id="quick-servico"><SelectValue placeholder="Selecionar serviço" /></SelectTrigger>
+              <SelectContent>{quickServicos.map((servico) => <SelectItem key={servico.id} value={servico.id}>{servico.nome} · {brl(Number(servico.valor ?? 0))}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-data">Data</Label>
+            <Input id="quick-data" type="date" value={quickData} onChange={(event) => setQuickData(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-hora">Horário</Label>
+            <Input id="quick-hora" type="time" value={quickHora} onChange={(event) => setQuickHora(event.target.value)} />
+          </div>
+          <Button className="gap-2" onClick={() => quickSchedule.mutate()} disabled={quickSchedule.isPending}>
+            <Plus className="h-4 w-4" /> {quickSchedule.isPending ? "Salvando…" : "Agendar"}
+          </Button>
+        </div>
+      </Card>
 
       {/* Filtro segmentado + Ações */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
