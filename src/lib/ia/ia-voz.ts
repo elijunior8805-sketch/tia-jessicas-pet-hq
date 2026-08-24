@@ -1,5 +1,5 @@
 
-export type VoiceRecognitionStatus = 'idle' | 'listening' | 'processing' | 'reviewing' | 'error';
+export type VoiceRecognitionStatus = 'idle' | 'requesting_permission' | 'listening' | 'reviewing' | 'error';
 
 export interface VoiceRecognitionOptions {
   onResult: (text: string, isFinal: boolean) => void;
@@ -74,9 +74,14 @@ export class VoiceRecognizer {
   start() {
     if (this.recognition && (this.status === 'idle' || this.status === 'reviewing' || this.status === 'error')) {
       try {
+        this.status = 'requesting_permission';
+        this.options.onStatusChange(this.status);
         this.recognition.start();
       } catch (err) {
         console.error('Falha ao iniciar reconhecimento:', err);
+        this.status = 'error';
+        this.options.onStatusChange(this.status);
+        this.options.onError('Falha ao acessar microfone.');
       }
     }
   }

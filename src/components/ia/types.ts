@@ -2,16 +2,21 @@ import { IAMessage, IAIntent } from "@/lib/ia/ia-agente.server";
 
 export type IAStatus =
   | "idle"
+  | "requesting_permission"
+  | "listening"
+  | "reviewing_transcription"
+  | "ready_to_send"
+  | "sending"
+  | "processing"
   | "interpretando"
   | "pesquisando"
   | "aguardando_informacao"
-  | "validando"
   | "aguardando_confirmacao"
   | "executando"
   | "verificando"
   | "concluido"
   | "cancelado"
-  | "erro";
+  | "error";
 
 export interface AssistenteIaSidebarProps {
   isOpen: boolean;
