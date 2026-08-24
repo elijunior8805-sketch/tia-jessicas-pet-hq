@@ -4,11 +4,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const consultarMensagensIA = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: any) => z.object({
+  .inputValidator((input: any) => z.object({
     cliente_id: z.string().optional(),
     pet_id: z.string().optional(),
     limite: z.number().optional()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data, context }) => {
     const { consultarMensagensRecentes } = await import("./ia-comunicacao.server");
     return consultarMensagensRecentes(context.supabase, data);

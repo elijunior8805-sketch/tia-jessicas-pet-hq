@@ -11,9 +11,9 @@ export const consultarFilaCobrancaIA = createServerFn({ method: "GET" })
 
 export const gerarMensagensCobrancaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
+  .inputValidator((input: any) => z.object({
     pagamento_id: z.string()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data, context }) => {
     const { gerarMensagensCobrancaIA: gerar } = await import("./ia-cobranca.server");
     return gerar(context.supabase, data);
@@ -21,13 +21,13 @@ export const gerarMensagensCobrancaIA = createServerFn({ method: "POST" })
 
 export const registrarPromessaPagamentoIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
+  .inputValidator((input: any) => z.object({
     pagamento_id: z.string(),
     cliente_id: z.string(),
     data_prometida: z.string(),
     valor_prometido: z.number(),
     observacoes: z.string().optional()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data, context }) => {
     const { registrarPromessaPagamentoIA: registrar } = await import("./ia-cobranca.server");
     return registrar(context.supabase, data);
