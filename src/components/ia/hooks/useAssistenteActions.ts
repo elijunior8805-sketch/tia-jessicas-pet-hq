@@ -15,7 +15,7 @@ import {
 
 import { 
   salvarTranscricaoIA,
-  listarTranscricoesIA 
+
 } from "@/lib/ia/ia-voz.functions";
 import {
   validarAgendamentoIA,
@@ -234,16 +234,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         }
       }
 
-      if (intent.intencao === "listar_transcricoes") {
-        setIaStatus("processing");
-        const res = await listarTranscricoesIA();
-        dadosReais = res;
-        respostaFinal = (res as any[]).length > 0 
-          ? `### 🎙️ Transcrições Recentes\n\n` + (res as any[]).map((t: any) => 
-              `- [${format(parseISO(t.created_at), "dd/MM HH:mm")}] "${t.texto.length > 60 ? t.texto.substring(0, 60) + '...' : t.texto}"`
-            ).join("\n")
-          : "Não encontrei áudios salvos recentemente.";
-      }
 
       if (intent.especialista === "gestao_estrategica" || intent.especialista === "relatorios") {
         setIaStatus("processing");
