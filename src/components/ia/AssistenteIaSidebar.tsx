@@ -26,6 +26,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     filePreview,
     handleSend,
     toggleVoice,
+    cancelVoice,
     scrollRef,
     setSelectedFile,
     setFilePreview,
@@ -35,6 +36,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     handleConfirmarAgendamento,
     selectedFile,
     analiseResult,
+    interimTranscript,
+    finalTranscript,
+    isReviewingVoice,
+    setFinalTranscript
   } = useAssistenteActions(isOpen, onClose);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
