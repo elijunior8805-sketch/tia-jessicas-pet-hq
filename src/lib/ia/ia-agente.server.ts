@@ -31,6 +31,23 @@ export interface IAMessage {
  * Classifica a intenção do usuário usando o modelo Gemini.
  */
 export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
+  const lowercaseTexto = texto.toLowerCase().trim();
+  
+  // Mapeamento direto para intenções fixas dos comandos rápidos
+  const mapeamentoDireto: Record<string, string> = {
+    "consultar_agenda": "consulta_agenda",
+    "contar_atendimentos": "contar_atendimentos",
+    "criar_agendamento": "criar_agendamento",
+    "consultar_faturamento": "consultar_faturamento",
+    "consultar_valores_a_receber": "consultar_valores_a_receber",
+    "consultar_resumo_operacional": "consultar_resumo_operacional"
+  };
+
+  if (mapeamentoDireto[lowercaseTexto]) {
+     // Para intenções fixas, podemos retornar um objeto pré-classificado ou forçar o especialista
+     console.log(`[IA] Intenção fixa detectada: ${lowercaseTexto}`);
+  }
+
   const { chamarIA } = await import("../ia-core.server");
   
   const userContext = contexto?.user ? `

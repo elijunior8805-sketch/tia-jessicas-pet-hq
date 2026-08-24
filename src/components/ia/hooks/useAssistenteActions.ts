@@ -219,14 +219,78 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         }
       }
 
-      if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
+      if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos" || intent.intencao === "consultar_agenda") {
         setIaStatus("processing");
         const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), comando_original: text } });
         dadosReais = res.data || [];
-        respostaFinal = intent.intencao === "contar_atendimentos" 
-          ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`
-          : `### 📅 Agenda\n\nExibindo ${dadosReais.length} atendimentos.`;
+        
+        if (intent.intencao === "contar_atendimentos") {
+          const stats = {
+            total: dadosReais.length,
+            confirmados: dadosReais.filter((a: any) => a.status === 'confirmado').length,
+            agendados: dadosReais.filter((a: any) => a.status === 'agendado').length,
+            em_atendimento: dadosReais.filter((a: any) => a.status === 'em_atendimento').length,
+            concluidos: dadosReais.filter((a: any) => a.status === 'finalizado').length,
+            cancelados: dadosReais.filter((a: any) => a.status === 'cancelado').length,
+            faltas: dadosReais.filter((a: any) => a.status === 'nao_compareceu').length,
+          };
+          respostaFinal = `### 📉 Resumo de Atendimentos (Hoje)\n\n` +
+            `- **Total**: ${stats.total}\n` +
+            `- **Confirmados**: ${stats.confirmados}\n` +
+            `- **Agendados**: ${stats.agendados}\n` +
+            `- **Em Atendimento**: ${stats.em_atendimento}\n` +
+            `- **Concluídos**: ${stats.concluidos}\n` +
+            `- **Cancelados**: ${stats.cancelados}\n` +
+            `- **Faltas**: ${stats.faltas}`;
+        } else {
+          respostaFinal = `### 📅 Agenda de Hoje\n\n` + 
+            (dadosReais.length > 0 
+              ? dadosReais.map((a: any) => `- **${a.hora.slice(0,5)}**: ${a.pets?.nome} (${a.servicos?.nome}) - ${a.clientes?.nome} [${a.status}]`).join("\n")
+              : "Nenhum atendimento agendado para hoje.");
+        }
       }
+
+      if (intent.intencao === "consultar_faturamento") {
+        setIaStatus("processing");
+        const res = await consultarFinanceiroIA({ data: { period: "mes", comando_original: text } });
+        const kpis = (res.data as any).metricas;
+        respostaFinal = `### 💰 Faturamento do Mês\n\n` +
+          `- **Período**: Mês Atual\n` +
+          `- **Total Faturado**: R$ ${kpis.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `- **Quantidade**: ${kpis.quantidade_servicos} serviços\n` +
+          `- **Ticket Médio**: R$ ${kpis.ticket_medio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+          `*Fonte: vw_financeiro_indicadores*`;
+      }
+
+      if (intent.intencao === "consultar_valores_a_receber") {
+        setIaStatus("processing");
+        const res = await consultarFinanceiroIA({ data: { apenas_pendentes: true, comando_original: text, intencao: "consultar_valores_a_receber" } as any });
+        const pendencias = res.data as any[];
+        const total = pendencias.reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0);
+        const vencidos = pendencias.filter(p => new Date(p.vencimento) < new Date()).reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0);
+        
+        respostaFinal = `### 💸 Valores a Receber\n\n` +
+          `- **Total Pendente**: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `- **Vencidos**: R$ ${vencidos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `- **A Vencer**: R$ ${(total - vencidos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `- **Clientes Pendentes**: ${new Set(pendencias.map(p => p.cliente_id)).size}\n\n` +
+          `Deseja ver a lista detalhada ou iniciar uma cobrança?`;
+      }
+
+      if (intent.intencao === "consultar_resumo_operacional") {
+        setIaStatus("processing");
+        const res = await consultarResumoOperacionalIA();
+        const r = res.data as any;
+        respostaFinal = `### 🚀 Resumo Operacional (${format(parseISO(r.data), "dd/MM")})\n\n` +
+          `**Agenda:**\n` +
+          `- Atendimentos: ${r.total_agenda} (${r.confirmados} conf.)\n` +
+          `- Leva e Traz: ${r.leva_traz} pets\n\n` +
+          `**Financeiro:**\n` +
+          `- Recebido Hoje: R$ ${r.recebido_hoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `- Pendências: R$ ${r.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+          (r.proximo_atendimento ? `**Próximo:** ${r.proximo_atendimento.hora} - ${r.proximo_atendimento.pet} (${r.proximo_atendimento.servico})` : "");
+      }
+
 
       const assistantMessage: IAMessage = {
         role: "assistant",
