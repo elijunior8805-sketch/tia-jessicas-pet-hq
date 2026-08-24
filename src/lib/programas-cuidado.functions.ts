@@ -460,7 +460,7 @@ export const reconciliarCreditosPet = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     
-    const { data: result, error } = await sb.rpc('reconciliar_creditos_pet', {
+    const { data: result, error } = await sb.rpc('reconciliar_creditos_pet' as any, {
       _pet_id: data.pet_id
     });
 
