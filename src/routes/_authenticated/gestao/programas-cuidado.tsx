@@ -148,9 +148,30 @@ function ProgramasCuidadoPage() {
     }
   });
 
-  const duplicarMutation = useMutation({
-    mutationFn: (id: string) => duplicarPrograma({ data: { id } }),
-    onSuccess: () => {
+  const { data: programasAtivos } = useQuery({
+    queryKey: ["programas-ativos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("programas_contratados")
+        .select("*, clientes(nome), pets(nome, raca)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: movimentacoes } = useQuery({
+    queryKey: ["creditos-movimentacoes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("programas_creditos_movimentacoes")
+        .select("*, pets(nome)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
       queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
       toast.success("Programa duplicado com sucesso");
     }
