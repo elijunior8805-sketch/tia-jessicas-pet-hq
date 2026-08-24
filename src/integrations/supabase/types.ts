@@ -545,41 +545,89 @@ export type Database = {
       auditoria_ia: {
         Row: {
           comando_original: string
+          command_id: string | null
+          confirmado: boolean
+          correcao_humana: boolean
+          correlation_id: string | null
           created_at: string | null
+          duplicidade_bloqueada: boolean
+          erro: string | null
+          erro_tipo: string | null
           especialista: string | null
+          fase_liberacao: string | null
           ferramenta_utilizada: string | null
           id: string
+          idempotency_key: string | null
           intencao_detectada: string | null
+          intencao_incorreta: boolean
           parametros: Json | null
+          registro_afetado_id: string | null
           resposta_ia: string | null
+          resultado: Json | null
+          retry_count: number
+          session_id: string | null
+          simulado: boolean
           sucesso: boolean | null
           tempo_resposta_ms: number | null
+          tipo_operacao: string | null
           user_id: string | null
         }
         Insert: {
           comando_original: string
+          command_id?: string | null
+          confirmado?: boolean
+          correcao_humana?: boolean
+          correlation_id?: string | null
           created_at?: string | null
+          duplicidade_bloqueada?: boolean
+          erro?: string | null
+          erro_tipo?: string | null
           especialista?: string | null
+          fase_liberacao?: string | null
           ferramenta_utilizada?: string | null
           id?: string
+          idempotency_key?: string | null
           intencao_detectada?: string | null
+          intencao_incorreta?: boolean
           parametros?: Json | null
+          registro_afetado_id?: string | null
           resposta_ia?: string | null
+          resultado?: Json | null
+          retry_count?: number
+          session_id?: string | null
+          simulado?: boolean
           sucesso?: boolean | null
           tempo_resposta_ms?: number | null
+          tipo_operacao?: string | null
           user_id?: string | null
         }
         Update: {
           comando_original?: string
+          command_id?: string | null
+          confirmado?: boolean
+          correcao_humana?: boolean
+          correlation_id?: string | null
           created_at?: string | null
+          duplicidade_bloqueada?: boolean
+          erro?: string | null
+          erro_tipo?: string | null
           especialista?: string | null
+          fase_liberacao?: string | null
           ferramenta_utilizada?: string | null
           id?: string
+          idempotency_key?: string | null
           intencao_detectada?: string | null
+          intencao_incorreta?: boolean
           parametros?: Json | null
+          registro_afetado_id?: string | null
           resposta_ia?: string | null
+          resultado?: Json | null
+          retry_count?: number
+          session_id?: string | null
+          simulado?: boolean
           sucesso?: boolean | null
           tempo_resposta_ms?: number | null
+          tipo_operacao?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -1716,6 +1764,30 @@ export type Database = {
           provedor?: string
           singleton?: boolean
           timeout_ms?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ia_liberacao: {
+        Row: {
+          atualizado_por: string | null
+          created_at: string
+          fase: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          created_at?: string
+          fase?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          created_at?: string
+          fase?: string
+          id?: string
           updated_at?: string
         }
         Relationships: []

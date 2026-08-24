@@ -5,6 +5,7 @@ import { IAStatus, IAResults } from "../types";
 import { toast } from "sonner";
 import { classificarIntencao } from "@/lib/ia/ia-agente.functions";
 import { registrarAuditoriaIA } from "@/lib/ia/ia-auditoria.functions";
+import { registrarEventoIA, getFaseLiberacao } from "@/lib/ia/ia-observabilidade.functions";
 import {
   consultarAgendaIA,
   consultarFinanceiroIA,
@@ -59,6 +60,18 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   } | null>(null);
 
   const processingRef = useRef(false);
+  const [faseLiberacao, setFaseLiberacao] = useState<
+    "observacao" | "teste_controlado" | "piloto" | "producao"
+  >("observacao");
+
+  // Fase de liberação controlada (Parte 4)
+  useEffect(() => {
+    if (!isOpen) return;
+    getFaseLiberacao()
+      .then((r: any) => setFaseLiberacao(r?.fase || "observacao"))
+      .catch(() => setFaseLiberacao("observacao"));
+  }, [isOpen]);
+
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -303,22 +316,46 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setIaStatus(intent.informacoes_faltantes?.length ? "aguardando_informacao" : "concluido");
-      await registrarAuditoriaIA({
+      await registrarEventoIA({
         data: {
-          comando: text,
-          intencao: intent.intencao,
+          command_id: commandId,
+          correlation_id: correlationId,
+          session_id: sessionId,
+          idempotency_key: idempotencyKey,
+          comando_original: text,
+          intencao_detectada: intent.intencao,
+          especialista: intent.especialista || undefined,
+          ferramenta_utilizada: intent.ferramenta || intent.intencao,
+          tipo_operacao: intent.tipo_operacao || "consulta",
+          parametros: intent.parametros || {},
+          resposta_ia: respostaFinal.slice(0, 4000),
+          resultado: { dados: dadosReais },
           sucesso: true,
-          tempo_ms: Date.now() - startTime,
-          metadata: { intent, dados: dadosReais, ...(activeCommandRef.current || {}) },
+          retry_count: 0,
+          confirmado: false,
+          tempo_resposta_ms: Date.now() - startTime,
         },
-      });
+      }).catch(() => {});
       activeCommandRef.current = null; // Libera trava após auditoria
 
     } catch (error: any) {
       console.error(error);
       setIaStatus("error");
-      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${activeCommandRef.current?.correlationId || 'N/A'}`;
+      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${correlationId}`;
       setMessages((prev) => [...prev, { role: "assistant", content: errorMessage, timestamp: new Date().toISOString() }]);
+      await registrarEventoIA({
+        data: {
+          command_id: commandId,
+          correlation_id: correlationId,
+          session_id: sessionId,
+          idempotency_key: idempotencyKey,
+          comando_original: text,
+          sucesso: false,
+          erro: String(error?.message || error).slice(0, 2000),
+          erro_tipo: /timeout|abort/i.test(String(error?.message)) ? "timeout" : "execucao",
+          tempo_resposta_ms: Date.now() - startTime,
+        },
+      }).catch(() => {});
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
@@ -351,18 +388,84 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     processingRef.current = true;
     setIsProcessing(true);
     setIaStatus("processing");
+    const inicio = Date.now();
+    const commandId = activeCommandRef.current?.commandId || crypto.randomUUID();
     try {
       const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
       if (resVal.disponivel === false) throw new Error(resVal.mensagem || "Horário indisponível");
-      
+
+      // FASE 1 — Observação: a ação é apenas simulada, nada é gravado.
+      if (faseLiberacao === "observacao") {
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `🔍 **Modo Observação (Fase 1)**\n\nNenhum registro foi gravado. O que eu faria:\n\n- Criar agendamento com os dados confirmados\n- Validar disponibilidade (já validada: horário livre)\n\nPara executar de verdade, altere a fase de liberação em **Qualidade da IA**.`,
+          timestamp: new Date().toISOString(),
+        }]);
+        setIaStatus("concluido");
+        await registrarEventoIA({
+          data: {
+            command_id: commandId,
+            comando_original: intent?.parametros?.comando_original || "criar_agendamento",
+            intencao_detectada: "criar_agendamento",
+            especialista: "agenda",
+            ferramenta_utilizada: "executarCriacaoAgendamento",
+            tipo_operacao: "acao",
+            parametros: intent.parametros,
+            sucesso: true,
+            simulado: true,
+            confirmado: true,
+            tempo_resposta_ms: Date.now() - inicio,
+          },
+        }).catch(() => {});
+        return;
+      }
+
       setIaStatus("executando");
-      await executarCriacaoAgendamento({ data: intent.parametros });
-      
-      setMessages((prev) => [...prev, { role: "assistant", content: `✅ **Agendamento realizado com sucesso!**`, timestamp: new Date().toISOString() }]);
+      const res = (await executarCriacaoAgendamento({ data: intent.parametros })) as any;
+      const registroId = res?.affected_record_id || res?.data?.id || null;
+
+      setIaStatus("verificando");
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: `✅ **Agendamento realizado com sucesso!**${registroId ? `\n\nID do registro: \`${registroId}\`` : ""}`,
+        timestamp: new Date().toISOString(),
+      }]);
       setIaStatus("concluido");
+      await registrarEventoIA({
+        data: {
+          command_id: commandId,
+          idempotency_key: activeCommandRef.current?.idempotencyKey,
+          comando_original: intent?.parametros?.comando_original || "criar_agendamento",
+          intencao_detectada: "criar_agendamento",
+          especialista: "agenda",
+          ferramenta_utilizada: "executarCriacaoAgendamento",
+          tipo_operacao: "acao",
+          parametros: intent.parametros,
+          resultado: res ?? null,
+          registro_afetado_id: registroId ? String(registroId) : undefined,
+          duplicidade_bloqueada: !!res?.duplicado,
+          sucesso: true,
+          confirmado: true,
+          tempo_resposta_ms: Date.now() - inicio,
+        },
+      }).catch(() => {});
     } catch (error: any) {
       toast.error(error.message);
       setIaStatus("error");
+      await registrarEventoIA({
+        data: {
+          command_id: commandId,
+          comando_original: intent?.parametros?.comando_original || "criar_agendamento",
+          intencao_detectada: "criar_agendamento",
+          tipo_operacao: "acao",
+          parametros: intent?.parametros,
+          sucesso: false,
+          confirmado: true,
+          erro: String(error?.message || error).slice(0, 2000),
+          erro_tipo: /timeout/i.test(String(error?.message)) ? "timeout" : "execucao",
+          tempo_resposta_ms: Date.now() - inicio,
+        },
+      }).catch(() => {});
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
