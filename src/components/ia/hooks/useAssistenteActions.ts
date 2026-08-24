@@ -177,7 +177,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       if (intent.especialista === "estoque_compras") {
         setIaStatus("pesquisando");
         if (intent.intencao === "consulta_estoque") {
-          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque } });
+          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque, comando_original: text } });
           dadosReais = res;
           respostaFinal = (res as any[]).length > 0 ? `### 📦 Estoque\n\n` + (res as any[]).map((p: any) => `- **${p.nome}**: ${p.quantidade} (Mín: ${p.estoque_minimo || 0})`).join("\n") : "Nenhum produto encontrado.";
         } else if (intent.intencao === "sugerir_reposicao") {
@@ -189,7 +189,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
         setIaStatus("pesquisando");
-        const res = await consultarAgendaIA({ data: intent.parametros || {} });
+        const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), comando_original: text } });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
           ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`
