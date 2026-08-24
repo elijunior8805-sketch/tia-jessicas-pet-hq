@@ -227,14 +227,15 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           intencao: intent.intencao,
           sucesso: true,
           tempo_ms: Date.now() - startTime,
-          metadata: { intent, dados: dadosReais, commandId },
+          metadata: { intent, dados: dadosReais, ...activeCommandRef.current },
         },
       });
 
     } catch (error: any) {
       console.error(error);
       setIaStatus("error");
-      setMessages((prev) => [...prev, { role: "assistant", content: `A resposta foi interrompida ou ocorreu um erro: ${error.message}`, timestamp: new Date().toISOString() }]);
+      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${activeCommandRef.current?.correlationId}`;
+      setMessages((prev) => [...prev, { role: "assistant", content: errorMessage, timestamp: new Date().toISOString() }]);
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
