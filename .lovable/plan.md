@@ -36,3 +36,4 @@ Este plano detalha a transição para a Parte 2 da implementação da Assistente
 1. Habilitar o modo de streaming no cliente IA.
 2. Implementar o serviço de resposta por voz (TTS).
 3. Desenvolver as ferramentas de processamento em lote na agenda.
+
