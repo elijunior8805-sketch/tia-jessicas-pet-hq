@@ -98,7 +98,12 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             setFinalTranscript(prev => {
               const cleaned = text.trim();
               if (prev.endsWith(cleaned)) return prev;
-              return (prev + " " + cleaned).trim();
+              const newTranscript = (prev + " " + cleaned).trim();
+              
+              // Execução Direta: Se a transcrição final mudou e estamos no modo listening,
+              // podemos disparar o processamento automaticamente sem revisão manual.
+              // Note: O onend do recognizer vai mudar o status para 'reviewing' se não dispararmos o send.
+              return newTranscript;
             });
             setInterimTranscript("");
           } else {
@@ -109,10 +114,20 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         onStatusChange: (status) => {
           setVoiceStatus(status);
           if (status === 'reviewing') {
-            setIsReviewingVoice(true);
-            setIaStatus("reviewing_transcription");
+            // Se chegou no estado de revisão, e temos conteúdo, enviamos automaticamente
+            // para satisfazer o requisito de "Remoção da Confirmação de Áudio"
+            setFinalTranscript(current => {
+              if (current.trim()) {
+                // Dispara o envio direto do que foi capturado
+                handleSend(current);
+                return ""; // Limpa para a próxima
+              }
+              return current;
+            });
+            setIsReviewingVoice(false);
           } else if (status === 'listening') {
             setIaStatus("listening");
+            setIsReviewingVoice(false);
           } else if (status === 'requesting_permission') {
             setIaStatus("requesting_permission");
           }
@@ -403,13 +418,15 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       processingRef.current = false;
       
       // Salvar transcrição original se for vinda de voz (Parte 2 & 3)
-      if (text.trim() && voiceStatus === "reviewing") {
+      // Ajustado para capturar a mensagem que foi efetivamente enviada (text)
+      if (text.trim() && (voiceStatus === "reviewing" || voiceStatus === "listening")) {
         salvarTranscricaoIA({ 
           data: { 
             texto: text,
             metadata: { 
               origem: "voz",
-              correlation_id: correlationId
+              correlation_id: correlationId,
+              execucao_direta: true
             }
           } 
         }).catch(err => console.error("[IA-VOZ] Erro silenciado ao salvar transcrição:", err));

@@ -67,46 +67,29 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
           </motion.div>
         )}
 
-        {/* Voice Review Area */}
-        {isReviewingVoice && (
+        {/* Voice Review Area - Removida para Execução Direta, mantida apenas se necessário manual */}
+        {isReviewingVoice && finalTranscript && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="mb-4 p-4 bg-white rounded-2xl border-2 border-[#C99845]/30 shadow-xl overflow-hidden"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold text-[#C99845] uppercase tracking-widest">Revisar Transcrição</span>
+              <span className="text-[10px] font-bold text-[#C99845] uppercase tracking-widest">Processando Comando de Voz</span>
               <div className="px-2 py-0.5 rounded text-[10px] font-bold border bg-[#C99845]/5 border-[#C99845]/20 text-[#C99845]">VOZ</div>
             </div>
             
-            <Textarea
-              value={finalTranscript}
-              onChange={(e) => setFinalTranscript(e.target.value)}
-              className="min-h-[80px] bg-[#F5F2EA]/30 border-none focus-visible:ring-0 text-[#123F2A] text-sm mb-4 leading-relaxed"
-              placeholder="Aguardando áudio..."
-            />
+            <div className="p-3 bg-[#F5F2EA]/30 rounded-xl text-[#123F2A] text-sm leading-relaxed italic">
+              "{finalTranscript}"
+            </div>
 
-            <div className="flex gap-2">
-              <Button
-                onClick={() => handleSend(finalTranscript)}
-                className="flex-1 bg-[#C99845] hover:bg-[#C99845]/90 text-white rounded-xl h-10 font-bold text-xs"
-                disabled={!finalTranscript.trim() || isProcessing}
-              >
-                <Check className="w-4 h-4 mr-2" /> Confirmar
-              </Button>
-              <Button
-                variant="outline"
-                onClick={toggleVoice}
-                className="w-10 h-10 p-0 border-[#C99845]/20 text-[#C99845] rounded-xl hover:bg-[#C99845]/5"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
+            <div className="mt-3 flex gap-2">
               <Button
                 variant="outline"
                 onClick={cancelVoice}
-                className="w-10 h-10 p-0 border-red-100 text-red-500 rounded-xl hover:bg-red-50"
+                className="flex-1 h-9 border-red-100 text-red-500 rounded-xl hover:bg-red-50 text-[10px] font-bold"
               >
-                <X className="w-4 h-4" />
+                CANCELAR
               </Button>
             </div>
           </motion.div>
