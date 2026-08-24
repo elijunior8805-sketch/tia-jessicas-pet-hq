@@ -111,10 +111,12 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     try {
       setIaStatus("interpretando");
       const intent = await classificarIntencao({
-        texto: text,
-        contexto: {
-          mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
-          data_atual: new Date().toISOString(),
+        data: {
+          texto: text,
+          contexto: {
+            mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
+            data_atual: new Date().toISOString(),
+          },
         },
       });
 
@@ -133,7 +135,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         setIaStatus("pesquisando");
         if (intent.intencao === "consultar_mensagens") {
           const res = await consultarMensagensIA({
-            cliente_id: intent.parametros?.cliente_id
+            data: { cliente_id: intent.parametros?.cliente_id }
           });
           dadosReais = res.data;
           respostaFinal = `### 💬 Mensagens Recentes\n\n` + (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), "dd/MM HH:mm")}] **${m.clientes?.nome || "Sistema"}**: ${m.mensagem}`).join("\n");
@@ -166,7 +168,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       if (intent.especialista === "estoque_compras") {
         setIaStatus("pesquisando");
         if (intent.intencao === "consulta_estoque") {
-          const res = await getEstoqueIA({ termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque });
+          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque } });
           dadosReais = res;
           respostaFinal = (res as any[]).length > 0 ? `### 📦 Estoque\n\n` + (res as any[]).map((p: any) => `- **${p.nome}**: ${p.quantidade} (Mín: ${p.estoque_minimo || 0})`).join("\n") : "Nenhum produto encontrado.";
         } else if (intent.intencao === "sugerir_reposicao") {
@@ -178,7 +180,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
         setIaStatus("pesquisando");
-        const res = await consultarAgendaIA(intent.parametros || {});
+        const res = await consultarAgendaIA({ data: intent.parametros || {} });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
           ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`
@@ -198,11 +200,13 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       setIaStatus(intent.informacoes_faltantes?.length ? "aguardando_informacao" : "concluido");
 
       await registrarAuditoriaIA({
-        comando: text,
-        intencao: intent.intencao,
-        sucesso: true,
-        tempo_ms: Date.now() - startTime,
-        metadata: { intent, dados: dadosReais },
+        data: {
+          comando: text,
+          intencao: intent.intencao,
+          sucesso: true,
+          tempo_ms: Date.now() - startTime,
+          metadata: { intent, dados: dadosReais },
+        },
       });
 
     } catch (error: any) {
@@ -223,11 +227,11 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setIsProcessing(true);
     setIaStatus("validando");
     try {
-      const resVal = (await validarAgendamentoIA(intent.parametros)) as any;
+      const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
       if (resVal.disponivel === false) throw new Error(resVal.mensagem || resVal.message || "Horário indisponível");
       
       setIaStatus("executando");
-      await executarCriacaoAgendamento(intent.parametros);
+      await executarCriacaoAgendamento({ data: intent.parametros });
       
       setMessages((prev) => [...prev, { role: "assistant", content: `✅ **Agendamento realizado!**`, timestamp: new Date().toISOString() }]);
       setIaStatus("concluido");

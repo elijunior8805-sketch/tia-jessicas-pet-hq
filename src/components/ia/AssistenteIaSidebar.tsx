@@ -88,7 +88,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       }
 
       const res = await processarComprovanteIA({
-        imagemBase64: base64, contentType: selectedFile.type
+        data: { imagemBase64: base64, contentType: selectedFile.type },
       });
 
       if (res.sucesso) {
