@@ -1669,6 +1669,9 @@ function NovoAgendamentoDialog({
 
       let agendamentoId: string;
       if (isEdit && editId) {
+        // Se estiver editando, primeiro libera as reservas antigas para evitar conflito/saldo negativo
+        await liberarReserva({ data: { agendamento_id: editId } });
+
         const currentVersion = Number(editData?.version ?? 1);
         const { error: errUpd } = await supabase.rpc("atualizar_agendamento_seguro", {
           _id: editId,
