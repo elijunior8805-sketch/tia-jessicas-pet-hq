@@ -5,13 +5,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const validarAgendamentoIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    data: z.string(),
-    hora: z.string(),
-    pet_id: z.string(),
-    cliente_id: z.string(),
+    data: z.string().optional().default("hoje"),
+    hora: z.string().optional().default("08:00"),
+    pet_id: z.string().optional().default(""),
+    cliente_id: z.string().optional().default(""),
     profissional_id: z.string().optional(),
-    servicos: z.array(z.string()),
-  }).parse(input))
+    servicos: z.array(z.string()).optional().default([]),
+    comando_original: z.string().optional().default("acao"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { validarDisponibilidadeReal } = await import("./ia-acoes.server");
     return validarDisponibilidadeReal(context.supabase, data);
@@ -20,20 +21,21 @@ export const validarAgendamentoIA = createServerFn({ method: "POST" })
 export const executarCriacaoAgendamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string(),
-    pet_id: z.string(),
+    cliente_id: z.string().optional().default(""),
+    pet_id: z.string().optional().default(""),
     servicos: z.array(z.object({
       id: z.string(),
       nome: z.string(),
       valor: z.number(),
-    })),
-    data: z.string(),
-    hora: z.string(),
+    })).optional().default([]),
+    data: z.string().optional().default("hoje"),
+    hora: z.string().optional().default("08:00"),
     profissional_id: z.string().optional(),
     transporte: z.boolean().optional(),
     taxa_transporte: z.number().optional(),
     observacoes: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("criar_agendamento"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { criarAgendamentoIA } = await import("./ia-acoes.server");
     return criarAgendamentoIA(context.supabase, data);
@@ -42,10 +44,11 @@ export const executarCriacaoAgendamento = createServerFn({ method: "POST" })
 export const executarRemarcacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    agendamento_id: z.string(),
-    nova_data: z.string(),
-    nova_hora: z.string(),
-  }).parse(input))
+    agendamento_id: z.string().optional().default(""),
+    nova_data: z.string().optional().default("hoje"),
+    nova_hora: z.string().optional().default("08:00"),
+    comando_original: z.string().optional().default("remarcar"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { remarcarAgendamentoIA } = await import("./ia-acoes.server");
     return remarcarAgendamentoIA(context.supabase, data.agendamento_id, data.nova_data, data.nova_hora);
@@ -54,9 +57,10 @@ export const executarRemarcacao = createServerFn({ method: "POST" })
 export const executarCancelamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    agendamento_id: z.string(),
+    agendamento_id: z.string().optional().default(""),
     motivo: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("cancelar"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { cancelarAgendamentoIA } = await import("./ia-acoes.server");
     return cancelarAgendamentoIA(context.supabase, data.agendamento_id, data.motivo || "");
@@ -65,11 +69,12 @@ export const executarCancelamento = createServerFn({ method: "POST" })
 export const executarCriacaoCliente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    nome: z.string(),
+    nome: z.string().optional().default(""),
     telefone: z.string().optional(),
     email: z.string().optional(),
     observacoes: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("criar_cliente"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { criarClienteIA } = await import("./ia-acoes.server");
     return criarClienteIA(context.supabase, data);
@@ -78,13 +83,14 @@ export const executarCriacaoCliente = createServerFn({ method: "POST" })
 export const executarCriacaoPet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string(),
-    nome: z.string(),
+    cliente_id: z.string().optional().default(""),
+    nome: z.string().optional().default(""),
     especie: z.string().optional(),
     raca: z.string().optional(),
     porte: z.string().optional(),
     observacoes: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("criar_pet"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { criarPetIA } = await import("./ia-acoes.server");
     return criarPetIA(context.supabase, data);

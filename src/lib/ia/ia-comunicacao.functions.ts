@@ -7,8 +7,9 @@ export const consultarMensagensIA = createServerFn({ method: "GET" })
   .inputValidator((input: any) => z.object({
     cliente_id: z.string().optional(),
     pet_id: z.string().optional(),
-    limite: z.number().optional()
-  }).parse(input))
+    limite: z.number().optional(),
+    comando_original: z.string().optional().default("mensagens"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { consultarMensagensRecentes } = await import("./ia-comunicacao.server");
     return consultarMensagensRecentes(context.supabase, data);

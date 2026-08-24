@@ -126,12 +126,16 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
             data_atual: new Date().toISOString(),
           },
+          comando_original: text
         },
       });
 
       // Normalizar parâmetros para evitar Zod Errors em funções subsequentes
-      if (!intent.parametros) intent.parametros = {};
-      if (!intent.parametros.comando_original) intent.parametros.comando_original = text;
+      if (!intent.parametros) {
+        (intent as any).parametros = { comando_original: text };
+      } else if (!(intent.parametros as any).comando_original) {
+        (intent.parametros as any).comando_original = text;
+      }
 
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Operação concluída.";
@@ -141,7 +145,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       if (intent.especialista === "comunicacao") {
         setIaStatus("pesquisando");
         if (intent.intencao === "consultar_mensagens") {
-          const res = await consultarMensagensIA({ data: { cliente_id: intent.parametros?.cliente_id } });
+          const res = await consultarMensagensIA({ data: { cliente_id: intent.parametros?.cliente_id, comando_original: text } });
           dadosReais = res.data;
           respostaFinal = `### 💬 Mensagens Recentes\n\n` + (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), "dd/MM HH:mm")}] **${m.clientes?.nome || "Sistema"}**: ${m.mensagem}`).join("\n");
         } else if (intent.intencao === "consultar_aniversariantes") {
@@ -173,7 +177,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       if (intent.especialista === "estoque_compras") {
         setIaStatus("pesquisando");
         if (intent.intencao === "consulta_estoque") {
-          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque } });
+          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque, comando_original: text } });
           dadosReais = res;
           respostaFinal = (res as any[]).length > 0 ? `### 📦 Estoque\n\n` + (res as any[]).map((p: any) => `- **${p.nome}**: ${p.quantidade} (Mín: ${p.estoque_minimo || 0})`).join("\n") : "Nenhum produto encontrado.";
         } else if (intent.intencao === "sugerir_reposicao") {
@@ -185,7 +189,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
         setIaStatus("pesquisando");
-        const res = await consultarAgendaIA({ data: intent.parametros || {} });
+        const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), comando_original: text } });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
           ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`

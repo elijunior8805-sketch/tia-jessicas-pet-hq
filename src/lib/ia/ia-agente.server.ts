@@ -5,7 +5,9 @@ export const IAIntentSchema = z.object({
   intencao: z.string(),
   especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica"]).optional().nullable(),
   tipo_operacao: z.enum(["consulta", "acao"]),
-  parametros: z.record(z.any()).optional().nullable(),
+  parametros: z.object({
+    comando_original: z.string().optional(),
+  }).catchall(z.any()).optional().nullable(),
   informacoes_faltantes: z.array(z.string()).optional().nullable(),
   ambiguidades: z.array(z.string()).optional().nullable(),
   nivel_confianca: z.number().min(0).max(1),
@@ -108,24 +110,15 @@ DATAS:
 
     const parsed = JSON.parse(res.texto);
     
-    // Garantir que parametros nunca seja null para evitar erro de validação Zod no client/server functions
-    if (!parsed.parametros) {
-      parsed.parametros = {};
-    }
-
-    // Normalização para evitar o erro Zod "Required" em campos como 'comando_original' se a IA omitir
-    if (parsed.intencao === "criar_agendamento" || parsed.intencao === "validar_agendamento") {
-      if (!parsed.parametros.comando_original) {
-        parsed.parametros.comando_original = texto;
-      }
+    // Normalização rigorosa de parâmetros
+    const parametrosNormalizados = parsed.parametros || {};
+    if (!parametrosNormalizados.comando_original) {
+      parametrosNormalizados.comando_original = texto;
     }
     
     return {
       ...parsed,
-      parametros: {
-        ...parsed.parametros,
-        comando_original: texto
-      },
+      parametros: parametrosNormalizados,
       nivel_confianca: parsed.nivel_confianca || 0.9
     } as IAIntent;
   } catch (error) {

@@ -20,7 +20,7 @@ export const getAuditoriaIA = createServerFn({ method: "GET" })
 
 export const registrarAuditoriaIA = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({
-    comando_original: z.string().optional(),
+    comando_original: z.string().optional().default("auditoria"),
     comando: z.string().optional(),
     intencao_detectada: z.string().optional(),
     intencao: z.string().optional(),

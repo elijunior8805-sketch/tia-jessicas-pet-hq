@@ -13,8 +13,9 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     data_pagamento: z.string().optional(),
     observacoes: z.string().optional(),
     comprovante_path: z.string().optional(),
-    id_transacao: z.string().optional()
-  }).parse(input))
+    id_transacao: z.string().optional(),
+    comando_original: z.string().optional().default("pagamento"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     
@@ -33,8 +34,9 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     pagamento_id: z.string(),
-    motivo: z.string()
-  }).parse(input))
+    motivo: z.string(),
+    comando_original: z.string().nullish(),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { estornarPagamentoIA: estornar } = await import("./ia-acoes.server");
     return estornar(context.supabase, data.pagamento_id, data.motivo);
