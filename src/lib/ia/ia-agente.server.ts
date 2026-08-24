@@ -44,10 +44,23 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       exige_confirmacao: false,
       resposta_ia: "Consultando a agenda de hoje..."
     },
+    "selecionado: cliente": {
+      intencao: "buscar_clientes",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { 
+        comando_original: texto, 
+        termo: texto.replace(/selecionado: cliente/i, "").trim()
+      },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Localizando o cliente selecionado..."
+    },
     "contar_atendimentos": {
       intencao: "contar_atendimentos",
       especialista: "agenda",
       tipo_operacao: "consulta",
+
       parametros: { comando_original: texto, data: "hoje" },
       nivel_confianca: 1,
       exige_confirmacao: false,
