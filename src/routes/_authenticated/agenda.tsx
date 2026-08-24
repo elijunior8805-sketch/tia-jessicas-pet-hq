@@ -1568,6 +1568,14 @@ function NovoAgendamentoDialog({
 
       // Serviço principal = primeiro item (mantém compat com servico_id)
       const principal = parsed.itens[0];
+      
+      // Reservar crédito se necessário
+      const temCredito = itens.some(it => it.usar_credito);
+      if (temCredito) {
+        // Lógica de reserva será implementada na Parte 3 conforme o fluxo de agendamento avançado
+        // Por enquanto apenas marcamos no agendamento via observações ou campo customizado se existir
+      }
+
 
       // Validações LT
       if (ltModalidade !== "nao_utilizar") {
