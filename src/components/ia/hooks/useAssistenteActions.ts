@@ -275,9 +275,9 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           const metricas = (res.data as any)?.metricas || {};
           
           // Garantir valores padrão para evitar toLocaleString of undefined
-          const faturamento = metricas.faturamento || 0;
-          const ticketMedio = metricas.ticketMedio || 0;
-          const quantidade = metricas.atendimentos || 0;
+          const faturamento = Number(metricas.faturamento || 0);
+          const ticketMedio = Number(metricas.ticketMedio || 0);
+          const quantidade = Number(metricas.atendimentos || 0);
 
           respostaFinal = `### 💰 Faturamento do Mês\n\n` +
             `- **Período**: Mês Atual\n` +
