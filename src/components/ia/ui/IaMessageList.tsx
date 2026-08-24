@@ -24,7 +24,7 @@ const QUICK_COMMANDS = [
   { label: "Faturamento do mês", icon: TrendingUp, intent: "consultar_faturamento" },
   { label: "Valores a receber", icon: DollarSign, intent: "consultar_valores_a_receber" },
   { label: "Resumo do dia", icon: LayoutDashboard, intent: "consultar_resumo_operacional" },
-  { label: "Últimos Áudios", icon: Mic, intent: "listar_transcricoes" },
+  
 ];
 
 export const IaMessageList: React.FC<IaMessageListProps> = ({
