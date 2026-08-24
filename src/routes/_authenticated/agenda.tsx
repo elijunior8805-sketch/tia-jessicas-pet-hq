@@ -1581,8 +1581,6 @@ function NovoAgendamentoDialog({
         observacoes: obs,
       });
 
-      // Serviço principal = primeiro item (mantém compat com servico_id)
-      const principal = parsed.itens[0];
       
       // Serviço principal = primeiro item (mantém compat com servico_id)
       const principal = parsed.itens[0];
