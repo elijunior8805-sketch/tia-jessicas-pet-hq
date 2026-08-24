@@ -349,17 +349,23 @@ function ProgramasCuidadoPage() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 bg-muted/20 border-2 border-dashed border-sidebar-border rounded-xl">
-              <PackageCheck className="h-12 w-12 text-muted-foreground/40 mb-4" />
-              <h3 className="text-lg font-medium text-sidebar-foreground">Nenhum programa cadastrado</h3>
-              <p className="text-sm text-muted-foreground mt-1">Comece criando o seu primeiro programa de fidelidade.</p>
-              <Button className="mt-6 bg-gold hover:bg-gold/90 text-white">
-                <Plus className="mr-2 h-4 w-4" />
+            <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-zinc-950 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-gold/5 flex items-center justify-center mb-6">
+                <PackageCheck className="h-8 w-8 text-gold/40" />
+              </div>
+              <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100">Nenhum programa no catálogo</h3>
+              <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs text-center">Comece criando o seu primeiro programa de fidelidade para atrair mais clientes.</p>
+              <Button 
+                className="mt-8 bg-gold hover:bg-gold/90 text-white font-bold px-8 h-12 rounded-xl shadow-lg shadow-gold/20"
+                onClick={() => setIsProgramaModalOpen(true)}
+              >
+                <Plus className="mr-2 h-5 w-5" />
                 Criar Primeiro Programa
               </Button>
             </div>
           )}
         </TabsContent>
+
 
         <TabsContent value="auditoria" className="space-y-6 outline-none">
           <AuditoriaProgramasTab />
