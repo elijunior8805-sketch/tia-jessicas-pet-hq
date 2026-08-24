@@ -13,7 +13,7 @@ export const getQualidadeIA = createServerFn({ method: "GET" })
   });
 
 export const getAuditoriaIA = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ limit: z.number().optional() }).parse(d || {}))
+  .inputValidator((input: any) => z.object({ limit: z.number().optional() }).parse(input))
   .handler(async ({ data }) => {
     return auditoriaServer.getLogsAuditoriaIA(data.limit);
   });
