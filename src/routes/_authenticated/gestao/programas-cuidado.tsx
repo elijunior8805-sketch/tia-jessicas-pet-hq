@@ -229,29 +229,29 @@ function ProgramasCuidadoPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-muted/50 p-1 mb-6 flex-wrap h-auto overflow-x-auto justify-start">
-          <TabsTrigger value="catalogo" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+        <TabsList className="bg-zinc-100/80 dark:bg-zinc-900/80 p-1.5 mb-8 flex-wrap h-auto overflow-x-auto justify-start rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-sm gap-1">
+          <TabsTrigger value="catalogo" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <Sparkles className="mr-2 h-4 w-4" />
             Catálogo
           </TabsTrigger>
-          <TabsTrigger value="ativos" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="ativos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <Plus className="mr-2 h-4 w-4" />
             Programas Ativos
           </TabsTrigger>
-          <TabsTrigger value="creditos" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="creditos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <CreditCard className="mr-2 h-4 w-4" />
             Movimentações
           </TabsTrigger>
-          <TabsTrigger value="auditoria" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="auditoria" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <History className="mr-2 h-4 w-4" />
             Auditoria
           </TabsTrigger>
-
-          <TabsTrigger value="configuracoes" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="configuracoes" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <SettingsIcon className="mr-2 h-4 w-4" />
             Configurações
           </TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="catalogo" className="space-y-6 outline-none">
           {programas && programas.length > 0 ? (
