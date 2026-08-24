@@ -97,7 +97,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
      return mapeamentoDireto[lowercaseTexto];
   }
 
-  const { chamarIA } = await import("../ia-core.server");
+  const { chamarIA, IA_CONFIG_PADRAO } = await import("../ia-core.server");
   
   const userContext = contexto?.user ? `
   USUÁRIO LOGADO:
@@ -169,7 +169,7 @@ DATAS:
     const res = await chamarIA({
       system: systemPrompt,
       prompt: `TEXTO DO USUÁRIO: "${texto}"\n\nCONTEXTO DO SISTEMA:\n- Data de Hoje: ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full' }).format(new Date())}\n- Histórico Recente: ${JSON.stringify(contexto?.mensagens || [])}`,
-      config: contexto?.config,
+      config: contexto?.config ?? IA_CONFIG_PADRAO,
       json: true,
       origem: "assistente_ia_classificador"
     });
