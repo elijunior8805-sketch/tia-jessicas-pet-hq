@@ -573,12 +573,28 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       setIaStatus("verificando");
+
+      // Leitura de verificação: o registro precisa existir no banco
+      let verificado = false;
+      if (registroId) {
+        const { data: check } = await supabase
+          .from("agendamentos")
+          .select("id, data, hora, status")
+          .eq("id", String(registroId))
+          .maybeSingle();
+        verificado = !!check;
+      }
+
+      agendaDraftRef.current = null;
       setMessages((prev) => [...prev, {
         role: "assistant",
-        content: `✅ **Agendamento realizado e confirmado!**\n\n- **Cliente:** ${intent.parametros?.cliente_nome || 'Identificado'}\n- **Pet:** ${intent.parametros?.pet_nome || 'Identificado'}\n- **Data:** ${intent.parametros?.data}\n- **Hora:** ${intent.parametros?.hora}\n\nCódigo do registro: \`${registroId}\``,
+        content: verificado
+          ? `✅ **Agendamento criado e verificado na agenda.**\n\n- **Cliente:** ${intent.parametros?.cliente_nome || 'Identificado'}\n- **Pet:** ${intent.parametros?.pet_nome || 'Identificado'}\n- **Data:** ${intent.parametros?.data}\n- **Hora:** ${intent.parametros?.hora}\n\nCódigo do registro: \`${registroId}\``
+          : `⚠️ **Não consegui confirmar o agendamento no banco.** Verifique a agenda antes de repetir o comando (código retornado: \`${registroId || "nenhum"}\`).`,
         timestamp: new Date().toISOString(),
       }]);
-      setIaStatus("concluido");
+      setIaStatus(verificado ? "concluido" : "error");
+
 
       await registrarEventoIA({
         data: {
