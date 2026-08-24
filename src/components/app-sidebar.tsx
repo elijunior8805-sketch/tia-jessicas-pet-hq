@@ -84,6 +84,7 @@ const adminGroup = {
   items: [
     { title: "Usuários e Acessos", url: "/usuarios", icon: Shield },
     { title: "Auditoria de Acessos", url: "/auditoria-acessos", icon: ShieldAlert },
+    { title: "Qualidade da IA", url: "/qualidade-ia", icon: ShieldAlert },
   ],
 };
 
