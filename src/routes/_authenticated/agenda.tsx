@@ -1520,6 +1520,13 @@ function NovoAgendamentoDialog({
     },
   });
 
+  const { data: creditosPet } = useQuery({
+    queryKey: ["creditos-pet", petId],
+    enabled: !!petId,
+    queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
+  });
+
+
   // Totais calculados
   const totalValor = useMemo(
     () => itens.reduce((s, it) => s + Number(it.valor_unit ?? 0), 0),
