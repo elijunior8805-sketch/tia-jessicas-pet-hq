@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { User, Dog, ExternalLink, UserPlus, CheckCircle2, XCircle } from "lucide-react";
+import { User, Dog, ExternalLink, CheckCircle2, Calendar, TrendingUp, DollarSign, LayoutDashboard, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
@@ -15,6 +15,14 @@ interface IaMessageListProps {
   handleConfirmarAgendamento: (intent: any) => void;
   isProcessing: boolean;
 }
+
+const QUICK_COMMANDS = [
+  { label: "Agenda de hoje", icon: Calendar, text: "Agenda de hoje" },
+  { label: "Faturamento do mês", icon: TrendingUp, text: "Qual o faturamento deste mês?" },
+  { label: "Valores a receber", icon: DollarSign, text: "Quais os valores a receber?" },
+  { label: "Resumo do dia", icon: LayoutDashboard, text: "Me dê um resumo do dia" },
+  { label: "Itens críticos estoque", icon: ClipboardList, text: "Quais itens estão com estoque baixo?" },
+];
 
 export const IaMessageList: React.FC<IaMessageListProps> = ({
   messages,
@@ -117,6 +125,28 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
           </div>
         </motion.div>
       ))}
+
+      {/* Quick Commands - Only show when not processing and no search results active */}
+      {!isProcessing && !searchResults && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-wrap gap-2 mt-4"
+        >
+          {QUICK_COMMANDS.map((cmd) => (
+            <Button
+              key={cmd.text}
+              variant="outline"
+              size="sm"
+              onClick={() => handleSend(cmd.text)}
+              className="h-9 rounded-xl border-[#C99845]/20 text-[#123F2A]/70 hover:bg-[#C99845]/10 hover:text-[#C99845] transition-all text-xs font-medium"
+            >
+              <cmd.icon className="w-3.5 h-3.5 mr-2 opacity-50" />
+              {cmd.label}
+            </Button>
+          ))}
+        </motion.div>
+      )}
 
       {isProcessing && (
         <div className="flex justify-start">
