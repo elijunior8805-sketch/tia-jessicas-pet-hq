@@ -41,6 +41,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       tipo_operacao: "consulta",
       parametros: { comando_original: texto, data: "hoje" },
       nivel_confianca: 1,
+      exige_confirmacao: false,
       resposta_ia: "Consultando a agenda de hoje..."
     },
     "contar_atendimentos": {
@@ -49,6 +50,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       tipo_operacao: "consulta",
       parametros: { comando_original: texto, data: "hoje" },
       nivel_confianca: 1,
+      exige_confirmacao: false,
       resposta_ia: "Contando atendimentos de hoje..."
     },
     "criar_agendamento": {
@@ -57,6 +59,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       tipo_operacao: "acao",
       parametros: { comando_original: texto },
       nivel_confianca: 1,
+      exige_confirmacao: true,
       informacoes_faltantes: ["cliente", "pet", "serviço", "data", "horário"],
       resposta_ia: "Com certeza! Para criar um novo agendamento, preciso de algumas informações. Qual o nome do cliente ou do pet?"
     },
@@ -66,6 +69,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       tipo_operacao: "consulta",
       parametros: { comando_original: texto, period: "mes" },
       nivel_confianca: 1,
+      exige_confirmacao: false,
       resposta_ia: "Buscando o faturamento do mês atual..."
     },
     "consultar_valores_a_receber": {
@@ -74,6 +78,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       tipo_operacao: "consulta",
       parametros: { comando_original: texto, apenas_pendentes: true },
       nivel_confianca: 1,
+      exige_confirmacao: false,
       resposta_ia: "Calculando valores pendentes e a receber..."
     },
     "consultar_resumo_operacional": {
@@ -82,6 +87,7 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       tipo_operacao: "consulta",
       parametros: { comando_original: texto },
       nivel_confianca: 1,
+      exige_confirmacao: false,
       resposta_ia: "Preparando o resumo operacional do dia..."
     }
   };
