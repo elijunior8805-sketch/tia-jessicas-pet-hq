@@ -182,13 +182,21 @@ DATAS:
       parametrosNormalizados.comando_original = texto;
     }
     
-    // Garantir que UUIDs vazios sejam transformados em undefined para passar no Zod
+    // Normalização rigorosa de parâmetros
     Object.keys(parametrosNormalizados).forEach(key => {
-      if (typeof parametrosNormalizados[key] === 'string' && parametrosNormalizados[key] === '') {
-        if (key.endsWith('_id')) {
-           parametrosNormalizados[key] = undefined;
-        }
+      const val = parametrosNormalizados[key];
+      // 1. Converter strings vazias para undefined (evita erro Zod em UUIDs)
+      if (typeof val === 'string' && val.trim() === '') {
+        parametrosNormalizados[key] = undefined;
       }
+      // 2. Tentar converter números que chegam como string
+      else if (typeof val === 'string' && /^-?\d+(\.\d+)?$/.test(val) && !key.endsWith('_id') && key !== 'telefone') {
+        const num = Number(val);
+        if (!isNaN(num)) parametrosNormalizados[key] = num;
+      }
+      // 3. Garantir booleanos
+      else if (val === 'true') parametrosNormalizados[key] = true;
+      else if (val === 'false') parametrosNormalizados[key] = false;
     });
     
     return {
