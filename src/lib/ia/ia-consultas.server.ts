@@ -302,12 +302,20 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     // Precisamos importar o helper admin pois server functions chamadas de dentro de outras podem ter problemas de RLS se não estiverem no contexto correto
     // Mas buscarDadosFinanceiros é exportada como helper, então deve funcionar se o client sb tiver as permissões
     const indicators = await getFinancialKPIs({ data: { from, to } });
+    
+    // Garantir que todos os valores sejam convertidos para string formatada ou número antes de retornar
+    // Isso evita o erro "toLocaleString of undefined" se o indicador não tiver valor
+    const dataRetorno = indicators ? Object.keys(indicators).reduce((acc, key) => {
+      const val = (indicators as any)[key];
+      acc[key] = val !== undefined && val !== null ? val : 0;
+      return acc;
+    }, {} as any) : {};
 
     return createIAResponse({
       source: 'consultar_resumo_financeiro',
       data: {
         periodo: { from, to },
-        metricas: indicators
+        metricas: dataRetorno
       }
     });
   }
