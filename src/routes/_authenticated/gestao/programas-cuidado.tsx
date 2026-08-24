@@ -74,6 +74,9 @@ function ProgramasCuidadoPage() {
   const [openVenda, setOpenVenda] = useState(false);
   const [selectedPrograma, setSelectedPrograma] = useState<any>(null);
   const [vendaStep, setVendaStep] = useState(1);
+  const [isProgramaModalOpen, setIsProgramaModalOpen] = useState(false);
+  const [editingPrograma, setEditingPrograma] = useState<any>(null);
+
   
   // Estados da Venda
   const [searchCliente, setSearchCliente] = useState("");
