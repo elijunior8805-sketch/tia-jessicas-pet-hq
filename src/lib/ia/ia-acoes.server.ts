@@ -80,6 +80,9 @@ export async function criarAgendamentoIA(
     idempotency_key?: string;
   }
 ) {
+  if (!params.cliente_id || !params.pet_id) {
+    throw new Error("Cliente ou Pet não identificados para criar o agendamento.");
+  }
   const { data: user } = await sb.auth.getUser();
   const userId = user?.user?.id;
   // 1. Verificação de Idempotência
