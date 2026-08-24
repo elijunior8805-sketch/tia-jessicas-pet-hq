@@ -24,7 +24,7 @@ export const upsertServico = createServerFn({ method: "POST" })
     if (id) {
       const { data: updated, error } = await sb
         .from("servicos")
-        .update(rest)
+        .update(rest as any)
         .eq("id", id)
         .select()
         .single();
@@ -33,7 +33,7 @@ export const upsertServico = createServerFn({ method: "POST" })
     } else {
       const { data: inserted, error } = await sb
         .from("servicos")
-        .insert(rest)
+        .insert(rest as any)
         .select()
         .single();
       if (error) throw error;
