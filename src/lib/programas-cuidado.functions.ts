@@ -261,4 +261,147 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
     if (iError) throw iError;
 
     return clone;
+
+export const reservarCredito = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    pet_id: z.string().uuid(),
+    servico_id: z.string().uuid(),
+    agendamento_id: z.string().uuid(),
+    quantidade: z.number().default(1)
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    // Busca programas ativos que tenham o serviço e créditos disponíveis
+    const { data: movs, error: e1 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .select(`
+        *,
+        contratado:programas_contratados!inner (*)
+      `)
+      .eq("contratado.pet_id", data.pet_id)
+      .eq("contratado.status_do_programa", "ativo")
+      .eq("servico_id", data.servico_id)
+      .order("criado_em", { ascending: true });
+
+    if (e1) throw e1;
+
+    // Calcula saldo por programa_contratado_id
+    const saldosPorPrograma: Record<string, number> = {};
+    (movs as any[]).forEach(m => {
+      const pcid = m.programa_contratado_id;
+      if (!saldosPorPrograma[pcid]) saldosPorPrograma[pcid] = 0;
+      
+      if (['credito_criado', 'reserva_liberada', 'cancelamento', 'estorno'].includes(m.tipo)) {
+        saldosPorPrograma[pcid] += m.quantidade;
+      } else if (['credito_consumido', 'credito_expirado', 'credito_reservado'].includes(m.tipo)) {
+        saldosPorPrograma[pcid] -= m.quantidade;
+      } else if (m.tipo === 'ajuste_manual') {
+        saldosPorPrograma[pcid] += m.quantidade;
+      }
+    });
+
+    // Encontra o primeiro programa com saldo
+    const programaComSaldo = Object.entries(saldosPorPrograma).find(([_, saldo]) => saldo >= data.quantidade);
+    
+    if (!programaComSaldo) {
+      throw new Error("Saldo insuficiente para reserva");
+    }
+
+    const { error: e2 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .insert({
+        programa_contratado_id: programaComSaldo[0],
+        servico_id: data.servico_id,
+        quantidade: data.quantidade,
+        tipo: 'credito_reservado',
+        agendamento_id: data.agendamento_id,
+        usuario_id: userId,
+        motivo: 'Reserva automática via Agenda',
+        idempotency_key: `reserva_${data.agendamento_id}_${data.servico_id}`
+      });
+
+    if (e2) throw e2;
+    return { success: true };
   });
+
+export const liberarReserva = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    agendamento_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    // Busca as reservas deste agendamento
+    const { data: reservas, error: e1 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .select("*")
+      .eq("agendamento_id", data.agendamento_id)
+      .eq("tipo", "credito_reservado");
+
+    if (e1) throw e1;
+    if (!reservas || reservas.length === 0) return { success: true, count: 0 };
+
+    // Libera cada reserva
+    const liberacoes = (reservas as any[]).map(res => ({
+      programa_contratado_id: res.programa_contratado_id,
+      servico_id: res.servico_id,
+      quantidade: res.quantidade,
+      tipo: 'reserva_liberada',
+      agendamento_id: data.agendamento_id,
+      usuario_id: userId,
+      motivo: 'Liberação de reserva (Cancelamento/Exclusão)',
+      idempotency_key: `liberacao_${res.id}`
+    }));
+
+    const { error: e2 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .insert(liberacoes);
+
+    if (e2) throw e2;
+    return { success: true, count: liberacoes.length };
+  });
+
+export const consumirReserva = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    agendamento_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    // Busca as reservas deste agendamento
+    const { data: reservas, error: e1 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .select("*")
+      .eq("agendamento_id", data.agendamento_id)
+      .eq("tipo", "credito_reservado");
+
+    if (e1) throw e1;
+    if (!reservas || reservas.length === 0) return { success: true, count: 0 };
+
+    // Consome cada reserva
+    const consumos = (reservas as any[]).map(res => ({
+      programa_contratado_id: res.programa_contratado_id,
+      servico_id: res.servico_id,
+      quantidade: res.quantidade,
+      tipo: 'credito_consumido',
+      agendamento_id: data.agendamento_id,
+      usuario_id: userId,
+      motivo: 'Consumo definitivo (Finalização)',
+      idempotency_key: `consumo_${res.id}`
+    }));
+
+    const { error: e2 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .insert(consumos);
+
+    if (e2) throw e2;
+    return { success: true, count: consumos.length };
+  });
+
