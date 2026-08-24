@@ -2133,6 +2133,9 @@ function EditarServicosDialog({
       }).eq("id", agendamento.id);
       if (errUp) throw errUp;
 
+      // Libera reservas anteriores para re-reservar se necessário
+      await liberarReserva({ data: { agendamento_id: agendamento.id } });
+
       // Reseta os itens (delete + insert)
       const { error: errDel } = await supabase
         .from("agendamento_servicos")
