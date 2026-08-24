@@ -172,6 +172,10 @@ function ProgramasCuidadoPage() {
       return data;
     },
   });
+
+  const duplicarMutation = useMutation({
+    mutationFn: (id: string) => duplicarPrograma({ data: { id } }),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
       toast.success("Programa duplicado com sucesso");
     }
