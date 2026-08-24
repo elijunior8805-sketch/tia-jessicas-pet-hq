@@ -2099,14 +2099,20 @@ function EditarServicosDialog({
     }
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
+
+    const infoCredito = (creditosPet as any)?.[s.id];
+    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0;
+
     setItens((prev) => [...prev, {
       servico_id: s.id,
       nome: s.nome,
-      valor_unit: Number(s.valor ?? 0),
+      valor_unit: temCredito ? 0 : Number(s.valor ?? 0),
       duracao_min: s.duracao_min ?? null,
+      usar_credito: temCredito
     }]);
     setServicoAdd("");
   }
+
 
   function removerItem(idx: number) {
     setItens((prev) => prev.filter((_, i) => i !== idx));
