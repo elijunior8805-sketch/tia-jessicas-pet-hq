@@ -726,7 +726,7 @@ function AgendamentoRow({
   signer,
 }: {
   row: any;
-  onChangeStatus: (s: Status) => void;
+  onChangeStatus: (s: Status) => Promise<void>;
   onIniciar: () => void;
   iniciando: boolean;
   signer: { name: string; initials: string };
