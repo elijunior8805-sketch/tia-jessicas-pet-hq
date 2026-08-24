@@ -122,6 +122,10 @@ DATAS:
     
     return {
       ...parsed,
+      parametros: {
+        ...parsed.parametros,
+        comando_original: texto
+      },
       nivel_confianca: parsed.nivel_confianca || 0.9
     } as IAIntent;
   } catch (error) {
