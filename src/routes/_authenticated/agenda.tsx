@@ -1685,7 +1685,25 @@ function NovoAgendamentoDialog({
       }));
       const { error: errItens } = await supabase.from("agendamento_servicos").insert(rowsItens);
       if (errItens) throw errItens;
+
+      // Realiza reservas de crédito no servidor
+      for (const it of parsed.itens) {
+        if (it.usar_credito) {
+          try {
+            await reservarCredito({ data: {
+              pet_id: parsed.pet_id,
+              servico_id: it.servico_id,
+              agendamento_id: agendamentoId,
+              quantidade: 1
+            }});
+          } catch (e) {
+            console.error("Erro ao reservar crédito:", e);
+            // Não trava a criação do agendamento, mas loga
+          }
+        }
+      }
     },
+
     onSuccess: () => {
       toast.success(isEdit ? "Agendamento atualizado" : "Agendamento criado");
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
