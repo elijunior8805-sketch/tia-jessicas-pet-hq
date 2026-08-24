@@ -1721,7 +1721,19 @@ function NovoAgendamentoDialog({
           }
         }
       }
+
+      // Auditoria de criação/edição
+      await registrarAuditoriaPrograma({
+        data: {
+          acao: isEdit ? 'edicao_agendamento' : 'criacao_agendamento',
+          cliente_id: parsed.cliente_id,
+          pet_id: parsed.pet_id,
+          metadata: { agendamento_id: agendamentoId, status: parsed.status },
+          motivo: isEdit ? 'Alteração de agendamento na agenda' : 'Novo agendamento na agenda'
+        }
+      });
     },
+
 
     onSuccess: () => {
       toast.success(isEdit ? "Agendamento atualizado" : "Agendamento criado");

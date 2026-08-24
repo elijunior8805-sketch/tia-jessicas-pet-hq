@@ -1,5 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { consumirReserva } from "@/lib/programas-cuidado.functions";
+import { 
+  consumirReserva, 
+  registrarAuditoriaPrograma 
+} from "@/lib/programas-cuidado.functions";
+
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -534,7 +538,25 @@ function AtendimentoDetalhe() {
       if (error) throw error;
       
       // Consome a reserva de créditos do programa de cuidado, se houver
-      await consumirReserva({ data: { agendamento_id: (atendimento as any).agendamento_id } });
+      if ((atendimento as any).agendamento_id) {
+        await consumirReserva({ data: { agendamento_id: (atendimento as any).agendamento_id } });
+        
+        // Registrar auditoria do consumo
+        await registrarAuditoriaPrograma({
+          data: {
+            acao: 'consumo_credito',
+            pet_id: (atendimento as any).pet_id,
+            cliente_id: (atendimento as any).cliente_id,
+            metadata: { 
+              agendamento_id: (atendimento as any).agendamento_id,
+              atendimento_id: atendId,
+              valor_executado: subtotalCalc
+            },
+            motivo: 'Consumo definitivo na finalização do atendimento'
+          }
+        });
+      }
+
 
       if ((atendimento as any).agendamento_id) {
         await supabase.from("agendamentos")

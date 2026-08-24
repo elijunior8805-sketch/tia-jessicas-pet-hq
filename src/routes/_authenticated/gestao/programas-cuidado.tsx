@@ -406,6 +406,22 @@ function ProgramasCuidadoPage() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 px-2 text-[10px] text-gold hover:text-gold/80 hover:bg-gold/5"
+                              onClick={async () => {
+                                const res = await reconciliarCreditosPet({ data: { pet_id: contrato.pet_id } });
+                                if ((res as any)[0]?.divergencia) {
+                                  toast.error("Divergência detectada nos créditos!");
+                                } else {
+                                  toast.success("Créditos reconciliados e consistentes.");
+                                }
+                              }}
+                            >
+                              Reconciliar
+                            </Button>
+
                             <span className="flex items-center gap-1"><Search className="h-3 w-3" /> {contrato.clientes?.nome}</span>
                             <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {contrato.pets?.nome}</span>
                             <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Expira em {format(new Date(contrato.data_de_validade), 'dd/MM/yyyy')}</span>
