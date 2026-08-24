@@ -3925,8 +3925,11 @@ export type Database = {
           duracao_min: number
           id: string
           is_combo: boolean
+          itens_inclusos: string[] | null
           nome: string
+          observacoes_internas: string | null
           preco_a_partir: boolean
+          profissionais_habilitados: string[] | null
           updated_at: string
           valor: number
         }
@@ -3938,8 +3941,11 @@ export type Database = {
           duracao_min?: number
           id?: string
           is_combo?: boolean
+          itens_inclusos?: string[] | null
           nome: string
+          observacoes_internas?: string | null
           preco_a_partir?: boolean
+          profissionais_habilitados?: string[] | null
           updated_at?: string
           valor?: number
         }
@@ -3951,8 +3957,11 @@ export type Database = {
           duracao_min?: number
           id?: string
           is_combo?: boolean
+          itens_inclusos?: string[] | null
           nome?: string
+          observacoes_internas?: string | null
           preco_a_partir?: boolean
+          profissionais_habilitados?: string[] | null
           updated_at?: string
           valor?: number
         }
