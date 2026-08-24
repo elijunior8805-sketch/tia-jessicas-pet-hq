@@ -344,6 +344,11 @@ function ProgramasCuidadoPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="auditoria" className="space-y-6 outline-none">
+          <AuditoriaProgramasTab />
+        </TabsContent>
+
+
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
