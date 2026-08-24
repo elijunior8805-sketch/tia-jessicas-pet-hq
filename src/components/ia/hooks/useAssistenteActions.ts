@@ -501,13 +501,18 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       const res = (await executarCriacaoAgendamento({ data: intent.parametros })) as any;
       const registroId = res?.affected_record_id || res?.data?.id || null;
 
+      if (!res.success) {
+        throw new Error(res.message || "Falha ao criar agendamento.");
+      }
+
       setIaStatus("verificando");
       setMessages((prev) => [...prev, {
         role: "assistant",
-        content: `✅ **Agendamento realizado com sucesso!**${registroId ? `\n\nID do registro: \`${registroId}\`` : ""}`,
+        content: `✅ **Agendamento realizado e confirmado!**\n\n- **Cliente:** ${intent.parametros?.cliente_nome || 'Identificado'}\n- **Pet:** ${intent.parametros?.pet_nome || 'Identificado'}\n- **Data:** ${intent.parametros?.data}\n- **Hora:** ${intent.parametros?.hora}\n\nCódigo do registro: \`${registroId}\``,
         timestamp: new Date().toISOString(),
       }]);
       setIaStatus("concluido");
+
       await registrarEventoIA({
         data: {
           command_id: commandId,
