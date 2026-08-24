@@ -9,8 +9,10 @@ import { registrarEventoIA, getFaseLiberacao } from "@/lib/ia/ia-observabilidade
 import {
   consultarAgendaIA,
   consultarFinanceiroIA,
-  consultarResumoOperacionalIA,
-} from "@/lib/ia/ia-consultas.functions";
+   consultarResumoOperacionalIA,
+   buscarClientesIA,
+ } from "@/lib/ia/ia-consultas.functions";
+
 import { 
   salvarTranscricaoIA,
   listarTranscricoesIA 
@@ -94,42 +96,36 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       recognizerRef.current = new VoiceRecognizer({
         onResult: (text, isFinal) => {
           if (isFinal) {
-            // Consolidar transcrição final removendo duplicações simples
             setFinalTranscript(prev => {
               const cleaned = text.trim();
-              if (prev.endsWith(cleaned)) return prev;
-              const newTranscript = (prev + " " + cleaned).trim();
-              
-              // Execução Direta: Se a transcrição final mudou e estamos no modo listening,
-              // podemos disparar o processamento automaticamente sem revisão manual.
-              // Note: O onend do recognizer vai mudar o status para 'reviewing' se não dispararmos o send.
-              return newTranscript;
+              if (prev.toLowerCase().includes(cleaned.toLowerCase())) return prev;
+              return (prev + " " + cleaned).trim();
             });
             setInterimTranscript("");
           } else {
-            // A transcrição parcial aparece apenas como prévia
             setInterimTranscript(text);
           }
         },
         onStatusChange: (status) => {
           setVoiceStatus(status);
-          if (status === 'reviewing') {
-            // Se chegou no estado de revisão, e temos conteúdo, enviamos automaticamente
-            // para satisfazer o requisito de "Remoção da Confirmação de Áudio"
+          
+          if (status === 'listening') {
+            setIaStatus("listening");
+            setIsReviewingVoice(false);
+          } else if (status === 'reviewing') {
+            setIaStatus("idle");
+            setIsReviewingVoice(true);
+            // Salvar no sessionStorage para persistência
             setFinalTranscript(current => {
-              if (current.trim()) {
-                // Dispara o envio direto do que foi capturado
-                handleSend(current);
-                return ""; // Limpa para a próxima
+              if (current) {
+                sessionStorage.setItem('ia_draft_transcript', current);
               }
               return current;
             });
-            setIsReviewingVoice(false);
-          } else if (status === 'listening') {
-            setIaStatus("listening");
-            setIsReviewingVoice(false);
           } else if (status === 'requesting_permission') {
             setIaStatus("requesting_permission");
+          } else if (status === 'finalizing') {
+            setIaStatus("processing");
           }
         },
         onError: (err) => {
@@ -145,17 +141,27 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       });
     }
     
+    // Carregar rascunho se existir
+    const savedDraft = sessionStorage.getItem('ia_draft_transcript');
+    if (savedDraft && !finalTranscript) {
+      setFinalTranscript(savedDraft);
+      setIsReviewingVoice(true);
+    }
+    
     return () => {
       if (recognizerRef.current) {
         recognizerRef.current.stop();
-        // Garantir limpeza total da instância
         recognizerRef.current = null;
       }
     };
+
   }, []);
 
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
+
+    // Limpar rascunho após envio
+    sessionStorage.removeItem('ia_draft_transcript');
 
     // Idempotency and Session IDs
     const commandId = crypto.randomUUID();
@@ -171,6 +177,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setIsReviewingVoice(false);
     setFinalTranscript("");
     setInterimTranscript("");
+
 
     const startTime = Date.now();
 
@@ -251,7 +258,26 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         }
       }
 
+      if (intent.intencao === "buscar_clientes") {
+        setIaStatus("processing");
+        const res = await buscarClientesIA({ data: { termo: intent.parametros?.termo || intent.parametros?.cliente_nome || text } });
+        dadosReais = res.data;
+        
+        if (dadosReais.length === 0) {
+          respostaFinal = "Não encontrei nenhum cliente com esse nome. Verifique se ele está cadastrado corretamente ou tente outro nome.";
+        } else if (dadosReais.length === 1) {
+          const c = dadosReais[0];
+          respostaFinal = `Encontrei o cliente **${c.nome}**. \n\n**Detalhes:**\n- **Bairro:** ${c.bairro || 'Não informado'}\n- **Pets:** ${c.pets?.map((p: any) => p.nome).join(", ") || 'Nenhum pet vinculado'}\n\nÉ este o cliente que você procura?`;
+          setSearchResults({ clientes: dadosReais, pets: [] });
+        } else {
+          respostaFinal = `Encontrei **${dadosReais.length}** clientes com nomes semelhantes. Qual deles você deseja selecionar?`;
+          setSearchResults({ clientes: dadosReais, pets: [] });
+        }
+
+      }
+
       if (intent.especialista === "estoque_compras") {
+
         setIaStatus("processing");
         if (intent.intencao === "consulta_estoque") {
           const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque, comando_original: text } });
@@ -496,13 +522,18 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       const res = (await executarCriacaoAgendamento({ data: intent.parametros })) as any;
       const registroId = res?.affected_record_id || res?.data?.id || null;
 
+      if (!res.success) {
+        throw new Error(res.message || "Falha ao criar agendamento.");
+      }
+
       setIaStatus("verificando");
       setMessages((prev) => [...prev, {
         role: "assistant",
-        content: `✅ **Agendamento realizado com sucesso!**${registroId ? `\n\nID do registro: \`${registroId}\`` : ""}`,
+        content: `✅ **Agendamento realizado e confirmado!**\n\n- **Cliente:** ${intent.parametros?.cliente_nome || 'Identificado'}\n- **Pet:** ${intent.parametros?.pet_nome || 'Identificado'}\n- **Data:** ${intent.parametros?.data}\n- **Hora:** ${intent.parametros?.hora}\n\nCódigo do registro: \`${registroId}\``,
         timestamp: new Date().toISOString(),
       }]);
       setIaStatus("concluido");
+
       await registrarEventoIA({
         data: {
           command_id: commandId,

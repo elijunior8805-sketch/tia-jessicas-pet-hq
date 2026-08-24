@@ -68,17 +68,35 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
                   <button
                     key={c.id}
                     onClick={() => handleSend(`Selecionado: Cliente ${c.nome}`)}
-                    className="flex items-center justify-between p-3 rounded-xl border border-[#C99845]/10 bg-[#F5F2EA]/50 hover:bg-[#F5F2EA] transition-all text-left"
+                    className="flex flex-col p-3 rounded-xl border border-[#C99845]/10 bg-[#F5F2EA]/50 hover:bg-[#F5F2EA] transition-all text-left group/item"
                   >
-                    <div className="flex items-center gap-3">
-                      <User className="w-4 h-4 text-[#C99845]" />
-                      <span className="text-sm font-bold">{c.nome}</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-[#C99845]" />
+                        <span className="text-sm font-bold">{c.nome}</span>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-[#C99845]/30 text-[#C99845]">
+                        CLIENTE
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="text-[9px] border-[#C99845]/30 text-[#C99845]">
-                      CLIENTE
-                    </Badge>
+                    {c.telefone && (
+                      <div className="text-[10px] text-[#123F2A]/60 flex items-center gap-1">
+                        <span>Tel: ****{c.telefone.slice(-4)}</span>
+                        {c.bairro && <span>• {c.bairro}</span>}
+                      </div>
+                    )}
+                    {c.pets && c.pets.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {c.pets.map((p: any) => (
+                          <span key={p.id} className="text-[9px] bg-[#C99845]/10 text-[#C99845] px-1.5 py-0.5 rounded-full">
+                            {p.nome}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </button>
                 ))}
+
                 {searchResults.pets.map((p: any) => (
                   <button
                     key={p.id}
@@ -113,7 +131,7 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
                   Abrir Sistema
                 </Button>
 
-                {msg.intent.intencao === "criar_agendamento" && (
+                {msg.intent.intencao === "criar_agendamento" && !msg.intent.informacoes_faltantes?.length && (
                   <Button
                     size="sm"
                     className="h-8 text-[11px] font-bold bg-[#123F2A] hover:bg-[#123F2A]/90 text-white rounded-lg px-3 shadow-md"
@@ -124,6 +142,7 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
                     Confirmar Agendamento
                   </Button>
                 )}
+
               </div>
             )}
           </div>
