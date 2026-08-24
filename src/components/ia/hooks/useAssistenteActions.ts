@@ -11,6 +11,10 @@ import {
   consultarFinanceiroIA,
   consultarResumoOperacionalIA,
 } from "@/lib/ia/ia-consultas.functions";
+import { 
+  salvarTranscricaoIA,
+  listarTranscricoesIA 
+} from "@/lib/ia/ia-voz.functions";
 import {
   validarAgendamentoIA,
   executarCriacaoAgendamento,
@@ -31,7 +35,6 @@ import {
 import { processarComprovanteIA } from "@/lib/ia/ia-financeiro.functions";
 import { format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { salvarTranscricaoIA } from "@/lib/ia/ia-voz.functions";
 
 export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [messages, setMessages] = useState<IAMessage[]>([]);
@@ -207,6 +210,17 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           dadosReais = res.data;
           respostaFinal = `### 🔄 Risco de Evasão (Reativação)\n\n` + (dadosReais as any[]).map((c: any) => `- **${c.nome}** (${c.dias_inatividade} dias sem vir) - ${c.justificativa}`).join("\n");
         }
+      }
+
+      if (intent.intencao === "listar_transcricoes") {
+        setIaStatus("processing");
+        const res = await listarTranscricoesIA();
+        dadosReais = res;
+        respostaFinal = (res as any[]).length > 0 
+          ? `### 🎙️ Transcrições Recentes\n\n` + (res as any[]).map((t: any) => 
+              `- [${format(parseISO(t.created_at), "dd/MM HH:mm")}] "${t.texto.length > 60 ? t.texto.substring(0, 60) + '...' : t.texto}"`
+            ).join("\n")
+          : "Não encontrei áudios salvos recentemente.";
       }
 
       if (intent.especialista === "gestao_estrategica" || intent.especialista === "relatorios") {

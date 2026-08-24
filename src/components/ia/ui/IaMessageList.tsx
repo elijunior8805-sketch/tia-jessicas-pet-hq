@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { User, Dog, ExternalLink, CheckCircle2, Calendar, TrendingUp, DollarSign, LayoutDashboard, ClipboardList } from "lucide-react";
+import { User, Dog, ExternalLink, CheckCircle2, Calendar, TrendingUp, DollarSign, LayoutDashboard, ClipboardList, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
@@ -24,6 +24,7 @@ const QUICK_COMMANDS = [
   { label: "Faturamento do mês", icon: TrendingUp, intent: "consultar_faturamento" },
   { label: "Valores a receber", icon: DollarSign, intent: "consultar_valores_a_receber" },
   { label: "Resumo do dia", icon: LayoutDashboard, intent: "consultar_resumo_operacional" },
+  { label: "Últimos Áudios", icon: Mic, intent: "listar_transcricoes" },
 ];
 
 export const IaMessageList: React.FC<IaMessageListProps> = ({
