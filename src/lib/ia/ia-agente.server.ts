@@ -86,7 +86,7 @@ ESTRUTURA DA INTERPRETAÇÃO (Retorne sempre este JSON):
 - intencao: Nome técnico.
 - especialista: Um dos especialistas listados.
 - tipo_operacao: "consulta" ou "acao".
-- parametros: Objeto com dados extraídos.
+- parametros: Objeto com dados extraídos. OBRIGATÓRIO incluir "comando_original" (string) com o texto do usuário.
 - informacoes_faltantes: Lista de dados que impedem a execução.
 - ambiguidades: Dúvidas sobre o pedido.
 - nivel_confianca: 0 a 1.
