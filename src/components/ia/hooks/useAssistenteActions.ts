@@ -60,6 +60,18 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   } | null>(null);
 
   const processingRef = useRef(false);
+  const [faseLiberacao, setFaseLiberacao] = useState<
+    "observacao" | "teste_controlado" | "piloto" | "producao"
+  >("observacao");
+
+  // Fase de liberação controlada (Parte 4)
+  useEffect(() => {
+    if (!isOpen) return;
+    getFaseLiberacao()
+      .then((r: any) => setFaseLiberacao(r?.fase || "observacao"))
+      .catch(() => setFaseLiberacao("observacao"));
+  }, [isOpen]);
+
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
