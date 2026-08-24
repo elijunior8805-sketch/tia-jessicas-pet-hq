@@ -135,7 +135,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         setIaStatus("pesquisando");
         if (intent.intencao === "consultar_mensagens") {
           const res = await consultarMensagensIA({
-            data: { cliente_id: intent.parametros?.cliente_id },
+            data: { cliente_id: intent.parametros?.cliente_id }
           });
           dadosReais = res.data;
           respostaFinal = `### 💬 Mensagens Recentes\n\n` + (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), "dd/MM HH:mm")}] **${m.clientes?.nome || "Sistema"}**: ${m.mensagem}`).join("\n");
@@ -180,7 +180,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
         setIaStatus("pesquisando");
-        const res = await consultarAgendaIA({ data: intent.parametros });
+        const res = await consultarAgendaIA({ data: intent.parametros || {} });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
           ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`
