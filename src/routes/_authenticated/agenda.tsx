@@ -1272,6 +1272,7 @@ type ItemServico = {
   nome: string;
   valor_unit: number;
   duracao_min: number | null;
+  usar_credito?: boolean;
 };
 
 const novoSchema = z.object({
@@ -1282,6 +1283,7 @@ const novoSchema = z.object({
     nome: z.string(),
     valor_unit: z.number().nonnegative(),
     duracao_min: z.number().int().positive().nullable(),
+    usar_credito: z.boolean().optional(),
   })).min(1, "Adicione ao menos um serviço"),
   data: z.string().min(1, "Informe a data"),
   hora: z.string().min(1, "Informe a hora"),
