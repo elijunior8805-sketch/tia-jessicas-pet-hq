@@ -16,7 +16,7 @@ export const salvarTranscricaoIA = createServerFn({ method: "POST" })
     const userId = context.userId;
 
     const { data: result, error } = await sb
-      .from("ia_transcricoes")
+      .from("ia_transcricoes" as any)
       .insert({
         usuario_id: userId,
         texto: data.texto,
@@ -33,7 +33,7 @@ export const salvarTranscricaoIA = createServerFn({ method: "POST" })
       throw new Error("Falha ao salvar transcrição");
     }
 
-    return { success: true, id: result.id };
+    return { success: true, id: (result as any).id };
   });
 
 export const listarTranscricoesIA = createServerFn({ method: "GET" })
@@ -43,7 +43,7 @@ export const listarTranscricoesIA = createServerFn({ method: "GET" })
     const userId = context.userId;
 
     const { data, error } = await sb
-      .from("ia_transcricoes")
+      .from("ia_transcricoes" as any)
       .select("*")
       .eq("usuario_id", userId)
       .order("created_at", { ascending: false })
@@ -52,3 +52,4 @@ export const listarTranscricoesIA = createServerFn({ method: "GET" })
     if (error) throw error;
     return data;
   });
+

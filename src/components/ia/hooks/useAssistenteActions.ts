@@ -31,6 +31,7 @@ import {
 import { processarComprovanteIA } from "@/lib/ia/ia-financeiro.functions";
 import { format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { salvarTranscricaoIA } from "@/lib/ia/ia-voz.functions";
 
 export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [messages, setMessages] = useState<IAMessage[]>([]);
@@ -386,8 +387,21 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
+      
+      // Salvar transcrição original se for vinda de voz (Parte 2 & 3)
+      if (text.trim() && voiceStatus === "reviewing") {
+        salvarTranscricaoIA({ 
+          data: { 
+            texto: text,
+            metadata: { 
+              origem: "voz",
+              correlation_id: correlationId
+            }
+          } 
+        }).catch(err => console.error("[IA-VOZ] Erro silenciado ao salvar transcrição:", err));
+      }
     }
-  }, [messages]);
+  }, [messages, voiceStatus]);
 
   const toggleVoice = () => {
     if (voiceStatus === "listening") {
