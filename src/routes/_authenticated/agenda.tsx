@@ -30,7 +30,7 @@ import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
   ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
-  Check, ChevronsUpDown,
+  Check, ChevronsUpDown, PackageCheck,
 } from "lucide-react";
 
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
