@@ -1791,7 +1791,10 @@ function NovoAgendamentoDialog({
                 {itens.map((it, idx) => (
                   <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_90px_80px_auto] gap-2 items-center">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{it.nome}</div>
+                      <div className="text-sm font-medium truncate flex items-center gap-1">
+                        {it.nome}
+                        {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" title="Usando crédito do programa" />}
+                      </div>
                       {idx === 0 && <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</div>}
                     </div>
                     <Input
