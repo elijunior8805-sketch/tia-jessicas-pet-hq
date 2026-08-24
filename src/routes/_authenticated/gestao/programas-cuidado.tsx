@@ -214,10 +214,17 @@ function ProgramasCuidadoPage() {
 
         </div>
         
-        <Button className="bg-gold hover:bg-gold/90 text-white font-medium shadow-sm transition-all active:scale-95" onClick={() => setIsProgramaModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button 
+          className="bg-gold hover:bg-gold/90 text-white font-bold h-12 px-6 rounded-xl shadow-lg shadow-gold/20 transition-all hover:scale-[1.02] active:scale-[0.98]" 
+          onClick={() => {
+            setEditingPrograma(null);
+            setIsProgramaModalOpen(true);
+          }}
+        >
+          <Plus className="mr-2 h-5 w-5" />
           Novo Programa
         </Button>
+
 
       </div>
 
