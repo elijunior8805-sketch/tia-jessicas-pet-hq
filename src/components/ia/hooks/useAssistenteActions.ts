@@ -353,7 +353,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             `- **Cancelados**: ${stats.cancelados}\n` +
             `- **Faltas**: ${stats.faltas}`;
         } else {
-          const dataFormatada = intent.parametros?.data 
+          const dataFormatada = intent.parametros?.data && /^\d{4}-\d{2}-\d{2}$/.test(intent.parametros.data)
             ? format(parseISO(intent.parametros.data), "dd/MM") 
             : "Hoje";
           respostaFinal = `### 📅 Agenda de ${dataFormatada}\n\n` + 
