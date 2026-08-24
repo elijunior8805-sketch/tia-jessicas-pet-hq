@@ -5,6 +5,7 @@ import { IAStatus, IAResults } from "../types";
 import { toast } from "sonner";
 import { classificarIntencao } from "@/lib/ia/ia-agente.functions";
 import { registrarAuditoriaIA } from "@/lib/ia/ia-auditoria.functions";
+import { registrarEventoIA, getFaseLiberacao } from "@/lib/ia/ia-observabilidade.functions";
 import {
   consultarAgendaIA,
   consultarFinanceiroIA,
