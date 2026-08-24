@@ -101,17 +101,31 @@ export async function buscarDadosAgenda(sb: SupabaseClient<Database>, filtros: {
 
 
 function normalizarTermo(termo: string): string {
-  return termo
+  if (!termo) return "";
+  
+  // Normalização de sufixos e honoríficos comuns
+  let t = termo.toLowerCase();
+  
+  // Mapeamento de variações de "Júnior"
+  const juniorVariations = ["junior", "jr", "jr.", "jnr", "jnr."];
+  juniorVariations.forEach(v => {
+    // Substitui variações isoladas por "junior" para normalização
+    const regex = new RegExp(`\\b${v.replace('.', '\\.')}\\b`, 'gi');
+    t = t.replace(regex, "junior");
+  });
+
+  return t
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove acentos
     .replace(/[^\w\s]/gi, "") // Remove pontuação
-    .trim()
-    .toLowerCase();
+    .replace(/\s+/g, " ") // Espaços simples
+    .trim();
 }
 
 function formatarTelefoneBusca(termo: string): string {
   return termo.replace(/\D/g, ""); // Apenas números
 }
+
 
 export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: string) {
   const termoOriginal = termo.trim();
@@ -131,50 +145,55 @@ export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: stri
     if (data && data.length > 0) return createIAResponse({ source: 'buscar_clientes', data });
   }
 
-  // Camada 2: Nome exato e ILIKE
-  const { data: dataNome, error: errorNome } = await sb
+  // Camada 2: Nome exato e normalizado
+  // Buscamos todos os clientes e filtramos no servidor para garantir normalização flexível
+  const { data: todosClientes, error: errorTodos } = await sb
     .from("clientes")
     .select(`*, pets(id, nome, raca, porte)`)
-    .or(`nome.ilike.%${termoLimpo}%, email.ilike.%${termoOriginal}%`)
-    .order('nome')
-    .limit(10);
+    .eq('ativo', true)
+    .limit(1000);
 
-  if (dataNome && dataNome.length > 0) return createIAResponse({ source: 'buscar_clientes', data: dataNome });
+  if (errorTodos) throw errorTodos;
+
+  if (todosClientes && todosClientes.length > 0) {
+    const matches = todosClientes.filter(c => {
+      const nomeNorm = normalizarTermo(c.nome);
+      return nomeNorm === termoLimpo || nomeNorm.includes(termoLimpo) || termoLimpo.includes(nomeNorm);
+    });
+
+    if (matches.length > 0) {
+      // Ordenar por relevância (match exato primeiro)
+      matches.sort((a, b) => {
+        const aNorm = normalizarTermo(a.nome);
+        const bNorm = normalizarTermo(b.nome);
+        if (aNorm === termoLimpo) return -1;
+        if (bNorm === termoLimpo) return 1;
+        return a.nome.localeCompare(b.nome);
+      });
+      return createIAResponse({ source: 'buscar_clientes', data: matches.slice(0, 10) });
+    }
+  }
 
   // Camada 3: Busca por nome do Pet
   const { data: dataPets } = await sb
     .from("pets")
     .select(`cliente_id, clientes(*, pets(id, nome, raca, porte))`)
     .ilike("nome", `%${termoLimpo}%`)
-    .limit(5);
+    .limit(10);
 
   if (dataPets && dataPets.length > 0) {
-    const clientesDosPets = dataPets.map(p => p.clientes).filter(Boolean);
+    const clientesDosPets = dataPets
+      .map(p => p.clientes)
+      .filter(Boolean)
+      .filter((v, i, a) => a.findIndex(t => t?.id === v?.id) === i); // Unique
     if (clientesDosPets.length > 0) return createIAResponse({ source: 'buscar_clientes', data: clientesDosPets });
-  }
-
-  // Camada 4: Busca por partes do nome (se tiver espaços)
-  if (termoLimpo.includes(' ')) {
-    const palavras = termoLimpo.split(' ').filter(p => p.length > 2);
-    if (palavras.length > 0) {
-      const orString = palavras.map(p => `nome.ilike.%${p}%`).join(',');
-      const { data: dataFuzzy } = await sb
-        .from("clientes")
-        .select(`*, pets(id, nome, raca, porte)`)
-        .or(orString)
-        .order('nome')
-        .limit(10);
-      
-      if (dataFuzzy && dataFuzzy.length > 0) {
-        return createIAResponse({ source: 'buscar_clientes', data: dataFuzzy });
-      }
-    }
   }
 
   return createIAResponse({
     source: 'buscar_clientes',
     data: []
   });
+
 }
 
 export async function buscarPetsDoClienteIA(sb: SupabaseClient<Database>, clienteId: string) {

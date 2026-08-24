@@ -67,7 +67,7 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
           </motion.div>
         )}
 
-        {/* Voice Review Area - Removida para Execução Direta, mantida apenas se necessário manual */}
+        {/* Voice Review Area */}
         {isReviewingVoice && finalTranscript && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -75,25 +75,37 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
             className="mb-4 p-4 bg-white rounded-2xl border-2 border-[#C99845]/30 shadow-xl overflow-hidden"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold text-[#C99845] uppercase tracking-widest">Processando Comando de Voz</span>
+              <span className="text-[10px] font-bold text-[#C99845] uppercase tracking-widest">Revisar Transcrição</span>
               <div className="px-2 py-0.5 rounded text-[10px] font-bold border bg-[#C99845]/5 border-[#C99845]/20 text-[#C99845]">VOZ</div>
             </div>
             
-            <div className="p-3 bg-[#F5F2EA]/30 rounded-xl text-[#123F2A] text-sm leading-relaxed italic">
-              "{finalTranscript}"
-            </div>
+            <Textarea
+              value={finalTranscript}
+              onChange={(e) => setFinalTranscript(e.target.value)}
+              className="p-3 bg-[#F5F2EA]/30 rounded-xl text-[#123F2A] text-sm leading-relaxed italic border-none focus-visible:ring-0 resize-none min-h-[80px]"
+            />
 
             <div className="mt-3 flex gap-2">
               <Button
                 variant="outline"
-                onClick={cancelVoice}
+                onClick={() => {
+                  sessionStorage.removeItem('ia_draft_transcript');
+                  cancelVoice();
+                }}
                 className="flex-1 h-9 border-red-100 text-red-500 rounded-xl hover:bg-red-50 text-[10px] font-bold"
               >
-                CANCELAR
+                DESCARTAR
+              </Button>
+              <Button
+                onClick={() => handleSend(finalTranscript)}
+                className="flex-[2] h-9 bg-[#C99845] text-white rounded-xl hover:bg-[#C99845]/90 text-[10px] font-bold"
+              >
+                USAR TRANSCRIÇÃO
               </Button>
             </div>
           </motion.div>
         )}
+
       </AnimatePresence>
 
       {filePreview && (

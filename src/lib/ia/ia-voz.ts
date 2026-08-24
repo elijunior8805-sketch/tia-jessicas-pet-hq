@@ -1,5 +1,5 @@
 
-export type VoiceRecognitionStatus = 'idle' | 'requesting_permission' | 'listening' | 'reviewing' | 'error';
+export type VoiceRecognitionStatus = 'idle' | 'requesting_permission' | 'listening' | 'finalizing' | 'reviewing' | 'error' | 'processing';
 
 export interface VoiceRecognitionOptions {
   onResult: (text: string, isFinal: boolean) => void;
@@ -43,7 +43,6 @@ export class VoiceRecognizer {
         }
       }
 
-      // Evita disparar resultados vazios ou repetidos se possível
       if (finalTranscript.trim()) {
         this.options.onResult(finalTranscript.trim(), true);
       }
@@ -52,6 +51,7 @@ export class VoiceRecognizer {
         this.options.onResult(interimTranscript.trim(), false);
       }
     };
+
 
     this.recognition.onerror = (event: any) => {
       if (event.error === 'no-speech') return;
@@ -62,24 +62,27 @@ export class VoiceRecognizer {
     };
 
     this.recognition.onend = () => {
-      // Se parou inesperadamente enquanto deveria estar ouvindo, tenta reiniciar uma vez
       if (this.status === 'listening') {
-        try {
-          this.recognition.start();
-          return;
-        } catch (e) {
-          console.error("Erro ao tentar reiniciar reconhecimento:", e);
-        }
+        // Se parou mas o status ainda é listening, tentamos finalizar a transcrição
+        this.status = 'finalizing';
+        this.options.onStatusChange(this.status);
+        
+        // Aguarda um pouco para capturar resultados pendentes e então vai para revisão
+        setTimeout(() => {
+          if (this.status === 'finalizing') {
+            this.status = 'reviewing';
+            this.options.onStatusChange(this.status);
+          }
+        }, 500);
+        return;
       }
       
-      if (this.status === 'listening') {
-        this.status = 'reviewing';
-        this.options.onStatusChange(this.status);
-      } else if (this.status !== 'error') {
+      if (this.status !== 'error' && this.status !== 'processing') {
         this.status = 'idle';
         this.options.onStatusChange(this.status);
       }
     };
+
   }
 
   start() {

@@ -94,42 +94,36 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       recognizerRef.current = new VoiceRecognizer({
         onResult: (text, isFinal) => {
           if (isFinal) {
-            // Consolidar transcrição final removendo duplicações simples
             setFinalTranscript(prev => {
               const cleaned = text.trim();
-              if (prev.endsWith(cleaned)) return prev;
-              const newTranscript = (prev + " " + cleaned).trim();
-              
-              // Execução Direta: Se a transcrição final mudou e estamos no modo listening,
-              // podemos disparar o processamento automaticamente sem revisão manual.
-              // Note: O onend do recognizer vai mudar o status para 'reviewing' se não dispararmos o send.
-              return newTranscript;
+              if (prev.toLowerCase().includes(cleaned.toLowerCase())) return prev;
+              return (prev + " " + cleaned).trim();
             });
             setInterimTranscript("");
           } else {
-            // A transcrição parcial aparece apenas como prévia
             setInterimTranscript(text);
           }
         },
         onStatusChange: (status) => {
           setVoiceStatus(status);
-          if (status === 'reviewing') {
-            // Se chegou no estado de revisão, e temos conteúdo, enviamos automaticamente
-            // para satisfazer o requisito de "Remoção da Confirmação de Áudio"
+          
+          if (status === 'listening') {
+            setIaStatus("listening");
+            setIsReviewingVoice(false);
+          } else if (status === 'reviewing') {
+            setIaStatus("idle");
+            setIsReviewingVoice(true);
+            // Salvar no sessionStorage para persistência
             setFinalTranscript(current => {
-              if (current.trim()) {
-                // Dispara o envio direto do que foi capturado
-                handleSend(current);
-                return ""; // Limpa para a próxima
+              if (current) {
+                sessionStorage.setItem('ia_draft_transcript', current);
               }
               return current;
             });
-            setIsReviewingVoice(false);
-          } else if (status === 'listening') {
-            setIaStatus("listening");
-            setIsReviewingVoice(false);
           } else if (status === 'requesting_permission') {
             setIaStatus("requesting_permission");
+          } else if (status === 'finalizing') {
+            setIaStatus("processing");
           }
         },
         onError: (err) => {
@@ -145,17 +139,27 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       });
     }
     
+    // Carregar rascunho se existir
+    const savedDraft = sessionStorage.getItem('ia_draft_transcript');
+    if (savedDraft && !finalTranscript) {
+      setFinalTranscript(savedDraft);
+      setIsReviewingVoice(true);
+    }
+    
     return () => {
       if (recognizerRef.current) {
         recognizerRef.current.stop();
-        // Garantir limpeza total da instância
         recognizerRef.current = null;
       }
     };
+
   }, []);
 
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
+
+    // Limpar rascunho após envio
+    sessionStorage.removeItem('ia_draft_transcript');
 
     // Idempotency and Session IDs
     const commandId = crypto.randomUUID();
@@ -171,6 +175,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setIsReviewingVoice(false);
     setFinalTranscript("");
     setInterimTranscript("");
+
 
     const startTime = Date.now();
 
