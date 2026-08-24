@@ -172,7 +172,8 @@ async function proximaPergunta(draft: AgendaDraft): Promise<PassoFluxo> {
     const resServ: any = await buscarServicosIA({
       data: { termo: draft.termo_servico || undefined, comando_original: draft.comando_original },
     });
-    let servicos = (resServ?.data || []).map((s: any) => ({
+    type ServicoFluxo = { id: string; nome: string; valor: number; duracao_min: number };
+    let servicos: ServicoFluxo[] = (resServ?.data || []).map((s: any) => ({
       id: s.id,
       nome: s.nome,
       valor: Number(s.valor ?? s.preco_a_partir ?? 0),
