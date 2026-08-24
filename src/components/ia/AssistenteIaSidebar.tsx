@@ -153,6 +153,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   handleSend={handleSend}
                   handleConfirmarAgendamento={handleConfirmarAgendamento}
                   isProcessing={isProcessing}
+                  iaStatus={iaStatus}
                 />
               </ScrollArea>
 

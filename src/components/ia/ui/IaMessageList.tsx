@@ -14,6 +14,7 @@ interface IaMessageListProps {
   handleSend: (text: string) => void;
   handleConfirmarAgendamento: (intent: any) => void;
   isProcessing: boolean;
+  iaStatus?: string;
 }
 
 const QUICK_COMMANDS = [
@@ -30,6 +31,7 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
   handleSend,
   handleConfirmarAgendamento,
   isProcessing,
+  iaStatus,
 }) => {
   return (
     <div className="space-y-6 max-w-full mx-auto">
@@ -162,7 +164,10 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
               ))}
             </div>
             <span className="text-[11px] font-bold text-[#123F2A]/60 uppercase tracking-widest">
-              Processando...
+              {iaStatus === "sending" ? "Enviando..." : 
+               iaStatus === "interpretando" ? "Interpretando..." :
+               iaStatus === "executando" ? "Executando..." :
+               "Processando..."}
             </span>
           </div>
         </div>
