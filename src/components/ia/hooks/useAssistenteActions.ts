@@ -9,8 +9,10 @@ import { registrarEventoIA, getFaseLiberacao } from "@/lib/ia/ia-observabilidade
 import {
   consultarAgendaIA,
   consultarFinanceiroIA,
-  consultarResumoOperacionalIA,
-} from "@/lib/ia/ia-consultas.functions";
+   consultarResumoOperacionalIA,
+   buscarClientesIA,
+ } from "@/lib/ia/ia-consultas.functions";
+
 import { 
   salvarTranscricaoIA,
   listarTranscricoesIA 
@@ -266,11 +268,12 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         } else if (dadosReais.length === 1) {
           const c = dadosReais[0];
           respostaFinal = `Encontrei o cliente **${c.nome}**. \n\n**Detalhes:**\n- **Bairro:** ${c.bairro || 'Não informado'}\n- **Pets:** ${c.pets?.map((p: any) => p.nome).join(", ") || 'Nenhum pet vinculado'}\n\nÉ este o cliente que você procura?`;
-          setSearchResults({ clientes: dadosReais });
+          setSearchResults({ clientes: dadosReais, pets: [] });
         } else {
           respostaFinal = `Encontrei **${dadosReais.length}** clientes com nomes semelhantes. Qual deles você deseja selecionar?`;
-          setSearchResults({ clientes: dadosReais });
+          setSearchResults({ clientes: dadosReais, pets: [] });
         }
+
       }
 
       if (intent.especialista === "estoque_compras") {
