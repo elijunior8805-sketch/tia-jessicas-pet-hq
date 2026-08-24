@@ -19,6 +19,7 @@ import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticated/servicos'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedReativacaoRouteImport } from './routes/_authenticated/reativacao'
+import { Route as AuthenticatedQualidadeIaRouteImport } from './routes/_authenticated/qualidade-ia'
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
 import { Route as AuthenticatedLevaTrazRouteImport } from './routes/_authenticated/leva-traz'
 import { Route as AuthenticatedLembretesRouteImport } from './routes/_authenticated/lembretes'
@@ -101,6 +102,12 @@ const AuthenticatedReativacaoRoute = AuthenticatedReativacaoRouteImport.update({
   path: '/reativacao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedQualidadeIaRoute =
+  AuthenticatedQualidadeIaRouteImport.update({
+    id: '/qualidade-ia',
+    path: '/qualidade-ia',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPagamentosAbertosRoute =
   AuthenticatedPagamentosAbertosRouteImport.update({
     id: '/pagamentos-abertos',
@@ -295,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/lembretes': typeof AuthenticatedLembretesRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
+  '/qualidade-ia': typeof AuthenticatedQualidadeIaRoute
   '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
@@ -337,6 +345,7 @@ export interface FileRoutesByTo {
   '/lembretes': typeof AuthenticatedLembretesRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
+  '/qualidade-ia': typeof AuthenticatedQualidadeIaRoute
   '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
@@ -380,6 +389,7 @@ export interface FileRoutesById {
   '/_authenticated/lembretes': typeof AuthenticatedLembretesRoute
   '/_authenticated/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
+  '/_authenticated/qualidade-ia': typeof AuthenticatedQualidadeIaRoute
   '/_authenticated/reativacao': typeof AuthenticatedReativacaoRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
@@ -424,6 +434,7 @@ export interface FileRouteTypes {
     | '/lembretes'
     | '/leva-traz'
     | '/pagamentos-abertos'
+    | '/qualidade-ia'
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/lembretes'
     | '/leva-traz'
     | '/pagamentos-abertos'
+    | '/qualidade-ia'
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
@@ -508,6 +520,7 @@ export interface FileRouteTypes {
     | '/_authenticated/lembretes'
     | '/_authenticated/leva-traz'
     | '/_authenticated/pagamentos-abertos'
+    | '/_authenticated/qualidade-ia'
     | '/_authenticated/reativacao'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
@@ -612,6 +625,13 @@ declare module '@tanstack/react-router' {
       path: '/reativacao'
       fullPath: '/reativacao'
       preLoaderRoute: typeof AuthenticatedReativacaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/qualidade-ia': {
+      id: '/_authenticated/qualidade-ia'
+      path: '/qualidade-ia'
+      fullPath: '/qualidade-ia'
+      preLoaderRoute: typeof AuthenticatedQualidadeIaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/pagamentos-abertos': {
@@ -867,6 +887,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLembretesRoute: typeof AuthenticatedLembretesRoute
   AuthenticatedLevaTrazRoute: typeof AuthenticatedLevaTrazRoute
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
+  AuthenticatedQualidadeIaRoute: typeof AuthenticatedQualidadeIaRoute
   AuthenticatedReativacaoRoute: typeof AuthenticatedReativacaoRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
@@ -901,6 +922,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLembretesRoute: AuthenticatedLembretesRoute,
   AuthenticatedLevaTrazRoute: AuthenticatedLevaTrazRoute,
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,
+  AuthenticatedQualidadeIaRoute: AuthenticatedQualidadeIaRoute,
   AuthenticatedReativacaoRoute: AuthenticatedReativacaoRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
