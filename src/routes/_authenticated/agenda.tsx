@@ -796,6 +796,9 @@ function AgendamentoRow({
 
   const excluirMut = useMutation({
     mutationFn: async () => {
+      // Liberar reserva se existir
+      await liberarReserva({ data: { agendamento_id: row.id } });
+
       // Remove serviços vinculados (caso não haja cascade)
       await supabase.from("agendamento_servicos").delete().eq("agendamento_id", row.id);
       const { error } = await supabase.from("agendamentos").delete().eq("id", row.id);
