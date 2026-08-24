@@ -204,13 +204,14 @@ function ProgramasCuidadoPage() {
     <div className="container mx-auto py-6 space-y-6 px-4 md:px-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-display font-semibold flex items-center gap-2">
-            <PackageCheck className="h-6 w-6 text-gold" />
+          <h1 className="text-3xl font-display font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
+            <PackageCheck className="h-8 w-8 text-gold" />
             Programas de Cuidado
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Gerencie planos pré-pagos e fidelidade para seus clientes.
+          <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+            Gerencie planos pré-pagos e fidelidade com inteligência e elegância.
           </p>
+
         </div>
         
         <Button className="bg-gold hover:bg-gold/90 text-white font-medium shadow-sm transition-all active:scale-95" onClick={() => setIsProgramaModalOpen(true)}>
