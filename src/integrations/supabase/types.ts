@@ -3334,6 +3334,199 @@ export type Database = {
         }
         Relationships: []
       }
+      programas_contratados: {
+        Row: {
+          atualizado_em: string | null
+          cliente_id: string | null
+          composicao_snapshot: Json
+          criado_em: string | null
+          criado_por: string | null
+          data_da_venda: string | null
+          data_de_inicio: string
+          data_de_validade: string
+          desconto: number | null
+          estabelecimento_id: string | null
+          forma_de_pagamento: string | null
+          id: string
+          nome_snapshot: string
+          observacoes: string | null
+          pet_id: string | null
+          preco_original: number
+          preco_vendido: number
+          programa_id: string | null
+          regras_snapshot: string | null
+          status_do_pagamento: string | null
+          status_do_programa: Database["public"]["Enums"]["programa_contratado_status"]
+        }
+        Insert: {
+          atualizado_em?: string | null
+          cliente_id?: string | null
+          composicao_snapshot: Json
+          criado_em?: string | null
+          criado_por?: string | null
+          data_da_venda?: string | null
+          data_de_inicio: string
+          data_de_validade: string
+          desconto?: number | null
+          estabelecimento_id?: string | null
+          forma_de_pagamento?: string | null
+          id?: string
+          nome_snapshot: string
+          observacoes?: string | null
+          pet_id?: string | null
+          preco_original: number
+          preco_vendido: number
+          programa_id?: string | null
+          regras_snapshot?: string | null
+          status_do_pagamento?: string | null
+          status_do_programa?: Database["public"]["Enums"]["programa_contratado_status"]
+        }
+        Update: {
+          atualizado_em?: string | null
+          cliente_id?: string | null
+          composicao_snapshot?: Json
+          criado_em?: string | null
+          criado_por?: string | null
+          data_da_venda?: string | null
+          data_de_inicio?: string
+          data_de_validade?: string
+          desconto?: number | null
+          estabelecimento_id?: string | null
+          forma_de_pagamento?: string | null
+          id?: string
+          nome_snapshot?: string
+          observacoes?: string | null
+          pet_id?: string | null
+          preco_original?: number
+          preco_vendido?: number
+          programa_id?: string | null
+          regras_snapshot?: string | null
+          status_do_pagamento?: string | null
+          status_do_programa?: Database["public"]["Enums"]["programa_contratado_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programas_contratados_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_contratados_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "programas_contratados_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "programas_contratados_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "programas_contratados_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_contratados_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+          {
+            foreignKeyName: "programas_contratados_programa_id_fkey"
+            columns: ["programa_id"]
+            isOneToOne: false
+            referencedRelation: "programas_de_cuidado"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programas_creditos_movimentacoes: {
+        Row: {
+          agendamento_id: string | null
+          data_hora: string | null
+          estabelecimento_id: string | null
+          id: string
+          idempotency_key: string | null
+          motivo: string | null
+          programa_contratado_id: string | null
+          quantidade: number
+          servico_id: string | null
+          tipo: Database["public"]["Enums"]["credito_movimentacao_tipo"]
+          usuario_id: string | null
+        }
+        Insert: {
+          agendamento_id?: string | null
+          data_hora?: string | null
+          estabelecimento_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          motivo?: string | null
+          programa_contratado_id?: string | null
+          quantidade: number
+          servico_id?: string | null
+          tipo: Database["public"]["Enums"]["credito_movimentacao_tipo"]
+          usuario_id?: string | null
+        }
+        Update: {
+          agendamento_id?: string | null
+          data_hora?: string | null
+          estabelecimento_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          motivo?: string | null
+          programa_contratado_id?: string | null
+          quantidade?: number
+          servico_id?: string | null
+          tipo?: Database["public"]["Enums"]["credito_movimentacao_tipo"]
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programas_creditos_movimentacoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_creditos_movimentacoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
+            foreignKeyName: "programas_creditos_movimentacoes_programa_contratado_id_fkey"
+            columns: ["programa_contratado_id"]
+            isOneToOne: false
+            referencedRelation: "programas_contratados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_creditos_movimentacoes_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programas_de_cuidado: {
         Row: {
           criado_em: string
@@ -4331,6 +4524,15 @@ export type Database = {
         | "agressivo"
         | "necessitou_focinheira"
         | "necessitou_pausa"
+      credito_movimentacao_tipo:
+        | "credito_criado"
+        | "credito_reservado"
+        | "credito_consumido"
+        | "reserva_liberada"
+        | "ajuste_manual"
+        | "credito_expirado"
+        | "cancelamento"
+        | "estorno"
       leva_traz_modalidade:
         | "nao_utilizar"
         | "somente_buscar"
@@ -4370,6 +4572,13 @@ export type Database = {
         | "atrasado"
         | "cancelado"
       parcela_status: "pendente" | "pago" | "parcial" | "atrasado" | "cancelado"
+      programa_contratado_status:
+        | "aguardando_pagamento"
+        | "ativo"
+        | "suspenso"
+        | "vencido"
+        | "concluído"
+        | "cancelado"
       programa_status: "rascunho" | "ativo" | "inativo"
     }
     CompositeTypes: {
@@ -4553,6 +4762,16 @@ export const Constants = {
         "necessitou_focinheira",
         "necessitou_pausa",
       ],
+      credito_movimentacao_tipo: [
+        "credito_criado",
+        "credito_reservado",
+        "credito_consumido",
+        "reserva_liberada",
+        "ajuste_manual",
+        "credito_expirado",
+        "cancelamento",
+        "estorno",
+      ],
       leva_traz_modalidade: [
         "nao_utilizar",
         "somente_buscar",
@@ -4597,6 +4816,14 @@ export const Constants = {
         "cancelado",
       ],
       parcela_status: ["pendente", "pago", "parcial", "atrasado", "cancelado"],
+      programa_contratado_status: [
+        "aguardando_pagamento",
+        "ativo",
+        "suspenso",
+        "vencido",
+        "concluído",
+        "cancelado",
+      ],
       programa_status: ["rascunho", "ativo", "inativo"],
     },
   },
