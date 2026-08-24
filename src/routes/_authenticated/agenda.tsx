@@ -2153,6 +2153,22 @@ function EditarServicosDialog({
       }));
       const { error: errIns } = await supabase.from("agendamento_servicos").insert(rows);
       if (errIns) throw errIns;
+
+      // Realiza novas reservas
+      for (const it of itens) {
+        if (it.usar_credito) {
+          try {
+            await reservarCredito({ data: {
+              pet_id: agendamento.pet_id,
+              servico_id: it.servico_id,
+              agendamento_id: agendamento.id,
+              quantidade: 1
+            }});
+          } catch (e) {
+            console.error("Erro ao reservar crédito na edição:", e);
+          }
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Serviços atualizados");
