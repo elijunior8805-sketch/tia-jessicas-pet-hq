@@ -128,6 +128,33 @@ function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
   });
 }
 
+function ProgramasCuidadoBadge({ petId }: { petId: string | null }) {
+  const { data: creditos, isLoading } = useQuery({
+    queryKey: ["creditos-pet", petId],
+    enabled: !!petId,
+    queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
+  });
+
+  if (!petId || isLoading || !creditos || Object.keys(creditos).length === 0) return null;
+
+  return (
+    <div className="mt-2 p-3 bg-gold/10 border border-gold/30 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="flex items-center gap-2 mb-2">
+        <PackageCheck className="h-4 w-4 text-gold" />
+        <span className="text-xs font-bold text-gold uppercase tracking-wider">Programa Ativo</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(creditos).map(([id, info]: [string, any]) => (
+          <Badge key={id} variant="outline" className="bg-white border-gold/20 text-[10px] h-6">
+            {info.nome}: {info.disponivel}x
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 
 
 
