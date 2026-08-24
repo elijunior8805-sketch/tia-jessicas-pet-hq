@@ -185,7 +185,7 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
             onClick={toggleVoice}
             className={cn(
               "h-10 w-10 rounded-xl transition-all duration-300",
-              voiceStatus === "listening"
+              voiceStatus === "listening" || voiceStatus === "requesting_permission"
                 ? "bg-red-500 text-white animate-pulse"
                 : "text-[#123F2A]/40 hover:text-[#C99845] hover:bg-[#C99845]/10"
             )}
