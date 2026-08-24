@@ -2232,7 +2232,10 @@ function EditarServicosDialog({
               {itens.map((it, idx) => (
                 <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_100px_80px_auto] gap-2 items-center">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{it.nome}</div>
+                    <div className="text-sm font-medium truncate flex items-center gap-1">
+                      {it.nome}
+                      {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" />}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {idx === 0 && (
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</span>
