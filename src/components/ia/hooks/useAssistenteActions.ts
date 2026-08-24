@@ -37,7 +37,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [iaStatus, setIaStatus] = useState<IAStatus>("idle");
   const [searchResults, setSearchResults] = useState<IAResults | null>(null);
   
-  // Novos estados para Voz
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
   const [isReviewingVoice, setIsReviewingVoice] = useState(false);
@@ -49,6 +48,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
+  
+  const activeCommandRef = useRef<{
+    commandId: string;
+    idempotencyKey: string;
+    sessionId: string;
+    correlationId: string;
+  } | null>(null);
+
   const processingRef = useRef(false);
 
   useEffect(() => {
@@ -68,9 +75,15 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       recognizerRef.current = new VoiceRecognizer({
         onResult: (text, isFinal) => {
           if (isFinal) {
-            setFinalTranscript(prev => (prev + " " + text).trim());
+            // Consolidar transcrição final removendo duplicações simples
+            setFinalTranscript(prev => {
+              const cleaned = text.trim();
+              if (prev.endsWith(cleaned)) return prev;
+              return (prev + " " + cleaned).trim();
+            });
             setInterimTranscript("");
           } else {
+            // A transcrição parcial aparece apenas como prévia
             setInterimTranscript(text);
           }
         },
@@ -78,13 +91,22 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           setVoiceStatus(status);
           if (status === 'reviewing') {
             setIsReviewingVoice(true);
+            setIaStatus("reviewing_transcription");
+          } else if (status === 'listening') {
+            setIaStatus("listening");
+          } else if (status === 'requesting_permission') {
+            setIaStatus("requesting_permission");
           }
         },
         onError: (err) => {
           console.error("Erro de reconhecimento de voz:", err);
           setVoiceStatus("error");
+          setIaStatus("error");
           toast.error("Erro no microfone: " + err);
-          setTimeout(() => setVoiceStatus("idle"), 2000);
+          setTimeout(() => {
+            setVoiceStatus("idle");
+            setIaStatus("idle");
+          }, 2000);
         },
       });
     }
@@ -92,20 +114,30 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     return () => {
       if (recognizerRef.current) {
         recognizerRef.current.stop();
+        // Garantir limpeza total da instância
+        recognizerRef.current = null;
       }
     };
   }, []);
 
   const handleSend = useCallback(async (text: string) => {
-    if (!text.trim() || processingRef.current) return;
+    if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
+
+    // Idempotency and Session IDs
+    const commandId = crypto.randomUUID();
+    const idempotencyKey = `idemp-${commandId}`;
+    const correlationId = `corr-${Date.now()}`;
+    const sessionId = activeCommandRef.current?.sessionId || crypto.randomUUID();
+
+    activeCommandRef.current = { commandId, idempotencyKey, sessionId, correlationId };
 
     processingRef.current = true;
     setIsProcessing(true);
+    setIaStatus("sending");
     setIsReviewingVoice(false);
     setFinalTranscript("");
     setInterimTranscript("");
 
-    const commandId = crypto.randomUUID();
     const startTime = Date.now();
 
     const userMessage: IAMessage = {
@@ -143,7 +175,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       // --- Especialistas ---
       if (intent.especialista === "comunicacao") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         if (intent.intencao === "consultar_mensagens") {
           const res = await consultarMensagensIA({ data: { cliente_id: intent.parametros?.cliente_id, comando_original: text } });
           dadosReais = res.data;
@@ -162,7 +194,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       if (intent.especialista === "gestao_estrategica" || intent.especialista === "relatorios") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         if (intent.intencao === "resumo_negocio") {
           const res = await getResumoProprietarioIA();
           dadosReais = res;
@@ -175,7 +207,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       if (intent.especialista === "estoque_compras") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         if (intent.intencao === "consulta_estoque") {
           const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque, comando_original: text } });
           dadosReais = res;
@@ -188,7 +220,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
-        setIaStatus("pesquisando");
+        setIaStatus("processing");
         const res = await consultarAgendaIA({ data: { ...(intent.parametros || {}), comando_original: text } });
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
@@ -205,21 +237,22 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setIaStatus(intent.informacoes_faltantes?.length ? "aguardando_informacao" : "concluido");
-
       await registrarAuditoriaIA({
         data: {
           comando: text,
           intencao: intent.intencao,
           sucesso: true,
           tempo_ms: Date.now() - startTime,
-          metadata: { intent, dados: dadosReais, commandId },
+          metadata: { intent, dados: dadosReais, ...(activeCommandRef.current || {}) },
         },
       });
+      activeCommandRef.current = null; // Libera trava após auditoria
 
     } catch (error: any) {
       console.error(error);
-      setIaStatus("erro");
-      setMessages((prev) => [...prev, { role: "assistant", content: `A resposta foi interrompida ou ocorreu um erro: ${error.message}`, timestamp: new Date().toISOString() }]);
+      setIaStatus("error");
+      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${activeCommandRef.current?.correlationId || 'N/A'}`;
+      setMessages((prev) => [...prev, { role: "assistant", content: errorMessage, timestamp: new Date().toISOString() }]);
     } finally {
       setIsProcessing(false);
       processingRef.current = false;
@@ -243,13 +276,15 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setInterimTranscript("");
     setIsReviewingVoice(false);
     setVoiceStatus("idle");
+    setIaStatus("cancelado");
+    setTimeout(() => setIaStatus("idle"), 1500);
   };
 
   const handleConfirmarAgendamento = async (intent: any) => {
     if (processingRef.current) return;
     processingRef.current = true;
     setIsProcessing(true);
-    setIaStatus("validando");
+    setIaStatus("processing");
     try {
       const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
       if (resVal.disponivel === false) throw new Error(resVal.mensagem || "Horário indisponível");
@@ -261,7 +296,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       setIaStatus("concluido");
     } catch (error: any) {
       toast.error(error.message);
-      setIaStatus("erro");
+      setIaStatus("error");
     } finally {
       setIsProcessing(false);
       processingRef.current = false;

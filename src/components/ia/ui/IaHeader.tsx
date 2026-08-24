@@ -8,6 +8,25 @@ interface IaHeaderProps {
   onClose: () => void;
 }
 
+const statusMessages: Record<IAStatus, string> = {
+  idle: "Spa Tia Jéssica • Online",
+  requesting_permission: "Solicitando microfone...",
+  listening: "Ouvindo...",
+  reviewing_transcription: "Revisando voz...",
+  ready_to_send: "Pronto para enviar",
+  sending: "Enviando...",
+  processing: "Validando dados...",
+  interpretando: "Pensando...",
+  pesquisando: "Consultando base de dados...",
+  aguardando_informacao: "Aguardando detalhes...",
+  aguardando_confirmacao: "Aguardando sua confirmação...",
+  executando: "Executando operação real...",
+  verificando: "Verificando resultado...",
+  concluido: "Operação concluída",
+  cancelado: "Cancelado",
+  error: "Ocorreu um erro",
+};
+
 export const IaHeader: React.FC<IaHeaderProps> = ({ iaStatus, onClose }) => (
   <div className="px-6 py-5 border-b border-[#C99845]/10 flex items-center justify-between bg-[#123F2A] text-white">
     <div className="flex items-center gap-3">
@@ -20,19 +39,10 @@ export const IaHeader: React.FC<IaHeaderProps> = ({ iaStatus, onClose }) => (
         </h2>
         <div className="flex items-center gap-2 mt-1.5">
           <span
-            className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === "erro" ? "bg-red-500" : "bg-[#C99845]"}`}
+            className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === "error" ? "bg-red-500" : "bg-[#C99845]"}`}
           />
           <p className="text-[9px] uppercase tracking-widest font-bold text-white/60">
-            {iaStatus === "idle" && "Spa Tia Jéssica • Online"}
-            {iaStatus === "interpretando" && "Pensando..."}
-            {iaStatus === "pesquisando" && "Consultando base de dados..."}
-            {iaStatus === "aguardando_informacao" && "Aguardando detalhes..."}
-            {iaStatus === "validando" && "Validando dados..."}
-            {iaStatus === "aguardando_confirmacao" && "Aguardando sua confirmação..."}
-            {iaStatus === "executando" && "Executando operação real..."}
-            {iaStatus === "verificando" && "Verificando resultado..."}
-            {iaStatus === "concluido" && "Operação concluída"}
-            {iaStatus === "erro" && "Ocorreu um erro"}
+            {statusMessages[iaStatus]}
           </p>
         </div>
       </div>

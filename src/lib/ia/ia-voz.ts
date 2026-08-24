@@ -1,5 +1,5 @@
 
-export type VoiceRecognitionStatus = 'idle' | 'listening' | 'processing' | 'reviewing' | 'error';
+export type VoiceRecognitionStatus = 'idle' | 'requesting_permission' | 'listening' | 'reviewing' | 'error';
 
 export interface VoiceRecognitionOptions {
   onResult: (text: string, isFinal: boolean) => void;
@@ -35,20 +35,21 @@ export class VoiceRecognizer {
       let finalTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
         } else {
-          interimTranscript += transcript;
+          interimTranscript += result[0].transcript;
         }
       }
 
-      if (finalTranscript) {
-        this.options.onResult(finalTranscript, true);
+      // Evita disparar resultados vazios ou repetidos se possível
+      if (finalTranscript.trim()) {
+        this.options.onResult(finalTranscript.trim(), true);
       }
       
-      if (interimTranscript) {
-        this.options.onResult(interimTranscript, false);
+      if (interimTranscript.trim()) {
+        this.options.onResult(interimTranscript.trim(), false);
       }
     };
 
@@ -74,9 +75,14 @@ export class VoiceRecognizer {
   start() {
     if (this.recognition && (this.status === 'idle' || this.status === 'reviewing' || this.status === 'error')) {
       try {
+        this.status = 'requesting_permission';
+        this.options.onStatusChange(this.status);
         this.recognition.start();
       } catch (err) {
         console.error('Falha ao iniciar reconhecimento:', err);
+        this.status = 'error';
+        this.options.onStatusChange(this.status);
+        this.options.onError('Falha ao acessar microfone.');
       }
     }
   }
