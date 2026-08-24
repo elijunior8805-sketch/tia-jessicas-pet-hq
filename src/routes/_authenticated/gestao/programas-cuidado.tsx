@@ -68,6 +68,7 @@ function ProgramasCuidadoPage() {
   });
 
   const [activeTab, setActiveTab] = useState("catalogo");
+  const [activeSubTabAtivos, setActiveSubTabAtivos] = useState("todos");
   const [openVenda, setOpenVenda] = useState(false);
   const [selectedPrograma, setSelectedPrograma] = useState<any>(null);
   const [vendaStep, setVendaStep] = useState(1);
