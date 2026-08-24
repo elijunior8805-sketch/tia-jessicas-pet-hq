@@ -14,7 +14,7 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     observacoes: z.string().optional(),
     comprovante_path: z.string().optional(),
     id_transacao: z.string().optional()
-  }).parse(d))
+  }).parse(d || {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     
@@ -34,7 +34,7 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     pagamento_id: z.string(),
     motivo: z.string()
-  }).parse(d))
+  }).parse(d || {}))
   .handler(async ({ data, context }) => {
     const { estornarPagamentoIA: estornar } = await import("./ia-acoes.server");
     return estornar(context.supabase, data.pagamento_id, data.motivo);
@@ -45,7 +45,7 @@ export const processarComprovanteIA = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     imagemBase64: z.string(),
     contentType: z.string().optional()
-  }).parse(d))
+  }).parse(d || {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     return analisarComprovanteIA(sb, data.imagemBase64, data.contentType);

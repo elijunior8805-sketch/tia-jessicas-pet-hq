@@ -8,7 +8,7 @@ export const consultarMensagensIA = createServerFn({ method: "GET" })
     cliente_id: z.string().optional(),
     pet_id: z.string().optional(),
     limite: z.number().optional()
-  }).parse(d))
+  }).parse(d || {}))
   .handler(async ({ data, context }) => {
     const { consultarMensagensRecentes } = await import("./ia-comunicacao.server");
     return consultarMensagensRecentes(context.supabase, data);
