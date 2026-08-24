@@ -12,24 +12,27 @@ export const getEstoqueIA = createServerFn({ method: "GET" })
   .inputValidator((input: any) => z.object({ 
     termo: z.string().optional(),
     categoria: z.string().optional(),
-    apenasBaixo: z.boolean().optional() 
-  }).parse(input))
+    apenasBaixo: z.boolean().optional(),
+    comando_original: z.string().optional().default("estoque"),
+  }).parse(input || {}))
   .handler(async ({ data }) => {
     return consultarEstoque(data);
   });
 
 export const getComprasIA = createServerFn({ method: "GET" })
   .inputValidator((input: any) => z.object({ 
-    status: z.string().optional()
-  }).parse(input))
+    status: z.string().optional(),
+    comando_original: z.string().optional().default("compras"),
+  }).parse(input || {}))
   .handler(async ({ data }) => {
     return consultarComprasAbertas(data.status);
   });
 
 export const getFornecedoresIA = createServerFn({ method: "GET" })
   .inputValidator((input: any) => z.object({ 
-    termo: z.string().optional()
-  }).parse(input))
+    termo: z.string().optional(),
+    comando_original: z.string().optional().default("fornecedores"),
+  }).parse(input || {}))
   .handler(async ({ data }) => {
     return consultarFornecedores(data.termo);
   });

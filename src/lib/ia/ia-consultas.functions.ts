@@ -66,7 +66,8 @@ export const consultarDisponibilidadeIA = createServerFn({ method: "POST" })
     servico: z.string().optional(),
     data: z.string(),
     profissional: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { buscarDisponibilidade } = await import("./ia-consultas.server");
     return buscarDisponibilidade(context.supabase, data);

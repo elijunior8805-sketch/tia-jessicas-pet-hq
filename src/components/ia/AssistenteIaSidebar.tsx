@@ -8,6 +8,7 @@ import { useAssistenteActions } from "./hooks/useAssistenteActions";
 import { toast } from "sonner";
 import { processarComprovanteIA } from "@/lib/ia/ia-financeiro.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { AssistenteErrorBoundary } from "./ui/AssistenteErrorBoundary";
 
 interface AssistenteIaSidebarProps {
   isOpen: boolean;
@@ -144,34 +145,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           >
             <IaHeader iaStatus={iaStatus} onClose={onClose} />
 
-            <ScrollArea className="flex-1 p-6" ref={scrollRef}>
-              <IaMessageList
-                messages={messages}
-                searchResults={searchResults}
-                handleSend={handleSend}
-                handleConfirmarAgendamento={handleConfirmarAgendamento}
-                isProcessing={isProcessing}
-              />
-            </ScrollArea>
+            <AssistenteErrorBoundary>
+              <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+                <IaMessageList
+                  messages={messages}
+                  searchResults={searchResults}
+                  handleSend={handleSend}
+                  handleConfirmarAgendamento={handleConfirmarAgendamento}
+                  isProcessing={isProcessing}
+                />
+              </ScrollArea>
 
-            <IaInputArea
-              inputText={inputText}
-              setInputText={setInputText}
-              voiceStatus={voiceStatus}
-              isProcessing={isProcessing}
-              handleSend={handleSend}
-              toggleVoice={toggleVoice}
-              cancelVoice={cancelVoice}
-              handleFileSelect={handleFileSelect}
-              filePreview={filePreview}
-              setFilePreview={setFilePreview}
-              setSelectedFile={setSelectedFile}
-              handleAnalizarComprovante={handleAnalizarComprovante}
-              interimTranscript={interimTranscript}
-              finalTranscript={finalTranscript}
-              isReviewingVoice={isReviewingVoice}
-              setFinalTranscript={setFinalTranscript}
-            />
+              <IaInputArea
+                inputText={inputText}
+                setInputText={setInputText}
+                voiceStatus={voiceStatus}
+                isProcessing={isProcessing}
+                handleSend={handleSend}
+                toggleVoice={toggleVoice}
+                cancelVoice={cancelVoice}
+                handleFileSelect={handleFileSelect}
+                filePreview={filePreview}
+                setFilePreview={setFilePreview}
+                setSelectedFile={setSelectedFile}
+                handleAnalizarComprovante={handleAnalizarComprovante}
+                interimTranscript={interimTranscript}
+                finalTranscript={finalTranscript}
+                isReviewingVoice={isReviewingVoice}
+                setFinalTranscript={setFinalTranscript}
+              />
+            </AssistenteErrorBoundary>
           </motion.div>
         </div>
       )}
