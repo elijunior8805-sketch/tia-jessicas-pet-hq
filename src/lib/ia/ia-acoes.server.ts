@@ -11,12 +11,20 @@ export async function validarDisponibilidadeReal(
   params: {
     data: string;
     hora: string;
-    pet_id: string;
-    cliente_id: string;
+    pet_id?: string;
+    cliente_id?: string;
     profissional_id?: string;
     servicos: string[];
   }
 ) {
+  if (!params.cliente_id || !params.pet_id) {
+    return createIAResponse({
+      success: false,
+      source: 'validar_disponibilidade',
+      validation_errors: ["ID do cliente ou pet não fornecido."]
+    });
+  }
+
   const { data: duplicados, error: errD } = await sb
     .from("agendamentos")
     .select("id")
@@ -59,8 +67,8 @@ export async function validarDisponibilidadeReal(
 export async function criarAgendamentoIA(
   sb: SupabaseClient<Database>,
   params: {
-    cliente_id: string;
-    pet_id: string;
+    cliente_id?: string;
+    pet_id?: string;
     servicos: { id: string, nome: string, valor: number }[];
     data: string;
     hora: string;
@@ -72,6 +80,9 @@ export async function criarAgendamentoIA(
     idempotency_key?: string;
   }
 ) {
+  if (!params.cliente_id || !params.pet_id) {
+    throw new Error("Cliente ou Pet não identificados para criar o agendamento.");
+  }
   const { data: user } = await sb.auth.getUser();
   const userId = user?.user?.id;
   // 1. Verificação de Idempotência
@@ -101,8 +112,8 @@ export async function criarAgendamentoIA(
   const { data: agendamento, error: errA } = await sb
     .from("agendamentos")
     .insert({
-      cliente_id: params.cliente_id,
-      pet_id: params.pet_id,
+      cliente_id: params.cliente_id!,
+      pet_id: params.pet_id!,
       data: params.data,
       hora: params.hora,
       profissional_id: params.profissional_id,
@@ -141,10 +152,11 @@ export async function criarAgendamentoIA(
 
 export async function remarcarAgendamentoIA(
   sb: SupabaseClient<Database>,
-  agendamento_id: string,
+  agendamento_id: string | undefined,
   nova_data: string,
   nova_hora: string
 ) {
+  if (!agendamento_id) throw new Error("ID do agendamento não fornecido.");
   const { data, error } = await sb
     .from("agendamentos")
     .update({
@@ -166,9 +178,10 @@ export async function remarcarAgendamentoIA(
 
 export async function cancelarAgendamentoIA(
   sb: SupabaseClient<Database>,
-  agendamento_id: string,
+  agendamento_id: string | undefined,
   motivo: string
 ) {
+  if (!agendamento_id) throw new Error("ID do agendamento não fornecido.");
   const { data, error } = await sb
     .from("agendamentos")
     .update({
@@ -294,8 +307,9 @@ export async function criarClienteIA(
 
 export async function criarPetIA(
   sb: SupabaseClient<Database>,
-  params: { cliente_id: string; nome: string; especie?: string; raca?: string; porte?: string; observacoes?: string }
+  params: { cliente_id?: string; nome: string; especie?: string; raca?: string; porte?: string; observacoes?: string }
 ) {
+  if (!params.cliente_id) throw new Error("ID do cliente não fornecido.");
   const { data, error } = await sb
     .from("pets")
     .insert({

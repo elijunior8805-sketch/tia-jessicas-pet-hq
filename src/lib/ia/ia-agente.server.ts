@@ -182,6 +182,15 @@ DATAS:
       parametrosNormalizados.comando_original = texto;
     }
     
+    // Garantir que UUIDs vazios sejam transformados em undefined para passar no Zod
+    Object.keys(parametrosNormalizados).forEach(key => {
+      if (typeof parametrosNormalizados[key] === 'string' && parametrosNormalizados[key] === '') {
+        if (key.endsWith('_id')) {
+           parametrosNormalizados[key] = undefined;
+        }
+      }
+    });
+    
     return {
       ...parsed,
       parametros: parametrosNormalizados,

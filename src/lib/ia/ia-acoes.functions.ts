@@ -7,8 +7,8 @@ export const validarAgendamentoIA = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({
     data: z.string().optional().default("hoje"),
     hora: z.string().optional().default("08:00"),
-    pet_id: z.string().optional().default(""),
-    cliente_id: z.string().optional().default(""),
+    pet_id: z.string().uuid().optional(),
+    cliente_id: z.string().uuid().optional(),
     profissional_id: z.string().optional(),
     servicos: z.array(z.string()).optional().default([]),
     comando_original: z.string().optional().default("acao"),
@@ -21,8 +21,8 @@ export const validarAgendamentoIA = createServerFn({ method: "POST" })
 export const executarCriacaoAgendamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string().optional().default(""),
-    pet_id: z.string().optional().default(""),
+    cliente_id: z.string().uuid().optional(),
+    pet_id: z.string().uuid().optional(),
     servicos: z.array(z.object({
       id: z.string(),
       nome: z.string(),
@@ -44,7 +44,7 @@ export const executarCriacaoAgendamento = createServerFn({ method: "POST" })
 export const executarRemarcacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    agendamento_id: z.string().optional().default(""),
+    agendamento_id: z.string().uuid().optional(),
     nova_data: z.string().optional().default("hoje"),
     nova_hora: z.string().optional().default("08:00"),
     comando_original: z.string().optional().default("remarcar"),
@@ -57,7 +57,7 @@ export const executarRemarcacao = createServerFn({ method: "POST" })
 export const executarCancelamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    agendamento_id: z.string().optional().default(""),
+    agendamento_id: z.string().uuid().optional(),
     motivo: z.string().optional(),
     comando_original: z.string().optional().default("cancelar"),
   }).parse(input || {}))
@@ -83,7 +83,7 @@ export const executarCriacaoCliente = createServerFn({ method: "POST" })
 export const executarCriacaoPet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    cliente_id: z.string().optional().default(""),
+    cliente_id: z.string().uuid().optional(),
     nome: z.string().optional().default(""),
     especie: z.string().optional(),
     raca: z.string().optional(),
