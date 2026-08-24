@@ -1882,6 +1882,96 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_transcricoes: {
+        Row: {
+          agendamento_id: string | null
+          cliente_id: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          pet_id: string | null
+          texto: string
+          usuario_id: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          pet_id?: string | null
+          texto: string
+          usuario_id: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          pet_id?: string | null
+          texto?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_transcricoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_transcricoes_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
+      }
       lembretes_config: {
         Row: {
           aniversario_hora: string
