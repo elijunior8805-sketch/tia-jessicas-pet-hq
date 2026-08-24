@@ -349,6 +349,7 @@ function ProgramasCuidadoPage() {
         </TabsContent>
 
 
+
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -843,8 +844,8 @@ function AuditoriaProgramasTab() {
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-sidebar-border/40 text-left">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-sidebar-border/40">
               <tr>
                 <th className="p-4">Data</th>
                 <th className="p-4">Ação</th>
@@ -860,7 +861,7 @@ function AuditoriaProgramasTab() {
                   </td>
                   <td className="p-4">
                     <Badge variant="outline" className="text-[10px] uppercase font-bold border-gold/30 text-gold-foreground bg-gold/5">
-                      {log.acao.replace('_', ' ')}
+                      {log.acao.replace(/_/g, ' ')}
                     </Badge>
                   </td>
                   <td className="p-4">
@@ -881,4 +882,5 @@ function AuditoriaProgramasTab() {
     </Card>
   );
 }
+
 
