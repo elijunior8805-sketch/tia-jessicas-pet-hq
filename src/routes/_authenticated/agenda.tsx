@@ -1710,6 +1710,7 @@ function NovoAgendamentoDialog({
                 ))}
               </SelectContent>
             </Select>
+            <ProgramasCuidadoBadge petId={petId} />
             {clienteId && pets && pets.length === 0 && (
               <p className="text-xs text-warning mt-1">Este cliente ainda não tem pets cadastrados.</p>
             )}
