@@ -145,7 +145,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       if (intent.especialista === "comunicacao") {
         setIaStatus("pesquisando");
         if (intent.intencao === "consultar_mensagens") {
-          const res = await consultarMensagensIA({ data: { cliente_id: intent.parametros?.cliente_id } });
+          const res = await consultarMensagensIA({ data: { cliente_id: intent.parametros?.cliente_id, comando_original: text } });
           dadosReais = res.data;
           respostaFinal = `### 💬 Mensagens Recentes\n\n` + (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), "dd/MM HH:mm")}] **${m.clientes?.nome || "Sistema"}**: ${m.mensagem}`).join("\n");
         } else if (intent.intencao === "consultar_aniversariantes") {
