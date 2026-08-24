@@ -86,7 +86,7 @@ ESTRUTURA DA INTERPRETAÇÃO (Retorne sempre este JSON):
 - intencao: Nome técnico.
 - especialista: Um dos especialistas listados.
 - tipo_operacao: "consulta" ou "acao".
-- parametros: Objeto com dados extraídos.
+- parametros: Objeto com dados extraídos. OBRIGATÓRIO incluir "comando_original" (string) com o texto do usuário.
 - informacoes_faltantes: Lista de dados que impedem a execução.
 - ambiguidades: Dúvidas sobre o pedido.
 - nivel_confianca: 0 a 1.
@@ -108,8 +108,24 @@ DATAS:
 
     const parsed = JSON.parse(res.texto);
     
+    // Garantir que parametros nunca seja null para evitar erro de validação Zod no client/server functions
+    if (!parsed.parametros) {
+      parsed.parametros = {};
+    }
+
+    // Normalização para evitar o erro Zod "Required" em campos como 'comando_original' se a IA omitir
+    if (parsed.intencao === "criar_agendamento" || parsed.intencao === "validar_agendamento") {
+      if (!parsed.parametros.comando_original) {
+        parsed.parametros.comando_original = texto;
+      }
+    }
+    
     return {
       ...parsed,
+      parametros: {
+        ...parsed.parametros,
+        comando_original: texto
+      },
       nivel_confianca: parsed.nivel_confianca || 0.9
     } as IAIntent;
   } catch (error) {
