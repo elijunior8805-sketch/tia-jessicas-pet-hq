@@ -60,6 +60,6 @@ export class AssistenteErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.children;
+    return this.props.children;
   }
 }
