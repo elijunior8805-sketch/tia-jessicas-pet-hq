@@ -21,8 +21,10 @@ import {
   getProgramasCatalogo, 
   toggleProgramaStatus,
   duplicarPrograma,
-  contratarPrograma
+  contratarPrograma,
+  reconciliarCreditosPet
 } from "@/lib/programas-cuidado.functions";
+
 import { Button } from "@/components/ui/button";
 import { 
   Card, 
@@ -223,6 +225,11 @@ function ProgramasCuidadoPage() {
             <CreditCard className="mr-2 h-4 w-4" />
             Movimentações
           </TabsTrigger>
+          <TabsTrigger value="auditoria" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <History className="mr-2 h-4 w-4" />
+            Auditoria
+          </TabsTrigger>
+
           <TabsTrigger value="configuracoes" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <SettingsIcon className="mr-2 h-4 w-4" />
             Configurações
