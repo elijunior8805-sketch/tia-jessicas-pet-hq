@@ -1,48 +1,29 @@
-# Plan - Implementation of Care Programs (Phase 3)
+# Plan - Implementation of Care Programs (Phase 4)
 
-Integrate Care Programs with Financial, Dashboard, Communication, and AI Assistant modules, ensuring strict separation between Cash and Accrual (Competência) accounting.
+Audit and validate the entire module to ensure security, data integrity, and correct end-to-end operation with real data.
 
-## User Review Required
+## Security and Permissions
+- **RLS & Isolation**: Verify that no user can view or modify programs from another establishment.
+- **Granular Permissions**: Implement and test specific permissions for:
+    - Catalog viewing and program creation/editing.
+    - Sales, discounts, and validity adjustments.
+    - Credit reservation, adjustment, and reconciliation.
+    - Financial consultation and report exporting.
+- **Auditing**: Ensure every action (sale, scheduling, payment, adjustment) is logged with User ID, Action, Timestamp, and previous/post values.
 
-> [!IMPORTANT]
-> The user provided a large block of text as a "visual text edit" instructions for Phase 3. I will implement these as the functional requirements for this phase.
+## Reconciliation Logic
+- **Credit Reconciliation**: Automated check between contract composition, created credits, reservations, consumption, and current balance.
+- **Financial Reconciliation**: Comparison between sold price, accounts receivable, received amounts, and revenue recognition.
 
-- **Partial Payment Strategy**: Should credits be released proportionally, blocked until full payment, or released by manual authorization? (Defaulting to a configurable setting as requested).
-- **Accrual Formula**: I will use a proportional allocation based on the original service price to distribute the sold price.
+## Edge Case Testing
+- Testing edited programs after sale, inactivated services, duplicated clients, partial payments, and expired programs.
+- Handling race conditions (double clicks, two tabs) and network failures during credit transactions.
 
-## Proposed Changes
-
-### Financial Integration
-- **Contratação**: Create `contas_a_receber` linked to the `programas_contratados`.
-- **Pagamento**: Update payments to activate credits based on the selected business rule (partial vs full).
-- **Utilização**: Implement accrual recognition (competência) when a service is finalized, without creating new cash entries.
-- **Cancelamento**: Logic to calculate utilized/reserved credits and suggest refundable amounts.
-
-### Dashboard & Analytics
-- Add specialized KPIs for Care Programs to the main Dashboard and Financial panels:
-    - Programs sold, received, and balance due.
-    - Active vs expired programs.
-    - Credit lifecycle (Available, Reserved, Used).
-    - Revenue recognition (Accrual).
-
-### Client & Pet Profile
-- New "Programas de Cuidado" section in `PetDetails` and `ClientDetails`.
-- History of usage and validity tracking.
-
-### AI Assistant (Phase 3 Tools)
-- Implement real tools in `ia-agente.server.ts` and `AssistenteIaSidebar.tsx`:
-    - `consultar_creditos`, `consultar_vencimentos`, `vender_programa` (via AI).
-    - AI-driven renewal suggestions based on pet frequency.
-
-### Communication
-- New WhatsApp templates for Program confirmation, Credit summaries, and Renewal alerts.
+## Controlled End-to-End Test
+- Execution of the full cycle: Program Creation -> Sale -> Payment -> Scheduling -> Credit Reservation -> Attendance Completion -> Credit Consumption.
+- Verification via AI Assistant, Customer Profile, Dashboard, and Financial reports.
 
 ## Technical Details
-- **Schema Updates**: Add `financeiro_id` to `programas_contratados` if needed for direct linkage.
-- **Accrual Table**: Use a ledger or a view to track recognized revenue per service session.
-- **AI Tools**: Register new function definitions in the Gemini ReAct flow.
-
-## Verification Plan
-- **Automated**: Test credit deduction and revenue recognition consistency.
-- **Manual**: Verify that Dashboard totals match individual program reports.
-- **AI**: Test voice queries like "How many baths left for Thor?".
+- **Tables**: `programas_de_cuidado`, `programas_contratados`, `programas_creditos_movimentacoes`, `ia_audit_logs`.
+- **Functions**: Enhanced server functions with multi-tenant validation and audit triggers.
+- **Testing**: Manual and automated checks for mobile and desktop consistency.
