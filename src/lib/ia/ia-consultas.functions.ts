@@ -6,6 +6,7 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     data: z.string().optional(),
+    comando_original: z.string().optional().default("consulta"),
     periodo_inicio: z.string().optional(),
     periodo_fim: z.string().optional(),
     status: z.string().optional(),
@@ -14,7 +15,7 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
     profissional: z.string().optional(),
     servico_nome: z.string().optional(),
     leva_e_traz: z.boolean().optional(),
-  }).parse(input))
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { buscarDadosAgenda } = await import("./ia-consultas.server");
     return buscarDadosAgenda(context.supabase, data);
