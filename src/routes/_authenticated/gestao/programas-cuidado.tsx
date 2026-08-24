@@ -339,15 +339,90 @@ function ProgramasCuidadoPage() {
 
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg">Programas em Vigor</CardTitle>
-              <CardDescription>Lista de todos os programas contratados pelos clientes e pets.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-lg">Programas em Vigor</CardTitle>
+                <CardDescription>Lista de todos os programas contratados.</CardDescription>
+              </div>
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+                <Button 
+                  variant={activeSubTabAtivos === "todos" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("todos")}
+                >
+                  Todos
+                </Button>
+                <Button 
+                  variant={activeSubTabAtivos === "aguardando_pagamento" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("aguardando_pagamento")}
+                >
+                  Aguardando
+                </Button>
+                <Button 
+                  variant={activeSubTabAtivos === "ativo" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("ativo")}
+                >
+                  Ativos
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="py-10 text-center text-muted-foreground">
-                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p>Nenhuma contratação ativa encontrada no momento.</p>
-              </div>
+              {programasAtivos && programasAtivos.length > 0 ? (
+                <div className="space-y-4">
+                  {programasAtivos
+                    .filter((p: any) => activeSubTabAtivos === "todos" || p.status === activeSubTabAtivos)
+                    .map((contrato: any) => (
+                    <div key={contrato.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border border-sidebar-border/40 hover:bg-muted/10 transition-colors gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                          <PackageCheck className="h-5 w-5 text-gold" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">{contrato.nome_snapshot}</span>
+                            {contrato.status === 'ativo' ? (
+                              <Badge className="bg-green-500/10 text-green-600 border-green-200 h-5 px-1.5 text-[10px]">Ativo</Badge>
+                            ) : contrato.status === 'aguardando_pagamento' ? (
+                              <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 h-5 px-1.5 text-[10px]">Aguardando</Badge>
+                            ) : (
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{contrato.status}</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="flex items-center gap-1"><Search className="h-3 w-3" /> {contrato.clientes?.nome}</span>
+                            <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {contrato.pets?.nome}</span>
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Expira em {format(new Date(contrato.data_de_validade), 'dd/MM/yyyy')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                        <div className="text-right">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Valor Contratado</p>
+                          <p className="text-sm font-bold text-gold">R$ {Number(contrato.preco_vendido).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold">
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {programasAtivos.filter((p: any) => activeSubTabAtivos === "todos" || p.status === activeSubTabAtivos).length === 0 && (
+                    <div className="py-10 text-center text-muted-foreground italic text-sm">
+                      Nenhum programa encontrado com este status.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-10 text-center text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>Nenhuma contratação ativa encontrada no momento.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
