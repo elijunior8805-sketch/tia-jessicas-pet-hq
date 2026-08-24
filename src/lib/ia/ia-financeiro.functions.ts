@@ -14,7 +14,7 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     observacoes: z.string().optional(),
     comprovante_path: z.string().optional(),
     id_transacao: z.string().optional(),
-    comando_original: z.string().nullish(),
+    comando_original: z.string().optional(),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
