@@ -126,6 +126,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
             data_atual: new Date().toISOString(),
           },
+          comando_original: text
         },
       });
 

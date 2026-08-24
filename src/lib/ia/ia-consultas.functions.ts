@@ -173,5 +173,5 @@ export const compararPeriodosFinanceirosIA = createServerFn({ method: "POST" })
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { compararPeriodosIA } = await import("./ia-financeiro.server");
-    return compararPeriodosIA(context.supabase, data);
+    return compararPeriodosIA(context.supabase, data as any);
   });

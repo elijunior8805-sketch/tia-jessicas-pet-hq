@@ -114,10 +114,8 @@ DATAS:
     }
 
     // Normalização para evitar o erro Zod "Required" em campos como 'comando_original' se a IA omitir
-    if (parsed.intencao === "criar_agendamento" || parsed.intencao === "validar_agendamento") {
-      if (!parsed.parametros.comando_original) {
-        parsed.parametros.comando_original = texto;
-      }
+    if (!parsed.parametros.comando_original) {
+      parsed.parametros.comando_original = texto;
     }
     
     return {
