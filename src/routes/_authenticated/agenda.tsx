@@ -416,6 +416,15 @@ function AgendaPage() {
   const navigate = useNavigate();
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Status }) => {
+      // Se estiver finalizando, consome a reserva
+      if (status === "finalizado") {
+        await consumirReserva({ data: { agendamento_id: id } });
+      }
+      // Se estiver cancelando, libera a reserva
+      if (status === "cancelado") {
+        await liberarReserva({ data: { agendamento_id: id } });
+      }
+
       const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
       if (error) throw error;
     },
