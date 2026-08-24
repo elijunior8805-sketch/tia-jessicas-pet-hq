@@ -221,6 +221,7 @@ export async function registrarPagamentoIA(
     observacoes?: string;
     comprovante_path?: string;
     id_transacao?: string;
+    comprovante_hash?: string;
   }
 ) {
   const { data: pagamento, error: errP } = await sb
@@ -250,6 +251,7 @@ export async function registrarPagamentoIA(
       updated_at: new Date().toISOString(),
       comprovante_path: params.comprovante_path,
       id_transacao_bancaria: params.id_transacao,
+      comprovante_hash: params.comprovante_hash,
       ia_analisado: !!params.comprovante_path
     })
     .eq("id", params.pagamento_id)

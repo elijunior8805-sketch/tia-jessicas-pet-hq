@@ -35,8 +35,11 @@ import {
   getQualidadeIA 
 } from "@/lib/ia/ia-auditoria.functions";
 import { processarComprovanteIA } from "@/lib/ia/ia-financeiro.functions";
+import { preInterpretar } from "@/lib/ia/ia-nlp";
+import { iniciarFluxo, avancarFluxo, AgendaDraft } from "@/lib/ia/ia-fluxo-agendamento";
 import { format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [messages, setMessages] = useState<IAMessage[]>([]);
@@ -57,6 +60,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
+  const agendaDraftRef = useRef<AgendaDraft | null>(null);
+
   
   const activeCommandRef = useRef<{
     commandId: string;
@@ -94,38 +99,28 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   useEffect(() => {
     if (typeof window !== "undefined" && !recognizerRef.current) {
       recognizerRef.current = new VoiceRecognizer({
-        onResult: (text, isFinal) => {
-          if (isFinal) {
-            setFinalTranscript(prev => {
-              const cleaned = text.trim();
-              if (prev.toLowerCase().includes(cleaned.toLowerCase())) return prev;
-              return (prev + " " + cleaned).trim();
-            });
-            setInterimTranscript("");
-          } else {
-            setInterimTranscript(text);
-          }
+        // Somente trechos FINAIS consolidados chegam aqui (nunca dispara backend)
+        onFinal: (textoAcumulado) => {
+          setFinalTranscript(textoAcumulado);
+          if (textoAcumulado) sessionStorage.setItem("ia_draft_transcript", textoAcumulado);
         },
+        onInterim: (texto) => setInterimTranscript(texto),
         onStatusChange: (status) => {
           setVoiceStatus(status);
-          
-          if (status === 'listening') {
+
+          if (status === "listening") {
             setIaStatus("listening");
             setIsReviewingVoice(false);
-          } else if (status === 'reviewing') {
+          } else if (status === "reviewing") {
             setIaStatus("idle");
             setIsReviewingVoice(true);
-            // Salvar no sessionStorage para persistência
-            setFinalTranscript(current => {
-              if (current) {
-                sessionStorage.setItem('ia_draft_transcript', current);
-              }
-              return current;
-            });
-          } else if (status === 'requesting_permission') {
+          } else if (status === "requesting_permission") {
             setIaStatus("requesting_permission");
-          } else if (status === 'finalizing') {
+          } else if (status === "finalizing") {
             setIaStatus("processing");
+          } else if (status === "idle") {
+            setIaStatus("idle");
+            setInterimTranscript("");
           }
         },
         onError: (err) => {
@@ -140,14 +135,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         },
       });
     }
-    
-    // Carregar rascunho se existir
-    const savedDraft = sessionStorage.getItem('ia_draft_transcript');
-    if (savedDraft && !finalTranscript) {
-      setFinalTranscript(savedDraft);
+
+    // Carregar rascunho se existir (a transcrição nunca se perde)
+    const savedDraft = sessionStorage.getItem("ia_draft_transcript");
+    if (savedDraft) {
+      setFinalTranscript((prev) => prev || savedDraft);
       setIsReviewingVoice(true);
     }
-    
+
     return () => {
       if (recognizerRef.current) {
         recognizerRef.current.stop();
@@ -156,6 +151,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     };
 
   }, []);
+
 
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
@@ -192,6 +188,58 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
     try {
       setIaStatus("interpretando");
+
+      // ---- Fluxo determinístico de agendamento (voz e texto no MESMO caminho) ----
+      const pre = preInterpretar(text);
+      if (agendaDraftRef.current || pre.intencao === "criar_agendamento") {
+        const passo = agendaDraftRef.current
+          ? await avancarFluxo(agendaDraftRef.current, text)
+          : await iniciarFluxo(text);
+
+        agendaDraftRef.current = passo.draft;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: passo.mensagem,
+            timestamp: new Date().toISOString(),
+            intent: passo.pronto
+              ? ({
+                  intencao: "criar_agendamento",
+                  especialista: "agenda",
+                  tipo_operacao: "acao",
+                  parametros: { ...passo.parametros, idempotency_key: idempotencyKey },
+                  informacoes_faltantes: [],
+                  nivel_confianca: 1,
+                  exige_confirmacao: true,
+                } as any)
+              : undefined,
+          },
+        ]);
+
+        setIaStatus(passo.pronto ? "aguardando_confirmacao" : "aguardando_informacao");
+        await registrarEventoIA({
+          data: {
+            command_id: commandId,
+            correlation_id: correlationId,
+            session_id: sessionId,
+            idempotency_key: idempotencyKey,
+            comando_original: text,
+            intencao_detectada: "criar_agendamento",
+            especialista: "agenda",
+            ferramenta_utilizada: "fluxo_agendamento",
+            tipo_operacao: "acao",
+            parametros: (passo.parametros || passo.draft || {}) as any,
+            resposta_ia: passo.mensagem.slice(0, 4000),
+            sucesso: true,
+            confirmado: false,
+            tempo_resposta_ms: Date.now() - startTime,
+          },
+        }).catch(() => {});
+        return;
+      }
+
       const intent = await classificarIntencao({
         data: {
           texto: text,
@@ -202,6 +250,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           comando_original: text
         },
       });
+
 
       // Normalizar parâmetros para evitar Zod Errors em funções subsequentes
       if (!intent.parametros) {
@@ -480,7 +529,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     const commandId = activeCommandRef.current?.commandId || crypto.randomUUID();
     try {
       const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
-      if (resVal.disponivel === false) throw new Error(resVal.mensagem || "Horário indisponível");
+      if (resVal.disponivel === false) {
+        // Mantém o rascunho para o usuário apenas trocar o horário
+        if (agendaDraftRef.current) {
+          agendaDraftRef.current = { ...agendaDraftRef.current, etapa: "hora", hora: null };
+        }
+        throw new Error(resVal.mensagem || "Horário indisponível");
+      }
+
 
       // FASE 1 — Observação: a ação é apenas simulada, nada é gravado.
       if (faseLiberacao === "observacao") {
@@ -517,12 +573,28 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
 
       setIaStatus("verificando");
+
+      // Leitura de verificação: o registro precisa existir no banco
+      let verificado = false;
+      if (registroId) {
+        const { data: check } = await supabase
+          .from("agendamentos")
+          .select("id, data, hora, status")
+          .eq("id", String(registroId))
+          .maybeSingle();
+        verificado = !!check;
+      }
+
+      agendaDraftRef.current = null;
       setMessages((prev) => [...prev, {
         role: "assistant",
-        content: `✅ **Agendamento realizado e confirmado!**\n\n- **Cliente:** ${intent.parametros?.cliente_nome || 'Identificado'}\n- **Pet:** ${intent.parametros?.pet_nome || 'Identificado'}\n- **Data:** ${intent.parametros?.data}\n- **Hora:** ${intent.parametros?.hora}\n\nCódigo do registro: \`${registroId}\``,
+        content: verificado
+          ? `✅ **Agendamento criado e verificado na agenda.**\n\n- **Cliente:** ${intent.parametros?.cliente_nome || 'Identificado'}\n- **Pet:** ${intent.parametros?.pet_nome || 'Identificado'}\n- **Data:** ${intent.parametros?.data}\n- **Hora:** ${intent.parametros?.hora}\n\nCódigo do registro: \`${registroId}\``
+          : `⚠️ **Não consegui confirmar o agendamento no banco.** Verifique a agenda antes de repetir o comando (código retornado: \`${registroId || "nenhum"}\`).`,
         timestamp: new Date().toISOString(),
       }]);
-      setIaStatus("concluido");
+      setIaStatus(verificado ? "concluido" : "error");
+
 
       await registrarEventoIA({
         data: {

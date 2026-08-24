@@ -2,6 +2,8 @@ import { Database } from "@/integrations/supabase/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { createIAResponse } from "./ia-retorno.server";
+import { compararNome } from "./ia-nomes";
+
 import { getFinancialKPIs } from "../financial-kpis.functions";
 
 
@@ -189,10 +191,25 @@ export async function buscarClientesIA(sb: SupabaseClient<Database>, termo: stri
     if (clientesDosPets.length > 0) return createIAResponse({ source: 'buscar_clientes', data: clientesDosPets });
   }
 
+  // Camada 4: Aproximada / fonética (erros de digitação e de transcrição de voz)
+  if (todosClientes && todosClientes.length > 0 && termoLimpo.length >= 3) {
+    const aproximados = todosClientes
+      .map((c) => ({ cliente: c, match: compararNome(termoOriginal, c.nome) }))
+      .filter((r) => r.match && r.match.score >= 0.5)
+      .sort((a, b) => (b.match!.score - a.match!.score))
+      .slice(0, 8)
+      .map((r) => r.cliente);
+
+    if (aproximados.length > 0) {
+      return createIAResponse({ source: 'buscar_clientes', data: aproximados });
+    }
+  }
+
   return createIAResponse({
     source: 'buscar_clientes',
     data: []
   });
+
 
 }
 

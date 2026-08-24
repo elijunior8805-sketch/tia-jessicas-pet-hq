@@ -93,27 +93,56 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         });
       }
 
-      const res = await processarComprovanteIA({
+      const res: any = await processarComprovanteIA({
         data: { imagemBase64: base64, contentType: selectedFile.type },
       });
 
       if (res.sucesso) {
+        // Upload do arquivo original para consulta posterior
+        const fileExt = selectedFile.name.split(".").pop();
+        const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        await supabase.storage.from("comprovantes").upload(filePath, selectedFile);
+
+        const candidatos = res.candidatos || [];
+        const linhasCandidatos = candidatos.length
+          ? candidatos
+              .map(
+                (c: any, i: number) =>
+                  `**${i + 1}. ${c.cliente_nome}**${c.pet_nome ? ` (${c.pet_nome})` : ""} — em aberto R$ ${Number(c.valor_previsto).toFixed(2)} — ${c.motivo}`,
+              )
+              .join("\n")
+          : "_Nenhum pagamento em aberto compatível. Você precisará escolher o lançamento manualmente._";
+
+        const leitura =
+          `### Comprovante lido\n\n` +
+          `- **Valor:** R$ ${Number(res.valor).toFixed(2)}\n` +
+          `- **Data/hora:** ${res.data || "-"} ${res.horario || ""}\n` +
+          `- **Pagador:** ${res.pagador || "-"}\n` +
+          `- **Recebedor:** ${res.recebedor || "-"}\n` +
+          `- **Instituição:** ${res.instituicao || "-"}\n` +
+          `- **ID da transação:** ${res.id_transacao || "não identificado"}\n` +
+          `- **Situação:** ${res.situacao === "agendado" ? "PIX AGENDADO (ainda não caiu)" : res.situacao === "concluido" ? "Concluído" : "Não identificada"}\n\n` +
+          (res.situacao === "agendado"
+            ? `⚠️ Pix agendado: **não vou dar baixa**. Posso registrar como promessa de pagamento para a data indicada.\n\n`
+            : `**A quem pertence este pagamento?**\n${linhasCandidatos}\n\n`) +
+          `Nada foi lançado ainda — confirme antes de eu registrar.`;
+
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: leitura, timestamp: new Date().toISOString() },
+        ]);
+      } else {
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `Li o comprovante! Valor: R$ ${res.valor.toFixed(2)}.`,
+            content: `⚠️ ${res.mensagem || "Não consegui ler o comprovante."}`,
             timestamp: new Date().toISOString(),
           },
         ]);
-        
-        // Upload logic simplified for brevity in refactor
-        const fileExt = selectedFile.name.split(".").pop();
-        const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        await supabase.storage.from("comprovantes").upload(filePath, selectedFile);
-      } else {
         toast.error(res.mensagem || "Erro na análise.");
       }
+
     } catch (error) {
       console.error(error);
       toast.error("Erro ao processar comprovante.");

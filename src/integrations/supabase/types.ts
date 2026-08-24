@@ -138,6 +138,7 @@ export type Database = {
           entrega_hora: string | null
           hora: string
           id: string
+          idempotency_key: string | null
           leva_traz_isencao_motivo: string | null
           leva_traz_isencao_por: string | null
           leva_traz_isento: boolean
@@ -170,6 +171,7 @@ export type Database = {
           entrega_hora?: string | null
           hora: string
           id?: string
+          idempotency_key?: string | null
           leva_traz_isencao_motivo?: string | null
           leva_traz_isencao_por?: string | null
           leva_traz_isento?: boolean
@@ -202,6 +204,7 @@ export type Database = {
           entrega_hora?: string | null
           hora?: string
           id?: string
+          idempotency_key?: string | null
           leva_traz_isencao_motivo?: string | null
           leva_traz_isencao_por?: string | null
           leva_traz_isento?: boolean
@@ -2935,6 +2938,7 @@ export type Database = {
           cliente_id: string | null
           cobranca_tentativas: number | null
           cobranca_ultima_tentativa: string | null
+          comprovante_hash: string | null
           comprovante_path: string | null
           created_at: string
           created_by: string | null
@@ -2945,6 +2949,7 @@ export type Database = {
           ia_meta_dados: Json | null
           id: string
           id_transacao_bancaria: string | null
+          idempotency_key: string | null
           is_teste: boolean
           observacoes: string | null
           responsavel_id: string | null
@@ -2965,6 +2970,7 @@ export type Database = {
           cliente_id?: string | null
           cobranca_tentativas?: number | null
           cobranca_ultima_tentativa?: string | null
+          comprovante_hash?: string | null
           comprovante_path?: string | null
           created_at?: string
           created_by?: string | null
@@ -2975,6 +2981,7 @@ export type Database = {
           ia_meta_dados?: Json | null
           id?: string
           id_transacao_bancaria?: string | null
+          idempotency_key?: string | null
           is_teste?: boolean
           observacoes?: string | null
           responsavel_id?: string | null
@@ -2995,6 +3002,7 @@ export type Database = {
           cliente_id?: string | null
           cobranca_tentativas?: number | null
           cobranca_ultima_tentativa?: string | null
+          comprovante_hash?: string | null
           comprovante_path?: string | null
           created_at?: string
           created_by?: string | null
@@ -3005,6 +3013,7 @@ export type Database = {
           ia_meta_dados?: Json | null
           id?: string
           id_transacao_bancaria?: string | null
+          idempotency_key?: string | null
           is_teste?: boolean
           observacoes?: string | null
           responsavel_id?: string | null
