@@ -261,6 +261,7 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
     if (iError) throw iError;
 
     return clone;
+  });
 
 export const reservarCredito = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
