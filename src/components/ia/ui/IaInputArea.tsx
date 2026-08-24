@@ -18,6 +18,7 @@ interface IaInputAreaProps {
   setFilePreview: (preview: string | null) => void;
   setSelectedFile: (file: File | null) => void;
   handleAnalizarComprovante: () => void;
+  handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   interimTranscript: string;
   finalTranscript: string;
   isReviewingVoice: boolean;
@@ -36,6 +37,7 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
   setFilePreview,
   setSelectedFile,
   handleAnalizarComprovante,
+  handleFileSelect,
   interimTranscript,
   finalTranscript,
   isReviewingVoice,
@@ -59,7 +61,7 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mb-4 p-3 bg-[#F5F2EA] rounded-xl border border-[#C99845]/20 text-[#123F2A]/70 text-sm italic italic-serif"
+            className="mb-4 p-3 bg-[#F5F2EA] rounded-xl border border-[#C99845]/20 text-[#123F2A]/70 text-sm italic"
           >
             {interimTranscript}...
           </motion.div>
@@ -74,7 +76,7 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-bold text-[#C99845] uppercase tracking-widest">Revisar Transcrição</span>
-              <Badge variant="outline" className="text-[9px] bg-[#C99845]/5 border-[#C99845]/20 text-[#C99845]">VOZ</Badge>
+              <div className="px-2 py-0.5 rounded text-[10px] font-bold border bg-[#C99845]/5 border-[#C99845]/20 text-[#C99845]">VOZ</div>
             </div>
             
             <Textarea
@@ -153,19 +155,7 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
           <input
             type="file"
             ref={fileInputRef}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = (prev) => setFilePreview(prev.target?.result as string);
-                if (file.type.startsWith("image/")) {
-                  reader.readAsDataURL(file);
-                } else {
-                  setFilePreview("pdf");
-                }
-                setSelectedFile(file);
-              }
-            }}
+            onChange={handleFileSelect}
             className="hidden"
             accept="image/*,application/pdf"
           />
@@ -220,13 +210,3 @@ export const IaInputArea: React.FC<IaInputAreaProps> = ({
     </div>
   );
 };
-
-const Badge = ({ children, variant, className }: any) => (
-  <span className={cn(
-    "px-2 py-0.5 rounded text-[10px] font-bold border",
-    variant === "outline" ? "bg-transparent" : "bg-current opacity-10",
-    className
-  )}>
-    {children}
-  </span>
-);
