@@ -108,22 +108,15 @@ DATAS:
 
     const parsed = JSON.parse(res.texto);
     
-    // Garantir que parametros nunca seja null para evitar erro de validação Zod no client/server functions
-    if (!parsed.parametros) {
-      parsed.parametros = {};
-    }
-
-    // Normalização para evitar o erro Zod "Required" em campos como 'comando_original' se a IA omitir
-    if (!parsed.parametros.comando_original) {
-      parsed.parametros.comando_original = texto;
+    // Normalização rigorosa de parâmetros
+    const parametrosNormalizados = parsed.parametros || {};
+    if (!parametrosNormalizados.comando_original) {
+      parametrosNormalizados.comando_original = texto;
     }
     
     return {
       ...parsed,
-      parametros: {
-        ...(parsed.parametros || {}),
-        comando_original: texto
-      },
+      parametros: parametrosNormalizados,
       nivel_confianca: parsed.nivel_confianca || 0.9
     } as IAIntent;
   } catch (error) {
