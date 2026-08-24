@@ -22,6 +22,7 @@ import {
   Settings,
   PawPrint,
   Cake,
+  PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
