@@ -6,7 +6,7 @@ import { analisarComprovanteIA } from "./ia-comprovante.server";
 
 export const executarBaixaPagamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
+  .inputValidator((input: any) => z.object({
     pagamento_id: z.string(),
     valor_pago: z.number(),
     forma: z.string(),
@@ -14,7 +14,7 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     observacoes: z.string().optional(),
     comprovante_path: z.string().optional(),
     id_transacao: z.string().optional()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     
@@ -31,10 +31,10 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
 
 export const executarEstornoIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
+  .inputValidator((input: any) => z.object({
     pagamento_id: z.string(),
     motivo: z.string()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data, context }) => {
     const { estornarPagamentoIA: estornar } = await import("./ia-acoes.server");
     return estornar(context.supabase, data.pagamento_id, data.motivo);
@@ -42,10 +42,10 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
 
 export const processarComprovanteIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
+  .inputValidator((input: any) => z.object({
     imagemBase64: z.string(),
     contentType: z.string().optional()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     return analisarComprovanteIA(sb, data.imagemBase64, data.contentType);

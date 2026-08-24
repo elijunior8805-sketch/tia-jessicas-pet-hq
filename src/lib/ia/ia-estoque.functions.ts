@@ -9,27 +9,27 @@ import {
 } from "./ia-estoque.server";
 
 export const getEstoqueIA = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ 
+  .inputValidator((input: any) => z.object({ 
     termo: z.string().optional(),
     categoria: z.string().optional(),
     apenasBaixo: z.boolean().optional() 
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data }) => {
     return consultarEstoque(data);
   });
 
 export const getComprasIA = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ 
+  .inputValidator((input: any) => z.object({ 
     status: z.string().optional()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data }) => {
     return consultarComprasAbertas(data.status);
   });
 
 export const getFornecedoresIA = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ 
+  .inputValidator((input: any) => z.object({ 
     termo: z.string().optional()
-  }).parse(d || {}))
+  }).parse(input))
   .handler(async ({ data }) => {
     return consultarFornecedores(data.termo);
   });

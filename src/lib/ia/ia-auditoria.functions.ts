@@ -13,13 +13,13 @@ export const getQualidadeIA = createServerFn({ method: "GET" })
   });
 
 export const getAuditoriaIA = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ limit: z.number().optional() }).parse(d || {}))
+  .inputValidator((input: any) => z.object({ limit: z.number().optional() }).parse(input))
   .handler(async ({ data }) => {
     return auditoriaServer.getLogsAuditoriaIA(data.limit);
   });
 
 export const registrarAuditoriaIA = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({
+  .inputValidator((input: any) => z.object({
     comando_original: z.string().optional(),
     comando: z.string().optional(),
     intencao_detectada: z.string().optional(),
@@ -32,7 +32,7 @@ export const registrarAuditoriaIA = createServerFn({ method: "POST" })
     sucesso: z.boolean().optional(),
     tempo_resposta_ms: z.number().optional(),
     tempo_ms: z.number().optional(),
-  }).parse(input || {}))
+  }).parse(input))
   .handler(async ({ data }) => {
     // Mapping keys to match the server side expectations if needed, or just passing through
     const mappedData = {
