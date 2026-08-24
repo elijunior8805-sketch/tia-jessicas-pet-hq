@@ -3334,6 +3334,114 @@ export type Database = {
         }
         Relationships: []
       }
+      programas_de_cuidado: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          descricao: string | null
+          economia: number
+          estabelecimento_id: string | null
+          id: string
+          inclui_transporte: boolean
+          modalidade_transporte: string | null
+          nome: string
+          permite_parcelamento: boolean
+          preco_do_programa: number
+          quantidade_transportes: number | null
+          regras: string | null
+          status: Database["public"]["Enums"]["programa_status"]
+          updated_at: string
+          validade_em_dias: number
+          valor_normal_dos_servicos: number
+          valor_transporte: number | null
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          economia?: number
+          estabelecimento_id?: string | null
+          id?: string
+          inclui_transporte?: boolean
+          modalidade_transporte?: string | null
+          nome: string
+          permite_parcelamento?: boolean
+          preco_do_programa?: number
+          quantidade_transportes?: number | null
+          regras?: string | null
+          status?: Database["public"]["Enums"]["programa_status"]
+          updated_at?: string
+          validade_em_dias?: number
+          valor_normal_dos_servicos?: number
+          valor_transporte?: number | null
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          economia?: number
+          estabelecimento_id?: string | null
+          id?: string
+          inclui_transporte?: boolean
+          modalidade_transporte?: string | null
+          nome?: string
+          permite_parcelamento?: boolean
+          preco_do_programa?: number
+          quantidade_transportes?: number | null
+          regras?: string | null
+          status?: Database["public"]["Enums"]["programa_status"]
+          updated_at?: string
+          validade_em_dias?: number
+          valor_normal_dos_servicos?: number
+          valor_transporte?: number | null
+        }
+        Relationships: []
+      }
+      programas_de_cuidado_itens: {
+        Row: {
+          id: string
+          ordem_de_exibicao: number | null
+          programa_id: string
+          quantidade: number
+          servico_id: string
+          valor_alocado: number
+          valor_unitario_de_referencia: number
+        }
+        Insert: {
+          id?: string
+          ordem_de_exibicao?: number | null
+          programa_id: string
+          quantidade?: number
+          servico_id: string
+          valor_alocado?: number
+          valor_unitario_de_referencia?: number
+        }
+        Update: {
+          id?: string
+          ordem_de_exibicao?: number | null
+          programa_id?: string
+          quantidade?: number
+          servico_id?: string
+          valor_alocado?: number
+          valor_unitario_de_referencia?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programas_de_cuidado_itens_programa_id_fkey"
+            columns: ["programa_id"]
+            isOneToOne: false
+            referencedRelation: "programas_de_cuidado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_de_cuidado_itens_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promessas_pagamento: {
         Row: {
           cliente_id: string
@@ -4262,6 +4370,7 @@ export type Database = {
         | "atrasado"
         | "cancelado"
       parcela_status: "pendente" | "pago" | "parcial" | "atrasado" | "cancelado"
+      programa_status: "rascunho" | "ativo" | "inativo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4488,6 +4597,7 @@ export const Constants = {
         "cancelado",
       ],
       parcela_status: ["pendente", "pago", "parcial", "atrasado", "cancelado"],
+      programa_status: ["rascunho", "ativo", "inativo"],
     },
   },
 } as const
