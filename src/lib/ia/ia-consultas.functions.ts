@@ -4,18 +4,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const consultarAgendaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: any) => z.object({
-    data: z.string().optional(),
-    comando_original: z.string().optional().default("consulta"),
-    periodo_inicio: z.string().optional(),
-    periodo_fim: z.string().optional(),
-    status: z.string().optional(),
-    pet_nome: z.string().optional(),
-    cliente_nome: z.string().optional(),
-    profissional: z.string().optional(),
-    servico_nome: z.string().optional(),
-    leva_e_traz: z.boolean().optional(),
-  }).parse(input || {}))
+  .inputValidator((input: any) => {
+    const schema = z.object({
+      data: z.string().optional(),
+      comando_original: z.string().optional().default("consulta"),
+      periodo_inicio: z.string().optional(),
+      periodo_fim: z.string().optional(),
+      status: z.string().optional(),
+      pet_nome: z.string().optional(),
+      cliente_nome: z.string().optional(),
+      profissional: z.string().optional(),
+      servico_nome: z.string().optional(),
+      leva_e_traz: z.boolean().optional(),
+    });
+    return schema.parse(input || {});
+  })
   .handler(async ({ data, context }) => {
     const { buscarDadosAgenda } = await import("./ia-consultas.server");
     return buscarDadosAgenda(context.supabase, data);
