@@ -62,6 +62,16 @@ export class VoiceRecognizer {
     };
 
     this.recognition.onend = () => {
+      // Se parou inesperadamente enquanto deveria estar ouvindo, tenta reiniciar uma vez
+      if (this.status === 'listening') {
+        try {
+          this.recognition.start();
+          return;
+        } catch (e) {
+          console.error("Erro ao tentar reiniciar reconhecimento:", e);
+        }
+      }
+      
       if (this.status === 'listening') {
         this.status = 'reviewing';
         this.options.onStatusChange(this.status);

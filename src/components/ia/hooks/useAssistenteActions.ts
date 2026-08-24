@@ -258,10 +258,13 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             `- **Cancelados**: ${stats.cancelados}\n` +
             `- **Faltas**: ${stats.faltas}`;
         } else {
-          respostaFinal = `### 📅 Agenda de Hoje\n\n` + 
+          const dataFormatada = intent.parametros?.data 
+            ? format(parseISO(intent.parametros.data), "dd/MM") 
+            : "Hoje";
+          respostaFinal = `### 📅 Agenda de ${dataFormatada}\n\n` + 
             (dadosReais.length > 0 
               ? dadosReais.map((a: any) => `- **${a.hora.slice(0,5)}**: ${a.pets?.nome} (${a.servicos?.nome}) - ${a.clientes?.nome} [${a.status}]`).join("\n")
-              : "Nenhum atendimento agendado para hoje.");
+              : `Nenhum atendimento agendado para ${dataFormatada.toLowerCase()}.`);
         }
       }
 
