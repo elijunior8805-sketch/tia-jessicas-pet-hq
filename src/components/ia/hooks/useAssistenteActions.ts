@@ -237,8 +237,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setIaStatus(intent.informacoes_faltantes?.length ? "aguardando_informacao" : "concluido");
-      activeCommandRef.current = null; // Libera trava após sucesso
-
       await registrarAuditoriaIA({
         data: {
           comando: text,
@@ -248,6 +246,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           metadata: { intent, dados: dadosReais, ...activeCommandRef.current },
         },
       });
+      activeCommandRef.current = null; // Libera trava após auditoria
 
     } catch (error: any) {
       console.error(error);
