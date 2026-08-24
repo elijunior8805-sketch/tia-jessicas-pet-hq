@@ -1793,7 +1793,7 @@ function NovoAgendamentoDialog({
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate flex items-center gap-1">
                         {it.nome}
-                        {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" title="Usando crédito do programa" />}
+                        {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" />}
                       </div>
                       {idx === 0 && <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</div>}
                     </div>
