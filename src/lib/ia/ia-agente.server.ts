@@ -163,7 +163,10 @@ ESTRUTURA DA INTERPRETAÇÃO (Retorne sempre este JSON):
 - proxima_etapa: O que fazer a seguir.
 
 DATAS:
-- Use fuso America/Sao_Paulo. "hoje", "amanhã" -> Converter para YYYY-MM-DD.`;
+- Use fuso America/Sao_Paulo. "hoje", "amanhã", "dia 28" -> Converter para YYYY-MM-DD.
+- A data atual de referência é fornecida no prompt.
+- Se o usuário citar um dia (ex: "dia 28") sem mês, assuma o mês atual, a menos que o dia já tenha passado, então use o próximo mês.
+- NUNCA responda sobre a agenda de "hoje" se o comando envolver uma data específica no futuro.`;
 
   try {
     const res = await chamarIA({
