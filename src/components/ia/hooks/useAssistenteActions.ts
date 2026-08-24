@@ -118,7 +118,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             data_atual: new Date().toISOString(),
           },
         },
-      });
+      } as any);
 
       let dadosReais: any = null;
       let respostaFinal = intent.resposta_ia || "Processando...";
@@ -136,7 +136,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         if (intent.intencao === "consultar_mensagens") {
           const res = await consultarMensagensIA({
             data: { cliente_id: intent.parametros?.cliente_id },
-          });
+          } as any);
           dadosReais = res.data;
           respostaFinal = `### 💬 Mensagens Recentes\n\n` + (dadosReais as any[]).map((m: any) => `- [${format(parseISO(m.created_at), "dd/MM HH:mm")}] **${m.clientes?.nome || "Sistema"}**: ${m.mensagem}`).join("\n");
         } else if (intent.intencao === "consultar_aniversariantes") {
@@ -168,7 +168,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       if (intent.especialista === "estoque_compras") {
         setIaStatus("pesquisando");
         if (intent.intencao === "consulta_estoque") {
-          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque } });
+          const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque } } as any);
           dadosReais = res;
           respostaFinal = (res as any[]).length > 0 ? `### 📦 Estoque\n\n` + (res as any[]).map((p: any) => `- **${p.nome}**: ${p.quantidade} (Mín: ${p.estoque_minimo || 0})`).join("\n") : "Nenhum produto encontrado.";
         } else if (intent.intencao === "sugerir_reposicao") {
@@ -180,7 +180,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consulta_agenda" || intent.intencao === "listar_atendimentos" || intent.intencao === "contar_atendimentos") {
         setIaStatus("pesquisando");
-        const res = await consultarAgendaIA({ data: intent.parametros });
+        const res = await consultarAgendaIA({ data: intent.parametros } as any);
         dadosReais = res.data || [];
         respostaFinal = intent.intencao === "contar_atendimentos" 
           ? `Hoje existem **${dadosReais.length} atendimentos** agendados.`
@@ -207,7 +207,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           tempo_ms: Date.now() - startTime,
           metadata: { intent, dados: dadosReais },
         },
-      });
+      } as any);
 
     } catch (error: any) {
       console.error(error);
@@ -227,11 +227,11 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     setIsProcessing(true);
     setIaStatus("validando");
     try {
-      const resVal = (await validarAgendamentoIA({ data: intent.parametros })) as any;
+      const resVal = (await validarAgendamentoIA({ data: intent.parametros } as any)) as any;
       if (resVal.disponivel === false) throw new Error(resVal.mensagem || resVal.message || "Horário indisponível");
       
       setIaStatus("executando");
-      await executarCriacaoAgendamento({ data: intent.parametros });
+      await executarCriacaoAgendamento({ data: intent.parametros } as any);
       
       setMessages((prev) => [...prev, { role: "assistant", content: `✅ **Agendamento realizado!**`, timestamp: new Date().toISOString() }]);
       setIaStatus("concluido");
