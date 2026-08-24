@@ -21,8 +21,10 @@ import {
   getProgramasCatalogo, 
   toggleProgramaStatus,
   duplicarPrograma,
-  contratarPrograma
+  contratarPrograma,
+  reconciliarCreditosPet
 } from "@/lib/programas-cuidado.functions";
+
 import { Button } from "@/components/ui/button";
 import { 
   Card, 
@@ -223,6 +225,11 @@ function ProgramasCuidadoPage() {
             <CreditCard className="mr-2 h-4 w-4" />
             Movimentações
           </TabsTrigger>
+          <TabsTrigger value="auditoria" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <History className="mr-2 h-4 w-4" />
+            Auditoria
+          </TabsTrigger>
+
           <TabsTrigger value="configuracoes" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <SettingsIcon className="mr-2 h-4 w-4" />
             Configurações
@@ -337,6 +344,12 @@ function ProgramasCuidadoPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="auditoria" className="space-y-6 outline-none">
+          <AuditoriaProgramasTab />
+        </TabsContent>
+
+
+
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -394,6 +407,22 @@ function ProgramasCuidadoPage() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 px-2 text-[10px] text-gold hover:text-gold/80 hover:bg-gold/5"
+                              onClick={async () => {
+                                const res = await reconciliarCreditosPet({ data: { pet_id: contrato.pet_id } });
+                                if ((res as any)[0]?.divergencia) {
+                                  toast.error("Divergência detectada nos créditos!");
+                                } else {
+                                  toast.success("Créditos reconciliados e consistentes.");
+                                }
+                              }}
+                            >
+                              Reconciliar
+                            </Button>
+
                             <span className="flex items-center gap-1"><Search className="h-3 w-3" /> {contrato.clientes?.nome}</span>
                             <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {contrato.pets?.nome}</span>
                             <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Expira em {format(new Date(contrato.data_de_validade), 'dd/MM/yyyy')}</span>
@@ -787,3 +816,71 @@ function ProgramasCuidadoPage() {
     </div>
   );
 }
+
+function AuditoriaProgramasTab() {
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["auditoria-programas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("auditoria_programas" as any)
+        .select("*, clientes(nome), pets(nome)")
+        .order("criado_em", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data as any[];
+    }
+  });
+
+  if (isLoading) return <div className="p-8 text-center animate-pulse">Carregando auditoria...</div>;
+
+  return (
+    <Card className="border-sidebar-border/60 overflow-hidden">
+      <CardHeader className="bg-muted/30 pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <History className="h-5 w-5 text-gold" />
+          Log de Auditoria
+        </CardTitle>
+        <CardDescription>Histórico detalhado de ações no módulo de programas.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-sidebar-border/40">
+              <tr>
+                <th className="p-4">Data</th>
+                <th className="p-4">Ação</th>
+                <th className="p-4">Cliente/Pet</th>
+                <th className="p-4">Motivo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-sidebar-border/30">
+              {logs && logs.length > 0 ? logs.map((log) => (
+                <tr key={log.id} className="hover:bg-muted/10 transition-colors">
+                  <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">
+                    {format(new Date(log.criado_em), 'dd/MM/yy HH:mm')}
+                  </td>
+                  <td className="p-4">
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold border-gold/30 text-gold-foreground bg-gold/5">
+                      {log.acao.replace(/_/g, ' ')}
+                    </Badge>
+                  </td>
+                  <td className="p-4">
+                    <div className="font-semibold text-xs">{log.clientes?.nome || '-'}</div>
+                    <div className="text-[10px] text-muted-foreground">{log.pets?.nome || '-'}</div>
+                  </td>
+                  <td className="p-4 text-xs italic text-muted-foreground/80">{log.motivo || '-'}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={4} className="p-12 text-center text-muted-foreground italic">Nenhum registro de auditoria encontrado.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
