@@ -25,7 +25,8 @@ export const buscarClientesIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     termo: z.string(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { buscarClientesIA: buscarClientes } = await import("./ia-consultas.server");
     return buscarClientes(context.supabase, data.termo);
@@ -35,7 +36,8 @@ export const buscarPetsDoClienteIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     cliente_id: z.string(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { buscarPetsDoClienteIA: buscarPets } = await import("./ia-consultas.server");
     return buscarPets(context.supabase, data.cliente_id);
@@ -51,7 +53,8 @@ export const consultarFinanceiroIA = createServerFn({ method: "POST" })
     period: z.enum(["hoje", "ontem", "semana", "mes", "mes_passado", "30dias"]).optional(),
     periodo_inicio: z.string().optional(),
     periodo_fim: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("financeiro"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { buscarDadosFinanceiros } = await import("./ia-consultas.server");
     return buscarDadosFinanceiros(context.supabase, data);
@@ -87,7 +90,8 @@ export const buscarServicosIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     termo: z.string().optional(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { buscarServicosIA: buscarServicos } = await import("./ia-consultas.server");
     return buscarServicos(context.supabase, data.termo);
@@ -97,7 +101,8 @@ export const consultarHistoricoPetIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     pet_id: z.string(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { consultarHistoricoPetIA: consultarHistorico } = await import("./ia-consultas.server");
     return consultarHistorico(context.supabase, data.pet_id);
@@ -107,7 +112,8 @@ export const consultarVisao360ClienteIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     cliente_id: z.string(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { obterVisao360Cliente } = await import("./ia-consultas.server");
     return obterVisao360Cliente(context.supabase, data.cliente_id);
@@ -117,7 +123,8 @@ export const consultarVisao360PetIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     pet_id: z.string(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { obterVisao360Pet } = await import("./ia-consultas.server");
     return obterVisao360Pet(context.supabase, data.pet_id);
@@ -127,7 +134,8 @@ export const consultarRiscoFaltaIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     cliente_id: z.string(),
-  }).parse(input))
+    comando_original: z.string().optional().default("consulta"),
+  }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { consultarRiscoFaltaIA: consultarRisco } = await import("./ia-consultas.server");
     return consultarRisco(context.supabase, data.cliente_id);
