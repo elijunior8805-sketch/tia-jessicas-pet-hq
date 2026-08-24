@@ -2,6 +2,125 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export const contratarPrograma = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    programa_id: z.string().uuid(),
+    cliente_id: z.string().uuid(),
+    pet_id: z.string().uuid(),
+    data_de_inicio: z.string(),
+    data_de_validade: z.string(),
+    preco_vendido: z.number(),
+    forma_de_pagamento: z.string().optional(),
+    observacoes: z.string().optional(),
+    idempotency_key: z.string()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    // 1. Busca detalhes do programa para snapshot
+    const { data: programa, error: pError } = await sb
+      .from("programas_de_cuidado" as any)
+      .select(`
+        *,
+        itens:programas_de_cuidado_itens (*)
+      `)
+      .eq("id", data.programa_id)
+      .single();
+
+    if (pError) throw pError;
+
+    // 2. Cria a contratação
+    const { data: contratado, error: cError } = await sb
+      .from("programas_contratados" as any)
+      .insert({
+        programa_id: data.programa_id,
+        cliente_id: data.cliente_id,
+        pet_id: data.pet_id,
+        nome_snapshot: (programa as any).nome,
+        composicao_snapshot: (programa as any).itens,
+        regras_snapshot: (programa as any).regras,
+        preco_original: (programa as any).preco_do_programa,
+        preco_vendido: data.preco_vendido,
+        desconto: (programa as any).preco_do_programa - data.preco_vendido,
+        data_de_inicio: data.data_de_inicio,
+        data_de_validade: data.data_de_validade,
+        status_do_programa: 'ativo',
+        forma_de_pagamento: data.forma_de_pagamento,
+        observacoes: data.observacoes,
+        criado_por: userId
+      })
+      .select()
+      .single();
+
+    if (cError) throw cError;
+
+    // 3. Cria as movimentações iniciais de crédito
+    const movimentacoes = (programa as any).itens.map((item: any) => ({
+      programa_contratado_id: (contratado as any).id,
+      servico_id: item.servico_id,
+      quantidade: item.quantidade,
+      tipo: 'credito_criado',
+      usuario_id: userId,
+      motivo: 'Contratação inicial',
+      idempotency_key: `${data.idempotency_key}_${item.servico_id}`
+    }));
+
+    const { error: mError } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .insert(movimentacoes);
+
+    if (mError) throw mError;
+
+    return contratado;
+  });
+
+export const getCreditosDisponiveis = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    pet_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    // Busca movimentações de programas ativos para este pet
+    const { data: movs, error } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .select(`
+        *,
+        contratado:programas_contratados!inner (*),
+        servico:servicos (id, nome)
+      `)
+      .eq("contratado.pet_id", data.pet_id)
+      .eq("contratado.status_do_programa", "ativo");
+
+    if (error) throw error;
+
+    // Agrupa por serviço
+    const saldo: Record<string, { nome: string, disponivel: number, reservado: number }> = {};
+
+    (movs as any[]).forEach(m => {
+      const sId = m.servico_id;
+      if (!saldo[sId]) {
+        saldo[sId] = { nome: m.servico?.nome || "Serviço", disponivel: 0, reservado: 0 };
+      }
+
+      if (['credito_criado', 'reserva_liberada', 'cancelamento', 'estorno'].includes(m.tipo)) {
+        saldo[sId].disponivel += m.quantidade;
+      } else if (['credito_consumido', 'credito_expirado'].includes(m.tipo)) {
+        saldo[sId].disponivel -= m.quantidade;
+      } else if (m.tipo === 'credito_reservado') {
+        saldo[sId].disponivel -= m.quantidade;
+        saldo[sId].reservado += m.quantidade;
+      } else if (m.tipo === 'ajuste_manual') {
+        saldo[sId].disponivel += m.quantidade;
+      }
+    });
+
+    return saldo;
+  });
+
 export const getProgramasCatalogo = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -52,7 +171,6 @@ export const upsertPrograma = createServerFn({ method: "POST" })
     const userId = context.userId;
     const { itens, ...programaData } = data;
 
-    // 1. Upsert do programa
     const { data: programa, error: pError } = await sb
       .from("programas_de_cuidado" as any)
       .upsert({
@@ -65,7 +183,6 @@ export const upsertPrograma = createServerFn({ method: "POST" })
 
     if (pError) throw pError;
 
-    // 2. Se for edição, remove itens antigos (ou poderíamos fazer sync mais complexo)
     if (data.id) {
       const { error: dError } = await sb
         .from("programas_de_cuidado_itens" as any)
@@ -74,7 +191,6 @@ export const upsertPrograma = createServerFn({ method: "POST" })
       if (dError) throw dError;
     }
 
-    // 3. Insere os novos itens
     const { error: iError } = await sb
       .from("programas_de_cuidado_itens" as any)
       .insert(itens.map(item => ({
@@ -113,7 +229,6 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    // 1. Busca programa original
     const { data: original, error: oError } = await sb
       .from("programas_de_cuidado" as any)
       .select("*, itens:programas_de_cuidado_itens(*)")
@@ -122,7 +237,6 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
 
     if (oError) throw oError;
 
-    // 2. Clona programa
     const { id: _, criado_em: __, updated_at: ___, itens, ...cloneData } = original as any;
     const { data: clone, error: cError } = await sb
       .from("programas_de_cuidado" as any)
@@ -137,7 +251,6 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
 
     if (cError) throw cError;
 
-    // 3. Clona itens
     const { error: iError } = await sb
       .from("programas_de_cuidado_itens" as any)
       .insert(itens.map((item: any) => {
