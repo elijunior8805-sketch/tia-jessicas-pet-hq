@@ -24,6 +24,9 @@ import {
   contratarPrograma,
   reconciliarCreditosPet
 } from "@/lib/programas-cuidado.functions";
+import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
+import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
+
 
 import { Button } from "@/components/ui/button";
 import { 
