@@ -13,7 +13,7 @@ export const getEstoqueIA = createServerFn({ method: "GET" })
     termo: z.string().optional(),
     categoria: z.string().optional(),
     apenasBaixo: z.boolean().optional(),
-    comando_original: z.string().optional().default("estoque"),
+    comando_original: z.string().nullish(),
   }).parse(input || {}))
   .handler(async ({ data }) => {
     return consultarEstoque(data);

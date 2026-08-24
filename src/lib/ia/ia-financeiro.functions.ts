@@ -35,7 +35,7 @@ export const executarEstornoIA = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({
     pagamento_id: z.string(),
     motivo: z.string(),
-    comando_original: z.string().optional().default("estorno"),
+    comando_original: z.string().nullish(),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
     const { estornarPagamentoIA: estornar } = await import("./ia-acoes.server");
