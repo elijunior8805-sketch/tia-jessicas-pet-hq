@@ -60,6 +60,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
+  const agendaDraftRef = useRef<AgendaDraft | null>(null);
+
   
   const activeCommandRef = useRef<{
     commandId: string;
