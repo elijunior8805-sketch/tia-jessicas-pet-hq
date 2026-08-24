@@ -2,6 +2,42 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export const registrarAuditoriaPrograma = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    acao: z.string(),
+    cliente_id: z.string().uuid().optional(),
+    pet_id: z.string().uuid().optional(),
+    programa_contratado_id: z.string().uuid().optional(),
+    valor_anterior: z.any().optional(),
+    valor_posterior: z.any().optional(),
+    motivo: z.string().optional(),
+    metadata: z.any().optional()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    const { data: profile, error: pError } = await sb
+      .from("profiles")
+      .select("estabelecimento_id")
+      .eq("id", userId)
+      .single();
+
+    if (pError) throw pError;
+
+    const { error } = await sb
+      .from("auditoria_programas" as any)
+      .insert({
+        ...data,
+        usuario_id: userId,
+        estabelecimento_id: (profile as any).estabelecimento_id
+      });
+
+    if (error) throw error;
+    return { success: true };
+  });
+
 export const contratarPrograma = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
@@ -19,7 +55,6 @@ export const contratarPrograma = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    // 1. Busca detalhes do programa para snapshot
     const { data: programa, error: pError } = await sb
       .from("programas_de_cuidado" as any)
       .select(`
@@ -31,7 +66,6 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (pError) throw pError;
 
-    // 2. Cria a contratação
     const { data: contratado, error: cError } = await sb
       .from("programas_contratados" as any)
       .insert({
@@ -56,7 +90,6 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (cError) throw cError;
 
-    // 3. Cria as movimentações iniciais de crédito
     const movimentacoes = (programa as any).itens.map((item: any) => ({
       programa_contratado_id: (contratado as any).id,
       servico_id: item.servico_id,
@@ -73,7 +106,6 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (mError) throw mError;
 
-    // 4. Log de auditoria
     await registrarAuditoriaPrograma({
       data: {
         acao: 'venda',
@@ -86,7 +118,6 @@ export const contratarPrograma = createServerFn({ method: "POST" })
     });
 
     return contratado;
-
   });
 
 export const getCreditosDisponiveis = createServerFn({ method: "GET" })
@@ -97,7 +128,6 @@ export const getCreditosDisponiveis = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
 
-    // Busca movimentações de programas ativos para este pet
     const { data: movs, error } = await sb
       .from("programas_creditos_movimentacoes" as any)
       .select(`
@@ -110,7 +140,6 @@ export const getCreditosDisponiveis = createServerFn({ method: "GET" })
 
     if (error) throw error;
 
-    // Agrupa por serviço
     const saldo: Record<string, { nome: string, disponivel: number, reservado: number }> = {};
 
     (movs as any[]).forEach(m => {
@@ -288,7 +317,6 @@ export const reservarCredito = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    // Busca programas ativos que tenham o serviço e créditos disponíveis
     const { data: movs, error: e1 } = await sb
       .from("programas_creditos_movimentacoes" as any)
       .select(`
@@ -302,7 +330,6 @@ export const reservarCredito = createServerFn({ method: "POST" })
 
     if (e1) throw e1;
 
-    // Calcula saldo por programa_contratado_id
     const saldosPorPrograma: Record<string, number> = {};
     (movs as any[]).forEach(m => {
       const pcid = m.programa_contratado_id;
@@ -317,7 +344,6 @@ export const reservarCredito = createServerFn({ method: "POST" })
       }
     });
 
-    // Encontra o primeiro programa com saldo
     const programaComSaldo = Object.entries(saldosPorPrograma).find(([_, saldo]) => saldo >= data.quantidade);
     
     if (!programaComSaldo) {
@@ -338,19 +364,18 @@ export const reservarCredito = createServerFn({ method: "POST" })
       });
 
     if (e2) throw e2;
-    // Log de auditoria
+
     await registrarAuditoriaPrograma({
       data: {
         acao: 'reserva_credito',
         pet_id: data.pet_id,
-        programa_contratado_id: (programaComSaldo as any)[0],
+        programa_contratado_id: programaComSaldo[0],
         metadata: { agendamento_id: data.agendamento_id, servico_id: data.servico_id },
         motivo: 'Reserva via Agenda'
       }
     });
 
     return { success: true };
-
   });
 
 export const liberarReserva = createServerFn({ method: "POST" })
@@ -362,7 +387,6 @@ export const liberarReserva = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    // Busca as reservas deste agendamento
     const { data: reservas, error: e1 } = await sb
       .from("programas_creditos_movimentacoes" as any)
       .select("*")
@@ -372,7 +396,6 @@ export const liberarReserva = createServerFn({ method: "POST" })
     if (e1) throw e1;
     if (!reservas || reservas.length === 0) return { success: true, count: 0 };
 
-    // Libera cada reserva
     const liberacoes = (reservas as any[]).map(res => ({
       programa_contratado_id: res.programa_contratado_id,
       servico_id: res.servico_id,
@@ -401,7 +424,6 @@ export const consumirReserva = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    // Busca as reservas deste agendamento
     const { data: reservas, error: e1 } = await sb
       .from("programas_creditos_movimentacoes" as any)
       .select("*")
@@ -411,7 +433,6 @@ export const consumirReserva = createServerFn({ method: "POST" })
     if (e1) throw e1;
     if (!reservas || reservas.length === 0) return { success: true, count: 0 };
 
-    // Consome cada reserva
     const consumos = (reservas as any[]).map(res => ({
       programa_contratado_id: res.programa_contratado_id,
       servico_id: res.servico_id,
@@ -431,3 +452,18 @@ export const consumirReserva = createServerFn({ method: "POST" })
     return { success: true, count: consumos.length };
   });
 
+export const reconciliarCreditosPet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    pet_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    
+    const { data: result, error } = await sb.rpc('reconciliar_creditos_pet', {
+      _pet_id: data.pet_id
+    });
+
+    if (error) throw error;
+    return result;
+  });
