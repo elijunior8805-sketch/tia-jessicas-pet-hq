@@ -256,7 +256,25 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         }
       }
 
+      if (intent.intencao === "buscar_clientes") {
+        setIaStatus("processing");
+        const res = await buscarClientesIA({ data: { termo: intent.parametros?.termo || intent.parametros?.cliente_nome || text } });
+        dadosReais = res.data;
+        
+        if (dadosReais.length === 0) {
+          respostaFinal = "Não encontrei nenhum cliente com esse nome. Verifique se ele está cadastrado corretamente ou tente outro nome.";
+        } else if (dadosReais.length === 1) {
+          const c = dadosReais[0];
+          respostaFinal = `Encontrei o cliente **${c.nome}**. \n\n**Detalhes:**\n- **Bairro:** ${c.bairro || 'Não informado'}\n- **Pets:** ${c.pets?.map((p: any) => p.nome).join(", ") || 'Nenhum pet vinculado'}\n\nÉ este o cliente que você procura?`;
+          setSearchResults({ clientes: dadosReais });
+        } else {
+          respostaFinal = `Encontrei **${dadosReais.length}** clientes com nomes semelhantes. Qual deles você deseja selecionar?`;
+          setSearchResults({ clientes: dadosReais });
+        }
+      }
+
       if (intent.especialista === "estoque_compras") {
+
         setIaStatus("processing");
         if (intent.intencao === "consulta_estoque") {
           const res = await getEstoqueIA({ data: { termo: intent.parametros?.termo, apenasBaixo: intent.parametros?.baixo_estoque, comando_original: text } });
