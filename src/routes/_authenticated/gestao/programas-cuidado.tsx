@@ -114,6 +114,7 @@ function ProgramasCuidadoPage() {
     mutationFn: (vars: any) => contratarPrograma({ data: vars }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
+      queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
       toast.success("Programa contratado com sucesso!");
       setOpenVenda(false);
       resetVenda();
