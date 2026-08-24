@@ -73,7 +73,20 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (mError) throw mError;
 
+    // 4. Log de auditoria
+    await registrarAuditoriaPrograma({
+      data: {
+        acao: 'venda',
+        cliente_id: data.cliente_id,
+        pet_id: data.pet_id,
+        programa_contratado_id: (contratado as any).id,
+        valor_posterior: contratado,
+        motivo: 'Contratação de programa'
+      }
+    });
+
     return contratado;
+
   });
 
 export const getCreditosDisponiveis = createServerFn({ method: "GET" })
@@ -325,7 +338,19 @@ export const reservarCredito = createServerFn({ method: "POST" })
       });
 
     if (e2) throw e2;
+    // Log de auditoria
+    await registrarAuditoriaPrograma({
+      data: {
+        acao: 'reserva_credito',
+        pet_id: data.pet_id,
+        programa_contratado_id: (programaComSaldo as any)[0],
+        metadata: { agendamento_id: data.agendamento_id, servico_id: data.servico_id },
+        motivo: 'Reserva via Agenda'
+      }
+    });
+
     return { success: true };
+
   });
 
 export const liberarReserva = createServerFn({ method: "POST" })
