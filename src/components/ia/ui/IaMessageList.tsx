@@ -18,11 +18,12 @@ interface IaMessageListProps {
 }
 
 const QUICK_COMMANDS = [
-  { label: "Agenda de hoje", icon: Calendar, text: "Agenda de hoje" },
-  { label: "Faturamento do mês", icon: TrendingUp, text: "Qual o faturamento deste mês?" },
-  { label: "Valores a receber", icon: DollarSign, text: "Quais os valores a receber?" },
-  { label: "Resumo do dia", icon: LayoutDashboard, text: "Me dê um resumo do dia" },
-  { label: "Itens críticos estoque", icon: ClipboardList, text: "Quais itens estão com estoque baixo?" },
+  { label: "Agenda de hoje", icon: Calendar, intent: "consultar_agenda" },
+  { label: "Quantos atendimentos?", icon: ClipboardList, intent: "contar_atendimentos" },
+  { label: "Novo Agendamento", icon: Calendar, intent: "criar_agendamento" },
+  { label: "Faturamento do mês", icon: TrendingUp, intent: "consultar_faturamento" },
+  { label: "Valores a receber", icon: DollarSign, intent: "consultar_valores_a_receber" },
+  { label: "Resumo do dia", icon: LayoutDashboard, intent: "consultar_resumo_operacional" },
 ];
 
 export const IaMessageList: React.FC<IaMessageListProps> = ({
@@ -137,10 +138,10 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
         >
           {QUICK_COMMANDS.map((cmd) => (
             <Button
-              key={cmd.text}
+              key={cmd.intent}
               variant="outline"
               size="sm"
-              onClick={() => handleSend(cmd.text)}
+              onClick={() => handleSend(cmd.intent)}
               className="h-9 rounded-xl border-[#C99845]/20 text-[#123F2A]/70 hover:bg-[#C99845]/10 hover:text-[#C99845] transition-all text-xs font-medium"
             >
               <cmd.icon className="w-3.5 h-3.5 mr-2 opacity-50" />

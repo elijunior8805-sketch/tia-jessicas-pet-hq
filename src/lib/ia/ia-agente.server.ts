@@ -31,6 +31,72 @@ export interface IAMessage {
  * Classifica a intenção do usuário usando o modelo Gemini.
  */
 export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
+  const lowercaseTexto = texto.toLowerCase().trim();
+  
+  // Mapeamento direto para intenções fixas dos comandos rápidos
+  const mapeamentoDireto: Record<string, any> = {
+    "consultar_agenda": {
+      intencao: "consulta_agenda",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: "hoje" },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Consultando a agenda de hoje..."
+    },
+    "contar_atendimentos": {
+      intencao: "contar_atendimentos",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: "hoje" },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Contando atendimentos de hoje..."
+    },
+    "criar_agendamento": {
+      intencao: "criar_agendamento",
+      especialista: "agenda",
+      tipo_operacao: "acao",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: true,
+      informacoes_faltantes: ["cliente", "pet", "serviço", "data", "horário"],
+      resposta_ia: "Com certeza! Para criar um novo agendamento, preciso de algumas informações. Qual o nome do cliente ou do pet?"
+    },
+    "consultar_faturamento": {
+      intencao: "consultar_faturamento",
+      especialista: "financeiro",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, period: "mes" },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Buscando o faturamento do mês atual..."
+    },
+    "consultar_valores_a_receber": {
+      intencao: "consultar_valores_a_receber",
+      especialista: "financeiro",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, apenas_pendentes: true },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Calculando valores pendentes e a receber..."
+    },
+    "consultar_resumo_operacional": {
+      intencao: "consultar_resumo_operacional",
+      especialista: "relatorios",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Preparando o resumo operacional do dia..."
+    }
+  };
+
+  if (mapeamentoDireto[lowercaseTexto]) {
+     console.log(`[IA] Comando rápido detectado: ${lowercaseTexto}`);
+     return mapeamentoDireto[lowercaseTexto];
+  }
+
   const { chamarIA } = await import("../ia-core.server");
   
   const userContext = contexto?.user ? `

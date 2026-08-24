@@ -263,7 +263,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
   }
 
   // 2. Se for Resumo de KPIs (Dashboard/IA)
-  if (!filtros.cliente_id && !filtros.apenas_pendentes && !filtros.termo) {
+  if (!filtros.cliente_id && !filtros.apenas_pendentes && !filtros.termo && (filtros as any).intencao !== "consultar_valores_a_receber") {
     let from = filtros.periodo_inicio || hojeStr;
     let to = filtros.periodo_fim || hojeStr;
 
