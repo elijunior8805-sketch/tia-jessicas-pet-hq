@@ -39,6 +39,7 @@ import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes.index'
 import { Route as AuthenticatedAtendimentosIndexRouteImport } from './routes/_authenticated/atendimentos.index'
 import { Route as AuthenticatedPetsNovoRouteImport } from './routes/_authenticated/pets.novo'
+import { Route as AuthenticatedGestaoProgramasCuidadoRouteImport } from './routes/_authenticated/gestao/programas-cuidado'
 import { Route as AuthenticatedClientesNovoRouteImport } from './routes/_authenticated/clientes.novo'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_authenticated/atendimentos.$atendId'
@@ -211,6 +212,12 @@ const AuthenticatedPetsNovoRoute = AuthenticatedPetsNovoRouteImport.update({
   path: '/pets/novo',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGestaoProgramasCuidadoRoute =
+  AuthenticatedGestaoProgramasCuidadoRouteImport.update({
+    id: '/gestao/programas-cuidado',
+    path: '/gestao/programas-cuidado',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClientesNovoRoute =
   AuthenticatedClientesNovoRouteImport.update({
     id: '/clientes/novo',
@@ -312,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/gestao/programas-cuidado': typeof AuthenticatedGestaoProgramasCuidadoRoute
   '/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
@@ -354,6 +362,7 @@ export interface FileRoutesByTo {
   '/recibo/$codigo': typeof ReciboCodigoRoute
   '/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/gestao/programas-cuidado': typeof AuthenticatedGestaoProgramasCuidadoRoute
   '/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/atendimentos': typeof AuthenticatedAtendimentosIndexRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
@@ -399,6 +408,7 @@ export interface FileRoutesById {
   '/_authenticated/atendimentos/$atendId': typeof AuthenticatedAtendimentosAtendIdRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRouteWithChildren
   '/_authenticated/clientes/novo': typeof AuthenticatedClientesNovoRoute
+  '/_authenticated/gestao/programas-cuidado': typeof AuthenticatedGestaoProgramasCuidadoRoute
   '/_authenticated/pets/novo': typeof AuthenticatedPetsNovoRoute
   '/_authenticated/atendimentos/': typeof AuthenticatedAtendimentosIndexRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
@@ -444,6 +454,7 @@ export interface FileRouteTypes {
     | '/atendimentos/$atendId'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/gestao/programas-cuidado'
     | '/pets/novo'
     | '/atendimentos/'
     | '/clientes/'
@@ -486,6 +497,7 @@ export interface FileRouteTypes {
     | '/recibo/$codigo'
     | '/atendimentos/$atendId'
     | '/clientes/novo'
+    | '/gestao/programas-cuidado'
     | '/pets/novo'
     | '/atendimentos'
     | '/clientes'
@@ -530,6 +542,7 @@ export interface FileRouteTypes {
     | '/_authenticated/atendimentos/$atendId'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/novo'
+    | '/_authenticated/gestao/programas-cuidado'
     | '/_authenticated/pets/novo'
     | '/_authenticated/atendimentos/'
     | '/_authenticated/clientes/'
@@ -767,6 +780,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPetsNovoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/gestao/programas-cuidado': {
+      id: '/_authenticated/gestao/programas-cuidado'
+      path: '/gestao/programas-cuidado'
+      fullPath: '/gestao/programas-cuidado'
+      preLoaderRoute: typeof AuthenticatedGestaoProgramasCuidadoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/clientes/novo': {
       id: '/_authenticated/clientes/novo'
       path: '/clientes/novo'
@@ -896,6 +916,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAtendimentosAtendIdRoute: typeof AuthenticatedAtendimentosAtendIdRoute
   AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRouteWithChildren
   AuthenticatedClientesNovoRoute: typeof AuthenticatedClientesNovoRoute
+  AuthenticatedGestaoProgramasCuidadoRoute: typeof AuthenticatedGestaoProgramasCuidadoRoute
   AuthenticatedPetsNovoRoute: typeof AuthenticatedPetsNovoRoute
   AuthenticatedAtendimentosIndexRoute: typeof AuthenticatedAtendimentosIndexRoute
   AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
@@ -931,6 +952,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAtendimentosAtendIdRoute: AuthenticatedAtendimentosAtendIdRoute,
   AuthenticatedClientesIdRoute: AuthenticatedClientesIdRouteWithChildren,
   AuthenticatedClientesNovoRoute: AuthenticatedClientesNovoRoute,
+  AuthenticatedGestaoProgramasCuidadoRoute:
+    AuthenticatedGestaoProgramasCuidadoRoute,
   AuthenticatedPetsNovoRoute: AuthenticatedPetsNovoRoute,
   AuthenticatedAtendimentosIndexRoute: AuthenticatedAtendimentosIndexRoute,
   AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,

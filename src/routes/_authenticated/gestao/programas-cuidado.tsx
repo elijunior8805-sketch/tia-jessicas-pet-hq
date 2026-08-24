@@ -155,7 +155,7 @@ function ProgramasCuidadoPage() {
                       {getStatusBadge(programa.status)}
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold" onClick={() => duplicarMutation.mutate(programa.id)}>
-                          <Plus className="h-4 w-4 rotate-45" title="Duplicar" />
+                          <Plus className="h-4 w-4 rotate-45" />
                         </Button>
                       </div>
                     </div>
