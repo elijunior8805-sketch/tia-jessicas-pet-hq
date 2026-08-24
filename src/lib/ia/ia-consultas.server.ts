@@ -305,7 +305,12 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     // Usar a função central de KPIs para garantir paridade
     // Precisamos importar o helper admin pois server functions chamadas de dentro de outras podem ter problemas de RLS se não estiverem no contexto correto
     // Mas buscarDadosFinanceiros é exportada como helper, então deve funcionar se o client sb tiver as permissões
-    const indicators = await getFinancialKPIs({ data: { from, to } });
+    let indicators: any = {};
+    try {
+      indicators = await getFinancialKPIs({ data: { from, to } });
+    } catch (err) {
+      console.error("[IA-CONSULTAS] Erro ao buscar KPIs financeiros:", err);
+    }
     
     // Garantir que todos os valores existam para evitar "toLocaleString of undefined"
     const fallbackIndicators = {
@@ -468,9 +473,11 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
 
   // Próximo atendimento
   const agora = new Date().toLocaleTimeString("pt-BR", { timeZone: timezone, hour12: false });
-  const proximo = agenda
-    ?.filter(a => a.hora > agora)
-    .sort((a, b) => a.hora.localeCompare(b.hora))[0];
+  const proximo = Array.isArray(agenda) 
+    ? agenda
+        .filter(a => a.hora > agora)
+        .sort((a, b) => a.hora.localeCompare(b.hora))[0]
+    : null;
 
   return createIAResponse({
     source: 'consultar_resumo_operacional',

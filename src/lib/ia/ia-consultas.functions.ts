@@ -74,17 +74,17 @@ export const consultarDisponibilidadeIA = createServerFn({ method: "POST" })
   });
 
 export const consultarResumoOperacionalIA = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
     const { consultarResumoOperacionalIA: consultarResumo } = await import("./ia-consultas.server");
-    return consultarResumo(supabaseAdmin);
+    return consultarResumo(context.supabase);
   });
 
 export const analisarRiscoEvasaoIA = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
     const { analisarRiscoEvasaoIA: analisarEvasao } = await import("./ia-consultas.server");
-    return analisarEvasao(supabaseAdmin);
+    return analisarEvasao(context.supabase);
   });
 
 export const buscarServicosIA = createServerFn({ method: "POST" })
