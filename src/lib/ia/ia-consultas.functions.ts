@@ -14,7 +14,7 @@ export const consultarAgendaIA = createServerFn({ method: "POST" })
     profissional: z.string().optional(),
     servico_nome: z.string().optional(),
     leva_e_traz: z.boolean().optional(),
-  }).parse(data))
+  }).parse(data || {}))
   .handler(async ({ data, context }) => {
     const { buscarDadosAgenda } = await import("./ia-consultas.server");
     return buscarDadosAgenda(context.supabase, data);
