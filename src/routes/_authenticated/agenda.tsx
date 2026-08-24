@@ -24,12 +24,13 @@ import {
 
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
+import { getCreditosDisponiveis, reservarCredito, liberarReserva, consumirReserva } from "@/lib/programas-cuidado.functions";
 
 import { z } from "zod";
 import {
   Calendar as CalendarIcon, Plus, Clock, User, PawPrint, MoreHorizontal,
   ChevronLeft, ChevronRight, MessageCircle, Send, Play, Pencil, Trash2, LogIn,
-  Check, ChevronsUpDown,
+  Check, ChevronsUpDown, PackageCheck,
 } from "lucide-react";
 
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
@@ -126,6 +127,33 @@ function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
     cliente_id: row.cliente_id ?? null,
   });
 }
+
+function ProgramasCuidadoBadge({ petId }: { petId: string | null }) {
+  const { data: creditos, isLoading } = useQuery({
+    queryKey: ["creditos-pet", petId],
+    enabled: !!petId,
+    queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
+  });
+
+  if (!petId || isLoading || !creditos || Object.keys(creditos).length === 0) return null;
+
+  return (
+    <div className="mt-2 p-3 bg-gold/10 border border-gold/30 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="flex items-center gap-2 mb-2">
+        <PackageCheck className="h-4 w-4 text-gold" />
+        <span className="text-xs font-bold text-gold uppercase tracking-wider">Programa Ativo</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(creditos).map(([id, info]: [string, any]) => (
+          <Badge key={id} variant="outline" className="bg-white border-gold/20 text-[10px] h-6">
+            {info.nome}: {info.disponivel}x
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 
 
@@ -388,6 +416,15 @@ function AgendaPage() {
   const navigate = useNavigate();
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Status }) => {
+      // Se estiver finalizando, consome a reserva
+      if (status === "finalizado") {
+        await consumirReserva({ data: { agendamento_id: id } });
+      }
+      // Se estiver cancelando, libera a reserva
+      if (status === "cancelado") {
+        await liberarReserva({ data: { agendamento_id: id } });
+      }
+
       const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
       if (error) throw error;
     },
@@ -607,7 +644,7 @@ function AgendaPage() {
                 <AgendamentoRow
                   key={a.id}
                   row={a}
-                  onChangeStatus={(status) => updateStatus.mutate({ id: a.id, status })}
+                  onChangeStatus={async (status) => { await updateStatus.mutateAsync({ id: a.id, status }); }}
                   onIniciar={() => iniciarAtendimentoMut.mutate(a)}
                   iniciando={iniciarAtendimentoMut.isPending}
                   signer={signer}
@@ -698,7 +735,7 @@ function AgendamentoRow({
   signer,
 }: {
   row: any;
-  onChangeStatus: (s: Status) => void;
+  onChangeStatus: (s: Status) => Promise<void>;
   onIniciar: () => void;
   iniciando: boolean;
   signer: { name: string; initials: string };
@@ -746,6 +783,10 @@ function AgendamentoRow({
       const nota = motivoCancel.trim()
         ? `${obsAntes ? obsAntes + "\n" : ""}[Cancelado em ${stamp}] ${motivoCancel.trim()}`
         : obsAntes || null;
+      
+      // Liberar reserva se existir
+      await liberarReserva({ data: { agendamento_id: row.id } });
+
       const { error } = await supabase
         .from("agendamentos")
         .update({ status: "cancelado", observacoes: nota })
@@ -764,6 +805,9 @@ function AgendamentoRow({
 
   const excluirMut = useMutation({
     mutationFn: async () => {
+      // Liberar reserva se existir
+      await liberarReserva({ data: { agendamento_id: row.id } });
+
       // Remove serviços vinculados (caso não haja cascade)
       await supabase.from("agendamento_servicos").delete().eq("agendamento_id", row.id);
       const { error } = await supabase.from("agendamentos").delete().eq("id", row.id);
@@ -1244,6 +1288,7 @@ type ItemServico = {
   nome: string;
   valor_unit: number;
   duracao_min: number | null;
+  usar_credito?: boolean;
 };
 
 const novoSchema = z.object({
@@ -1254,6 +1299,7 @@ const novoSchema = z.object({
     nome: z.string(),
     valor_unit: z.number().nonnegative(),
     duracao_min: z.number().int().positive().nullable(),
+    usar_credito: z.boolean().optional(),
   })).min(1, "Adicione ao menos um serviço"),
   data: z.string().min(1, "Informe a data"),
   hora: z.string().min(1, "Informe a hora"),
@@ -1490,6 +1536,13 @@ function NovoAgendamentoDialog({
     },
   });
 
+  const { data: creditosPet } = useQuery({
+    queryKey: ["creditos-pet", petId],
+    enabled: !!petId,
+    queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
+  });
+
+
   // Totais calculados
   const totalValor = useMemo(
     () => itens.reduce((s, it) => s + Number(it.valor_unit ?? 0), 0),
@@ -1509,14 +1562,20 @@ function NovoAgendamentoDialog({
     }
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
+
+    const infoCredito = (creditosPet as any)?.[s.id];
+    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0;
+
     setItens((prev) => [...prev, {
       servico_id: s.id,
       nome: s.nome,
-      valor_unit: Number(s.valor ?? 0),
+      valor_unit: temCredito ? 0 : Number(s.valor ?? 0),
       duracao_min: s.duracao_min ?? null,
+      usar_credito: temCredito
     }]);
     setServicoAdd("");
   }
+
 
   function removerItem(idx: number) {
     setItens((prev) => prev.filter((_, i) => i !== idx));
@@ -1538,8 +1597,11 @@ function NovoAgendamentoDialog({
         observacoes: obs,
       });
 
+      
       // Serviço principal = primeiro item (mantém compat com servico_id)
       const principal = parsed.itens[0];
+
+
 
       // Validações LT
       if (ltModalidade !== "nao_utilizar") {
@@ -1607,6 +1669,9 @@ function NovoAgendamentoDialog({
 
       let agendamentoId: string;
       if (isEdit && editId) {
+        // Se estiver editando, primeiro libera as reservas antigas para evitar conflito/saldo negativo
+        await liberarReserva({ data: { agendamento_id: editId } });
+
         const currentVersion = Number(editData?.version ?? 1);
         const { error: errUpd } = await supabase.rpc("atualizar_agendamento_seguro", {
           _id: editId,
@@ -1639,7 +1704,25 @@ function NovoAgendamentoDialog({
       }));
       const { error: errItens } = await supabase.from("agendamento_servicos").insert(rowsItens);
       if (errItens) throw errItens;
+
+      // Realiza reservas de crédito no servidor
+      for (const it of parsed.itens) {
+        if (it.usar_credito) {
+          try {
+            await reservarCredito({ data: {
+              pet_id: parsed.pet_id,
+              servico_id: it.servico_id,
+              agendamento_id: agendamentoId,
+              quantidade: 1
+            }});
+          } catch (e) {
+            console.error("Erro ao reservar crédito:", e);
+            // Não trava a criação do agendamento, mas loga
+          }
+        }
+      }
     },
+
     onSuccess: () => {
       toast.success(isEdit ? "Agendamento atualizado" : "Agendamento criado");
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
@@ -1709,6 +1792,7 @@ function NovoAgendamentoDialog({
                 ))}
               </SelectContent>
             </Select>
+            <ProgramasCuidadoBadge petId={petId} />
             {clienteId && pets && pets.length === 0 && (
               <p className="text-xs text-warning mt-1">Este cliente ainda não tem pets cadastrados.</p>
             )}
@@ -1739,7 +1823,10 @@ function NovoAgendamentoDialog({
                 {itens.map((it, idx) => (
                   <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_90px_80px_auto] gap-2 items-center">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{it.nome}</div>
+                      <div className="text-sm font-medium truncate flex items-center gap-1">
+                        {it.nome}
+                        {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" />}
+                      </div>
                       {idx === 0 && <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</div>}
                     </div>
                     <Input
@@ -2004,6 +2091,13 @@ function EditarServicosDialog({
     },
   });
 
+  const { data: creditosPet } = useQuery({
+    queryKey: ["creditos-pet", agendamento?.pet_id],
+    enabled: !!agendamento?.pet_id,
+    queryFn: () => getCreditosDisponiveis({ data: { pet_id: agendamento.pet_id } }),
+  });
+
+
   const totalValor = useMemo(() => itens.reduce((s, it) => s + Number(it.valor_unit ?? 0), 0), [itens]);
   const totalDuracao = useMemo(() => itens.reduce((s, it) => s + Number(it.duracao_min ?? 0), 0), [itens]);
   const totalComTaxa = totalValor + Number(taxa || 0);
@@ -2017,14 +2111,20 @@ function EditarServicosDialog({
     }
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
+
+    const infoCredito = (creditosPet as any)?.[s.id];
+    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0;
+
     setItens((prev) => [...prev, {
       servico_id: s.id,
       nome: s.nome,
-      valor_unit: Number(s.valor ?? 0),
+      valor_unit: temCredito ? 0 : Number(s.valor ?? 0),
       duracao_min: s.duracao_min ?? null,
+      usar_credito: temCredito
     }]);
     setServicoAdd("");
   }
+
 
   function removerItem(idx: number) {
     setItens((prev) => prev.filter((_, i) => i !== idx));
@@ -2058,6 +2158,9 @@ function EditarServicosDialog({
       }).eq("id", agendamento.id);
       if (errUp) throw errUp;
 
+      // Libera reservas anteriores para re-reservar se necessário
+      await liberarReserva({ data: { agendamento_id: agendamento.id } });
+
       // Reseta os itens (delete + insert)
       const { error: errDel } = await supabase
         .from("agendamento_servicos")
@@ -2075,6 +2178,22 @@ function EditarServicosDialog({
       }));
       const { error: errIns } = await supabase.from("agendamento_servicos").insert(rows);
       if (errIns) throw errIns;
+
+      // Realiza novas reservas
+      for (const it of itens) {
+        if (it.usar_credito) {
+          try {
+            await reservarCredito({ data: {
+              pet_id: agendamento.pet_id,
+              servico_id: it.servico_id,
+              agendamento_id: agendamento.id,
+              quantidade: 1
+            }});
+          } catch (e) {
+            console.error("Erro ao reservar crédito na edição:", e);
+          }
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Serviços atualizados");
@@ -2125,7 +2244,10 @@ function EditarServicosDialog({
               {itens.map((it, idx) => (
                 <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_100px_80px_auto] gap-2 items-center">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{it.nome}</div>
+                    <div className="text-sm font-medium truncate flex items-center gap-1">
+                      {it.nome}
+                      {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" />}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {idx === 0 && (
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</span>

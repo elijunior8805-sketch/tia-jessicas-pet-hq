@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { consumirReserva } from "@/lib/programas-cuidado.functions";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -531,6 +532,9 @@ function AtendimentoDetalhe() {
         desconto: Number(desc || 0),
       } as never).eq("id", atendId);
       if (error) throw error;
+      
+      // Consome a reserva de créditos do programa de cuidado, se houver
+      await consumirReserva({ data: { agendamento_id: (atendimento as any).agendamento_id } });
 
       if ((atendimento as any).agendamento_id) {
         await supabase.from("agendamentos")

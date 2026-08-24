@@ -1,12 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PackageCheck, Plus, Sparkles, History, Settings as SettingsIcon, CreditCard, Clock, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { 
+  PackageCheck, 
+  Plus, 
+  Sparkles, 
+  History, 
+  Settings as SettingsIcon, 
+  CreditCard, 
+  Clock, 
+  AlertTriangle,
+  Search,
+  ChevronRight,
+  CheckCircle2,
+  Trash2,
+  Calendar,
+  Wallet
+} from "lucide-react";
+import { useState, useMemo } from "react";
 import { 
   getProgramasCatalogo, 
-  upsertPrograma, 
   toggleProgramaStatus,
-  duplicarPrograma
+  duplicarPrograma,
+  contratarPrograma
 } from "@/lib/programas-cuidado.functions";
 import { Button } from "@/components/ui/button";
 import { 
@@ -26,9 +41,14 @@ import {
   DialogDescription, 
   DialogHeader, 
   DialogTitle,
-  DialogTrigger 
+  DialogTrigger,
+  DialogFooter
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { format, addDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export const Route = createFileRoute("/_authenticated/gestao/programas-cuidado")({
   component: ProgramasCuidadoPage,
@@ -48,6 +68,76 @@ function ProgramasCuidadoPage() {
   });
 
   const [activeTab, setActiveTab] = useState("catalogo");
+  const [activeSubTabAtivos, setActiveSubTabAtivos] = useState("todos");
+  const [openVenda, setOpenVenda] = useState(false);
+  const [selectedPrograma, setSelectedPrograma] = useState<any>(null);
+  const [vendaStep, setVendaStep] = useState(1);
+  
+  // Estados da Venda
+  const [searchCliente, setSearchCliente] = useState("");
+  const [selectedCliente, setSelectedCliente] = useState<any>(null);
+  const [selectedPet, setSelectedPet] = useState<any>(null);
+  const [vendaDataInicio, setVendaDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [vendaPreco, setVendaPreco] = useState(0);
+
+  // Busca Clientes
+  const { data: clientesBusca } = useQuery({
+    queryKey: ["clientes-busca", searchCliente],
+    queryFn: async () => {
+      if (searchCliente.length < 3) return [];
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome, whatsapp")
+        .ilike("nome", `%${searchCliente}%`)
+        .limit(5);
+      if (error) throw error;
+      return data;
+    },
+    enabled: searchCliente.length >= 3
+  });
+
+  // Busca Pets do Cliente
+  const { data: petsCliente } = useQuery({
+    queryKey: ["pets-cliente", selectedCliente?.id],
+    queryFn: async () => {
+      if (!selectedCliente) return [];
+      const { data, error } = await supabase
+        .from("pets")
+        .select("id, nome, raca, porte")
+        .eq("cliente_id", selectedCliente.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCliente
+  });
+
+  const contratarMutation = useMutation({
+    mutationFn: (vars: any) => contratarPrograma({ data: vars }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
+      queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
+      toast.success("Programa contratado com sucesso!");
+      setOpenVenda(false);
+      resetVenda();
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao contratar: " + err.message);
+    }
+  });
+
+  const resetVenda = () => {
+    setVendaStep(1);
+    setSelectedCliente(null);
+    setSelectedPet(null);
+    setSearchCliente("");
+    setSelectedPrograma(null);
+  };
+
+  const handleOpenVenda = (programa: any) => {
+    setSelectedPrograma(programa);
+    setVendaPreco(Number(programa.preco_do_programa));
+    setOpenVenda(true);
+  };
 
   const toggleStatusMutation = useMutation({
     mutationFn: (vars: { id: string, status: "ativo" | "inativo" | "rascunho" }) => 
@@ -56,6 +146,31 @@ function ProgramasCuidadoPage() {
       queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
       toast.success("Status atualizado com sucesso");
     }
+  });
+
+  const { data: programasAtivos } = useQuery({
+    queryKey: ["programas-ativos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("programas_contratados" as any)
+        .select("*, clientes(nome), pets(nome, raca)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const { data: movimentacoes } = useQuery({
+    queryKey: ["creditos-movimentacoes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("programas_creditos_movimentacoes" as any)
+        .select("*, pets(nome)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data as any[];
+    },
   });
 
   const duplicarMutation = useMutation({
@@ -88,33 +203,10 @@ function ProgramasCuidadoPage() {
           </p>
         </div>
         
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="bg-gold hover:bg-gold/90 text-white font-medium shadow-sm transition-all active:scale-95">
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Programa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Criar Programa de Cuidado</DialogTitle>
-              <DialogDescription>
-                Configure os serviços, validade e benefícios deste programa.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-8 text-center space-y-4">
-              <div className="mx-auto w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center">
-                <Sparkles className="h-6 w-6 text-gold" />
-              </div>
-              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                O formulário de criação completa será implementado na Parte 2 deste módulo.
-              </p>
-              <Button variant="outline" onClick={() => toast.info("Funcionalidade em desenvolvimento")}>
-                Fechar
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button className="bg-gold hover:bg-gold/90 text-white font-medium shadow-sm transition-all active:scale-95" onClick={() => toast.info("Funcionalidade de criação será expandida em breve")}>
+          <Plus className="mr-2 h-4 w-4" />
+          Novo Programa
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -123,21 +215,13 @@ function ProgramasCuidadoPage() {
             <Sparkles className="mr-2 h-4 w-4" />
             Catálogo
           </TabsTrigger>
-          <TabsTrigger value="ativos" disabled className="opacity-50">
+          <TabsTrigger value="ativos" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Plus className="mr-2 h-4 w-4" />
             Programas Ativos
           </TabsTrigger>
-          <TabsTrigger value="creditos" disabled className="opacity-50">
+          <TabsTrigger value="creditos" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <CreditCard className="mr-2 h-4 w-4" />
-            Créditos
-          </TabsTrigger>
-          <TabsTrigger value="vencimento" disabled className="opacity-50">
-            <Clock className="mr-2 h-4 w-4" />
-            Vencimentos
-          </TabsTrigger>
-          <TabsTrigger value="historico" disabled className="opacity-50">
-            <History className="mr-2 h-4 w-4" />
-            Histórico
+            Movimentações
           </TabsTrigger>
           <TabsTrigger value="configuracoes" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <SettingsIcon className="mr-2 h-4 w-4" />
@@ -218,18 +302,22 @@ function ProgramasCuidadoPage() {
                     </div>
                     
                     <div className="w-full flex gap-2 pt-1">
-                      <Button variant="outline" className="flex-1 text-xs h-9 hover:border-gold/50 hover:bg-gold/5" onClick={() => toast.info("Edição disponível na Parte 2")}>
-                        Editar
+                      <Button 
+                        className="flex-1 bg-gold hover:bg-gold/90 text-white font-medium"
+                        onClick={() => handleOpenVenda(programa)}
+                      >
+                        Vender Agora
                       </Button>
                       <Button 
                         variant="secondary" 
-                        className={`flex-1 text-xs h-9 ${programa.status === 'ativo' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                        size="icon"
+                        className={`${programa.status === 'ativo' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
                         onClick={() => toggleStatusMutation.mutate({ 
                           id: programa.id, 
                           status: programa.status === 'ativo' ? 'inativo' : 'ativo' 
                         })}
                       >
-                        {programa.status === 'ativo' ? 'Inativar' : 'Ativar'}
+                        <Plus className={`h-4 w-4 ${programa.status === 'ativo' ? 'rotate-45' : ''}`} />
                       </Button>
                     </div>
                   </CardFooter>
@@ -249,6 +337,156 @@ function ProgramasCuidadoPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="ativos" className="space-y-6 outline-none">
+          <Card className="border-sidebar-border/60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-lg">Programas em Vigor</CardTitle>
+                <CardDescription>Lista de todos os programas contratados.</CardDescription>
+              </div>
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+                <Button 
+                  variant={activeSubTabAtivos === "todos" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("todos")}
+                >
+                  Todos
+                </Button>
+                <Button 
+                  variant={activeSubTabAtivos === "aguardando_pagamento" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("aguardando_pagamento")}
+                >
+                  Aguardando
+                </Button>
+                <Button 
+                  variant={activeSubTabAtivos === "ativo" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("ativo")}
+                >
+                  Ativos
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {programasAtivos && programasAtivos.length > 0 ? (
+                <div className="space-y-4">
+                  {programasAtivos
+                    .filter((p: any) => activeSubTabAtivos === "todos" || p.status === activeSubTabAtivos)
+                    .map((contrato: any) => (
+                    <div key={contrato.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border border-sidebar-border/40 hover:bg-muted/10 transition-colors gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                          <PackageCheck className="h-5 w-5 text-gold" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">{contrato.nome_snapshot}</span>
+                            {contrato.status === 'ativo' ? (
+                              <Badge className="bg-green-500/10 text-green-600 border-green-200 h-5 px-1.5 text-[10px]">Ativo</Badge>
+                            ) : contrato.status === 'aguardando_pagamento' ? (
+                              <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 h-5 px-1.5 text-[10px]">Aguardando</Badge>
+                            ) : (
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{contrato.status}</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="flex items-center gap-1"><Search className="h-3 w-3" /> {contrato.clientes?.nome}</span>
+                            <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {contrato.pets?.nome}</span>
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Expira em {format(new Date(contrato.data_de_validade), 'dd/MM/yyyy')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                        <div className="text-right">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Valor Contratado</p>
+                          <p className="text-sm font-bold text-gold">R$ {Number(contrato.preco_vendido).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold">
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {programasAtivos.filter((p: any) => activeSubTabAtivos === "todos" || p.status === activeSubTabAtivos).length === 0 && (
+                    <div className="py-10 text-center text-muted-foreground italic text-sm">
+                      Nenhum programa encontrado com este status.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-10 text-center text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>Nenhuma contratação ativa encontrada no momento.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="creditos" className="space-y-6 outline-none">
+          <Card className="border-sidebar-border/60">
+            <CardHeader>
+              <CardTitle className="text-lg">Livro Razão de Créditos</CardTitle>
+              <CardDescription>Histórico detalhado de todas as movimentações de saldo.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {movimentacoes && movimentacoes.length > 0 ? (
+                <div className="relative overflow-x-auto rounded-lg border border-sidebar-border/40">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/50 text-muted-foreground uppercase font-bold tracking-wider border-b border-sidebar-border/40">
+                      <tr>
+                        <th className="px-4 py-3">Data</th>
+                        <th className="px-4 py-3">Pet</th>
+                        <th className="px-4 py-3">Tipo</th>
+                        <th className="px-4 py-3 text-right">Qtd</th>
+                        <th className="px-4 py-3">Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-sidebar-border/40">
+                      {movimentacoes.map((m: any) => (
+                        <tr key={m.id} className="hover:bg-muted/5 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                            {format(new Date(m.created_at), 'dd/MM/yy HH:mm')}
+                          </td>
+                          <td className="px-4 py-3 font-medium">{m.pets?.nome}</td>
+                          <td className="px-4 py-3">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[9px] px-1 h-4 ${
+                                m.tipo === 'credito_criado' ? 'border-green-200 text-green-600 bg-green-50/50' :
+                                m.tipo === 'credito_reservado' ? 'border-amber-200 text-amber-600 bg-amber-50/50' :
+                                m.tipo === 'credito_consumido' ? 'border-red-200 text-red-600 bg-red-50/50' :
+                                'border-gray-200 text-gray-600'
+                              }`}
+                            >
+                              {m.tipo.replace('credito_', '').toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td className={`px-4 py-3 text-right font-bold ${m.quantidade > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
+                            {m.motivo || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-10 text-center text-muted-foreground">
+                  <Wallet className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>Nenhuma movimentação de crédito registrada.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="configuracoes" className="outline-none">
           <Card className="border-sidebar-border/60 max-w-2xl">
             <CardHeader>
@@ -264,9 +502,9 @@ function ProgramasCuidadoPage() {
               <div className="flex items-start gap-4 p-4 rounded-lg bg-amber-50 border border-amber-200">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-amber-900">Configurações em breve</p>
+                  <p className="text-sm font-semibold text-amber-900">Configurações avançadas</p>
                   <p className="text-xs text-amber-800/80 leading-relaxed">
-                    A gestão de prazos de carência, regras de cancelamento automático e integração financeira será habilitada na Parte 2 da implementação.
+                    A gestão de prazos de carência, regras de cancelamento automático e integração financeira será habilitada na Parte 3.
                   </p>
                 </div>
               </div>
@@ -303,6 +541,249 @@ function ProgramasCuidadoPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* MODAL DE VENDA (CONTRATAÇÃO) */}
+      <Dialog open={openVenda} onOpenChange={(val) => {
+        if (!val) resetVenda();
+        setOpenVenda(val);
+      }}>
+        <DialogContent className="sm:max-w-[500px] overflow-hidden p-0 gap-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <PackageCheck className="h-5 w-5 text-gold" />
+              Contratar: {selectedPrograma?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Siga os passos para ativar o programa para o pet.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-6 pt-2">
+            {/* Step Indicators */}
+            <div className="flex items-center justify-between mb-8 px-2">
+              {[1, 2, 3].map((s) => (
+                <div key={s} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                    vendaStep === s ? 'bg-gold text-white shadow-lg shadow-gold/20' : 
+                    vendaStep > s ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {vendaStep > s ? <CheckCircle2 className="h-5 w-5" /> : s}
+                  </div>
+                  {s < 3 && <div className={`w-16 h-0.5 mx-2 ${vendaStep > s ? 'bg-green-500' : 'bg-muted'}`} />}
+                </div>
+              ))}
+            </div>
+
+            {vendaStep === 1 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Buscar Cliente</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Nome do cliente (mín. 3 letras)" 
+                        className="pl-9"
+                        value={searchCliente}
+                        onChange={(e) => setSearchCliente(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {selectedCliente ? (
+                    <div className="flex items-center justify-between p-3 bg-gold/5 border border-gold/20 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold font-bold">
+                          {selectedCliente.nome.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{selectedCliente.nome}</p>
+                          <p className="text-xs text-muted-foreground">{selectedCliente.whatsapp || "Sem WhatsApp"}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => { setSelectedCliente(null); setSelectedPet(null); }}>
+                        Alterar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {clientesBusca?.map((cli) => (
+                        <div 
+                          key={cli.id} 
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => setSelectedCliente(cli)}
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{cli.nome}</p>
+                            <p className="text-xs text-muted-foreground">{cli.whatsapp}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      ))}
+                      {searchCliente.length >= 3 && clientesBusca?.length === 0 && (
+                        <p className="text-center text-xs text-muted-foreground py-2 italic">Nenhum cliente encontrado.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedCliente && (
+                    <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <Label>Selecionar Pet</Label>
+                      {petsCliente && petsCliente.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          {petsCliente.map((pet) => (
+                            <div 
+                              key={pet.id}
+                              className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                                selectedPet?.id === pet.id ? 'border-gold bg-gold/5 shadow-sm' : 'hover:bg-muted/50'
+                              }`}
+                              onClick={() => setSelectedPet(pet)}
+                            >
+                              <p className="text-sm font-semibold truncate">{pet.nome}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{pet.raca || "Raça não inf."}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground py-2 italic">Este cliente não possui pets cadastrados.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {vendaStep === 2 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Data de Início</Label>
+                      <Input 
+                        type="date" 
+                        value={vendaDataInicio}
+                        onChange={(e) => setVendaDataInicio(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Validade (Dias)</Label>
+                      <div className="h-10 flex items-center px-3 border rounded-md bg-muted/30 text-sm font-medium">
+                        {selectedPrograma?.validade_em_dias} dias
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Preço de Venda (R$)</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-sm text-muted-foreground font-bold">R$</span>
+                      <Input 
+                        type="number"
+                        className="pl-10 font-bold text-gold"
+                        value={vendaPreco}
+                        onChange={(e) => setVendaPreco(Number(e.target.value))}
+                      />
+                    </div>
+                    {vendaPreco !== Number(selectedPrograma?.preco_do_programa) && (
+                      <p className="text-[10px] text-amber-600 font-medium">
+                        * Valor original: R$ {Number(selectedPrograma?.preco_do_programa).toLocaleString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-muted/20 border border-sidebar-border/40 space-y-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Resumo dos Créditos</p>
+                    <div className="space-y-2">
+                      {selectedPrograma?.itens?.map((item: any) => (
+                        <div key={item.id} className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">{item.servico?.nome}</span>
+                          <Badge variant="outline" className="font-bold border-gold/30 text-gold">
+                            {item.quantidade}x
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {vendaStep === 3 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="text-center space-y-2 mb-4">
+                  <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="h-8 w-8 text-gold" />
+                  </div>
+                  <h4 className="text-lg font-display font-bold">Tudo pronto!</h4>
+                  <p className="text-sm text-muted-foreground">Confirme os detalhes finais antes de ativar.</p>
+                </div>
+
+                <div className="bg-muted/30 border border-sidebar-border/50 rounded-2xl p-4 space-y-4">
+                  <div className="flex justify-between text-sm py-1 border-b border-dashed border-sidebar-border">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="font-semibold">{selectedCliente?.nome}</span>
+                  </div>
+                  <div className="flex justify-between text-sm py-1 border-b border-dashed border-sidebar-border">
+                    <span className="text-muted-foreground">Pet</span>
+                    <span className="font-semibold">{selectedPet?.nome}</span>
+                  </div>
+                  <div className="flex justify-between text-sm py-1 border-b border-dashed border-sidebar-border">
+                    <span className="text-muted-foreground">Validade até</span>
+                    <span className="font-semibold">
+                      {format(addDays(new Date(vendaDataInicio), selectedPrograma?.validade_em_dias), 'dd/MM/yyyy')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-lg py-2">
+                    <span className="font-bold">Total a Pagar</span>
+                    <span className="font-bold text-gold">R$ {vendaPreco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                  <AlertTriangle className="h-4 w-4 text-gold shrink-0 mt-0.5" />
+                  <p className="text-[10px] leading-relaxed text-gold-foreground/80">
+                    Ao confirmar, os créditos serão liberados imediatamente no livro razão. 
+                    Esta ação gerará registros de auditoria e não poderá ser desfeita automaticamente.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-6 bg-muted/20 border-t border-sidebar-border/40 gap-3">
+            {vendaStep > 1 && (
+              <Button variant="outline" className="flex-1" onClick={() => setVendaStep(vendaStep - 1)} disabled={contratarMutation.isPending}>
+                Voltar
+              </Button>
+            )}
+            {vendaStep < 3 ? (
+              <Button 
+                className="flex-1 bg-gold hover:bg-gold/90 text-white" 
+                onClick={() => setVendaStep(vendaStep + 1)}
+                disabled={!selectedPet || vendaPreco <= 0}
+              >
+                Continuar
+              </Button>
+            ) : (
+              <Button 
+                className="flex-1 bg-gold hover:bg-gold/90 text-white" 
+                onClick={() => contratarMutation.mutate({
+                  programa_id: selectedPrograma.id,
+                  cliente_id: selectedCliente.id,
+                  pet_id: selectedPet.id,
+                  data_de_inicio: vendaDataInicio,
+                  data_de_validade: format(addDays(new Date(vendaDataInicio), selectedPrograma.validade_em_dias), 'yyyy-MM-dd'),
+                  preco_vendido: vendaPreco,
+                  idempotency_key: `venda_${selectedPet.id}_${Date.now()}`
+                })}
+                disabled={contratarMutation.isPending}
+              >
+                {contratarMutation.isPending ? "Processando..." : "Confirmar e Ativar"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
