@@ -36,20 +36,4 @@ export const salvarTranscricaoIA = createServerFn({ method: "POST" })
     return { success: true, id: (result as any).id };
   });
 
-export const listarTranscricoesIA = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const sb = context.supabase;
-    const userId = context.userId;
-
-    const { data, error } = await sb
-      .from("ia_transcricoes" as any)
-      .select("*")
-      .eq("usuario_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (error) throw error;
-    return data;
-  });
 

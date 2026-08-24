@@ -103,15 +103,6 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       exige_confirmacao: false,
       resposta_ia: "Preparando o resumo operacional do dia..."
     },
-    "listar_transcricoes": {
-      intencao: "listar_transcricoes",
-      especialista: "relatorios",
-      tipo_operacao: "consulta",
-      parametros: { comando_original: texto },
-      nivel_confianca: 1,
-      exige_confirmacao: false,
-      resposta_ia: "Buscando seus áudios recentes..."
-    }
   };
 
   // Checagem de prefixos para o mapeamentoDireto
