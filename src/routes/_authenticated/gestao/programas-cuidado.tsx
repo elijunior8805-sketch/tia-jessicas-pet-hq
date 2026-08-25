@@ -28,6 +28,9 @@ import {
 } from "@/lib/programas-cuidado.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
+import { Switch } from "@/components/ui/switch";
+import { ProgramasConfigTab } from "@/components/gestao/programas/ProgramasConfigTab";
+import { getProgramasConfig } from "@/lib/programas-config.functions";
 
 
 import { Button } from "@/components/ui/button";
@@ -89,6 +92,41 @@ function ProgramasCuidadoPage() {
   const [selectedPet, setSelectedPet] = useState<any>(null);
   const [vendaDataInicio, setVendaDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [vendaPreco, setVendaPreco] = useState(0);
+  const [vendaFracionada, setVendaFracionada] = useState(false);
+  const [itensQtd, setItensQtd] = useState<Record<string, number>>({});
+
+  const { data: programasConfig } = useQuery({
+    queryKey: ["programas-config"],
+    queryFn: () => getProgramasConfig(),
+  });
+  const permiteFracionar = !!(programasConfig as any)?.permitir_venda_fracionada;
+
+  const itensPrograma: any[] = selectedPrograma?.itens ?? [];
+  const qtdDe = (item: any) =>
+    vendaFracionada ? Number(itensQtd[item.servico_id] ?? item.quantidade) : Number(item.quantidade);
+
+  // Mesmo cálculo aplicado no servidor (o servidor é a fonte da verdade)
+  const precoFracionado = (() => {
+    const precoCheio = Number(selectedPrograma?.preco_do_programa ?? 0);
+    if (!vendaFracionada || itensPrograma.length === 0) return precoCheio;
+    const somaAlocada = itensPrograma.reduce((s, i) => s + Number(i.valor_alocado || 0), 0);
+    let total = 0;
+    if (somaAlocada > 0) {
+      total = itensPrograma.reduce((s, i) => {
+        const unit = Number(i.valor_alocado || 0) / Math.max(Number(i.quantidade || 1), 1);
+        return s + unit * qtdDe(i);
+      }, 0);
+    } else {
+      const totalUnidades = itensPrograma.reduce((s, i) => s + Number(i.quantidade || 0), 0) || 1;
+      const unidades = itensPrograma.reduce((s, i) => s + qtdDe(i), 0);
+      total = (precoCheio / totalUnidades) * unidades;
+    }
+    return Math.round(total * 100) / 100;
+  })();
+
+  const precoFinalVenda = vendaFracionada ? precoFracionado : vendaPreco;
+  const unidadesSelecionadas = itensPrograma.reduce((s, i) => s + qtdDe(i), 0);
+
 
   // Busca Clientes
   const { data: clientesBusca } = useQuery({
@@ -141,13 +179,18 @@ function ProgramasCuidadoPage() {
     setSelectedPet(null);
     setSearchCliente("");
     setSelectedPrograma(null);
+    setVendaFracionada(false);
+    setItensQtd({});
   };
 
   const handleOpenVenda = (programa: any) => {
     setSelectedPrograma(programa);
     setVendaPreco(Number(programa.preco_do_programa));
+    setVendaFracionada(false);
+    setItensQtd({});
     setOpenVenda(true);
   };
+
 
   const toggleStatusMutation = useMutation({
     mutationFn: (vars: { id: string, status: "ativo" | "inativo" | "rascunho" }) => 
@@ -548,70 +591,8 @@ function ProgramasCuidadoPage() {
         </TabsContent>
 
         <TabsContent value="configuracoes" className="outline-none">
-          <Card className="border-sidebar-border/60 max-w-2xl bg-white dark:bg-zinc-950 overflow-hidden shadow-sm">
-            <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-sidebar-border/40 pb-6">
-              <CardTitle className="text-xl font-display font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
-                <SettingsIcon className="h-6 w-6 text-gold" />
-                Configurações do Módulo
-              </CardTitle>
-              <CardDescription className="text-zinc-500 dark:text-zinc-400">
-                Defina as regras operacionais e financeiras que regem todos os programas de cuidado.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8 pt-8">
-              <div className="flex items-start gap-4 p-5 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
-                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-amber-900 dark:text-amber-500">Funcionalidades em expansão</p>
-                  <p className="text-xs text-amber-800/80 dark:text-amber-400/80 leading-relaxed font-medium">
-                    A gestão de prazos de carência, regras de cancelamento automático e automação financeira estão em fase de teste e serão liberadas gradualmente para sua conta.
-                  </p>
-                </div>
-              </div>
+          <ProgramasConfigTab />
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Permitir venda fracionada</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Habilita a venda de cotas parciais de um programa para o cliente.</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
-                    EM BREVE
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Notificar vencimento</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Disparo automático de lembrete via WhatsApp antes da expiração.</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
-                    EM BREVE
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Validade padrão</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Prazo sugerido automaticamente na criação de novos planos.</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gold">30 dias</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-20 cursor-not-allowed">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="bg-zinc-50/30 dark:bg-zinc-900/30 border-t border-zinc-100 dark:border-zinc-800 p-6">
-              <Button disabled className="w-full h-12 rounded-xl font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-600 border-none">
-                Salvar Alterações
-              </Button>
-            </CardFooter>
-          </Card>
 
         </TabsContent>
       </Tabs>
@@ -754,30 +735,71 @@ function ProgramasCuidadoPage() {
                       <Input 
                         type="number"
                         className="pl-10 font-bold text-gold"
-                        value={vendaPreco}
+                        value={vendaFracionada ? precoFracionado : vendaPreco}
+                        readOnly={vendaFracionada}
                         onChange={(e) => setVendaPreco(Number(e.target.value))}
                       />
                     </div>
-                    {vendaPreco !== Number(selectedPrograma?.preco_do_programa) && (
+                    {vendaFracionada ? (
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        * Valor calculado automaticamente pelo servidor conforme os serviços selecionados.
+                      </p>
+                    ) : vendaPreco !== Number(selectedPrograma?.preco_do_programa) ? (
                       <p className="text-[10px] text-amber-600 font-medium">
                         * Valor original: R$ {Number(selectedPrograma?.preco_do_programa).toLocaleString('pt-BR')}
                       </p>
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="p-4 rounded-xl bg-muted/20 border border-sidebar-border/40 space-y-3">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Resumo dos Créditos</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Resumo dos Créditos</p>
+                      {permiteFracionar && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Fracionar</span>
+                          <Switch
+                            checked={vendaFracionada}
+                            onCheckedChange={(v: boolean) => {
+                              setVendaFracionada(v);
+                              if (v) {
+                                const base: Record<string, number> = {};
+                                itensPrograma.forEach((i: any) => { base[i.servico_id] = Number(i.quantidade); });
+                                setItensQtd(base);
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                     <div className="space-y-2">
-                      {selectedPrograma?.itens?.map((item: any) => (
-                        <div key={item.id} className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">{item.servico?.nome}</span>
-                          <Badge variant="outline" className="font-bold border-gold/30 text-gold">
-                            {item.quantidade}x
-                          </Badge>
+                      {itensPrograma.map((item: any) => (
+                        <div key={item.id} className="flex justify-between items-center text-sm gap-3">
+                          <span className="text-muted-foreground truncate">{item.servico?.nome}</span>
+                          {vendaFracionada ? (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg"
+                                onClick={() => setItensQtd((p) => ({ ...p, [item.servico_id]: Math.max(0, (p[item.servico_id] ?? Number(item.quantidade)) - 1) }))}
+                              >-</Button>
+                              <span className="w-8 text-center font-bold text-gold">{qtdDe(item)}</span>
+                              <Button
+                                type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg"
+                                onClick={() => setItensQtd((p) => ({ ...p, [item.servico_id]: Math.min(Number(item.quantidade), (p[item.servico_id] ?? Number(item.quantidade)) + 1) }))}
+                              >+</Button>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="font-bold border-gold/30 text-gold">
+                              {item.quantidade}x
+                            </Badge>
+                          )}
                         </div>
                       ))}
                     </div>
+                    {vendaFracionada && unidadesSelecionadas === 0 && (
+                      <p className="text-[10px] text-destructive font-medium">Selecione ao menos um serviço.</p>
+                    )}
                   </div>
+
                 </div>
               </div>
             )}
@@ -809,7 +831,7 @@ function ProgramasCuidadoPage() {
                   </div>
                   <div className="flex justify-between text-lg py-2">
                     <span className="font-bold">Total a Pagar</span>
-                    <span className="font-bold text-gold">R$ {vendaPreco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold text-gold">R$ {precoFinalVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
@@ -834,7 +856,7 @@ function ProgramasCuidadoPage() {
               <Button 
                 className="flex-1 bg-gold hover:bg-gold/90 text-white" 
                 onClick={() => setVendaStep(vendaStep + 1)}
-                disabled={!selectedPet || vendaPreco <= 0}
+                disabled={!selectedPet || precoFinalVenda <= 0 || (vendaFracionada && unidadesSelecionadas === 0)}
               >
                 Continuar
               </Button>
@@ -847,7 +869,11 @@ function ProgramasCuidadoPage() {
                   pet_id: selectedPet.id,
                   data_de_inicio: vendaDataInicio,
                   data_de_validade: format(addDays(new Date(vendaDataInicio), selectedPrograma.validade_em_dias), 'yyyy-MM-dd'),
-                  preco_vendido: vendaPreco,
+                  preco_vendido: precoFinalVenda,
+                  fracionado: vendaFracionada,
+                  itens_selecionados: vendaFracionada
+                    ? itensPrograma.map((i: any) => ({ servico_id: i.servico_id, quantidade: qtdDe(i) }))
+                    : undefined,
                   idempotency_key: `venda_${selectedPet.id}_${Date.now()}`
                 })}
                 disabled={contratarMutation.isPending}
@@ -875,7 +901,7 @@ function AuditoriaProgramasTab() {
       const { data, error } = await supabase
         .from("auditoria_programas" as any)
         .select("*, clientes(nome), pets(nome)")
-        .order("criado_em", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
       return data as any[];
@@ -908,7 +934,7 @@ function AuditoriaProgramasTab() {
               {logs && logs.length > 0 ? logs.map((log) => (
                 <tr key={log.id} className="hover:bg-muted/10 transition-colors">
                   <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">
-                    {format(new Date(log.criado_em), 'dd/MM/yy HH:mm')}
+                    {format(new Date(log.created_at), 'dd/MM/yy HH:mm')}
                   </td>
                   <td className="p-4">
                     <Badge variant="outline" className="text-[10px] uppercase font-bold border-gold/30 text-gold-foreground bg-gold/5">
