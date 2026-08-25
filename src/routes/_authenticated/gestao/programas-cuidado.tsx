@@ -729,30 +729,71 @@ function ProgramasCuidadoPage() {
                       <Input 
                         type="number"
                         className="pl-10 font-bold text-gold"
-                        value={vendaPreco}
+                        value={vendaFracionada ? precoFracionado : vendaPreco}
+                        readOnly={vendaFracionada}
                         onChange={(e) => setVendaPreco(Number(e.target.value))}
                       />
                     </div>
-                    {vendaPreco !== Number(selectedPrograma?.preco_do_programa) && (
+                    {vendaFracionada ? (
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        * Valor calculado automaticamente pelo servidor conforme os serviços selecionados.
+                      </p>
+                    ) : vendaPreco !== Number(selectedPrograma?.preco_do_programa) ? (
                       <p className="text-[10px] text-amber-600 font-medium">
                         * Valor original: R$ {Number(selectedPrograma?.preco_do_programa).toLocaleString('pt-BR')}
                       </p>
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="p-4 rounded-xl bg-muted/20 border border-sidebar-border/40 space-y-3">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Resumo dos Créditos</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Resumo dos Créditos</p>
+                      {permiteFracionar && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Fracionar</span>
+                          <Switch
+                            checked={vendaFracionada}
+                            onCheckedChange={(v) => {
+                              setVendaFracionada(v);
+                              if (v) {
+                                const base: Record<string, number> = {};
+                                itensPrograma.forEach((i: any) => { base[i.servico_id] = Number(i.quantidade); });
+                                setItensQtd(base);
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                     <div className="space-y-2">
-                      {selectedPrograma?.itens?.map((item: any) => (
-                        <div key={item.id} className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">{item.servico?.nome}</span>
-                          <Badge variant="outline" className="font-bold border-gold/30 text-gold">
-                            {item.quantidade}x
-                          </Badge>
+                      {itensPrograma.map((item: any) => (
+                        <div key={item.id} className="flex justify-between items-center text-sm gap-3">
+                          <span className="text-muted-foreground truncate">{item.servico?.nome}</span>
+                          {vendaFracionada ? (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg"
+                                onClick={() => setItensQtd((p) => ({ ...p, [item.servico_id]: Math.max(0, (p[item.servico_id] ?? Number(item.quantidade)) - 1) }))}
+                              >-</Button>
+                              <span className="w-8 text-center font-bold text-gold">{qtdDe(item)}</span>
+                              <Button
+                                type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg"
+                                onClick={() => setItensQtd((p) => ({ ...p, [item.servico_id]: Math.min(Number(item.quantidade), (p[item.servico_id] ?? Number(item.quantidade)) + 1) }))}
+                              >+</Button>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="font-bold border-gold/30 text-gold">
+                              {item.quantidade}x
+                            </Badge>
+                          )}
                         </div>
                       ))}
                     </div>
+                    {vendaFracionada && unidadesSelecionadas === 0 && (
+                      <p className="text-[10px] text-destructive font-medium">Selecione ao menos um serviço.</p>
+                    )}
                   </div>
+
                 </div>
               </div>
             )}
