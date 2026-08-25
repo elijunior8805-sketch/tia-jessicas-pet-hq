@@ -179,13 +179,18 @@ function ProgramasCuidadoPage() {
     setSelectedPet(null);
     setSearchCliente("");
     setSelectedPrograma(null);
+    setVendaFracionada(false);
+    setItensQtd({});
   };
 
   const handleOpenVenda = (programa: any) => {
     setSelectedPrograma(programa);
     setVendaPreco(Number(programa.preco_do_programa));
+    setVendaFracionada(false);
+    setItensQtd({});
     setOpenVenda(true);
   };
+
 
   const toggleStatusMutation = useMutation({
     mutationFn: (vars: { id: string, status: "ativo" | "inativo" | "rascunho" }) => 
