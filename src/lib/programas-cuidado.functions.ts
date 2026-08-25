@@ -18,20 +18,11 @@ export const registrarAuditoriaPrograma = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    const { data: profile, error: pError } = await sb
-      .from("profiles")
-      .select("estabelecimento_id")
-      .eq("id", userId)
-      .single();
-
-    if (pError) throw pError;
-
     const { error } = await sb
       .from("auditoria_programas" as any)
       .insert({
         ...data,
         usuario_id: userId,
-        estabelecimento_id: (profile as any).estabelecimento_id
       });
 
     if (error) throw error;
@@ -46,10 +37,15 @@ export const contratarPrograma = createServerFn({ method: "POST" })
     pet_id: z.string().uuid(),
     data_de_inicio: z.string(),
     data_de_validade: z.string(),
-    preco_vendido: z.number(),
+    preco_vendido: z.number().optional(),
     forma_de_pagamento: z.string().optional(),
     observacoes: z.string().optional(),
-    idempotency_key: z.string()
+    idempotency_key: z.string(),
+    fracionado: z.boolean().optional(),
+    itens_selecionados: z.array(z.object({
+      servico_id: z.string().uuid(),
+      quantidade: z.number().int().min(0)
+    })).optional()
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
@@ -66,18 +62,66 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (pError) throw pError;
 
+    const { data: cfg } = await sb
+      .from("programas_cuidado_config" as any)
+      .select("permitir_venda_fracionada")
+      .limit(1)
+      .maybeSingle();
+    const permiteFracionar = !!(cfg as any)?.permitir_venda_fracionada;
+
+    const itensOriginais = ((programa as any).itens ?? []) as any[];
+    let itensVenda = itensOriginais.map((i) => ({ ...i }));
+    let fracionado = false;
+
+    if (data.fracionado) {
+      if (!permiteFracionar) {
+        throw new Error("Venda fracionada está desativada nas configurações do módulo.");
+      }
+      const mapa = new Map((data.itens_selecionados ?? []).map((i) => [i.servico_id, i.quantidade]));
+      itensVenda = itensOriginais
+        .map((i) => ({ ...i, quantidade: Math.min(Number(mapa.get(i.servico_id) ?? 0), Number(i.quantidade)) }))
+        .filter((i) => i.quantidade > 0);
+      if (itensVenda.length === 0) {
+        throw new Error("Selecione ao menos um serviço para a venda fracionada.");
+      }
+      fracionado = itensVenda.some((i, idx) => i.quantidade !== Number(itensOriginais[idx]?.quantidade))
+        || itensVenda.length !== itensOriginais.length;
+    }
+
+    // Preço sempre calculado no backend
+    const precoCheio = Number((programa as any).preco_do_programa ?? 0);
+    const totalUnidadesOriginais = itensOriginais.reduce((s, i) => s + Number(i.quantidade || 0), 0) || 1;
+    let precoCalculado = precoCheio;
+
+    if (fracionado) {
+      const somaAlocada = itensOriginais.reduce(
+        (s, i) => s + Number(i.valor_alocado || 0), 0);
+      if (somaAlocada > 0) {
+        precoCalculado = itensVenda.reduce((s, i) => {
+          const orig = itensOriginais.find((o) => o.servico_id === i.servico_id);
+          const unit = Number(orig?.valor_alocado || 0) / Math.max(Number(orig?.quantidade || 1), 1);
+          return s + unit * i.quantidade;
+        }, 0);
+      } else {
+        const unidades = itensVenda.reduce((s, i) => s + i.quantidade, 0);
+        precoCalculado = (precoCheio / totalUnidadesOriginais) * unidades;
+      }
+      precoCalculado = Math.round(precoCalculado * 100) / 100;
+    }
+
     const { data: contratado, error: cError } = await sb
       .from("programas_contratados" as any)
       .insert({
         programa_id: data.programa_id,
         cliente_id: data.cliente_id,
         pet_id: data.pet_id,
-        nome_snapshot: (programa as any).nome,
-        composicao_snapshot: (programa as any).itens,
+        nome_snapshot: fracionado ? `${(programa as any).nome} (fracionado)` : (programa as any).nome,
+        composicao_snapshot: itensVenda,
         regras_snapshot: (programa as any).regras,
-        preco_original: (programa as any).preco_do_programa,
-        preco_vendido: data.preco_vendido,
-        desconto: (programa as any).preco_do_programa - data.preco_vendido,
+        preco_original: precoCheio,
+        preco_vendido: precoCalculado,
+        desconto: precoCheio - precoCalculado,
+        fracionado,
         data_de_inicio: data.data_de_inicio,
         data_de_validade: data.data_de_validade,
         status_do_programa: 'ativo',
@@ -90,13 +134,13 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (cError) throw cError;
 
-    const movimentacoes = (programa as any).itens.map((item: any) => ({
+    const movimentacoes = itensVenda.map((item: any) => ({
       programa_contratado_id: (contratado as any).id,
       servico_id: item.servico_id,
       quantidade: item.quantidade,
       tipo: 'credito_criado',
       usuario_id: userId,
-      motivo: 'Contratação inicial',
+      motivo: fracionado ? 'Contratação fracionada' : 'Contratação inicial',
       idempotency_key: `${data.idempotency_key}_${item.servico_id}`
     }));
 
@@ -106,19 +150,43 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (mError) throw mError;
 
-    await registrarAuditoriaPrograma({
-      data: {
-        acao: 'venda',
+    // Integração com o Financeiro
+    const formasValidas = ['pix', 'credito', 'debito', 'dinheiro', 'pendente', 'outras'];
+    const forma = formasValidas.includes(String(data.forma_de_pagamento))
+      ? String(data.forma_de_pagamento)
+      : 'pendente';
+
+    const { error: fError } = await sb
+      .from("pagamentos" as any)
+      .insert({
         cliente_id: data.cliente_id,
-        pet_id: data.pet_id,
-        programa_contratado_id: (contratado as any).id,
-        valor_posterior: contratado,
-        motivo: 'Contratação de programa'
-      }
+        valor_total: precoCalculado,
+        valor_pago: forma === 'pendente' ? 0 : precoCalculado,
+        forma,
+        status: forma === 'pendente' ? 'pendente' : 'pago',
+        data_pagamento: forma === 'pendente' ? null : data.data_de_inicio,
+        vencimento: forma === 'pendente' ? data.data_de_inicio : null,
+        categoria_receita: 'Programas de Cuidado',
+        descricao: `Programa: ${(programa as any).nome}${fracionado ? ' (fracionado)' : ''}`,
+        idempotency_key: `programa_${(contratado as any).id}`,
+        created_by: userId
+      });
+
+    if (fError && (fError as any).code !== '23505') throw fError;
+
+    await sb.from("auditoria_programas" as any).insert({
+      acao: fracionado ? 'venda_fracionada' : 'venda',
+      cliente_id: data.cliente_id,
+      pet_id: data.pet_id,
+      programa_contratado_id: (contratado as any).id,
+      valor_posterior: contratado as any,
+      motivo: 'Contratação de programa',
+      usuario_id: userId,
     });
 
     return contratado;
   });
+
 
 export const getCreditosDisponiveis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
