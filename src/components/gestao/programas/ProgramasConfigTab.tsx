@@ -32,7 +32,7 @@ import {
   atualizarAlertaVencimento,
 } from "@/lib/programas-config.functions";
 import { useMyAccess } from "@/hooks/use-my-permissions";
-import { abrirWhatsApp } from "@/lib/whatsapp";
+import { abrirWhatsAppBusiness } from "@/lib/whatsapp";
 
 type ConfigState = {
   permitir_venda_fracionada: boolean;
@@ -261,7 +261,7 @@ export function ProgramasConfigTab() {
                                     toast.error("Tutor sem telefone cadastrado.");
                                     return;
                                   }
-                                  abrirWhatsApp(a.telefone, a.mensagem_sugerida);
+                                  abrirWhatsAppBusiness(String(a.telefone).replace(/\D+/g, "").replace(/^(?!55)/, "55"), a.mensagem_sugerida);
                                   atualizarAlerta.mutate({ id: a.id, status: "enviado" });
                                   toast.info("WhatsApp aberto. Confirme o envio no aplicativo.");
                                 }}
