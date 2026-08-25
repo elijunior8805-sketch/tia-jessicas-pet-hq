@@ -10,10 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { upsertPrograma } from "@/lib/programas-cuidado.functions";
+import { getProgramasConfig } from "@/lib/programas-config.functions";
 import { PackageCheck, Save } from "lucide-react";
 
 interface ProgramaFormDialogProps {
@@ -24,10 +25,22 @@ interface ProgramaFormDialogProps {
 
 export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaFormDialogProps) {
   const queryClient = useQueryClient();
+  const { data: config } = useQuery({
+    queryKey: ["programas-config"],
+    queryFn: () => getProgramasConfig(),
+  });
   const [nome, setNome] = useState(initial?.nome || "");
   const [descricao, setDescricao] = useState(initial?.descricao || "");
   const [preco, setPreco] = useState(initial?.preco_do_programa || "0");
   const [validade, setValidade] = useState(initial?.validade_em_dias || "30");
+
+  // Novos programas herdam a validade padrão configurada no módulo
+  useEffect(() => {
+    if (!open || initial?.id) return;
+    const padrao = (config as any)?.validade_padrao_dias;
+    if (padrao) setValidade(String(padrao));
+  }, [open, initial?.id, config]);
+
 
   const mutation = useMutation({
     mutationFn: (data: any) => upsertPrograma({ data }),
