@@ -548,70 +548,8 @@ function ProgramasCuidadoPage() {
         </TabsContent>
 
         <TabsContent value="configuracoes" className="outline-none">
-          <Card className="border-sidebar-border/60 max-w-2xl bg-white dark:bg-zinc-950 overflow-hidden shadow-sm">
-            <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-sidebar-border/40 pb-6">
-              <CardTitle className="text-xl font-display font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
-                <SettingsIcon className="h-6 w-6 text-gold" />
-                Configurações do Módulo
-              </CardTitle>
-              <CardDescription className="text-zinc-500 dark:text-zinc-400">
-                Defina as regras operacionais e financeiras que regem todos os programas de cuidado.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8 pt-8">
-              <div className="flex items-start gap-4 p-5 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
-                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-amber-900 dark:text-amber-500">Funcionalidades em expansão</p>
-                  <p className="text-xs text-amber-800/80 dark:text-amber-400/80 leading-relaxed font-medium">
-                    A gestão de prazos de carência, regras de cancelamento automático e automação financeira estão em fase de teste e serão liberadas gradualmente para sua conta.
-                  </p>
-                </div>
-              </div>
+          <ProgramasConfigTab />
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Permitir venda fracionada</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Habilita a venda de cotas parciais de um programa para o cliente.</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
-                    EM BREVE
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Notificar vencimento</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Disparo automático de lembrete via WhatsApp antes da expiração.</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
-                    EM BREVE
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Validade padrão</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Prazo sugerido automaticamente na criação de novos planos.</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gold">30 dias</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-20 cursor-not-allowed">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="bg-zinc-50/30 dark:bg-zinc-900/30 border-t border-zinc-100 dark:border-zinc-800 p-6">
-              <Button disabled className="w-full h-12 rounded-xl font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-600 border-none">
-                Salvar Alterações
-              </Button>
-            </CardFooter>
-          </Card>
 
         </TabsContent>
       </Tabs>
