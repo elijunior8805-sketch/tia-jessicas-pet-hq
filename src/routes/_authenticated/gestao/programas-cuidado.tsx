@@ -28,6 +28,8 @@ import {
 } from "@/lib/programas-cuidado.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
+import { ProgramasConfigTab } from "@/components/gestao/programas/ProgramasConfigTab";
+import { getProgramasConfig } from "@/lib/programas-config.functions";
 
 
 import { Button } from "@/components/ui/button";
@@ -813,7 +815,7 @@ function AuditoriaProgramasTab() {
       const { data, error } = await supabase
         .from("auditoria_programas" as any)
         .select("*, clientes(nome), pets(nome)")
-        .order("criado_em", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
       return data as any[];
@@ -846,7 +848,7 @@ function AuditoriaProgramasTab() {
               {logs && logs.length > 0 ? logs.map((log) => (
                 <tr key={log.id} className="hover:bg-muted/10 transition-colors">
                   <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">
-                    {format(new Date(log.criado_em), 'dd/MM/yy HH:mm')}
+                    {format(new Date(log.created_at), 'dd/MM/yy HH:mm')}
                   </td>
                   <td className="p-4">
                     <Badge variant="outline" className="text-[10px] uppercase font-bold border-gold/30 text-gold-foreground bg-gold/5">
