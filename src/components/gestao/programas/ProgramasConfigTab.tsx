@@ -354,8 +354,8 @@ export function ProgramasConfigTab() {
               Confirmar e salvar
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogFooter>
         </AlertDialogContent>
+
       </AlertDialog>
     </>
   );
