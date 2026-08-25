@@ -28,6 +28,7 @@ import {
 } from "@/lib/programas-cuidado.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
+import { Switch } from "@/components/ui/switch";
 import { ProgramasConfigTab } from "@/components/gestao/programas/ProgramasConfigTab";
 import { getProgramasConfig } from "@/lib/programas-config.functions";
 
@@ -753,7 +754,7 @@ function ProgramasCuidadoPage() {
                           <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Fracionar</span>
                           <Switch
                             checked={vendaFracionada}
-                            onCheckedChange={(v) => {
+                            onCheckedChange={(v: boolean) => {
                               setVendaFracionada(v);
                               if (v) {
                                 const base: Record<string, number> = {};
@@ -825,7 +826,7 @@ function ProgramasCuidadoPage() {
                   </div>
                   <div className="flex justify-between text-lg py-2">
                     <span className="font-bold">Total a Pagar</span>
-                    <span className="font-bold text-gold">R$ {vendaPreco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold text-gold">R$ {precoFinalVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
@@ -850,7 +851,7 @@ function ProgramasCuidadoPage() {
               <Button 
                 className="flex-1 bg-gold hover:bg-gold/90 text-white" 
                 onClick={() => setVendaStep(vendaStep + 1)}
-                disabled={!selectedPet || vendaPreco <= 0}
+                disabled={!selectedPet || precoFinalVenda <= 0 || (vendaFracionada && unidadesSelecionadas === 0)}
               >
                 Continuar
               </Button>
@@ -863,7 +864,11 @@ function ProgramasCuidadoPage() {
                   pet_id: selectedPet.id,
                   data_de_inicio: vendaDataInicio,
                   data_de_validade: format(addDays(new Date(vendaDataInicio), selectedPrograma.validade_em_dias), 'yyyy-MM-dd'),
-                  preco_vendido: vendaPreco,
+                  preco_vendido: precoFinalVenda,
+                  fracionado: vendaFracionada,
+                  itens_selecionados: vendaFracionada
+                    ? itensPrograma.map((i: any) => ({ servico_id: i.servico_id, quantidade: qtdDe(i) }))
+                    : undefined,
                   idempotency_key: `venda_${selectedPet.id}_${Date.now()}`
                 })}
                 disabled={contratarMutation.isPending}
