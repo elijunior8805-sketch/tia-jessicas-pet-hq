@@ -91,6 +91,41 @@ function ProgramasCuidadoPage() {
   const [selectedPet, setSelectedPet] = useState<any>(null);
   const [vendaDataInicio, setVendaDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [vendaPreco, setVendaPreco] = useState(0);
+  const [vendaFracionada, setVendaFracionada] = useState(false);
+  const [itensQtd, setItensQtd] = useState<Record<string, number>>({});
+
+  const { data: programasConfig } = useQuery({
+    queryKey: ["programas-config"],
+    queryFn: () => getProgramasConfig(),
+  });
+  const permiteFracionar = !!(programasConfig as any)?.permitir_venda_fracionada;
+
+  const itensPrograma: any[] = selectedPrograma?.itens ?? [];
+  const qtdDe = (item: any) =>
+    vendaFracionada ? Number(itensQtd[item.servico_id] ?? item.quantidade) : Number(item.quantidade);
+
+  // Mesmo cálculo aplicado no servidor (o servidor é a fonte da verdade)
+  const precoFracionado = (() => {
+    const precoCheio = Number(selectedPrograma?.preco_do_programa ?? 0);
+    if (!vendaFracionada || itensPrograma.length === 0) return precoCheio;
+    const somaAlocada = itensPrograma.reduce((s, i) => s + Number(i.valor_alocado || 0), 0);
+    let total = 0;
+    if (somaAlocada > 0) {
+      total = itensPrograma.reduce((s, i) => {
+        const unit = Number(i.valor_alocado || 0) / Math.max(Number(i.quantidade || 1), 1);
+        return s + unit * qtdDe(i);
+      }, 0);
+    } else {
+      const totalUnidades = itensPrograma.reduce((s, i) => s + Number(i.quantidade || 0), 0) || 1;
+      const unidades = itensPrograma.reduce((s, i) => s + qtdDe(i), 0);
+      total = (precoCheio / totalUnidades) * unidades;
+    }
+    return Math.round(total * 100) / 100;
+  })();
+
+  const precoFinalVenda = vendaFracionada ? precoFracionado : vendaPreco;
+  const unidadesSelecionadas = itensPrograma.reduce((s, i) => s + qtdDe(i), 0);
+
 
   // Busca Clientes
   const { data: clientesBusca } = useQuery({
