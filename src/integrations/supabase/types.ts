@@ -635,6 +635,54 @@ export type Database = {
         }
         Relationships: []
       }
+      auditoria_programas: {
+        Row: {
+          acao: string
+          cliente_id: string | null
+          created_at: string
+          estabelecimento_id: string | null
+          id: string
+          metadata: Json | null
+          motivo: string | null
+          pet_id: string | null
+          programa_contratado_id: string | null
+          updated_at: string
+          usuario_id: string | null
+          valor_anterior: Json | null
+          valor_posterior: Json | null
+        }
+        Insert: {
+          acao: string
+          cliente_id?: string | null
+          created_at?: string
+          estabelecimento_id?: string | null
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          pet_id?: string | null
+          programa_contratado_id?: string | null
+          updated_at?: string
+          usuario_id?: string | null
+          valor_anterior?: Json | null
+          valor_posterior?: Json | null
+        }
+        Update: {
+          acao?: string
+          cliente_id?: string | null
+          created_at?: string
+          estabelecimento_id?: string | null
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          pet_id?: string | null
+          programa_contratado_id?: string | null
+          updated_at?: string
+          usuario_id?: string | null
+          valor_anterior?: Json | null
+          valor_posterior?: Json | null
+        }
+        Relationships: []
+      }
       campanhas: {
         Row: {
           agendada_para: string | null
@@ -3356,6 +3404,7 @@ export type Database = {
           desconto: number | null
           estabelecimento_id: string | null
           forma_de_pagamento: string | null
+          fracionado: boolean
           id: string
           nome_snapshot: string
           observacoes: string | null
@@ -3379,6 +3428,7 @@ export type Database = {
           desconto?: number | null
           estabelecimento_id?: string | null
           forma_de_pagamento?: string | null
+          fracionado?: boolean
           id?: string
           nome_snapshot: string
           observacoes?: string | null
@@ -3402,6 +3452,7 @@ export type Database = {
           desconto?: number | null
           estabelecimento_id?: string | null
           forma_de_pagamento?: string | null
+          fracionado?: boolean
           id?: string
           nome_snapshot?: string
           observacoes?: string | null
@@ -3536,6 +3587,42 @@ export type Database = {
           },
         ]
       }
+      programas_cuidado_config: {
+        Row: {
+          atualizado_por: string | null
+          created_at: string
+          estabelecimento_id: string | null
+          id: string
+          notificar_dias_antes: number
+          notificar_vencimento: boolean
+          permitir_venda_fracionada: boolean
+          updated_at: string
+          validade_padrao_dias: number
+        }
+        Insert: {
+          atualizado_por?: string | null
+          created_at?: string
+          estabelecimento_id?: string | null
+          id?: string
+          notificar_dias_antes?: number
+          notificar_vencimento?: boolean
+          permitir_venda_fracionada?: boolean
+          updated_at?: string
+          validade_padrao_dias?: number
+        }
+        Update: {
+          atualizado_por?: string | null
+          created_at?: string
+          estabelecimento_id?: string | null
+          id?: string
+          notificar_dias_antes?: number
+          notificar_vencimento?: boolean
+          permitir_venda_fracionada?: boolean
+          updated_at?: string
+          validade_padrao_dias?: number
+        }
+        Relationships: []
+      }
       programas_de_cuidado: {
         Row: {
           criado_em: string
@@ -3640,6 +3727,80 @@ export type Database = {
             columns: ["servico_id"]
             isOneToOne: false
             referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programas_vencimento_alertas: {
+        Row: {
+          aprovado_em: string | null
+          aprovado_por: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          contrato_id: string
+          created_at: string
+          data_de_validade: string
+          enviado_em: string | null
+          estabelecimento_id: string | null
+          id: string
+          idempotency_key: string
+          mensagem_sugerida: string
+          pet_id: string | null
+          pet_nome: string | null
+          programa_nome: string | null
+          saldo_creditos: number
+          status: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          contrato_id: string
+          created_at?: string
+          data_de_validade: string
+          enviado_em?: string | null
+          estabelecimento_id?: string | null
+          id?: string
+          idempotency_key: string
+          mensagem_sugerida: string
+          pet_id?: string | null
+          pet_nome?: string | null
+          programa_nome?: string | null
+          saldo_creditos?: number
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          contrato_id?: string
+          created_at?: string
+          data_de_validade?: string
+          enviado_em?: string | null
+          estabelecimento_id?: string | null
+          id?: string
+          idempotency_key?: string
+          mensagem_sugerida?: string
+          pet_id?: string | null
+          pet_nome?: string | null
+          programa_nome?: string | null
+          saldo_creditos?: number
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programas_vencimento_alertas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "programas_contratados"
             referencedColumns: ["id"]
           },
         ]
