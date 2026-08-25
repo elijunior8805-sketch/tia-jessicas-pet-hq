@@ -681,7 +681,50 @@ export type Database = {
           valor_anterior?: Json | null
           valor_posterior?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "auditoria_programas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditoria_programas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "auditoria_programas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "auditoria_programas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "auditoria_programas_pet_fk"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditoria_programas_pet_fk"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
+          },
+        ]
       }
       campanhas: {
         Row: {
@@ -3797,11 +3840,53 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "programas_vencimento_alertas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_vencimento_alertas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "programas_vencimento_alertas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens_threads_v2"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "programas_vencimento_alertas_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["cliente_id"]
+          },
+          {
             foreignKeyName: "programas_vencimento_alertas_contrato_id_fkey"
             columns: ["contrato_id"]
             isOneToOne: false
             referencedRelation: "programas_contratados"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_vencimento_alertas_pet_fk"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programas_vencimento_alertas_pet_fk"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets_reativacao"
+            referencedColumns: ["pet_id"]
           },
         ]
       }
