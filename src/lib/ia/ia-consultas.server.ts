@@ -371,6 +371,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     .from("pagamentos")
     .select(`
       *,
+      clientes(nome),
       atendimentos(
         id,
         data_inicio,
@@ -484,7 +485,7 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
     
   const { data: pendencias } = await sb
     .from("pagamentos")
-    .select("valor_total, valor_pago")
+    .select("valor_total, valor_pago, vencimento, cliente_id, clientes(nome)")
     .not("status", "in", '("pago","cancelado")')
     .is("arquivado_em", null)
     .or("is_teste.is.null,is_teste.eq.false")
@@ -502,7 +503,13 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
   const finalizados = agenda?.filter(a => a.status === 'finalizado').length || 0;
   const levaTraz = agenda?.filter(a => a.leva_traz_modalidade !== 'nao_utilizar').length || 0;
   
-  const valorPendente = pendencias?.reduce((acc, p) => acc + (p.valor_total - (p.valor_pago || 0)), 0) || 0;
+  const saldoDe = (p: any) => Number(p.valor_total || 0) - Number(p.valor_pago || 0);
+  const valorPendente = pendencias?.reduce((acc, p) => acc + saldoDe(p), 0) || 0;
+  const valorVencido = (pendencias ?? [])
+    .filter((p: any) => p.vencimento && String(p.vencimento) < hoje)
+    .reduce((acc, p: any) => acc + saldoDe(p), 0);
+  const valorAVencer = valorPendente - valorVencido;
+  const clientesPendentes = new Set((pendencias ?? []).map((p: any) => p.cliente_id).filter(Boolean)).size;
 
   const faturamentoHoje = indicators?.filter(i => i.tipo === 'receita_servico').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
   const recebidoHoje = indicators?.filter(i => i.tipo === 'receita_recebida').reduce((acc, i) => acc + Number(i.valor), 0) || 0;
@@ -525,6 +532,21 @@ export async function consultarResumoOperacionalIA(sb: SupabaseClient<Database>)
       finalizados,
       leva_traz: levaTraz,
       valor_pendente: valorPendente,
+      valor_vencido: valorVencido,
+      valor_a_vencer: valorAVencer,
+      clientes_pendentes: clientesPendentes,
+      agendados: (agenda ?? []).filter((a: any) => a.status === 'agendado').length,
+      atendimentos: (agenda ?? [])
+        .slice()
+        .sort((a: any, b: any) => String(a.hora).localeCompare(String(b.hora)))
+        .map((a: any) => ({
+          hora: String(a.hora ?? '').slice(0, 5),
+          cliente: a.clientes?.nome ?? null,
+          pet: a.pets?.nome ?? null,
+          servico: a.servicos?.nome ?? null,
+          status: a.status,
+          leva_traz: a.leva_traz_modalidade && a.leva_traz_modalidade !== 'nao_utilizar' ? a.leva_traz_modalidade : null,
+        })),
       faturamento_hoje: faturamentoHoje,
       recebido_hoje: recebidoHoje,
       promessas_hoje: promessas?.length || 0,
