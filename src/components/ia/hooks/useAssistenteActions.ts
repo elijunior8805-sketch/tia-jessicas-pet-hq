@@ -71,6 +71,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   } | null>(null);
 
   const processingRef = useRef(false);
+  const lastRequestRef = useRef<{ text: string; options?: { intencaoForcada?: string } } | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
   const [faseLiberacao, setFaseLiberacao] = useState<
     "observacao" | "teste_controlado" | "piloto" | "producao"
   >("observacao");
@@ -153,7 +155,10 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   }, []);
 
 
-  const handleSend = useCallback(async (text: string) => {
+  const handleSend = useCallback(async (
+    text: string,
+    options?: { intencaoForcada?: string },
+  ) => {
     if (!text.trim() || processingRef.current || iaStatus === "sending" || iaStatus === "processing") return;
 
     // Limpar rascunho após envio
@@ -168,6 +173,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     activeCommandRef.current = { commandId, idempotencyKey, sessionId, correlationId };
 
     processingRef.current = true;
+    setCanRetry(false);
     setIsProcessing(true);
     setIaStatus("sending");
     setIsReviewingVoice(false);
@@ -240,16 +246,28 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         return;
       }
 
-      const intent = await classificarIntencao({
-        data: {
-          texto: text,
-          contexto: {
-            mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
-            data_atual: new Date().toISOString(),
-          },
-          comando_original: text
-        },
-      });
+      // Comandos rápidos enviam a intenção já estruturada (nunca o nome da ferramenta)
+      const intent = options?.intencaoForcada
+        ? ({
+            intencao: options.intencaoForcada,
+            especialista: null,
+            tipo_operacao: "consulta",
+            parametros: { comando_original: text },
+            informacoes_faltantes: [],
+            nivel_confianca: 1,
+            exige_confirmacao: false,
+            resposta_ia: "",
+          } as any)
+        : await classificarIntencao({
+            data: {
+              texto: text,
+              contexto: {
+                mensagens: messages.slice(-5).map((m) => ({ role: m.role, content: m.content })),
+                data_atual: new Date().toISOString(),
+              },
+              comando_original: text
+            },
+          });
 
 
       // Normalizar parâmetros para evitar Zod Errors em funções subsequentes
@@ -388,44 +406,23 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
       if (intent.intencao === "consultar_valores_a_receber") {
         setIaStatus("processing");
-        try {
-          const res = await consultarFinanceiroIA({ data: { apenas_pendentes: true, comando_original: text, intencao: "consultar_valores_a_receber" } as any });
-          const pendencias = (res.data as any[]) || [];
-          const total = pendencias.reduce((acc, p) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
-          const vencidos = pendencias.filter(p => p.vencimento && new Date(p.vencimento) < new Date()).reduce((acc, p) => acc + (Number(p.valor_total || 0) - Number(p.valor_pago || 0)), 0);
-          
-          respostaFinal = `### 💸 Valores a Receber\n\n` +
-            `- **Total Pendente**: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-            `- **Vencidos**: R$ ${vencidos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-            `- **A Vencer**: R$ ${(total - vencidos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-            `- **Clientes Pendentes**: ${new Set(pendencias.map(p => p.cliente_id)).size}\n\n` +
-            `Deseja ver a lista detalhada ou iniciar uma cobrança?`;
-        } catch (err) {
-          console.error("Erro ao processar valores a receber na IA:", err);
-          respostaFinal = "Não consegui recuperar as pendências financeiras agora.";
-        }
+        const res = await consultarFinanceiroIA({ data: { apenas_pendentes: true, comando_original: text, intencao: "consultar_valores_a_receber" } as any });
+        const pendencias = ((res.data as any[]) || []).map((p: any) => ({
+          ...p,
+          saldo: Number(p.valor_total || 0) - Number(p.valor_pago || 0),
+          nome: p.clientes?.nome || p.atendimentos?.clientes?.nome || null,
+        })).filter((p: any) => p.saldo > 0);
+        dadosReais = pendencias;
+
+        respostaFinal = montarRespostaValoresAReceber(pendencias);
       }
 
       if (intent.intencao === "consultar_resumo_operacional") {
         setIaStatus("processing");
-        try {
-          const res = await consultarResumoOperacionalIA();
-          const r = (res.data as any) || {};
-          const recebidoHoje = r.recebido_hoje || 0;
-          const valorPendente = r.valor_pendente || 0;
-
-          respostaFinal = `### 🚀 Resumo Operacional (${r.data ? format(parseISO(r.data), "dd/MM") : ""})\n\n` +
-            `**Agenda:**\n` +
-            `- Atendimentos: ${r.total_agenda || 0} (${r.confirmados || 0} conf.)\n` +
-            `- Leva e Traz: ${r.leva_traz || 0} pets\n\n` +
-            `**Financeiro:**\n` +
-            `- Recebido Hoje: R$ ${recebidoHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-            `- Pendências: R$ ${valorPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
-            (r.proximo_atendimento ? `**Próximo:** ${r.proximo_atendimento.hora} - ${r.proximo_atendimento.pet} (${r.proximo_atendimento.servico})` : "");
-        } catch (err) {
-          console.error("Erro ao processar resumo operacional na IA:", err);
-          respostaFinal = "Erro ao gerar o resumo operacional do dia.";
-        }
+        const res = await consultarResumoOperacionalIA();
+        const r = (res.data as any) || {};
+        dadosReais = r;
+        respostaFinal = montarRespostaResumoOperacional(r);
       }
 
 
@@ -463,8 +460,18 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     } catch (error: any) {
       console.error(error);
       setIaStatus("error");
-      const errorMessage = `A resposta foi interrompida ou ocorreu um erro: ${error.message}. ID: ${correlationId}`;
-      setMessages((prev) => [...prev, { role: "assistant", content: errorMessage, timestamp: new Date().toISOString() }]);
+      console.error(`[IA] Falha na consulta. correlation_id=${correlationId}`, error);
+      lastRequestRef.current = { text, options };
+      setCanRetry(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Não consegui concluir essa consulta agora. Nada foi alterado no sistema e nossa conversa continua salva. Você pode tentar novamente em instantes.",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
       await registrarEventoIA({
         data: {
           command_id: commandId,
@@ -498,6 +505,13 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       }
     }
   }, [messages, voiceStatus]);
+
+  const retryLastCommand = useCallback(() => {
+    const last = lastRequestRef.current;
+    if (!last) return;
+    setCanRetry(false);
+    void handleSend(last.text, last.options);
+  }, [handleSend]);
 
   const toggleVoice = () => {
     if (voiceStatus === "listening") {
@@ -647,6 +661,8 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
     searchResults,
     filePreview,
     handleSend,
+    canRetry,
+    retryLastCommand,
     toggleVoice,
     cancelVoice,
     scrollRef,
