@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { User, Dog, ExternalLink, CheckCircle2, Calendar, TrendingUp, DollarSign, LayoutDashboard, ClipboardList, Mic } from "lucide-react";
+import { User, Dog, ExternalLink, CheckCircle2, Calendar, TrendingUp, DollarSign, LayoutDashboard, ClipboardList, Mic, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
@@ -11,20 +11,26 @@ import { IAResults } from "../types";
 interface IaMessageListProps {
   messages: IAMessage[];
   searchResults: IAResults | null;
-  handleSend: (text: string) => void;
+  handleSend: (text: string, options?: { intencaoForcada?: string }) => void;
+  canRetry?: boolean;
+  retryLastCommand?: () => void;
   handleConfirmarAgendamento: (intent: any) => void;
   isProcessing: boolean;
   iaStatus?: string;
 }
 
-const QUICK_COMMANDS = [
-  { label: "Agenda de hoje", icon: Calendar, intent: "consultar_agenda" },
-  { label: "Quantos atendimentos?", icon: ClipboardList, intent: "contar_atendimentos" },
-  { label: "Novo Agendamento", icon: Calendar, intent: "criar_agendamento" },
-  { label: "Faturamento do mês", icon: TrendingUp, intent: "consultar_faturamento" },
-  { label: "Valores a receber", icon: DollarSign, intent: "consultar_valores_a_receber" },
-  { label: "Resumo do dia", icon: LayoutDashboard, intent: "consultar_resumo_operacional" },
-  
+const QUICK_COMMANDS: {
+  label: string;
+  icon: any;
+  intent: string;
+  phrase: string;
+}[] = [
+  { label: "Agenda de hoje", icon: Calendar, intent: "consultar_agenda", phrase: "Mostre a agenda de hoje" },
+  { label: "Quantos atendimentos?", icon: ClipboardList, intent: "contar_atendimentos", phrase: "Quantos atendimentos eu tenho hoje?" },
+  { label: "Novo Agendamento", icon: Calendar, intent: "criar_agendamento", phrase: "Quero criar um agendamento" },
+  { label: "Faturamento do mês", icon: TrendingUp, intent: "consultar_faturamento", phrase: "Qual foi o faturamento do mês?" },
+  { label: "Valores a receber", icon: DollarSign, intent: "consultar_valores_a_receber", phrase: "Quanto tenho para receber?" },
+  { label: "Resumo do dia", icon: LayoutDashboard, intent: "consultar_resumo_operacional", phrase: "Mostre o resumo operacional de hoje" },
 ];
 
 export const IaMessageList: React.FC<IaMessageListProps> = ({
@@ -34,6 +40,8 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
   handleConfirmarAgendamento,
   isProcessing,
   iaStatus,
+  canRetry,
+  retryLastCommand,
 }) => {
   return (
     <div className="space-y-6 max-w-full mx-auto">
@@ -149,6 +157,20 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
         </motion.div>
       ))}
 
+      {canRetry && !isProcessing && (
+        <div className="flex justify-start">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => retryLastCommand?.()}
+            className="h-9 rounded-xl border-[#C99845]/30 text-[#C99845] hover:bg-[#C99845]/10 text-xs font-bold"
+          >
+            <RefreshCw className="w-3.5 h-3.5 mr-2" />
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+
       {/* Quick Commands - Only show when not processing and no search results active */}
       {!isProcessing && !searchResults && (
         <motion.div 
@@ -161,7 +183,7 @@ export const IaMessageList: React.FC<IaMessageListProps> = ({
               key={cmd.intent}
               variant="outline"
               size="sm"
-              onClick={() => handleSend(cmd.intent)}
+              onClick={() => handleSend(cmd.phrase, { intencaoForcada: cmd.intent })}
               className="h-9 rounded-xl border-[#C99845]/20 text-[#123F2A]/70 hover:bg-[#C99845]/10 hover:text-[#C99845] transition-all text-xs font-medium"
             >
               <cmd.icon className="w-3.5 h-3.5 mr-2 opacity-50" />
