@@ -371,6 +371,7 @@ export async function buscarDadosFinanceiros(sb: SupabaseClient<Database>, filtr
     .from("pagamentos")
     .select(`
       *,
+      clientes(nome),
       atendimentos(
         id,
         data_inicio,
