@@ -197,8 +197,16 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       setIaStatus("interpretando");
 
       // ---- Fluxo determinístico de agendamento (voz e texto no MESMO caminho) ----
-      const pre = preInterpretar(text);
-      if (agendaDraftRef.current || pre.intencao === "criar_agendamento") {
+      const forcada = options?.intencaoForcada;
+      // Comando rápido de consulta encerra qualquer rascunho de agendamento em aberto
+      if (forcada && forcada !== "criar_agendamento") {
+        agendaDraftRef.current = null;
+      }
+      const pre = forcada ? ({ intencao: forcada } as any) : preInterpretar(text);
+      if (
+        forcada === "criar_agendamento" ||
+        (!forcada && (agendaDraftRef.current || pre.intencao === "criar_agendamento"))
+      ) {
         const passo = agendaDraftRef.current
           ? await avancarFluxo(agendaDraftRef.current, text)
           : await iniciarFluxo(text);
