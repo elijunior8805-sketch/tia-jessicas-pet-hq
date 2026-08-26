@@ -26,6 +26,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     searchResults,
     filePreview,
     handleSend,
+    canRetry,
+    retryLastCommand,
     toggleVoice,
     cancelVoice,
     scrollRef,
@@ -183,6 +185,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                   handleConfirmarAgendamento={handleConfirmarAgendamento}
                   isProcessing={isProcessing}
                   iaStatus={iaStatus}
+                  canRetry={canRetry}
+                  retryLastCommand={retryLastCommand}
                 />
               </ScrollArea>
 
