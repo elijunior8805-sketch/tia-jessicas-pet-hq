@@ -403,9 +403,9 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
           respostaFinal = `### 💰 Faturamento do Mês\n\n` +
             `- **Período**: Mês Atual\n` +
-            `- **Total Faturado**: R$ ${faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+            `- **Total Faturado**: R$ ${faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
             `- **Quantidade**: ${quantidade} atendimentos\n` +
-            `- **Ticket Médio**: R$ ${ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            `- **Ticket Médio**: R$ ${ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         } catch (err) {
           console.error("Erro ao processar faturamento na IA:", err);
           respostaFinal = "Desculpe, ocorreu um erro ao calcular o faturamento. Por favor, tente novamente em instantes.";

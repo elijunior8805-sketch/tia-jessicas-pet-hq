@@ -74,7 +74,7 @@ export function montarRespostaResumoOperacional(r: any): string {
 
   // Financeiro
   const fin: string[] = [];
-  fin.push(recebido > 0 ? `Hoje você já recebeu ${brl(recebido)}` : "Ainda não houve recebimentos hoje");
+  fin.push(recebido > 0 ? `você já recebeu ${brl(recebido)} hoje` : "ainda não houve recebimentos hoje");
   if (pendente > 0) {
     if (vencido > 0 && aVencer > 0) {
       fin.push(`e existem ${brl(pendente)} pendentes, sendo ${brl(vencido)} já vencidos e ${brl(aVencer)} a vencer`);
