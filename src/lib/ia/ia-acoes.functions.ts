@@ -10,7 +10,15 @@ export const validarAgendamentoIA = createServerFn({ method: "POST" })
     pet_id: z.string().uuid().optional(),
     cliente_id: z.string().uuid().optional(),
     profissional_id: z.string().optional(),
-    servicos: z.array(z.string()).optional().default([]),
+    servicos: z.array(z.union([
+      z.string(),
+      z.object({ id: z.string().optional(), nome: z.string().optional() }).passthrough(),
+    ]))
+      .optional()
+      .default([])
+      .transform((arr) =>
+        arr.map((s) => (typeof s === "string" ? s : (s.id || s.nome || ""))).filter(Boolean)
+      ),
     comando_original: z.string().optional().default("acao"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
