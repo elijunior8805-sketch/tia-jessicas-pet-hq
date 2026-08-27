@@ -31,11 +31,27 @@ export const executarCriacaoAgendamento = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({
     cliente_id: z.string().uuid().optional(),
     pet_id: z.string().uuid().optional(),
-    servicos: z.array(z.object({
-      id: z.string(),
-      nome: z.string(),
-      valor: z.number(),
-    })).optional().default([]),
+    servicos: z.array(z.union([
+      z.string(),
+      z.object({
+        id: z.string().optional(),
+        nome: z.string().optional(),
+        valor: z.union([z.number(), z.string()]).optional(),
+      }).passthrough(),
+    ]))
+      .optional()
+      .default([])
+      .transform((arr) =>
+        arr.map((s) =>
+          typeof s === "string"
+            ? { id: s, nome: s, valor: 0 }
+            : {
+                id: String(s.id ?? ""),
+                nome: String(s.nome ?? ""),
+                valor: Number(s.valor ?? 0) || 0,
+              }
+        )
+      ),
     data: z.string().optional().default("hoje"),
     hora: z.string().optional().default("08:00"),
     profissional_id: z.string().optional(),
