@@ -109,6 +109,26 @@ export const contratarPrograma = createServerFn({ method: "POST" })
       precoCalculado = Math.round(precoCalculado * 100) / 100;
     }
 
+    // Idempotência: se esta chave já gerou um contrato, devolve o existente
+    const { data: jaExiste } = await sb
+      .from("programas_contratados" as any)
+      .select("id")
+      .eq("idempotency_key", data.idempotency_key)
+      .maybeSingle();
+
+    if (jaExiste) {
+      const { data: pagExistente } = await sb
+        .from("pagamentos" as any)
+        .select("id")
+        .eq("idempotency_key", `programa_${(jaExiste as any).id}`)
+        .maybeSingle();
+      return {
+        contract_id: (jaExiste as any).id,
+        payment_id: (pagExistente as any)?.id ?? null,
+        duplicado: true,
+      };
+    }
+
     const { data: contratado, error: cError } = await sb
       .from("programas_contratados" as any)
       .insert({
@@ -127,6 +147,7 @@ export const contratarPrograma = createServerFn({ method: "POST" })
         status_do_programa: 'ativo',
         forma_de_pagamento: data.forma_de_pagamento,
         observacoes: data.observacoes,
+        idempotency_key: data.idempotency_key,
         criado_por: userId
       })
       .select()
@@ -134,58 +155,96 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
     if (cError) throw cError;
 
-    const movimentacoes = itensVenda.map((item: any) => ({
-      programa_contratado_id: (contratado as any).id,
-      servico_id: item.servico_id,
-      quantidade: item.quantidade,
-      tipo: 'credito_criado',
-      usuario_id: userId,
-      motivo: fracionado ? 'Contratação fracionada' : 'Contratação inicial',
-      idempotency_key: `${data.idempotency_key}_${item.servico_id}`
-    }));
+    const contratoId = (contratado as any).id as string;
 
-    const { error: mError } = await sb
-      .from("programas_creditos_movimentacoes" as any)
-      .insert(movimentacoes);
+    // Compensação: se qualquer etapa seguinte falhar, desfaz o que foi criado
+    const desfazer = async () => {
+      await sb.from("programas_creditos_movimentacoes" as any)
+        .delete().eq("programa_contratado_id", contratoId);
+      await sb.from("pagamentos" as any)
+        .delete().eq("idempotency_key", `programa_${contratoId}`);
+      await sb.from("programas_contratados" as any).delete().eq("id", contratoId);
+    };
 
-    if (mError) throw mError;
+    try {
+      const movimentacoes = itensVenda.map((item: any) => ({
+        programa_contratado_id: contratoId,
+        servico_id: item.servico_id,
+        quantidade: item.quantidade,
+        tipo: 'credito_criado',
+        usuario_id: userId,
+        motivo: fracionado ? 'Contratação fracionada' : 'Contratação inicial',
+        idempotency_key: `${data.idempotency_key}_${item.servico_id}`
+      }));
 
-    // Integração com o Financeiro
-    const formasValidas = ['pix', 'credito', 'debito', 'dinheiro', 'pendente', 'outras'];
-    const forma = formasValidas.includes(String(data.forma_de_pagamento))
-      ? String(data.forma_de_pagamento)
-      : 'pendente';
+      const { error: mError } = await sb
+        .from("programas_creditos_movimentacoes" as any)
+        .insert(movimentacoes);
 
-    const { error: fError } = await sb
-      .from("pagamentos" as any)
-      .insert({
+      if (mError) throw mError;
+
+      // Integração com o Financeiro (categoria oficial: programa_cuidado)
+      const formasValidas = ['pix', 'credito', 'debito', 'dinheiro', 'pendente', 'outras'];
+      const forma = formasValidas.includes(String(data.forma_de_pagamento))
+        ? String(data.forma_de_pagamento)
+        : 'pendente';
+
+      const { data: pagamento, error: fError } = await sb
+        .from("pagamentos" as any)
+        .insert({
+          cliente_id: data.cliente_id,
+          valor_total: precoCalculado,
+          valor_pago: forma === 'pendente' ? 0 : precoCalculado,
+          forma,
+          status: forma === 'pendente' ? 'pendente' : 'pago',
+          data_pagamento: forma === 'pendente' ? null : data.data_de_inicio,
+          vencimento: forma === 'pendente' ? data.data_de_inicio : null,
+          categoria_receita: 'programa_cuidado',
+          descricao: `Programa: ${(programa as any).nome}${fracionado ? ' (fracionado)' : ''}`,
+          idempotency_key: `programa_${contratoId}`,
+          created_by: userId
+        })
+        .select("id")
+        .single();
+
+      if (fError) throw fError;
+
+      await sb.from("auditoria_programas" as any).insert({
+        acao: fracionado ? 'venda_fracionada' : 'venda',
         cliente_id: data.cliente_id,
-        valor_total: precoCalculado,
-        valor_pago: forma === 'pendente' ? 0 : precoCalculado,
-        forma,
-        status: forma === 'pendente' ? 'pendente' : 'pago',
-        data_pagamento: forma === 'pendente' ? null : data.data_de_inicio,
-        vencimento: forma === 'pendente' ? data.data_de_inicio : null,
-        categoria_receita: 'Programas de Cuidado',
-        descricao: `Programa: ${(programa as any).nome}${fracionado ? ' (fracionado)' : ''}`,
-        idempotency_key: `programa_${(contratado as any).id}`,
-        created_by: userId
+        pet_id: data.pet_id,
+        programa_contratado_id: contratoId,
+        valor_posterior: contratado as any,
+        motivo: 'Contratação de programa',
+        usuario_id: userId,
       });
 
-    if (fError && (fError as any).code !== '23505') throw fError;
+      // Read-back obrigatório
+      const { data: conferido, error: rbError } = await sb
+        .from("programas_contratados" as any)
+        .select("id, status_do_programa, preco_vendido")
+        .eq("id", contratoId)
+        .single();
+      if (rbError || !conferido) throw new Error("Falha na verificação pós-contratação.");
 
-    await sb.from("auditoria_programas" as any).insert({
-      acao: fracionado ? 'venda_fracionada' : 'venda',
-      cliente_id: data.cliente_id,
-      pet_id: data.pet_id,
-      programa_contratado_id: (contratado as any).id,
-      valor_posterior: contratado as any,
-      motivo: 'Contratação de programa',
-      usuario_id: userId,
-    });
+      const { data: creditosConferidos } = await sb
+        .from("programas_creditos_movimentacoes" as any)
+        .select("id, servico_id, quantidade, tipo")
+        .eq("programa_contratado_id", contratoId);
 
-    return contratado;
+      return {
+        contract_id: contratoId,
+        payment_id: (pagamento as any)?.id ?? null,
+        contrato: conferido,
+        creditos: creditosConferidos ?? [],
+        duplicado: false,
+      };
+    } catch (e) {
+      await desfazer();
+      throw e;
+    }
   });
+
 
 
 export const getCreditosDisponiveis = createServerFn({ method: "GET" })
