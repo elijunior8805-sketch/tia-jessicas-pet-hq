@@ -3437,6 +3437,8 @@ export type Database = {
       programas_contratados: {
         Row: {
           atualizado_em: string | null
+          cancelado_em: string | null
+          cancelado_por: string | null
           cliente_id: string | null
           composicao_snapshot: Json
           criado_em: string | null
@@ -3449,6 +3451,8 @@ export type Database = {
           forma_de_pagamento: string | null
           fracionado: boolean
           id: string
+          idempotency_key: string | null
+          motivo_cancelamento: string | null
           nome_snapshot: string
           observacoes: string | null
           pet_id: string | null
@@ -3461,6 +3465,8 @@ export type Database = {
         }
         Insert: {
           atualizado_em?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
           cliente_id?: string | null
           composicao_snapshot: Json
           criado_em?: string | null
@@ -3473,6 +3479,8 @@ export type Database = {
           forma_de_pagamento?: string | null
           fracionado?: boolean
           id?: string
+          idempotency_key?: string | null
+          motivo_cancelamento?: string | null
           nome_snapshot: string
           observacoes?: string | null
           pet_id?: string | null
@@ -3485,6 +3493,8 @@ export type Database = {
         }
         Update: {
           atualizado_em?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
           cliente_id?: string | null
           composicao_snapshot?: Json
           criado_em?: string | null
@@ -3497,6 +3507,8 @@ export type Database = {
           forma_de_pagamento?: string | null
           fracionado?: boolean
           id?: string
+          idempotency_key?: string | null
+          motivo_cancelamento?: string | null
           nome_snapshot?: string
           observacoes?: string | null
           pet_id?: string | null
