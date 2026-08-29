@@ -75,8 +75,8 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     if (data.vencimentoDe) query = query.gte("vencimento", data.vencimentoDe);
     if (data.vencimentoAte) query = query.lte("vencimento", data.vencimentoAte);
 
-    // Garantir que não mostramos pagamentos arquivados ou de atendimentos excluídos
-    query = query.is("arquivado_em", null).not("atendimento_id", "is", null);
+    // Garantir que não mostramos pagamentos arquivados
+    query = query.is("arquivado_em", null);
 
     const { data: rows, error } = await query;
     if (error) {
@@ -323,27 +323,41 @@ export const confirmarRecebimento = createServerFn({ method: "POST" })
       forma: z.enum(["pix", "dinheiro", "debito", "credito", "outras"]),
       valor: z.number().min(0.01),
       dataPagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      observacao: z.string().optional(),
     }).parse(data)
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
     const { data: atual, error: readErr } = await supabase
-      .from("pagamentos")
-      .select("id, status, valor_pago")
+      .from("pagamentos" as any)
+      .select("id, status, valor_pago, valor_total, categoria_receita, idempotency_key, observacoes")
       .eq("id", data.pagamentoId)
       .single();
 
     if (readErr || !atual) throw new Error("Pagamento não encontrado");
-    if (atual.status === "pago") throw new Error("Pagamento já foi recebido anteriormente");
+    if (atual.status === "pago") throw new Error("Pagamento já foi recebido integralmente");
+
+    const valorPagoAnterior = Number(atual.valor_pago ?? 0);
+    const novoValorPago = valorPagoAnterior + data.valor;
+    const valorTotal = Number(atual.valor_total ?? 0);
+    const saldoRestante = Math.max(0, valorTotal - novoValorPago);
+    const novoStatus = novoValorPago >= valorTotal ? "pago" : "parcial";
+    
+    let novasObs = atual.observacoes;
+    if (data.observacao) {
+      const msg = `[Pagamento ${data.forma} em ${data.dataPagamento}]: ${data.observacao}`;
+      novasObs = novasObs ? `${novasObs}\n${msg}` : msg;
+    }
 
     const { error: updErr } = await supabase
-      .from("pagamentos")
+      .from("pagamentos" as any)
       .update({
-        status: "pago",
+        status: novoStatus,
         forma: data.forma,
-        valor_pago: data.valor,
+        valor_pago: novoValorPago,
         data_pagamento: data.dataPagamento,
+        ...(novasObs ? { observacoes: novasObs } : {})
       })
       .eq("id", data.pagamentoId);
 
@@ -352,7 +366,157 @@ export const confirmarRecebimento = createServerFn({ method: "POST" })
       throw new Error("Falha ao registrar recebimento");
     }
 
-    return { success: true };
+    if (novoStatus === "pago" && atual.categoria_receita === "programa_cuidado" && atual.idempotency_key?.startsWith("programa_")) {
+      const contratoId = atual.idempotency_key.replace("programa_", "");
+      const { error: progErr } = await supabase
+        .from("programas_contratados" as any)
+        .update({ status_do_programa: "ativo" })
+        .eq("id", contratoId);
+      
+      if (progErr) {
+        console.error("[pagamentos] erro ao ativar contrato de programa:", progErr.message);
+      }
+    }
+
+    return { 
+      success: true, 
+      novo_status: novoStatus, 
+      valor_pago_total: novoValorPago, 
+      saldo_restante: saldoRestante 
+    };
+  });
+
+export const cancelarLancamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({
+      pagamentoId: z.string().uuid(),
+      motivo: z.string().min(3, "Informe o motivo do cancelamento"),
+    }).parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    
+    const { data: atual, error: readErr } = await supabase
+      .from("pagamentos" as any)
+      .select("id, status, categoria_receita, idempotency_key")
+      .eq("id", data.pagamentoId)
+      .single();
+
+    if (readErr || !atual) throw new Error("Pagamento não encontrado");
+    if (atual.status !== "pendente" && atual.status !== "parcial") {
+      throw new Error("Apenas pagamentos pendentes ou parciais podem ser cancelados");
+    }
+
+    const { error: updErr } = await supabase
+      .from("pagamentos" as any)
+      .update({ status: "cancelado" })
+      .eq("id", data.pagamentoId);
+
+    if (updErr) {
+      console.error("[pagamentos] cancelarLancamento erro:", updErr.message);
+      throw new Error("Falha ao cancelar pagamento");
+    }
+
+    let contratoCancelado = false;
+    if (atual.categoria_receita === "programa_cuidado" && atual.idempotency_key?.startsWith("programa_")) {
+      const contratoId = atual.idempotency_key.replace("programa_", "");
+      const { error: progErr } = await supabase
+        .from("programas_contratados" as any)
+        .update({ status_do_programa: "cancelado" })
+        .eq("id", contratoId);
+      
+      if (!progErr) {
+        contratoCancelado = true;
+      } else {
+        console.error("[pagamentos] erro ao cancelar contrato:", progErr.message);
+      }
+    }
+
+    await supabase.from("audit_log" as any).insert({
+      table_name: "pagamentos",
+      record_id: data.pagamentoId,
+      action: "cancelamento",
+      old_data: { status: atual.status },
+      new_data: { status: "cancelado", motivo: data.motivo },
+      user_id: userId
+    });
+
+    return { 
+      success: true, 
+      status_anterior: atual.status, 
+      contrato_cancelado: contratoCancelado 
+    };
+  });
+
+export const estornarPagamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({
+      pagamentoId: z.string().uuid(),
+      motivo: z.string().min(3, "Informe o motivo do estorno"),
+    }).parse(data)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: atual, error: readErr } = await supabase
+      .from("pagamentos" as any)
+      .select("id, status, observacoes, categoria_receita, idempotency_key")
+      .eq("id", data.pagamentoId)
+      .single();
+
+    if (readErr || !atual) throw new Error("Pagamento não encontrado");
+    if (atual.status !== "pago") throw new Error("Apenas pagamentos com status 'pago' podem ser estornados");
+
+    const agora = new Date().toISOString();
+    const estornoMsg = `[Estorno em ${agora} por ${userId}]: ${data.motivo}`;
+    const novasObs = atual.observacoes ? `${atual.observacoes}\n${estornoMsg}` : estornoMsg;
+
+    const { error: updErr } = await supabase
+      .from("pagamentos" as any)
+      .update({
+        status: "pendente",
+        valor_pago: 0,
+        forma: null,
+        data_pagamento: null,
+        observacoes: novasObs
+      })
+      .eq("id", data.pagamentoId);
+
+    if (updErr) {
+      console.error("[pagamentos] estornarPagamento erro:", updErr.message);
+      throw new Error("Falha ao estornar pagamento");
+    }
+
+    let contratoSuspenso = false;
+    if (atual.categoria_receita === "programa_cuidado" && atual.idempotency_key?.startsWith("programa_")) {
+      const contratoId = atual.idempotency_key.replace("programa_", "");
+      const { error: progErr } = await supabase
+        .from("programas_contratados" as any)
+        .update({ status_do_programa: "aguardando_pagamento" })
+        .eq("id", contratoId);
+      
+      if (!progErr) {
+        contratoSuspenso = true;
+      } else {
+        console.error("[pagamentos] erro ao suspender contrato:", progErr.message);
+      }
+    }
+
+    await supabase.from("audit_log" as any).insert({
+      table_name: "pagamentos",
+      record_id: data.pagamentoId,
+      action: "estorno",
+      old_data: { status: atual.status },
+      new_data: { status: "pendente", motivo: data.motivo },
+      user_id: userId
+    });
+
+    return { 
+      success: true, 
+      contrato_suspenso: contratoSuspenso 
+    };
   });
 
 // ============= Lixeira Financeira (Soft Delete) =============

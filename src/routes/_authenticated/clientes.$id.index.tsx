@@ -62,22 +62,40 @@ function ClienteDetalhe() {
     queryKey: ["cliente-pagamentos", id],
     enabled: !!data,
     queryFn: async () => {
-      const petIds = (data?.pets ?? []).map((p: any) => p.id);
-      if (petIds.length === 0) return [];
       const { data: rows } = await supabase
         .from("pagamentos")
-        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
-        .order("data_pagamento", { ascending: false, nullsFirst: false })
+        .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, categoria_receita, descricao, idempotency_key, arquivado_em, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
+        .eq("cliente_id", id)
+        .is("arquivado_em", null)
+        .order("created_at", { ascending: false })
         .limit(60);
-      return (rows ?? [])
-        .filter((r: any) => petIds.includes(r.atendimentos?.pet_id))
-        .map((r: any) => {
-          const a = r.atendimentos;
-          const valorDinamico = a?.finalizado
-            ? Math.max(Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0), 0)
-            : Number(r.valor_total || 0);
-          return { ...r, valor: valorDinamico };
-        });
+      return (rows ?? []).map((r: any) => {
+        const a = r.atendimentos;
+        const valorDinamico = a?.finalizado
+          ? Math.max(Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0), 0)
+          : Number(r.valor_total || 0);
+        return { ...r, valor: valorDinamico };
+      });
+    },
+  });
+
+  const { data: programasAtivos } = useQuery({
+    queryKey: ["cliente-programas", id],
+    enabled: !!data,
+    queryFn: async () => {
+      const { data: rows } = await supabase
+        .from("programas_contratados")
+        .select(`
+          id, programa_id, pet_id, nome_snapshot, composicao_snapshot,
+          preco_original, preco_vendido, desconto,
+          data_de_inicio, data_de_validade, status_do_programa,
+          forma_de_pagamento, criado_em,
+          pets:pet_id(nome)
+        `)
+        .eq("cliente_id", id)
+        .not("status_do_programa", "eq", "cancelado")
+        .order("criado_em", { ascending: false });
+      return rows ?? [];
     },
   });
 
@@ -112,7 +130,10 @@ function ClienteDetalhe() {
     .sort();
   const proximaVisita = proximas[0] as string | undefined;
 
-  const pendencias = (pagamentos ?? []).filter((p: any) => p.status === "pendente" || p.status === "parcial");
+  const pendencias = (pagamentos ?? []).filter((p: any) => 
+    (p.status === "pendente" || p.status === "parcial" || p.status === "atrasado") && 
+    !p.arquivado_em
+  );
   const totalPendente = pendencias.reduce((s: number, p: any) => s + (Number(p.valor) - Number(p.valor_pago || 0)), 0);
   const totalRecebido = (pagamentos ?? [])
     .filter((p: any) => p.status === "pago" || p.status === "parcial")
@@ -271,6 +292,71 @@ function ClienteDetalhe() {
           </Card>
         </div>
 
+        {/* Programas de Cuidado */}
+        <Card className="p-5 lg:col-span-3">
+          <h2 className="font-display font-semibold text-primary mb-3 flex items-center gap-2">
+            <ClipboardList className="h-4 w-4"/> Programas de Cuidado
+          </h2>
+          {!programasAtivos || programasAtivos.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-6 text-center">Nenhum programa de cuidado ativo.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(programasAtivos as any[]).map((prog: any) => {
+                // Find related payment
+                const pagProg = (pagamentos ?? []).find((p: any) => 
+                  p.idempotency_key === `programa_${prog.id}`
+                ) as any;
+                const valorPago = Number(pagProg?.valor_pago ?? 0);
+                const saldo = Math.max(0, Number(prog.preco_vendido) - valorPago);
+                const statusBadge = {
+                  'ativo': { label: 'Ativo', cls: 'bg-green-100 text-green-800' },
+                  'aguardando_pagamento': { label: 'Aguardando pagamento', cls: 'bg-amber-100 text-amber-800' },
+                  'suspenso': { label: 'Suspenso', cls: 'bg-orange-100 text-orange-800' },
+                  'vencido': { label: 'Vencido', cls: 'bg-red-100 text-red-800' },
+                  'concluído': { label: 'Concluído', cls: 'bg-blue-100 text-blue-800' },
+                }[prog.status_do_programa] ?? { label: prog.status_do_programa, cls: 'bg-gray-100 text-gray-800' };
+                
+                return (
+                  <div key={prog.id} className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-display font-semibold text-primary text-sm truncate">{prog.nome_snapshot}</div>
+                      <Badge className={`text-xs ${statusBadge.cls}`}>{statusBadge.label}</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {prog.pets?.nome ?? '—'} · Validade: {prog.data_de_validade ? new Date(prog.data_de_validade).toLocaleDateString('pt-BR') : '—'}
+                    </div>
+                    {Array.isArray(prog.composicao_snapshot) && (
+                      <div className="space-y-0.5">
+                        {prog.composicao_snapshot.map((item: any, i: number) => (
+                          <div key={i} className="text-xs flex justify-between">
+                            <span>{item.quantidade}x serviço</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="pt-2 border-t space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Valor contratado</span>
+                        <span className="font-medium">{Number(prog.preco_vendido).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Valor pago</span>
+                        <span className="font-medium text-green-700">{valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      </div>
+                      {saldo > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Saldo pendente</span>
+                          <span className="font-medium text-amber-700">{saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
         {/* Histórico de atendimentos */}
         <Card className="p-5 lg:col-span-2">
           <h2 className="font-display font-semibold text-primary mb-3 flex items-center gap-2">
@@ -324,7 +410,7 @@ function ClienteDetalhe() {
                 {pendencias.slice(0, 6).map((p: any) => (
                   <li key={p.id} className="flex justify-between gap-2">
                     <span className="truncate">
-                      {p.vencimento ? new Date(p.vencimento).toLocaleDateString("pt-BR") : "—"} · {p.status}
+                      {p.vencimento ? new Date(p.vencimento).toLocaleDateString("pt-BR") : "—"} · {p.status === 'pendente' ? 'Aguardando pagamento' : p.status === 'parcial' ? 'Pagamento parcial' : p.status === 'pago' ? `Pago via ${p.forma ?? '—'}` : p.status === 'cancelado' ? 'Cancelado' : p.status}
                     </span>
                     <span className="font-medium">
                       {(Number(p.valor) - Number(p.valor_pago || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}

@@ -462,7 +462,7 @@ function ProgramasCuidadoPage() {
               {programasAtivos && programasAtivos.length > 0 ? (
                 <div className="space-y-4">
                   {programasAtivos
-                    .filter((p: any) => activeSubTabAtivos === "todos" || p.status === activeSubTabAtivos)
+                    .filter((p: any) => activeSubTabAtivos === "todos" || p.status_do_programa === activeSubTabAtivos)
                     .map((contrato: any) => (
                     <div key={contrato.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border border-sidebar-border/40 hover:bg-muted/10 transition-colors gap-4">
                       <div className="flex items-center gap-4">
@@ -472,12 +472,12 @@ function ProgramasCuidadoPage() {
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm">{contrato.nome_snapshot}</span>
-                            {contrato.status === 'ativo' ? (
+                            {contrato.status_do_programa === 'ativo' ? (
                               <Badge className="bg-green-500/10 text-green-600 border-green-200 h-5 px-1.5 text-[10px]">Ativo</Badge>
-                            ) : contrato.status === 'aguardando_pagamento' ? (
+                            ) : contrato.status_do_programa === 'aguardando_pagamento' ? (
                               <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 h-5 px-1.5 text-[10px]">Aguardando</Badge>
                             ) : (
-                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{contrato.status}</Badge>
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{contrato.status_do_programa}</Badge>
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -514,7 +514,7 @@ function ProgramasCuidadoPage() {
                       </div>
                     </div>
                   ))}
-                  {programasAtivos.filter((p: any) => activeSubTabAtivos === "todos" || p.status === activeSubTabAtivos).length === 0 && (
+                  {programasAtivos.filter((p: any) => activeSubTabAtivos === "todos" || p.status_do_programa === activeSubTabAtivos).length === 0 && (
                     <div className="py-10 text-center text-muted-foreground italic text-sm">
                       Nenhum programa encontrado com este status.
                     </div>
