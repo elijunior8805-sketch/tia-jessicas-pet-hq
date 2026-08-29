@@ -227,19 +227,32 @@ export async function buscarPetsDoClienteIA(sb: SupabaseClient<Database>, client
   });
 }
 
-export async function buscarServicosIA(sb: SupabaseClient<Database>, termo?: string) {
-  let query = sb.from("servicos").select("*").eq("ativo", true);
-  
-  if (termo) {
-    query = query.ilike("nome", `%${termo}%`);
-  }
+const semAcento = (s: string) =>
+  (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-  const { data, error } = await query.limit(20);
+export async function buscarServicosIA(sb: SupabaseClient<Database>, termo?: string) {
+  // Sempre carrega o catálogo ativo completo e filtra em memória sem acento,
+  // para nunca "sumir" com serviços por causa de acento/limite/ordenação.
+  const { data, error } = await sb
+    .from("servicos")
+    .select("*")
+    .eq("ativo", true)
+    .order("nome", { ascending: true })
+    .limit(500);
   if (error) throw error;
+
+  let lista = data ?? [];
+  const t = semAcento(termo ?? "");
+  if (t) {
+    const filtrados = lista.filter((s: any) =>
+      semAcento(s.nome).includes(t) || semAcento(s.categoria ?? "").includes(t)
+    );
+    if (filtrados.length > 0) lista = filtrados;
+  }
 
   return createIAResponse({
     source: 'buscar_servicos',
-    data: data
+    data: lista
   });
 }
 
