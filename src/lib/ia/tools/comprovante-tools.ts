@@ -40,7 +40,7 @@ export async function conciliarEBaixarComprovanteJessi(
   const res = await registrarPagamentoIA(sb, {
     pagamento_id: params.pagamento_id,
     valor_pago: params.valor,
-    forma_pagamento: params.forma || "Pix",
+    forma: (params.forma || "pix") as any,
     observacoes: observacao,
   });
 

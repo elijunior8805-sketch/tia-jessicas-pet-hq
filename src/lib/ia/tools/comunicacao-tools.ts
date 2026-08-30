@@ -12,7 +12,7 @@ export async function gerarMensagensCobrancaJessi(
   sb: SupabaseClient<Database>,
   params: { cobranca_id: string }
 ): Promise<JessiQueryResult> {
-  const res = await gerarMensagensCobrancaIA(sb, params.cobranca_id);
+  const res = await gerarMensagensCobrancaIA(sb, { pagamento_id: params.cobranca_id });
 
   return {
     success: res.success,

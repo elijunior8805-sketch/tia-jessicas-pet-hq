@@ -88,6 +88,7 @@ export async function reconciliarCreditosJessi(
     return {
       success: false,
       source: "reconciliar_creditos",
+      verified: false,
       error_code: err.message,
       executed_at: new Date().toISOString(),
       summary: `Não foi possível reconciliar os créditos: ${err.message}`,
