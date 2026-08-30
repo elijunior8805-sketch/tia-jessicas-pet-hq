@@ -128,6 +128,7 @@ export const JessiLayout: React.FC = () => {
         setStatus("aguardando_confirmacao");
       } else {
         setStatus("disponivel");
+      }
     } catch (err: any) {
       console.error("Erro na comunicação com a Jessi:", err);
       const assistantErrMsg: JessiMessage = {
