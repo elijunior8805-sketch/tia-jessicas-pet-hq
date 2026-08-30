@@ -276,6 +276,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "saudacao",
       especialista: "gestao_estrategica",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto },
       nivel_confianca: 1,
       resposta_ia: "Olá! Sim, estou 100% ativa e operacional. Sou a Jessi, sua assistente operacional no Spa de Pet Tia Jéssica. Posso consultar a agenda, buscar clientes e pets, verificar saldos de programas de cuidado, contas a receber e conciliar comprovantes Pix. Como posso ajudar você agora?",
@@ -288,6 +289,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "health_check",
       especialista: "relatorios",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto },
       nivel_confianca: 1,
     };
@@ -306,6 +308,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "consultar_agenda",
       especialista: "agenda",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto, data: dataRef },
       nivel_confianca: 0.9,
     };
@@ -335,6 +338,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "buscar_pets_do_cliente",
       especialista: "clientes_pets",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto, cliente_nome: termo || "Eli Júnior" },
       nivel_confianca: 0.9,
     };
@@ -358,6 +362,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "buscar_clientes",
       especialista: "clientes_pets",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto, termo: termo || "Eli Júnior" },
       nivel_confianca: 0.9,
     };
@@ -369,6 +374,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "consultar_valores_a_receber",
       especialista: "financeiro",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto },
       nivel_confianca: 0.95,
     };
@@ -380,6 +386,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "consultar_faturamento",
       especialista: "financeiro",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto, period: "mes" },
       nivel_confianca: 0.9,
     };
@@ -392,6 +399,7 @@ function fallbackClassificador(texto: string): IAIntent {
         intencao: "consultar_creditos_pet",
         especialista: "programas_cuidado",
         tipo_operacao: "consulta",
+        exige_confirmacao: false,
         parametros: { comando_original: texto, pet_nome: "Thor" },
         nivel_confianca: 0.9,
       };
@@ -401,6 +409,7 @@ function fallbackClassificador(texto: string): IAIntent {
       intencao: "consultar_catalogo_programas",
       especialista: "programas_cuidado",
       tipo_operacao: "consulta",
+      exige_confirmacao: false,
       parametros: { comando_original: texto },
       nivel_confianca: 0.9,
     };
@@ -411,6 +420,7 @@ function fallbackClassificador(texto: string): IAIntent {
     intencao: "resumo_negocio",
     especialista: "gestao_estrategica",
     tipo_operacao: "consulta",
+    exige_confirmacao: false,
     parametros: { comando_original: texto },
     nivel_confianca: 0.7,
     resposta_ia: "Estou consultando as informações operacionais do Spa para responder...",

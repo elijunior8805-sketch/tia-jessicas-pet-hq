@@ -458,7 +458,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       ) {
         setIaStatus("processing");
         const { data: progs } = await supabase
-          .from("programas_catalogo")
+          .from("programas_catalogo" as any)
           .select("id, nome, preco, descricao")
           .eq("ativo", true);
         
