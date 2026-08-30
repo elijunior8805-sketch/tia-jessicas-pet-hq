@@ -25,6 +25,7 @@ import {
   PawPrint,
   Cake,
   PackageCheck,
+  Sparkles,
 } from "lucide-react";
 import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 import { useMyAccess } from "@/hooks/use-my-permissions";
@@ -46,6 +47,7 @@ const groups = [
     label: "Operação",
     items: [
       { title: "Painel", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Jessi (Assistente)", url: "/jessi", icon: Sparkles },
       { title: "Agenda", url: "/agenda", icon: Calendar },
       { title: "Atendimentos", url: "/atendimentos", icon: ClipboardList },
       { title: "Clientes e Pets", url: "/clientes", icon: Users },

@@ -14,13 +14,13 @@ export async function consultarEstoque(filtros: { termo?: string; categoria?: st
     query = query.eq('categoria', filtros.categoria);
   }
 
-  if (filtros.apenasBaixo) {
-    // Note: quantity <= estoque_minimo
-    query = query.lte('quantidade', 'estoque_minimo');
-  }
-
   const { data, error } = await query;
   if (error) throw error;
+
+  if (filtros.apenasBaixo && data) {
+    return data.filter(p => Number(p.quantidade || 0) <= Number(p.estoque_minimo || 0));
+  }
+
   return data;
 }
 

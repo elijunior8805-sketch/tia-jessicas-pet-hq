@@ -68,7 +68,7 @@ async function conciliar(
 ): Promise<CandidatoConciliacao[]> {
   const { data } = await sb
     .from("pagamentos")
-    .select("id, valor_previsto, valor_pago, status, data_vencimento, clientes(nome), pets(nome)")
+    .select("id, valor_total, valor_pago, status, vencimento, clientes(nome), atendimentos(pets(nome))")
     .in("status", ["pendente", "parcial", "atrasado"])
     .is("arquivado_em", null)
     .limit(300);
@@ -77,7 +77,7 @@ async function conciliar(
 
   const candidatos: CandidatoConciliacao[] = [];
   for (const p of data as any[]) {
-    const previsto = Number(p.valor_previsto || 0) - Number(p.valor_pago || 0);
+    const previsto = Number(p.valor_total || 0) - Number(p.valor_pago || 0);
     const nomeCliente = p.clientes?.nome || "";
     const matchNome = pagador ? compararNome(pagador, nomeCliente) : null;
     const diff = Math.abs(previsto - valor);
@@ -100,9 +100,9 @@ async function conciliar(
       candidatos.push({
         pagamento_id: p.id,
         cliente_nome: nomeCliente,
-        pet_nome: p.pets?.nome || null,
+        pet_nome: p.atendimentos?.pets?.nome || null,
         valor_previsto: previsto,
-        vencimento: p.data_vencimento,
+        vencimento: p.vencimento,
         status: p.status,
         score: Number(score.toFixed(2)),
         motivo: motivos.join(" + "),

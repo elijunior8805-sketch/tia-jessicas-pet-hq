@@ -4,46 +4,99 @@ import { createIAResponse } from "./ia-retorno.server";
 import { format, subDays, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 
 export async function consultarMensagensRecentes(sb: SupabaseClient<Database>, filtros: { cliente_id?: string; pet_id?: string; limite?: number }) {
-  let query = sb
-    .from("notificacoes")
-    .select(`
-      *
-    `)
-    .order("created_at", { ascending: false });
+  try {
+    let query = sb
+      .from("mensagens" as any)
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  // Nota: notificacoes no Supabase não tem cliente_id/pet_id diretos na tabela pública às vezes
-  // Se falhar o filtro, a busca será geral por user_id
-  
-  const { data, error } = await query.limit(filtros.limite || 20);
-  if (error) throw error;
+    if (filtros.cliente_id) {
+      query = query.eq("cliente_id", filtros.cliente_id);
+    }
+
+    const { data, error } = await query.limit(filtros.limite || 20);
+    if (!error && data && data.length > 0) {
+      return createIAResponse({
+        source: 'consultar_mensagens',
+        data: data
+      });
+    }
+  } catch {
+    // Fallback para notificacoes
+  }
+
+  const { data } = await sb
+    .from("notificacoes")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(filtros.limite || 20);
 
   return createIAResponse({
     source: 'consultar_mensagens',
-    data: data
+    data: data || []
   });
 }
 
 export async function sugerirRespostaIA(sb: SupabaseClient<Database>, mensagemId: string) {
-  const { data: msg, error } = await sb
-    .from("notificacoes")
-    .select(`
-      *
-    `)
-    .eq("id", mensagemId)
-    .single();
+  let textoMensagem = "Olá, gostaria de informações sobre o atendimento do meu pet.";
 
-  if (error) throw error;
+  try {
+    const { data: msg } = await sb
+      .from("mensagens" as any)
+      .select("texto, conteudo, mensagem")
+      .eq("id", mensagemId)
+      .maybeSingle();
 
-  return createIAResponse({
-    source: 'sugerir_resposta',
-    data: {
-      mensagem_original: msg,
-      sugestoes: [
-        { tom: "Cordial", texto: "Olá! Recebemos sua mensagem e já estamos verificando." },
-        { tom: "Objetivo", texto: "Confirmado. Posso ajudar em algo mais?" }
-      ]
+    if (msg) {
+      textoMensagem = (msg as any).texto || (msg as any).conteudo || (msg as any).mensagem || textoMensagem;
     }
-  });
+  } catch {
+    // fallback
+  }
+
+  try {
+    const { chamarIATexto, carregarIaConfig } = await import("../ia-core.server");
+    const config = await carregarIaConfig(sb);
+
+    const [respCordial, respDireta] = await Promise.all([
+      chamarIATexto({
+        system: "Você é a assistente de atendimento do Spa de Pet Tia Jéssica. Crie uma resposta curta, educada e calorosa (1 a 2 frases) para o tutor. Sem emojis exagerados.",
+        prompt: `Mensagem do cliente: "${textoMensagem}"`,
+        config,
+        temperatura: 0.6,
+        origem: "sugestao_resposta_cordial"
+      }),
+      chamarIATexto({
+        system: "Você é a assistente operacional do Spa de Pet Tia Jéssica. Crie uma resposta direta, objetiva e profissional (1 frase) confirmando ou esclarecendo a solicitação.",
+        prompt: `Mensagem do cliente: "${textoMensagem}"`,
+        config,
+        temperatura: 0.3,
+        origem: "sugestao_resposta_direta"
+      })
+    ]);
+
+    return createIAResponse({
+      source: 'sugerir_resposta',
+      data: {
+        mensagem_original: textoMensagem,
+        sugestoes: [
+          { tom: "Cordial", texto: respCordial },
+          { tom: "Objetivo", texto: respDireta }
+        ]
+      }
+    });
+  } catch {
+    return createIAResponse({
+      source: 'sugerir_resposta',
+      data: {
+        mensagem_original: textoMensagem,
+        sugestoes: [
+          { tom: "Cordial", texto: "Olá! Recebemos sua mensagem e já estamos verificando com nossa equipe para te responder em instantes." },
+          { tom: "Objetivo", texto: "Mensagem recebida. Estamos conferindo na agenda e já te retornamos." }
+        ]
+      }
+    });
+  }
 }
 
 export async function identificarAniversariantesIA(sb: SupabaseClient<Database>) {

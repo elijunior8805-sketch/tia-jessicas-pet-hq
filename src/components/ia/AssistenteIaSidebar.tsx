@@ -101,9 +101,13 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       if (res.sucesso) {
         // Upload do arquivo original para consulta posterior
-        const fileExt = selectedFile.name.split(".").pop();
-        const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        await supabase.storage.from("comprovantes").upload(filePath, selectedFile);
+        try {
+          const fileExt = selectedFile.name.split(".").pop();
+          const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          await supabase.storage.from("comprovantes").upload(filePath, selectedFile);
+        } catch (storageErr) {
+          console.warn("[Assistente] Aviso no upload para storage:", storageErr);
+        }
 
         const candidatos = res.candidatos || [];
         const linhasCandidatos = candidatos.length

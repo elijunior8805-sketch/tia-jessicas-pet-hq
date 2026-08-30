@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const IAIntentSchema = z.object({
   intencao: z.string(),
-  especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica"]).optional().nullable(),
+  especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica", "programas_cuidado"]).optional().nullable(),
   tipo_operacao: z.enum(["consulta", "acao"]),
   parametros: z.object({
     comando_original: z.string().optional(),

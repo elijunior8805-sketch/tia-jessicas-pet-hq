@@ -43,15 +43,15 @@ export async function logIAAuditoria(
       dadosLimpos.data = dadosLimpos.data.slice(0, 5); 
     }
 
-    const { data: logData, error: logError } = await supabaseAdmin.from('ia_auditoria').insert({
-      usuario_id: userId,
+    const { data: logData, error: logError } = await supabaseAdmin.from('auditoria_ia' as any).insert({
+      user_id: userId,
       comando_original: comando,
-      intencao_identificada: intencao,
-      dados_extraidos: dadosLimpos,
-      status: status,
-      erro: erro,
-      tempo_resposta_ms: dados?.tempo_processamento || 0
-    }).select('id').single();
+      intencao_detectada: intencao,
+      parametros: dadosLimpos,
+      sucesso: status === 'sucesso',
+      tempo_resposta_ms: dados?.tempo_processamento || 0,
+      metadata: erro ? { erro } : undefined
+    } as any).select('id').single();
 
     if (logError) console.error('[IA-AUDITORIA-LOG-ERROR]', logError);
     return logData?.id;

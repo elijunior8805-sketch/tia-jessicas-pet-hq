@@ -1,23 +1,28 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export async function getResumoNegocioIA() {
+  const hoje = new Date().toISOString().split('T')[0];
   const [
     atendimentosRes,
     pagamentosRes,
     estoqueRes,
     petsRes
   ] = await Promise.all([
-    supabaseAdmin.from('atendimentos').select('id', { count: 'exact', head: true }).eq('data' as any, new Date().toISOString().split('T')[0]),
-    supabaseAdmin.from('pagamentos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
-    supabaseAdmin.from('produtos_estoque').select('id', { count: 'exact', head: true }).lte('quantidade', 'estoque_minimo'),
+    supabaseAdmin.from('atendimentos').select('id', { count: 'exact', head: true }).eq('data' as any, hoje),
+    supabaseAdmin.from('pagamentos').select('id', { count: 'exact', head: true }).eq('status', 'pendente').is('arquivado_em', null),
+    supabaseAdmin.from('produtos_estoque').select('id, quantidade, estoque_minimo').eq('ativo', true),
     supabaseAdmin.from('pets').select('id', { count: 'exact', head: true })
   ]);
 
+  const itensCriticos = (estoqueRes.data || []).filter(
+    (item: any) => Number(item.quantidade || 0) <= Number(item.estoque_minimo || 0)
+  ).length;
+
   return {
-    urgencias: (estoqueRes.count || 0) > 0 ? ['Estoque baixo detectado'] : [],
+    urgencias: itensCriticos > 0 ? [`${itensCriticos} item(ns) com estoque baixo detectado`] : [],
     agenda: { hoje: atendimentosRes.count || 0 },
     financeiro: { pendencias: pagamentosRes.count || 0 },
-    estoque: { itens_criticos: estoqueRes.count || 0 },
+    estoque: { itens_criticos: itensCriticos },
     oportunidades: petsRes.count ? [`${petsRes.count} pets cadastrados no sistema`] : []
   };
 }
@@ -76,17 +81,54 @@ export async function registrarAuditoriaIA(params: {
 }
 
 export async function realizarAuditoriaDadosIA(supabase?: any) {
-  // Use admin client if supabase instance not provided
   const client = supabase || supabaseAdmin;
-  
-  // Example implementation that returns structure expected by UI
-  return { 
-    status: 'ok', 
-    data: {
-      resumo: { alertas: 0 },
-      atendimentos_sem_pagamento: [],
-      pagamentos_zerados: [],
-      provaveis_duplicidades: []
-    }
-  };
+
+  try {
+    const [atendimentos, pagamentos] = await Promise.all([
+      client
+        .from("atendimentos")
+        .select("id, data, cliente_id, pet_id, finalizado, valor_executado, clientes(nome), pets(nome)")
+        .eq("finalizado", true)
+        .order("data", { ascending: false })
+        .limit(100),
+      client
+        .from("pagamentos")
+        .select("id, atendimento_id, valor_total, valor_pago, status, arquivado_em")
+        .is("arquivado_em", null)
+        .limit(200)
+    ]);
+
+    const pagamentosMap = new Map((pagamentos.data || []).map((p: any) => [p.atendimento_id, p]));
+
+    const atendimentosSemPagamento = (atendimentos.data || []).filter(
+      (a: any) => !pagamentosMap.has(a.id) && Number(a.valor_executado || 0) > 0
+    );
+
+    const pagamentosZerados = (pagamentos.data || []).filter(
+      (p: any) => Number(p.valor_total || 0) <= 0 && p.status !== "cancelado"
+    );
+
+    const alertasTotal = atendimentosSemPagamento.length + pagamentosZerados.length;
+
+    return {
+      status: "ok",
+      data: {
+        resumo: { alertas: alertasTotal },
+        atendimentos_sem_pagamento: atendimentosSemPagamento,
+        pagamentos_zerados: pagamentosZerados,
+        provaveis_duplicidades: []
+      }
+    };
+  } catch (err: any) {
+    console.error("[ia-auditoria] Erro ao realizar auditoria de dados:", err);
+    return {
+      status: "erro",
+      data: {
+        resumo: { alertas: 0 },
+        atendimentos_sem_pagamento: [],
+        pagamentos_zerados: [],
+        provaveis_duplicidades: []
+      }
+    };
+  }
 }

@@ -134,18 +134,35 @@ export async function registrarPromessaPagamentoIA(
   }
 ) {
   const { data, error } = await sb
-    .from("cobranca_promessas")
+    .from("cobranca_promessas" as any)
     .insert({
       pagamento_id: params.pagamento_id,
       cliente_id: params.cliente_id,
       data_prometida: params.data_prometida,
       valor_prometido: params.valor_prometido,
-      resposta_cliente: params.observacoes
-    } as any) // Cast to any because TS hasn't picked up the new table yet
+      observacao: params.observacoes,
+      resposta_cliente: params.observacoes,
+    } as any)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error("[ia-cobranca] Erro ao registrar promessa:", error);
+    throw error;
+  }
+
+  // Tenta atualizar a cobrança correspondente se existir
+  try {
+    await sb
+      .from("cobrancas" as any)
+      .update({
+        status: "promessa",
+        promessa_data: params.data_prometida,
+      } as any)
+      .or(`pagamento_id.eq.${params.pagamento_id},cliente_id.eq.${params.cliente_id}`);
+  } catch (err) {
+    console.warn("[ia-cobranca] Aviso ao sincronizar cobrancas:", err);
+  }
 
   return createIAResponse({
     source: 'registrar_promessa',
