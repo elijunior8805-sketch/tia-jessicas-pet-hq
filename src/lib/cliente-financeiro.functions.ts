@@ -215,11 +215,11 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
 
     // Localizar serviços no catálogo para compor os créditos
     const { data: servicos } = await sb.from("servicos" as any).select("id, nome, valor");
-    const banhoSimples = (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("banho simples"))
+    const banhoSimples: any = (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("banho simples"))
       || (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("banho"))
       || servicos?.[0];
 
-    const hidratacao = (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("hidratação") || s.nome?.toLowerCase().includes("hidratacao"))
+    const hidratacao: any = (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("hidratação") || s.nome?.toLowerCase().includes("hidratacao"))
       || servicos?.[1] || banhoSimples;
 
     if (!contratosExistentes || contratosExistentes.length === 0) {
@@ -256,7 +256,7 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
         .single();
 
       if (!ncErr && novoContrato) {
-        contract_id = novoContrato.id;
+        contract_id = (novoContrato as any).id;
         programaCriado = true;
 
         // Criar créditos de movimentação
