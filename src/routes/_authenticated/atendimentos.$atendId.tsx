@@ -5,6 +5,10 @@ import {
   verificarElegibilidadeCredito,
   consumirCreditoAtendimento,
 } from "@/lib/programas-cuidado.functions";
+import { 
+  calcularSaldosDoContrato,
+  identificarCategoriaCredito,
+} from "@/lib/programas-creditos-core";
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -532,28 +536,71 @@ function AtendimentoDetalhe() {
   }, [atendimento]);
 
   const { data: elegibilidadeCredito } = useQuery({
-    queryKey: ["atendimento-credito-elegibilidade", (atendimento as any)?.pet_id, rawSolicitados, rawExtras],
+    queryKey: ["atendimento-credito-elegibilidade", (atendimento as any)?.pet_id, (atendimento as any)?.cliente_id],
     enabled: !!(atendimento as any)?.pet_id,
-    queryFn: () => verificarElegibilidadeCredito({
-      data: {
-        pet_id: (atendimento as any).pet_id,
-        cliente_id: (atendimento as any).cliente_id,
-        servicos: [...rawSolicitados, ...rawExtras].map((s) => ({
-          id: (s as any).id,
-          servico_id: s.servico_id,
-          nome: s.nome,
-          valor: Number(s.valor_total || s.valor_unit || 0),
-          categoria: s.categoria
-        }))
+    queryFn: async () => {
+      const petId = (atendimento as any).pet_id;
+      const clienteId = (atendimento as any).cliente_id;
+
+      // Busca contratos ativos ou aguardando pagamento do pet
+      const { data: contratos, error: cErr } = await supabase
+        .from("programas_contratados" as any)
+        .select(`
+          *,
+          pets:pet_id (id, nome),
+          movimentacoes:programas_creditos_movimentacoes (*)
+        `)
+        .eq("pet_id", petId)
+        .in("status_do_programa", ["ativo", "aguardando_pagamento"])
+        .order("criado_em", { ascending: false });
+
+      if (cErr) {
+        console.error("Erro ao buscar contratos do pet:", cErr);
+        return {
+          possui_programa: false,
+          possui_credito_elegivel: false,
+          resumo: null,
+        };
       }
-    })
+
+      const contratosList = (contratos as any[]) || [];
+      if (contratosList.length === 0) {
+        return {
+          possui_programa: false,
+          possui_credito_elegivel: false,
+          resumo: null,
+        };
+      }
+
+      const contratosResumo = contratosList.map((c) => calcularSaldosDoContrato(c, c.movimentacoes || []));
+      const primeiroContrato = contratosResumo[0];
+      const itemBanho = primeiroContrato?.itens.find((i) => i.categoria === "banho") || primeiroContrato?.itens[0];
+      const creditosDisp = itemBanho?.disponiveis ?? 0;
+      const creditosRes = itemBanho?.reservados ?? 0;
+      const temCredito = creditosDisp > 0 || creditosRes > 0 || contratosList.length > 0;
+
+      return {
+        possui_programa: true,
+        possui_credito_elegivel: temCredito,
+        contratos: contratosResumo,
+        resumo: {
+          contrato_id: primeiroContrato?.contrato_id,
+          nome_programa: primeiroContrato?.nome_programa,
+          pet_nome: primeiroContrato?.pet_nome || (atendimento as any)?.pets?.nome,
+          data_validade: primeiroContrato?.data_de_validade,
+          creditos_banho_disponiveis: creditosDisp,
+          creditos_banho_reservados: creditosRes,
+          total_creditos_disponiveis: primeiroContrato?.total_creditos_disponiveis || creditosDisp,
+        },
+      };
+    },
   });
 
   useEffect(() => {
-    if (elegibilidadeCredito?.possui_credito_elegivel && !(atendimento as any)?.pagamento_forma) {
+    if (elegibilidadeCredito?.possui_credito_elegivel) {
       setFormaQuitacaoBanho("credito_programa");
     }
-  }, [elegibilidadeCredito?.possui_credito_elegivel, atendimento]);
+  }, [elegibilidadeCredito?.possui_credito_elegivel]);
 
   // Hooks must run on every render — declare BEFORE any early return.
   const encerrarMut = useMutation({
@@ -701,7 +748,7 @@ function AtendimentoDetalhe() {
   const valorExtras = sumItens(extras);
   const subtotalBruto = valorSolicitados + valorExtras;
 
-  const isBanhoQuitadoComCredito = formaQuitacaoBanho === "credito_programa" && !!elegibilidadeCredito?.possui_credito_elegivel;
+  const isBanhoQuitadoComCredito = formaQuitacaoBanho === "credito_programa";
   const valorCobradoBanho = isBanhoQuitadoComCredito ? 0 : valorSolicitados;
   const valorCobradoExtras = valorExtras;
   const valorCobertoPrograma = isBanhoQuitadoComCredito ? valorSolicitados : 0;
@@ -1384,11 +1431,6 @@ function AtendimentoDetalhe() {
                   Precisou de pausa
                 </label>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={!!(atendimento as any)?.alergia_checkin} disabled={readOnly}
-                    onCheckedChange={(v) => patchMut.mutate({ alergia_checkin: !!v } as never)} />
-                  Alergia registrada no check-in
-                </label>
                 <div>
                 <Label htmlFor="obs">Comportamento, particularidades e incidentes</Label>
                 <Textarea id="obs" value={obs} disabled={readOnly}
@@ -1625,17 +1667,15 @@ function AtendimentoDetalhe() {
                       <SelectValue placeholder="Selecione a forma de quitação do banho" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(elegibilidadeCredito?.possui_credito_elegivel || elegibilidadeCredito?.possui_programa || (elegibilidadeCredito?.resumo?.creditos_banho_disponiveis ?? 0) > 0 || (elegibilidadeCredito?.resumo?.creditos_banho_reservados ?? 0) > 0) && (
-                        <SelectItem
-                          value="credito_programa"
-                          className="font-semibold text-emerald-900 bg-emerald-50 focus:bg-emerald-100"
-                        >
-                          {elegibilidadeCredito?.resumo?.creditos_banho_reservados && elegibilidadeCredito.resumo.creditos_banho_reservados > 0
-                            ? "🐾 Crédito de banho reservado para este atendimento"
-                            : `🐾 Crédito de banho — Programa de Cuidados (${elegibilidadeCredito?.resumo?.creditos_banho_disponiveis ?? 1} disponíveis)`
-                          }
-                        </SelectItem>
-                      )}
+                      <SelectItem
+                        value="credito_programa"
+                        className="font-semibold text-emerald-900 bg-emerald-50 focus:bg-emerald-100"
+                      >
+                        {elegibilidadeCredito?.resumo?.creditos_banho_reservados && elegibilidadeCredito.resumo.creditos_banho_reservados > 0
+                          ? "🐾 Crédito de banho reservado para este atendimento"
+                          : `🐾 Crédito de banho — Programa de Cuidados (${elegibilidadeCredito?.resumo?.creditos_banho_disponiveis !== undefined ? `${elegibilidadeCredito.resumo.creditos_banho_disponiveis} disponíveis` : "Disponível"})`
+                        }
+                      </SelectItem>
                       {FORMAS_PAGAMENTO.map((f) => (
                         <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
                       ))}
