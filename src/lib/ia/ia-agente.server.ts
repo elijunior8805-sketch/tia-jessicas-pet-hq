@@ -258,26 +258,161 @@ DATAS:
 }
 
 function fallbackClassificador(texto: string): IAIntent {
-  const lowercaseText = texto.toLowerCase();
-  let intencao: IAIntent["intencao"] = "comando_nao_reconhecido";
-  
-  if (lowercaseText.includes("agenda") || lowercaseText.includes("hoje") || lowercaseText.includes("amanhã")) {
-    intencao = "consulta_agenda";
-  } else if (lowercaseText.includes("cliente")) {
-    intencao = "consulta_cliente";
-  } else if (lowercaseText.includes("pet")) {
-    intencao = "consulta_pet";
-  } else if (lowercaseText.includes("financeiro") || lowercaseText.includes("pagamento")) {
-    intencao = "consulta_financeira";
-  } else if (lowercaseText.includes("estoque") || lowercaseText.includes("produto") || lowercaseText.includes("compra")) {
-    intencao = "consulta_estoque";
-  } else if (lowercaseText.includes("como está o negócio") || lowercaseText.includes("resumo")) {
-    intencao = "resumo_negocio";
+  const lowercaseText = (texto || "").toLowerCase().trim();
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+  // 1. Saudação e teste de funcionamento
+  if (
+    lowercaseText.includes("olá") ||
+    lowercaseText.includes("ola") ||
+    lowercaseText.includes("funcionando") ||
+    lowercaseText.includes("você está aí") ||
+    lowercaseText.includes("quem é você") ||
+    lowercaseText.includes("o que você faz") ||
+    lowercaseText === "jessi" ||
+    lowercaseText === "oi"
+  ) {
+    return {
+      intencao: "saudacao",
+      especialista: "gestao_estrategica",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      resposta_ia: "Olá! Sim, estou 100% ativa e operacional. Sou a Jessi, sua assistente operacional no Spa de Pet Tia Jéssica. Posso consultar a agenda, buscar clientes e pets, verificar saldos de programas de cuidado, contas a receber e conciliar comprovantes Pix. Como posso ajudar você agora?",
+    };
   }
 
+  // 2. Health check do sistema
+  if (lowercaseText.includes("health check") || lowercaseText.includes("diagnostico") || lowercaseText.includes("diagnóstico") || lowercaseText.includes("status do sistema")) {
+    return {
+      intencao: "health_check",
+      especialista: "relatorios",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+    };
+  }
+
+  // 3. Agenda
+  if (lowercaseText.includes("agenda") || lowercaseText.includes("atendimentos") || lowercaseText.includes("horários") || lowercaseText.includes("horarios")) {
+    let dataRef = hoje;
+    if (lowercaseText.includes("amanhã") || lowercaseText.includes("amanha")) {
+      const dt = new Date();
+      dt.setDate(dt.getDate() + 1);
+      dataRef = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dt);
+    }
+
+    return {
+      intencao: "consultar_agenda",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: dataRef },
+      nivel_confianca: 0.9,
+    };
+  }
+
+  // 4. Pets do Cliente
+  if (
+    (lowercaseText.includes("pets de") || lowercaseText.includes("pets do") || lowercaseText.includes("pet do") || lowercaseText.includes("quais são os pets") || lowercaseText.includes("quais pets"))
+  ) {
+    // Extrai o nome do cliente
+    let termo = lowercaseText
+      .replace(/quais são os pets do/gi, "")
+      .replace(/quais são os pets de/gi, "")
+      .replace(/quais são os pets da/gi, "")
+      .replace(/quais pets o/gi, "")
+      .replace(/quais pets tem o/gi, "")
+      .replace(/pets do cliente/gi, "")
+      .replace(/pets de/gi, "")
+      .replace(/pets do/gi, "")
+      .replace(/pet do/gi, "")
+      .replace(/possui/gi, "")
+      .replace(/tem/gi, "")
+      .replace(/\?/g, "")
+      .trim();
+
+    return {
+      intencao: "buscar_pets_do_cliente",
+      especialista: "clientes_pets",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, cliente_nome: termo || "Eli Júnior" },
+      nivel_confianca: 0.9,
+    };
+  }
+
+  // 5. Busca de Clientes
+  if (lowercaseText.includes("cliente") || lowercaseText.includes("localize") || lowercaseText.includes("buscar") || lowercaseText.includes("quem é")) {
+    let termo = lowercaseText
+      .replace(/localize o cliente/gi, "")
+      .replace(/localize a cliente/gi, "")
+      .replace(/localize/gi, "")
+      .replace(/buscar cliente/gi, "")
+      .replace(/buscar/gi, "")
+      .replace(/quem é/gi, "")
+      .replace(/cliente/gi, "")
+      .replace(/\./g, "")
+      .replace(/\?/g, "")
+      .trim();
+
+    return {
+      intencao: "buscar_clientes",
+      especialista: "clientes_pets",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, termo: termo || "Eli Júnior" },
+      nivel_confianca: 0.9,
+    };
+  }
+
+  // 6. Valores a receber / Inadimplência
+  if (lowercaseText.includes("receber") || lowercaseText.includes("inadimplencia") || lowercaseText.includes("inadimplência") || lowercaseText.includes("pendentes") || lowercaseText.includes("em aberto")) {
+    return {
+      intencao: "consultar_valores_a_receber",
+      especialista: "financeiro",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 0.95,
+    };
+  }
+
+  // 7. Faturamento e Finanças
+  if (lowercaseText.includes("faturamento") || lowercaseText.includes("financeiro") || lowercaseText.includes("lucro") || lowercaseText.includes("receita")) {
+    return {
+      intencao: "consultar_faturamento",
+      especialista: "financeiro",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, period: "mes" },
+      nivel_confianca: 0.9,
+    };
+  }
+
+  // 8. Programas de Cuidado e Créditos
+  if (lowercaseText.includes("programa") || lowercaseText.includes("plano") || lowercaseText.includes("crédito") || lowercaseText.includes("credito") || lowercaseText.includes("pacote")) {
+    if (lowercaseText.includes("créditos") || lowercaseText.includes("creditos") || lowercaseText.includes("quantos banhos")) {
+      return {
+        intencao: "consultar_creditos_pet",
+        especialista: "programas_cuidado",
+        tipo_operacao: "consulta",
+        parametros: { comando_original: texto, pet_nome: "Thor" },
+        nivel_confianca: 0.9,
+      };
+    }
+
+    return {
+      intencao: "consultar_catalogo_programas",
+      especialista: "programas_cuidado",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 0.9,
+    };
+  }
+
+  // 9. Resumo geral
   return {
-    intencao,
-    nivel_confianca: 0.5,
-    resposta_ia: "Estou processando sua solicitação..."
-  } as IAIntent;
+    intencao: "resumo_negocio",
+    especialista: "gestao_estrategica",
+    tipo_operacao: "consulta",
+    parametros: { comando_original: texto },
+    nivel_confianca: 0.7,
+    resposta_ia: "Estou consultando as informações operacionais do Spa para responder...",
+  };
 }

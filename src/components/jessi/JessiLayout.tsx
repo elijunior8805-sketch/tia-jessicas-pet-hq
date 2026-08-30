@@ -128,9 +128,25 @@ export const JessiLayout: React.FC = () => {
         setStatus("aguardando_confirmacao");
       } else {
         setStatus("disponivel");
-      }
     } catch (err: any) {
       console.error("Erro na comunicação com a Jessi:", err);
+      const assistantErrMsg: JessiMessage = {
+        id: `ast_err_${Date.now()}`,
+        role: "assistant",
+        content: "Tive uma dificuldade temporária na comunicação com o servidor. Por favor, tente enviar novamente.",
+        timestamp: new Date().toISOString(),
+        cards: [
+          {
+            type: "alerta",
+            data: {
+              tipo: "erro",
+              titulo: "Instabilidade temporária",
+              mensagem: "A requisição não pôde ser completada. Se persistir, recarregue a página.",
+            },
+          },
+        ],
+      };
+      setMessages((prev) => [...prev, assistantErrMsg]);
       toast.error("Não foi possível processar a mensagem.");
       setStatus("erro");
     } finally {

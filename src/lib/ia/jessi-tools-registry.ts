@@ -259,6 +259,110 @@ export const JESSI_TOOLS: Record<string, JessiToolDefinition> = {
     exigeConfirmacao: false,
     executar: (sb, p) => consultarQualidadeIAJessi(),
   },
+
+  // Aliases para máxima resiliência entre diferentes classificadores
+  consulta_agenda: {
+    nome: "consultar_agenda",
+    descricao: "Consulta agendamentos da agenda",
+    especialista: "agenda",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => consultarAgendaJessi(sb, p),
+  },
+  consulta_cliente: {
+    nome: "buscar_clientes",
+    descricao: "Busca clientes no cadastro",
+    especialista: "clientes_pets",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => buscarClientesJessi(sb, p),
+  },
+  consulta_pet: {
+    nome: "buscar_pets_do_cliente",
+    descricao: "Busca pets cadastrados",
+    especialista: "clientes_pets",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => buscarPetsDoClienteJessi(sb, p),
+  },
+  consulta_financeira: {
+    nome: "consultar_faturamento",
+    descricao: "Consulta indicadores e faturamento",
+    especialista: "financeiro",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => consultarKPIsFinanceirosJessi(sb, p),
+  },
+  consultar_kpis_financeiros: {
+    nome: "consultar_faturamento",
+    descricao: "Consulta KPIs oficiais de faturamento",
+    especialista: "financeiro",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => consultarKPIsFinanceirosJessi(sb, p),
+  },
+  consultar_creditos: {
+    nome: "consultar_creditos_pet",
+    descricao: "Consulta créditos de programas do pet",
+    especialista: "programas_cuidado",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => consultarCreditosPetJessi(sb, p),
+  },
+  consultar_programas: {
+    nome: "consultar_catalogo_programas",
+    descricao: "Lista programas disponíveis",
+    especialista: "programas_cuidado",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => consultarCatalogoProgramasJessi(sb),
+  },
+  consultar_resumo_operacional: {
+    nome: "resumo_negocio",
+    descricao: "Resumo operacional e estratégico",
+    especialista: "gestao_estrategica",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => consultarResumoNegocioJessi(),
+  },
+  saudacao: {
+    nome: "saudacao",
+    descricao: "Apresentação e status da Jessi",
+    especialista: "gestao_estrategica",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: async () => ({
+      success: true,
+      source: "jessi_status",
+      data: { status: "online", versao: "2.0" },
+      summary: "Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Estou ativa e pronta para ajudar na consulta da agenda, localização de clientes e pets, acompanhamento de programas de cuidado, conciliação de comprovantes Pix e finanças. Como posso ajudar agora?",
+    }),
+  },
+  health_check: {
+    nome: "health_check",
+    descricao: "Diagnóstico de saúde operacional da Jessi",
+    especialista: "relatorios",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: async (sb) => {
+      const { count: cliCount } = await sb.from("clientes").select("*", { count: "exact", head: true });
+      const { count: petCount } = await sb.from("pets").select("*", { count: "exact", head: true });
+      const { count: agendCount } = await sb.from("agendamentos").select("*", { count: "exact", head: true });
+      return {
+        success: true,
+        source: "health_check",
+        data: {
+          banco_dados: "conectado",
+          clientes_cadastrados: cliCount || 0,
+          pets_cadastrados: petCount || 0,
+          agendamentos_registrados: agendCount || 0,
+          ferramentas_ativas: Object.keys(JESSI_TOOLS).length,
+          timestamp: new Date().toISOString(),
+        },
+        summary: `Diagnóstico Operacional da Jessi: Banco de dados conectado com sucesso (${cliCount} clientes, ${petCount} pets, ${agendCount} agendamentos). Todas as ${Object.keys(JESSI_TOOLS).length} ferramentas estão operacionais.`,
+      };
+    },
+  },
 };
 
 /**

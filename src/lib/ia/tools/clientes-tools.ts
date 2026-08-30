@@ -28,26 +28,78 @@ export async function buscarClientesJessi(
 
 export async function buscarPetsDoClienteJessi(
   sb: SupabaseClient<Database>,
-  params: { cliente_id: string }
+  params: { cliente_id?: string; cliente_nome?: string; termo?: string },
+  contexto?: any
 ): Promise<JessiQueryResult> {
-  const res = await buscarPetsDoClienteIA(sb, params.cliente_id);
+  let targetId = params.cliente_id || contexto?.contexto?.clienteSelecionadoId;
+
+  // Se não temos UUID, tenta resolver pelo nome do cliente ou termo
+  if (!targetId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)) {
+    const nomeOuTermo = params.cliente_nome || params.termo || targetId;
+    if (nomeOuTermo) {
+      const buscaCli = await buscarClientesIA(sb, nomeOuTermo);
+      if (Array.isArray(buscaCli.data) && buscaCli.data.length > 0) {
+        targetId = buscaCli.data[0].id;
+      }
+    }
+  }
+
+  if (!targetId) {
+    return {
+      success: false,
+      source: "pets",
+      data: [],
+      total_count: 0,
+      executed_at: new Date().toISOString(),
+      summary: "Não foi possível identificar o cliente para listar os pets. Por favor, informe o nome do cliente.",
+    };
+  }
+
+  const res = await buscarPetsDoClienteIA(sb, targetId);
+  const petsList = Array.isArray(res.data) ? res.data : [];
+  const nomesPets = petsList.map((p: any) => p.nome).join(", ");
 
   return {
     success: res.success,
     source: "pets",
-    data: res.data,
-    total_count: Array.isArray(res.data) ? res.data.length : 0,
-    filters_applied: { cliente_id: params.cliente_id },
+    data: petsList,
+    total_count: petsList.length,
+    filters_applied: { cliente_id: targetId },
     executed_at: new Date().toISOString(),
-    summary: `Encontrados ${Array.isArray(res.data) ? res.data.length : 0} pet(s) do cliente.`,
+    summary: petsList.length > 0
+      ? `Encontrado(s) ${petsList.length} pet(s): ${nomesPets}.`
+      : "Nenhum pet encontrado para este cliente.",
   };
 }
 
 export async function obterVisao360ClienteJessi(
   sb: SupabaseClient<Database>,
-  params: { cliente_id: string }
+  params: { cliente_id?: string; cliente_nome?: string; termo?: string },
+  contexto?: any
 ): Promise<JessiQueryResult> {
-  const res = await obterVisao360Cliente(sb, params.cliente_id);
+  let targetId = params.cliente_id || contexto?.contexto?.clienteSelecionadoId;
+
+  if (!targetId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)) {
+    const nomeOuTermo = params.cliente_nome || params.termo || targetId;
+    if (nomeOuTermo) {
+      const buscaCli = await buscarClientesIA(sb, nomeOuTermo);
+      if (Array.isArray(buscaCli.data) && buscaCli.data.length > 0) {
+        targetId = buscaCli.data[0].id;
+      }
+    }
+  }
+
+  if (!targetId) {
+    return {
+      success: false,
+      source: "visao_360_cliente",
+      data: null,
+      executed_at: new Date().toISOString(),
+      summary: "Cliente não localizado para gerar visão 360°.",
+    };
+  }
+
+  const res = await obterVisao360Cliente(sb, targetId);
 
   return {
     success: res.success,

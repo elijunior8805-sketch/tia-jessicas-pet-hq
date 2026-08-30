@@ -425,12 +425,54 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         respostaFinal = montarRespostaValoresAReceber(pendencias);
       }
 
-      if (intent.intencao === "consultar_resumo_operacional") {
+      if (intent.intencao === "consultar_resumo_operacional" || intent.intencao === "resumo_negocio") {
         setIaStatus("processing");
         const res = await consultarResumoOperacionalIA();
         const r = (res.data as any) || {};
         dadosReais = r;
         respostaFinal = montarRespostaResumoOperacional(r);
+      }
+
+      if (intent.intencao === "buscar_pets_do_cliente" || intent.intencao === "consulta_pet") {
+        setIaStatus("processing");
+        const termoBusca = intent.parametros?.cliente_nome || intent.parametros?.termo || text;
+        const resCli = await buscarClientesIA({ data: { termo: termoBusca } });
+        const clientes = resCli.data || [];
+        if (clientes.length > 0) {
+          const cli = clientes[0];
+          const pets = cli.pets || [];
+          if (pets.length > 0) {
+            respostaFinal = `### 🐾 Pets de ${cli.nome}\n\n` + pets.map((p: any) => `- **${p.nome}** (${p.raca || "Raça não informada"})`).join("\n");
+          } else {
+            respostaFinal = `O cliente **${cli.nome}** não possui nenhum pet cadastrado no momento.`;
+          }
+        } else {
+          respostaFinal = `Não localizei o cliente para listar os pets. Por favor, verifique o nome informado.`;
+        }
+      }
+
+      if (
+        intent.intencao === "consultar_creditos_pet" ||
+        intent.intencao === "consultar_catalogo_programas" ||
+        intent.especialista === "programas_cuidado"
+      ) {
+        setIaStatus("processing");
+        const { data: progs } = await supabase
+          .from("programas_catalogo")
+          .select("id, nome, preco, descricao")
+          .eq("ativo", true);
+        
+        if (progs && progs.length > 0) {
+          respostaFinal = `### 🎁 Programas de Cuidado do Spa\n\n` +
+            `Equivalência de Banho: **1 crédito de banho cobre Banho Simples ou Banho Premium**.\n\n` +
+            progs.map((p: any) => `- **${p.nome}**: R$ ${Number(p.preco || 0).toFixed(2)}`).join("\n");
+        } else {
+          respostaFinal = "Não encontrei programas de cuidado ativos no catálogo.";
+        }
+      }
+
+      if (intent.intencao === "saudacao") {
+        respostaFinal = intent.resposta_ia || "Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Estou à disposição para ajudar com agenda, clientes, pets, programas de cuidado e finanças!";
       }
 
 
