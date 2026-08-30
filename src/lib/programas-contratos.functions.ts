@@ -394,3 +394,96 @@ export const excluirLancamentosLote = createServerFn({ method: "POST" })
       resultados,
     };
   });
+
+/** Exclui permanentemente contratos cancelados da área operacional com limpeza de resíduos e auditoria técnica mínima. */
+export const excluirContratosCanceladosDefinitivo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    contrato_ids: z.array(z.string().uuid()).min(1, "Selecione ao menos um contrato"),
+    motivo: z.string().min(3, "Informe o motivo da exclusão definitiva")
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const userId = context.userId;
+    const nowIso = new Date().toISOString();
+    const resultados: any[] = [];
+    const dadosExcluidos: any[] = [];
+
+    for (const contratoId of data.contrato_ids) {
+      try {
+        // 1. Busca dados do contrato
+        const { data: contrato, error: cErr } = await sb
+          .from("programas_contratados")
+          .select("*, clientes(nome), pets(nome)")
+          .eq("id", contratoId)
+          .single();
+
+        if (cErr || !contrato) {
+          resultados.push({ contrato_id: contratoId, sucesso: false, motivo: "Contrato não encontrado." });
+          continue;
+        }
+
+        // 2. Remove movimentações de crédito associadas
+        await sb
+          .from("programas_creditos_movimentacoes")
+          .delete()
+          .eq("programa_contratado_id", contratoId);
+
+        // 3. Arquiva / desfaz pagamentos de teste vinculados
+        await sb
+          .from("pagamentos")
+          .delete()
+          .eq("idempotency_key", `programa_${contratoId}`);
+
+        // 4. Deleta a linha em programas_contratados
+        const { error: dErr } = await sb
+          .from("programas_contratados")
+          .delete()
+          .eq("id", contratoId);
+
+        if (dErr) {
+          resultados.push({ contrato_id: contratoId, sucesso: false, motivo: dErr.message });
+        } else {
+          dadosExcluidos.push({
+            id: contrato.id,
+            nome_snapshot: contrato.nome_snapshot,
+            cliente: contrato.clientes?.nome,
+            pet: contrato.pets?.nome,
+            preco_vendido: contrato.preco_vendido,
+            status_anterior: contrato.status_do_programa,
+            criado_em: contrato.criado_em,
+          });
+
+          resultados.push({
+            contrato_id: contratoId,
+            sucesso: true,
+            nome: contrato.nome_snapshot
+          });
+        }
+      } catch (err: any) {
+        resultados.push({ contrato_id: contratoId, sucesso: false, motivo: err.message });
+      }
+    }
+
+    // 5. Registro técnico único na Auditoria Administrativa (fora da operação diária do cliente)
+    if (dadosExcluidos.length > 0) {
+      await sb.from("auditoria_programas").insert({
+        acao: "exclusao_cancelados_definitiva",
+        cliente_id: null,
+        pet_id: null,
+        programa_contratado_id: null,
+        valor_anterior: { contratos_excluidos: dadosExcluidos },
+        valor_posterior: null,
+        motivo: data.motivo,
+        usuario_id: userId,
+        created_at: nowIso,
+      });
+    }
+
+    return {
+      success: true,
+      total_excluidos: dadosExcluidos.length,
+      resultados
+    };
+  });
+

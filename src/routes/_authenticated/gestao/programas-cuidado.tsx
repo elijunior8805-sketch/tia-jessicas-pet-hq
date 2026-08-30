@@ -49,7 +49,8 @@ import {
 } from "@/lib/programas-cuidado.functions";
 import { 
   cancelarContrato, 
-  excluirLancamentosLote 
+  excluirLancamentosLote,
+  excluirContratosCanceladosDefinitivo
 } from "@/lib/programas-contratos.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
 import { ContratoDetalheDialog } from "@/components/gestao/programas/ContratoDetalheDialog";
@@ -129,7 +130,10 @@ function ProgramasCuidadoPage() {
 
   const [activeTab, setActiveTab] = useState("catalogo");
   const [activeSubTabCatalogo, setActiveSubTabCatalogo] = useState<"todos" | "ativo" | "rascunho" | "inativo">("todos");
-  const [activeSubTabAtivos, setActiveSubTabAtivos] = useState("todos");
+  
+  // Por padrão mostra contratos operacionais (Ativos + Aguardando Pagamento) para manter a tela limpa
+  const [activeSubTabAtivos, setActiveSubTabAtivos] = useState<"operacionais" | "ativo" | "aguardando_pagamento" | "cancelado">("operacionais");
+  
   const [openVenda, setOpenVenda] = useState(false);
   const [selectedPrograma, setSelectedPrograma] = useState<any>(null);
   const [vendaStep, setVendaStep] = useState(1);
@@ -160,6 +164,11 @@ function ProgramasCuidadoPage() {
   const [motivoCancelamentoIndividual, setMotivoCancelamentoIndividual] = useState("");
   const [openExcluirLoteDialog, setOpenExcluirLoteDialog] = useState(false);
   const [motivoExcluirLote, setMotivoExcluirLote] = useState("");
+
+  // Exclusão Definitiva de Contratos Cancelados (Individual / Lote)
+  const [contratoCanceladoParaExcluir, setContratoCanceladoParaExcluir] = useState<any | null>(null);
+  const [openExcluirCanceladosDialog, setOpenExcluirCanceladosDialog] = useState(false);
+  const [motivoExcluirCancelados, setMotivoExcluirCancelados] = useState("Limpeza de lançamentos cancelados e testes");
 
   // Estados da Venda Personalizada
   const [searchCliente, setSearchCliente] = useState("");
@@ -331,7 +340,24 @@ function ProgramasCuidadoPage() {
     }
   });
 
-  // Abre diálogo de exclusão e consulta vínculos automaticamente
+  // Exclusão definitiva de contratos cancelados (Individual e Lote)
+  const excluirCanceladosDefinitivoMut = useMutation({
+    mutationFn: (vars: { contrato_ids: string[]; motivo: string }) =>
+      excluirContratosCanceladosDefinitivo({ data: vars }),
+    onSuccess: (res: any) => {
+      invalidarTodosCaches();
+      toast.success(`${res.total_excluidos} programa(s) cancelado(s) excluído(s) definitivamente da área operacional!`);
+      setSelectedContratosIds([]);
+      setContratoCanceladoParaExcluir(null);
+      setOpenExcluirCanceladosDialog(false);
+      setMotivoExcluirCancelados("Limpeza de lançamentos cancelados e testes");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir contratos cancelados: " + err.message);
+    }
+  });
+
+  // Abre diálogo de exclusão de programa do catálogo e consulta vínculos automaticamente
   const handleAbrirExclusaoPrograma = async (prog: any) => {
     setProgramaParaExcluir(prog);
     setCarregandoVinculos(true);
@@ -570,37 +596,31 @@ function ProgramasCuidadoPage() {
     return normalizarNomeCopia(programaParaDuplicar.nome, nomes);
   }, [programaParaDuplicar, programas]);
 
-  // Cálculo financeiro em tempo real da venda
-  const subtotalVenda = useMemo(() => {
-    return itensCustomizados.reduce((acc, i) => acc + (i.quantidade * i.valor_unitario), 0);
-  }, [itensCustomizados]);
+  // Contratos Ativos, Pendentes e Cancelados
+  const contratosOperacionais = useMemo(() => {
+    return todosContratos.filter((c) => c.status_do_programa === "ativo" || c.status_do_programa === "aguardando_pagamento");
+  }, [todosContratos]);
 
-  const { valorDescontoVenda, precoFinalVenda, percentualEfetivoVenda } = useMemo(() => {
-    const sub = subtotalVenda;
-    if (sub <= 0) return { valorDescontoVenda: 0, precoFinalVenda: 0, percentualEfetivoVenda: 0 };
+  const contratosAtivos = useMemo(() => {
+    return todosContratos.filter((c) => c.status_do_programa === "ativo");
+  }, [todosContratos]);
 
-    const valorInput = Number(descontoValorVenda.replace(",", ".")) || 0;
-    if (tipoDescontoVenda === "percentual") {
-      const perc = Math.min(100, Math.max(0, valorInput));
-      const desc = Math.round((sub * (perc / 100)) * 100) / 100;
-      const final = Math.max(0, sub - desc);
-      return { valorDescontoVenda: desc, precoFinalVenda: final, percentualEfetivoVenda: perc };
-    } else {
-      const desc = Math.min(sub, Math.max(0, valorInput));
-      const final = Math.max(0, sub - desc);
-      const perc = sub > 0 ? Math.round((desc / sub) * 1000) / 10 : 0;
-      return { valorDescontoVenda: desc, precoFinalVenda: final, percentualEfetivoVenda: perc };
-    }
-  }, [subtotalVenda, tipoDescontoVenda, descontoValorVenda]);
+  const contratosAguardando = useMemo(() => {
+    return todosContratos.filter((c) => c.status_do_programa === "aguardando_pagamento");
+  }, [todosContratos]);
+
+  const contratosCancelados = useMemo(() => {
+    return todosContratos.filter((c) => c.status_do_programa === "cancelado");
+  }, [todosContratos]);
 
   // Contratos filtrados conforme subaba
   const contratosFiltrados = useMemo(() => {
-    if (activeSubTabAtivos === "todos") return todosContratos;
-    if (activeSubTabAtivos === "ativo") return todosContratos.filter((c) => c.status_do_programa === "ativo");
-    if (activeSubTabAtivos === "aguardando_pagamento") return todosContratos.filter((c) => c.status_do_programa === "aguardando_pagamento");
-    if (activeSubTabAtivos === "cancelado") return todosContratos.filter((c) => c.status_do_programa === "cancelado");
-    return todosContratos;
-  }, [todosContratos, activeSubTabAtivos]);
+    if (activeSubTabAtivos === "operacionais") return contratosOperacionais;
+    if (activeSubTabAtivos === "ativo") return contratosAtivos;
+    if (activeSubTabAtivos === "aguardando_pagamento") return contratosAguardando;
+    if (activeSubTabAtivos === "cancelado") return contratosCancelados;
+    return contratosOperacionais;
+  }, [activeSubTabAtivos, contratosOperacionais, contratosAtivos, contratosAguardando, contratosCancelados]);
 
   const valorTotalSelecionados = useMemo(() => {
     return todosContratos
@@ -655,7 +675,7 @@ function ProgramasCuidadoPage() {
           </TabsTrigger>
           <TabsTrigger value="ativos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <PackageCheck className="mr-2 h-4 w-4" />
-            Programas Ativos ({todosContratos.filter(c => c.status_do_programa !== 'cancelado').length})
+            Programas Ativos ({contratosOperacionais.length})
           </TabsTrigger>
           <TabsTrigger value="creditos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <CreditCard className="mr-2 h-4 w-4" />
@@ -957,7 +977,7 @@ function ProgramasCuidadoPage() {
           )}
         </TabsContent>
 
-        {/* PROGRAMAS ATIVOS / CONTRATADOS */}
+        {/* PROGRAMAS E CONTRATOS DE CLIENTES */}
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
             <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b">
@@ -967,18 +987,18 @@ function ProgramasCuidadoPage() {
                   Programas e Contratos de Clientes
                 </CardTitle>
                 <CardDescription>
-                  Gerencie lançamentos, edite créditos, cancele ou exclua vendas de teste com estorno automático e retorno ao baseline.
+                  Listagem limpa de contratos operacionais (ativos e aguardando pagamento). Programas cancelados podem ser consultados e excluídos definitivamente.
                 </CardDescription>
               </div>
               
               <div className="flex flex-wrap items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
                 <Button 
-                  variant={activeSubTabAtivos === "todos" ? "secondary" : "ghost"} 
+                  variant={activeSubTabAtivos === "operacionais" ? "secondary" : "ghost"} 
                   size="sm" 
                   className="h-8 text-xs px-3 rounded-lg"
-                  onClick={() => setActiveSubTabAtivos("todos")}
+                  onClick={() => setActiveSubTabAtivos("operacionais")}
                 >
-                  Todos ({todosContratos.length})
+                  Operacionais ({contratosOperacionais.length})
                 </Button>
                 <Button 
                   variant={activeSubTabAtivos === "ativo" ? "secondary" : "ghost"} 
@@ -986,7 +1006,7 @@ function ProgramasCuidadoPage() {
                   className="h-8 text-xs px-3 rounded-lg"
                   onClick={() => setActiveSubTabAtivos("ativo")}
                 >
-                  Ativos ({todosContratos.filter(c => c.status_do_programa === "ativo").length})
+                  Ativos ({contratosAtivos.length})
                 </Button>
                 <Button 
                   variant={activeSubTabAtivos === "aguardando_pagamento" ? "secondary" : "ghost"} 
@@ -994,21 +1014,60 @@ function ProgramasCuidadoPage() {
                   className="h-8 text-xs px-3 rounded-lg"
                   onClick={() => setActiveSubTabAtivos("aguardando_pagamento")}
                 >
-                  Aguardando Pagamento ({todosContratos.filter(c => c.status_do_programa === "aguardando_pagamento").length})
+                  Aguardando Pagamento ({contratosAguardando.length})
                 </Button>
                 <Button 
                   variant={activeSubTabAtivos === "cancelado" ? "secondary" : "ghost"} 
                   size="sm" 
-                  className="h-8 text-xs px-3 rounded-lg"
+                  className="h-8 text-xs px-3 rounded-lg text-rose-700 font-semibold"
                   onClick={() => setActiveSubTabAtivos("cancelado")}
                 >
-                  Cancelados ({todosContratos.filter(c => c.status_do_programa === "cancelado").length})
+                  Cancelados ({contratosCancelados.length})
                 </Button>
               </div>
             </CardHeader>
 
-            {/* Barra de Ações em Lote quando há seleção */}
-            {selectedContratosIds.length > 0 && (
+            {/* Barra de Ações em Lote para Cancelados */}
+            {activeSubTabAtivos === "cancelado" && contratosCancelados.length > 0 && (
+              <div className="p-3.5 bg-rose-50 border-b border-rose-200 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3 text-xs text-rose-900">
+                  <Badge className="bg-rose-600 text-white font-bold">{contratosCancelados.length} cancelado(s)</Badge>
+                  <span>Lançamentos inativos prontos para limpeza operacional definitiva.</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs bg-white border-rose-300 text-rose-900 hover:bg-rose-100"
+                    onClick={handleToggleSelectAll}
+                  >
+                    <CheckSquare className="h-3.5 w-3.5 mr-1" />
+                    {selectedContratosIds.length === contratosCancelados.length
+                      ? "Desmarcar todos"
+                      : `Selecionar todos (${contratosCancelados.length})`}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-8 text-xs gap-1.5 shadow-sm bg-rose-600 hover:bg-rose-700"
+                    onClick={() => {
+                      if (selectedContratosIds.length === 0) {
+                        setSelectedContratosIds(contratosCancelados.map((c) => c.id));
+                      }
+                      setOpenExcluirCanceladosDialog(true);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {selectedContratosIds.length > 0 
+                      ? `Excluir ${selectedContratosIds.length} cancelado(s)` 
+                      : `Excluir todos os ${contratosCancelados.length} cancelados`}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Barra de Ações em Lote quando há seleção em abas operacionais */}
+            {activeSubTabAtivos !== "cancelado" && selectedContratosIds.length > 0 && (
               <div className="p-3.5 bg-gold/10 border-b border-gold/20 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
                 <div className="flex items-center gap-3 text-xs">
                   <Badge className="bg-gold text-white font-bold">{selectedContratosIds.length} selecionado(s)</Badge>
@@ -1030,7 +1089,7 @@ function ProgramasCuidadoPage() {
                     onClick={() => setOpenExcluirLoteDialog(true)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Excluir / Cancelar Selecionados
+                    Cancelar Selecionados
                   </Button>
                 </div>
               </div>
@@ -1059,7 +1118,7 @@ function ProgramasCuidadoPage() {
                       <div 
                         key={contrato.id} 
                         className={`p-4 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                          isSelected ? 'bg-gold/5' : isCancelado ? 'bg-muted/20 opacity-75' : 'hover:bg-muted/30'
+                          isSelected ? 'bg-gold/5' : isCancelado ? 'bg-rose-50/30' : 'hover:bg-muted/30'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -1079,7 +1138,7 @@ function ProgramasCuidadoPage() {
                                   ? "bg-emerald-100 text-emerald-800" 
                                   : contrato.status_do_programa === "aguardando_pagamento"
                                   ? "bg-amber-100 text-amber-800"
-                                  : "bg-zinc-200 text-zinc-700"
+                                  : "bg-rose-100 text-rose-800 border-rose-200"
                               }>
                                 {contrato.status_do_programa === "ativo" 
                                   ? "Ativo" 
@@ -1115,7 +1174,7 @@ function ProgramasCuidadoPage() {
                                 Ações <ChevronRight className="h-3.5 w-3.5 rotate-90" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuContent align="end" className="w-56">
                               <DropdownMenuLabel className="text-xs">Opções do Lançamento</DropdownMenuLabel>
                               <DropdownMenuItem 
                                 className="text-xs cursor-pointer gap-2"
@@ -1124,7 +1183,7 @@ function ProgramasCuidadoPage() {
                                 <Eye className="h-3.5 w-3.5 text-primary" /> Ver detalhes
                               </DropdownMenuItem>
                               
-                              {!isCancelado && (
+                              {!isCancelado ? (
                                 <>
                                   <DropdownMenuItem 
                                     className="text-xs cursor-pointer gap-2"
@@ -1142,14 +1201,19 @@ function ProgramasCuidadoPage() {
                                   >
                                     <Ban className="h-3.5 w-3.5" /> Cancelar programa
                                   </DropdownMenuItem>
+                                </>
+                              ) : (
+                                <>
+                                  <DropdownMenuSeparator />
                                   <DropdownMenuItem 
-                                    className="text-xs cursor-pointer gap-2 text-rose-600 focus:text-rose-700"
+                                    className="text-xs cursor-pointer gap-2 text-rose-700 focus:text-rose-800 font-semibold"
                                     onClick={() => {
-                                      setContratoParaCancelar(contrato);
-                                      setMotivoCancelamentoIndividual("Exclusão de lançamento de teste e estorno de efeitos");
+                                      setContratoCanceladoParaExcluir(contrato);
+                                      setSelectedContratosIds([contrato.id]);
+                                      setOpenExcluirCanceladosDialog(true);
                                     }}
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" /> Excluir lançamento de teste
+                                    <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Excluir definitivamente
                                   </DropdownMenuItem>
                                 </>
                               )}
@@ -1171,8 +1235,16 @@ function ProgramasCuidadoPage() {
               ) : (
                 <div className="py-14 text-center text-muted-foreground">
                   <PackageCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p className="font-semibold text-sm">Nenhum contrato encontrado nesta visualização.</p>
-                  <p className="text-xs mt-1 text-muted-foreground">Utilize o catálogo para realizar novas vendas ou altere o filtro acima.</p>
+                  <p className="font-semibold text-sm">
+                    {activeSubTabAtivos === "cancelado" 
+                      ? "Nenhum programa cancelado encontrado. Área operacional 100% limpa."
+                      : "Nenhum contrato ativo ou aguardando pagamento no momento."}
+                  </p>
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    {activeSubTabAtivos === "cancelado"
+                      ? "Todos os lançamentos cancelados foram excluídos da base operacional."
+                      : "Utilize o catálogo para realizar novas vendas de programas."}
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -1292,10 +1364,10 @@ function ProgramasCuidadoPage() {
                   <HelpCircle className="h-4 w-4 text-primary" /> Exemplos de Comandos para a Central Inteligente
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Quantos banhos o Thor ainda possui?”</div>
-                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Posso agendar Banho Premium usando o crédito?”</div>
-                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Quais programas vencem nos próximos 7 dias?”</div>
-                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Prepare uma mensagem de renovação para o Eli Júnior”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Mostre os programas cancelados”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Quantos cancelados posso excluir?”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Confirme se os cancelados ainda afetam o Financeiro”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Limpe os programas cancelados de teste”</div>
                 </div>
               </div>
             </CardContent>
@@ -1312,6 +1384,86 @@ function ProgramasCuidadoPage() {
           <ProgramasConfigTab />
         </TabsContent>
       </Tabs>
+
+      {/* DIÁLOGO DE EXCLUSÃO DEFINITIVA DE PROGRAMAS CANCELADOS (INDIVIDUAL OU EM LOTE) */}
+      <Dialog open={openExcluirCanceladosDialog} onOpenChange={setOpenExcluirCanceladosDialog}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800 font-display text-lg">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Excluir {selectedContratosIds.length} Programa(s) Cancelado(s) Definitivamente?
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              Estes lançamentos cancelados serão removidos permanentemente da área operacional (Ficha do Cliente, Pet, Agenda e Financeiro). Apenas um registro técnico mínimo será mantido na Auditoria.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="max-h-48 overflow-y-auto rounded-lg border divide-y bg-muted/20">
+              {todosContratos
+                .filter((c: any) => selectedContratosIds.includes(c.id))
+                .map((c: any) => (
+                  <div key={c.id} className="p-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-semibold text-foreground">{c.nome_snapshot}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Tutor: {c.clientes?.nome || "Cliente"} · Pet: {c.pets?.nome || "Pet"} · {brl(Number(c.preco_vendido || 0))} ({c.forma_de_pagamento || "—"})
+                      </p>
+                      <p className="text-[9px] font-mono text-muted-foreground/75">ID: {c.id}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] border-rose-300 text-rose-800 bg-rose-50">
+                      Cancelado
+                    </Badge>
+                  </div>
+                ))}
+            </div>
+
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] leading-relaxed space-y-1">
+              <p className="font-bold">✓ Verificação de Segurança Realizada:</p>
+              <p>• Nenhum crédito ativo ou reservado será deixado na carteira do pet.</p>
+              <p>• Nenhum pagamento ou dívida permanecerá no Financeiro ou Dashboard.</p>
+              <p>• A área de trabalho ficará 100% limpa e profissional.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Motivo da Exclusão Definitiva (Auditoria)</Label>
+              <Input
+                value={motivoExcluirCancelados}
+                onChange={(e) => setMotivoExcluirCancelados(e.target.value)}
+                placeholder="Ex: Limpeza de lançamentos cancelados e testes"
+                className="text-xs h-8"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setOpenExcluirCanceladosDialog(false)} disabled={excluirCanceladosDefinitivoMut.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5"
+              disabled={excluirCanceladosDefinitivoMut.isPending || motivoExcluirCancelados.trim().length < 3}
+              onClick={() => {
+                if (motivoExcluirCancelados.trim().length < 3) {
+                  toast.error("Informe o motivo da exclusão.");
+                  return;
+                }
+                excluirCanceladosDefinitivoMut.mutate({
+                  contrato_ids: selectedContratosIds,
+                  motivo: motivoExcluirCancelados,
+                });
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {excluirCanceladosDefinitivoMut.isPending 
+                ? "Excluindo..." 
+                : `Confirmar exclusão de ${selectedContratosIds.length} cancelado(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* DIÁLOGO DE EXCLUSÃO INTELIGENTE DE PROGRAMA DO CATÁLOGO COM VÍNCULOS */}
       <Dialog open={Boolean(programaParaExcluir)} onOpenChange={(v) => !v && setProgramaParaExcluir(null)}>
@@ -2300,9 +2452,9 @@ function AuditoriaProgramasTab() {
       <CardHeader className="bg-muted/30 pb-4">
         <CardTitle className="text-lg flex items-center gap-2">
           <History className="h-5 w-5 text-gold" />
-          Log de Auditoria
+          Log de Auditoria Técnica e Comercial
         </CardTitle>
-        <CardDescription>Histórico detalhado e perene de vendas, cancelamentos, edições e estornos no módulo de programas.</CardDescription>
+        <CardDescription>Histórico detalhado e perene de vendas, cancelamentos, exclusões e estornos no módulo de programas.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -2327,8 +2479,8 @@ function AuditoriaProgramasTab() {
                     </Badge>
                   </td>
                   <td className="p-4">
-                    <div className="font-semibold text-xs">{log.clientes?.nome || log.valor_posterior?.nome || '-'}</div>
-                    <div className="text-[10px] text-muted-foreground">{log.pets?.nome || log.valor_anterior?.nome || '-'}</div>
+                    <div className="font-semibold text-xs">{log.clientes?.nome || log.valor_posterior?.nome || log.valor_anterior?.nome || (log.valor_anterior?.contratos_excluidos?.length ? `${log.valor_anterior.contratos_excluidos.length} contrato(s)` : '-')}</div>
+                    <div className="text-[10px] text-muted-foreground">{log.pets?.nome || log.valor_anterior?.cliente || '-'}</div>
                   </td>
                   <td className="p-4 text-xs italic text-muted-foreground/80">{log.motivo || '-'}</td>
                 </tr>
