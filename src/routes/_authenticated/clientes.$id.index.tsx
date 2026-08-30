@@ -71,6 +71,7 @@ function ClienteDetalhe() {
         .select("id, atendimento_id, valor_total, valor_pago, forma, status, data_pagamento, vencimento, categoria_receita, descricao, idempotency_key, arquivado_em, atendimentos(pet_id, finalizado, valor_executado, taxa_leva_traz, desconto)")
         .eq("cliente_id", id)
         .is("arquivado_em", null)
+        .neq("status", "cancelado")
         .order("created_at", { ascending: false })
         .limit(60);
       return (rows ?? []).map((r: any) => {
@@ -136,11 +137,13 @@ function ClienteDetalhe() {
 
   const pendencias = (pagamentos ?? []).filter((p: any) => 
     (p.status === "pendente" || p.status === "parcial" || p.status === "atrasado") && 
-    !p.arquivado_em
+    !p.arquivado_em &&
+    p.status !== "cancelado" &&
+    (Number(p.valor) - Number(p.valor_pago || 0)) > 0
   );
-  const totalPendente = pendencias.reduce((s: number, p: any) => s + (Number(p.valor) - Number(p.valor_pago || 0)), 0);
+  const totalPendente = pendencias.reduce((s: number, p: any) => s + Math.max(0, Number(p.valor) - Number(p.valor_pago || 0)), 0);
   const totalRecebido = (pagamentos ?? [])
-    .filter((p: any) => p.status === "pago" || p.status === "parcial")
+    .filter((p: any) => (p.status === "pago" || p.status === "parcial") && !p.arquivado_em && p.status !== "cancelado")
     .reduce((s: number, p: any) => s + Number(p.valor_pago || 0), 0);
 
   const enderecoLinhas = [

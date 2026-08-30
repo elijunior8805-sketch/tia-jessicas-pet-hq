@@ -69,6 +69,24 @@ function FichaOperacional() {
     },
   });
 
+  const { data: programaContratado } = useQuery({
+    queryKey: ["pet-programa-ativo", petId],
+    enabled: !!pet,
+    queryFn: async () => {
+      const { data: rows } = await supabase
+        .from("programas_contratados" as any)
+        .select(`
+          id, nome_snapshot, composicao_snapshot, data_de_inicio, data_de_validade, status_do_programa,
+          movimentacoes:programas_creditos_movimentacoes(id, servico_id, quantidade, tipo)
+        `)
+        .or(`pet_id.eq.${petId},and(cliente_id.eq.${pet!.cliente_id},pet_id.is.null)`)
+        .not("status_do_programa", "eq", "cancelado")
+        .order("criado_em", { ascending: false })
+        .limit(1);
+      return rows?.[0] ?? null;
+    },
+  });
+
   if (isLoading) return <PageShell><div className="text-sm text-muted-foreground">Carregando ficha…</div></PageShell>;
   if (!pet) return <PageShell><div className="text-sm text-muted-foreground">Pet não encontrado.</div></PageShell>;
 
@@ -79,6 +97,8 @@ function FichaOperacional() {
   if (pet.alergias) alertas.push(`Alergias: ${pet.alergias}`);
   if ((pet as any).cuidados_saude) alertas.push(`Saúde: ${(pet as any).cuidados_saude}`);
   if (pet.necessita_focinheira) alertas.push(`Focinheira obrigatória`);
+
+  const movs = ((programaContratado as any)?.movimentacoes as any[]) ?? [];
 
   return (
     <PageShell>
@@ -129,6 +149,52 @@ function FichaOperacional() {
               <ul className="mt-1 space-y-0.5 text-sm">
                 {alertas.map((a, i) => <li key={i}>• {a}</li>)}
               </ul>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Programa de Cuidado do Pet */}
+      {programaContratado && (
+        <Card className="p-4 mb-4 border-l-4 border-l-primary bg-primary/5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase font-bold text-muted-foreground">Programa de Cuidado</span>
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
+                  {(programaContratado as any).status_do_programa}
+                </Badge>
+              </div>
+              <h3 className="font-display font-semibold text-lg text-primary">
+                {(programaContratado as any).nome_snapshot}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Válido até {(programaContratado as any).data_de_validade ? new Date((programaContratado as any).data_de_validade).toLocaleDateString("pt-BR") : "—"}
+              </p>
+            </div>
+
+            {/* Créditos */}
+            <div className="flex flex-wrap gap-2">
+              {Array.isArray((programaContratado as any).composicao_snapshot) && (programaContratado as any).composicao_snapshot.map((item: any, idx: number) => {
+                const movsItem = movs.filter((m: any) => m.servico_id === item.servico_id);
+                let contratados = item.quantidade || 1;
+                let consumidos = 0;
+                let reservados = 0;
+                movsItem.forEach((m: any) => {
+                  if (m.tipo === "credito_consumido") consumidos += Number(m.quantidade || 0);
+                  if (m.tipo === "credito_reservado") reservados += Number(m.quantidade || 0);
+                });
+                const disponiveis = Math.max(0, contratados - consumidos - reservados);
+
+                return (
+                  <div key={idx} className="bg-background rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 shadow-sm">
+                    <span className="font-medium">{item.nome}</span>
+                    <Badge variant="secondary" className="font-bold text-primary">
+                      {disponiveis} disponíveis
+                    </Badge>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </Card>
