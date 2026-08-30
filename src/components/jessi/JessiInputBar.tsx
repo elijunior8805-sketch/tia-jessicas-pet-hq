@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { Mic, MicOff, Send, Paperclip, X, Image as ImageIcon, FileText } from "lucide-react";
+import React, { useRef } from "react";
+import { Mic, MicOff, Send, Paperclip, X, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -8,9 +8,10 @@ interface JessiInputBarProps {
   setInputText: (val: string) => void;
   onSend: () => void;
   isLoading: boolean;
-  voiceStatus: "idle" | "listening" | "reviewing";
+  voiceStatus: "idle" | "listening" | "reviewing" | "requesting_permission" | "finalizing" | "error" | "processing";
   onToggleVoice: () => void;
   onCancelVoice: () => void;
+  interimTranscript?: string;
   selectedFile: File | null;
   onSelectFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveFile: () => void;
@@ -24,11 +25,13 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
   voiceStatus,
   onToggleVoice,
   onCancelVoice,
+  interimTranscript,
   selectedFile,
   onSelectFile,
   onRemoveFile,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isListening = voiceStatus === "listening" || voiceStatus === "requesting_permission";
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -41,6 +44,38 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
   return (
     <div className="border-t border-border/70 bg-background/95 backdrop-blur-xs p-3 md:p-4 space-y-2">
+      {/* Visual de gravação de voz em tempo real */}
+      {isListening && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-red-50 text-red-950 border border-red-200 text-xs animate-pulse">
+          <div className="flex items-center gap-2 truncate">
+            <span className="h-2 w-2 rounded-full bg-red-600 animate-ping shrink-0" />
+            <span className="font-semibold text-red-900 shrink-0">Ouvindo sua voz:</span>
+            <span className="italic text-red-800 truncate">
+              {interimTranscript || inputText || "Fale seu comando..."}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={onToggleVoice}
+              className="h-7 px-2.5 text-[11px] font-semibold gap-1 rounded-lg"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Concluir Fala
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onCancelVoice}
+              className="h-7 px-2 text-[11px] border-red-200 text-red-800 hover:bg-red-100 rounded-lg"
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {selectedFile && (
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-medium">
           {selectedFile.type.startsWith("image/") ? (
@@ -75,7 +110,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
           onClick={() => fileInputRef.current?.click()}
           disabled={isLoading}
           title="Anexar comprovante ou imagem"
-          className="h-10 w-10 shrink-0 border-border/80 text-muted-foreground hover:text-foreground"
+          className="h-10 w-10 shrink-0 border-border/80 text-muted-foreground hover:text-foreground rounded-xl"
         >
           <Paperclip className="h-4 w-4" />
         </Button>
@@ -83,15 +118,17 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
         <Button
           type="button"
           size="icon"
-          variant={voiceStatus === "listening" ? "destructive" : "outline"}
-          onClick={voiceStatus === "listening" ? onCancelVoice : onToggleVoice}
+          variant={isListening ? "destructive" : "outline"}
+          onClick={onToggleVoice}
           disabled={isLoading}
-          title={voiceStatus === "listening" ? "Parar gravação" : "Falar por voz"}
-          className={`h-10 w-10 shrink-0 border-border/80 ${
-            voiceStatus === "listening" ? "animate-pulse" : "text-muted-foreground hover:text-emerald-700"
+          title={isListening ? "Parar gravação de voz" : "Falar comando por voz"}
+          className={`h-10 w-10 shrink-0 border-border/80 rounded-xl transition-all ${
+            isListening
+              ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
+              : "text-muted-foreground hover:text-emerald-700 hover:border-emerald-600/40"
           }`}
         >
-          {voiceStatus === "listening" ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
         </Button>
 
         <div className="flex-1 relative">
@@ -100,8 +137,8 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              voiceStatus === "listening"
-                ? "Ouvindo sua instrução..."
+              isListening
+                ? "Ouvindo sua voz..."
                 : "Fale com a Jessi: consultar agenda, buscar cliente, verificar saldos, comprovantes..."
             }
             rows={1}

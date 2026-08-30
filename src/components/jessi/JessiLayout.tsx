@@ -10,6 +10,7 @@ import { JessiStatusIndicator, JessiStatus } from "./JessiStatusIndicator";
 import { processarMensagemJessi } from "@/lib/ia/jessi-agent.functions";
 import { JessiMessage, JessiPendingAction } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
+import { useJessiVoice } from "@/lib/ia/useJessiVoice";
 import { Sparkles, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,7 +22,6 @@ export const JessiLayout: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<JessiStatus>("disponivel");
   const [statusDetalhe, setStatusDetalhe] = useState<string | undefined>();
-  const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "reviewing">("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [contexto, setContexto] = useState<JessiContextState>({
@@ -29,6 +29,40 @@ export const JessiLayout: React.FC = () => {
   });
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [moduloAtivo, setModuloAtivo] = useState("rotina");
+
+  // Hook real de reconhecimento de voz
+  const {
+    voiceStatus,
+    isListening,
+    interimTranscript,
+    finalTranscript,
+    startListening,
+    stopListening,
+    cancelListening,
+  } = useJessiVoice((textoFinal) => {
+    if (textoFinal.trim()) {
+      setInputText(textoFinal);
+    }
+  });
+
+  // Sincroniza status visual quando estiver gravando voz
+  React.useEffect(() => {
+    if (isListening) {
+      setStatus("ouvindo");
+      setStatusDetalhe("Ouvindo comando de voz...");
+    } else if (status === "ouvindo") {
+      setStatus("disponivel");
+      setStatusDetalhe(undefined);
+    }
+  }, [isListening]);
+
+  const handleToggleVoice = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening(inputText);
+    }
+  };
 
   const handleNovaConversa = () => {
     setMessages([]);
@@ -265,8 +299,9 @@ export const JessiLayout: React.FC = () => {
           onSend={() => handleSendMessage()}
           isLoading={isLoading}
           voiceStatus={voiceStatus}
-          onToggleVoice={() => toast.info("Reconhecimento de voz ativo.")}
-          onCancelVoice={() => setVoiceStatus("idle")}
+          onToggleVoice={handleToggleVoice}
+          onCancelVoice={cancelListening}
+          interimTranscript={interimTranscript}
           selectedFile={selectedFile}
           onSelectFile={handleFileSelect}
           onRemoveFile={() => {
