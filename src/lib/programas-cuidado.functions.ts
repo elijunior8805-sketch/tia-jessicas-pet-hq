@@ -506,11 +506,12 @@ export const reservarCredito = createServerFn({ method: "POST" })
     const userId = context.userId;
 
     // 1. Identifica a categoria do serviço solicitado
-    const { data: servicoEscolhido } = await sb
+    const { data: servicoEscolhidoRaw } = await sb
       .from("servicos" as any)
       .select("id, nome, categoria")
       .eq("id", data.servico_id)
       .single();
+    const servicoEscolhido = servicoEscolhidoRaw as any;
 
     const categoriaRequerida = identificarCategoriaCredito(servicoEscolhido || { id: data.servico_id });
 

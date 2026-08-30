@@ -42,11 +42,12 @@ export const diagnosticarContratacao = createServerFn({ method: "POST" })
         .select("id, servico_id, quantidade, tipo")
         .eq("programa_contratado_id", contrato.id);
 
-      const { data: pagamentoContrato } = await sb
+      const { data: pagamentoContratoRaw } = await sb
         .from("pagamentos" as any)
         .select("id, valor_total, valor_pago, status")
         .eq("idempotency_key", `programa_${contrato.id}`)
         .maybeSingle();
+      const pagamentoContrato = pagamentoContratoRaw as any;
 
       if (pagamentoContrato) {
         pagamentosVinculados.add(pagamentoContrato.id);
@@ -132,11 +133,12 @@ export const repararContratacao = createServerFn({ method: "POST" })
     }
 
     // 1. Validar pagamento
-    const { data: pagamento, error: pErr } = await sb
+    const { data: pagamentoRaw, error: pErr } = await sb
       .from("pagamentos" as any)
       .select("*")
       .eq("id", data.pagamento_id)
       .single();
+    const pagamento = pagamentoRaw as any;
 
     if (pErr || !pagamento) throw new Error("Pagamento não encontrado.");
     if (pagamento.categoria_receita !== "programa_cuidado") {
@@ -163,12 +165,12 @@ export const repararContratacao = createServerFn({ method: "POST" })
         .maybeSingle();
 
       if (existente) {
-        contract_id = existente.id;
+        contract_id = (existente as any).id;
         // Verificar se precisa corrigir créditos
         const { data: creds } = await sb
           .from("programas_creditos_movimentacoes" as any)
           .select("id")
-          .eq("programa_contratado_id", existente.id);
+          .eq("programa_contratado_id", (existente as any).id);
 
         if (!creds || creds.length === 0) {
           // Contrato existe mas sem créditos — criar
@@ -188,7 +190,7 @@ export const repararContratacao = createServerFn({ method: "POST" })
                 })
                 .select("id")
                 .single();
-              if (mov) creditos_ids.push(mov.id);
+              if (mov) creditos_ids.push((mov as any).id);
             }
           }
         }
@@ -288,7 +290,7 @@ export const repararContratacao = createServerFn({ method: "POST" })
         })
         .select("id")
         .single();
-      if (mov) creditos_ids.push(mov.id);
+      if (mov) creditos_ids.push((mov as any).id);
     }
 
     // Vincular pagamento ao contrato

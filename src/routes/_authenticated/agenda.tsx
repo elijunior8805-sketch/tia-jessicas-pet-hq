@@ -1844,7 +1844,7 @@ function NovoAgendamentoDialog({
                         )}
                       </div>
                       {idx === 0 && <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</div>}
-                    </div>
+
                     <Input
                       type="number" min={0} step="0.01"
                       value={it.valor_unit}
