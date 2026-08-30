@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Package, Scissors, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Scissors, Search, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { excluirServicoSeguro, duplicarServico } from "@/lib/servicos.functions";
 
 export const Route = createFileRoute("/_authenticated/servicos")({
   component: ServicosPage,
@@ -137,11 +138,21 @@ function ServicosPage() {
 
   const removerServico = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("servicos").delete().eq("id", id);
-      if (error) throw error;
+      return excluirServicoSeguro({ data: { servico_id: id } });
     },
-    onSuccess: () => {
-      toast.success("Serviço excluído");
+    onSuccess: (res: any) => {
+      toast.success(res?.mensagem || "Operação realizada com sucesso");
+      qc.invalidateQueries({ queryKey: ["servicos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const duplicarServicoMut = useMutation({
+    mutationFn: async (id: string) => {
+      return duplicarServico({ data: { servico_id: id } });
+    },
+    onSuccess: (res: any) => {
+      toast.success(`Serviço "${res?.nome}" duplicado com sucesso!`);
       qc.invalidateQueries({ queryKey: ["servicos"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -192,12 +203,27 @@ function ServicosPage() {
             precos={precos}
             loading={isLoading}
             onEdit={(s) => { setEditing(s); setOpenForm(true); }}
+            onDuplicate={(id) => duplicarServicoMut.mutate(id)}
             onPrecos={(s) => setOpenPrecos(s)}
             onDelete={(id) => removerServico.mutate(id)}
           />
         </TabsContent>
 
         <TabsContent value="combos" className="mt-4">
+          <ServicosList
+            isCombo
+            items={filtrados}
+            portes={portes}
+            precos={precos}
+            comboItens={comboItens}
+            allServicos={servicos}
+            loading={isLoading}
+            onEdit={(s) => { setEditing(s); setOpenForm(true); }}
+            onDuplicate={(id) => duplicarServicoMut.mutate(id)}
+            onCombo={(s) => setOpenCombo(s)}
+            onDelete={(id) => removerServico.mutate(id)}
+          />
+        </TabsContent>
           <ServicosList
             items={filtrados}
             portes={portes}
@@ -245,13 +271,14 @@ function ServicosPage() {
 
 /* -------------------- LISTA -------------------- */
 function ServicosList({
-  items, portes, precos, loading, onEdit, onPrecos, onDelete, isCombo, comboItens, allServicos, onCombo,
+  items, portes, precos, loading, onEdit, onDuplicate, onPrecos, onDelete, isCombo, comboItens, allServicos, onCombo,
 }: {
   items: Servico[];
   portes: Porte[];
   precos: Preco[];
   loading: boolean;
   onEdit: (s: Servico) => void;
+  onDuplicate?: (id: string) => void;
   onDelete: (id: string) => void;
   onPrecos?: (s: Servico) => void;
   isCombo?: boolean;
@@ -364,6 +391,11 @@ function ServicosList({
               <Button size="sm" variant="ghost" onClick={() => onEdit(s)} aria-label={`Editar ${s.nome}`}>
                 <Pencil className="h-4 w-4" />
               </Button>
+              {onDuplicate && (
+                <Button size="sm" variant="ghost" onClick={() => onDuplicate(s.id)} aria-label={`Duplicar ${s.nome}`} title="Duplicar serviço">
+                  <Copy className="h-4 w-4" />
+                </Button>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button size="sm" variant="ghost" aria-label={`Excluir ${s.nome}`}>

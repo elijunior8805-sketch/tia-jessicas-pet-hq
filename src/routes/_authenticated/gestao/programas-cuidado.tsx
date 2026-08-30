@@ -30,7 +30,9 @@ import {
   Square,
   Eye,
   FileSpreadsheet,
-  Copy
+  Copy,
+  Link as LinkIcon,
+  PlayCircle
 } from "lucide-react";
 
 import { useState, useMemo, useEffect } from "react";
@@ -39,6 +41,8 @@ import {
   toggleProgramaStatus,
   duplicarPrograma,
   excluirRascunhosProgramas,
+  consultarVinculosPrograma,
+  excluirProgramaCatalogo,
   normalizarNomeCopia,
   contratarPrograma,
   reconciliarCreditosPet
@@ -134,11 +138,21 @@ function ProgramasCuidadoPage() {
   const [selectedContratoId, setSelectedContratoId] = useState<string | null>(null);
   const [programaParaArquivar, setProgramaParaArquivar] = useState<any | null>(null);
 
-  // Duplicação e Exclusão de Rascunhos do Catálogo
+  // Duplicação e Exclusão Inteligente de Programas do Catálogo
   const [selectedRascunhosIds, setSelectedRascunhosIds] = useState<string[]>([]);
   const [programaParaDuplicar, setProgramaParaDuplicar] = useState<any | null>(null);
   const [openExcluirRascunhosDialog, setOpenExcluirRascunhosDialog] = useState(false);
   const [motivoExcluirRascunhos, setMotivoExcluirRascunhos] = useState("");
+
+  // Diálogo de Exclusão Inteligente e Vínculos
+  const [programaParaExcluir, setProgramaParaExcluir] = useState<any | null>(null);
+  const [vinculosInfo, setVinculosInfo] = useState<any | null>(null);
+  const [carregandoVinculos, setCarregandoVinculos] = useState(false);
+  const [motivoExcluirPrograma, setMotivoExcluirPrograma] = useState("");
+  const [forcarCancelamentoTestes, setForcarCancelamentoTestes] = useState(false);
+
+  // Diálogo de Consulta de Vínculos
+  const [programaParaVerVinculos, setProgramaParaVerVinculos] = useState<any | null>(null);
 
   // Seleção e Cancelamento de Contratos Vendidos em Lote / Individual
   const [selectedContratosIds, setSelectedContratosIds] = useState<string[]>([]);
@@ -277,8 +291,7 @@ function ProgramasCuidadoPage() {
   const duplicarMutation = useMutation({
     mutationFn: (vars: { id: string }) => duplicarPrograma({ data: { id: vars.id } }),
     onSuccess: (res: any) => {
-      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
-      queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
+      invalidarTodosCaches();
       toast.success(`Programa duplicado com sucesso como "${res.nome}"!`);
       setProgramaParaDuplicar(null);
     },
@@ -291,8 +304,7 @@ function ProgramasCuidadoPage() {
     mutationFn: (vars: { programa_ids: string[]; motivo: string }) =>
       excluirRascunhosProgramas({ data: vars }),
     onSuccess: (res: any) => {
-      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
-      queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
+      invalidarTodosCaches();
       toast.success(`${res.total_processados} rascunho(s) excluído(s) com sucesso!`);
       setSelectedRascunhosIds([]);
       setOpenExcluirRascunhosDialog(false);
@@ -302,6 +314,56 @@ function ProgramasCuidadoPage() {
       toast.error("Erro ao excluir rascunhos: " + err.message);
     }
   });
+
+  const excluirProgramaCatalogoMut = useMutation({
+    mutationFn: (vars: { programa_id: string; motivo: string; forcar_cancelamento_testes: boolean }) =>
+      excluirProgramaCatalogo({ data: vars }),
+    onSuccess: (res: any) => {
+      invalidarTodosCaches();
+      toast.success(`Programa "${res.nome}" excluído do catálogo com sucesso!`);
+      setProgramaParaExcluir(null);
+      setVinculosInfo(null);
+      setMotivoExcluirPrograma("");
+      setForcarCancelamentoTestes(false);
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir programa: " + err.message);
+    }
+  });
+
+  // Abre diálogo de exclusão e consulta vínculos automaticamente
+  const handleAbrirExclusaoPrograma = async (prog: any) => {
+    setProgramaParaExcluir(prog);
+    setCarregandoVinculos(true);
+    setVinculosInfo(null);
+    setMotivoExcluirPrograma("");
+    setForcarCancelamentoTestes(false);
+
+    try {
+      const info = await consultarVinculosPrograma({ data: { programa_id: prog.id } });
+      setVinculosInfo(info);
+    } catch (e: any) {
+      toast.error("Erro ao consultar vínculos: " + e.message);
+    } finally {
+      setCarregandoVinculos(false);
+    }
+  };
+
+  // Abre diálogo de consulta de vínculos
+  const handleAbrirVinculosPrograma = async (prog: any) => {
+    setProgramaParaVerVinculos(prog);
+    setCarregandoVinculos(true);
+    setVinculosInfo(null);
+
+    try {
+      const info = await consultarVinculosPrograma({ data: { programa_id: prog.id } });
+      setVinculosInfo(info);
+    } catch (e: any) {
+      toast.error("Erro ao consultar vínculos: " + e.message);
+    } finally {
+      setCarregandoVinculos(false);
+    }
+  };
 
   const contratarMutation = useMutation({
     mutationFn: (vars: any) => contratarPrograma({ data: vars }),
@@ -437,7 +499,7 @@ function ProgramasCuidadoPage() {
     mutationFn: (vars: { id: string, status: "ativo" | "inativo" | "rascunho" }) => 
       toggleProgramaStatus({ data: vars }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
+      invalidarTodosCaches();
       toast.success("Status atualizado com sucesso");
       setProgramaParaArquivar(null);
     }
@@ -703,30 +765,79 @@ function ProgramasCuidadoPage() {
                             {getStatusBadge(programa.status)}
                           </div>
 
-                          <div className="flex gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-gold"
-                              title="Editar programa"
-                              onClick={() => {
-                                setEditingPrograma(programa);
-                                setIsProgramaModalOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-gold" 
-                              title="Duplicar programa"
-                              onClick={() => setProgramaParaDuplicar(programa)}
-                              disabled={duplicarMutation.isPending}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {/* BOTÃO DE AÇÕES EM TODOS OS CARDS DO CATÁLOGO */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuLabel className="text-xs">Ações do Catálogo</DropdownMenuLabel>
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2"
+                                onClick={() => handleAbrirVinculosPrograma(programa)}
+                              >
+                                <Eye className="h-3.5 w-3.5 text-primary" /> Ver detalhes e vínculos
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2"
+                                onClick={() => {
+                                  setEditingPrograma(programa);
+                                  setIsProgramaModalOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5 text-gold" /> Editar programa
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2"
+                                onClick={() => setProgramaParaDuplicar(programa)}
+                              >
+                                <Copy className="h-3.5 w-3.5 text-primary" /> Duplicar programa
+                              </DropdownMenuItem>
+                              
+                              {programa.status === "rascunho" && (
+                                <DropdownMenuItem 
+                                  className="text-xs cursor-pointer gap-2 text-emerald-600 focus:text-emerald-700 font-semibold"
+                                  onClick={() => toggleStatusMutation.mutate({ id: programa.id, status: "ativo" })}
+                                >
+                                  <PlayCircle className="h-3.5 w-3.5" /> Publicar no Catálogo
+                                </DropdownMenuItem>
+                              )}
+
+                              {programa.status === "ativo" && (
+                                <DropdownMenuItem 
+                                  className="text-xs cursor-pointer gap-2 text-amber-700 focus:text-amber-800"
+                                  onClick={() => setProgramaParaArquivar(programa)}
+                                >
+                                  <Archive className="h-3.5 w-3.5" /> Arquivar programa
+                                </DropdownMenuItem>
+                              )}
+
+                              {programa.status === "inativo" && (
+                                <DropdownMenuItem 
+                                  className="text-xs cursor-pointer gap-2 text-emerald-600 focus:text-emerald-700"
+                                  onClick={() => toggleStatusMutation.mutate({ id: programa.id, status: "ativo" })}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" /> Reativar programa
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2 text-rose-600 focus:text-rose-700 font-semibold"
+                                onClick={() => handleAbrirExclusaoPrograma(programa)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Excluir programa / cópia
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2 text-muted-foreground"
+                                onClick={() => setActiveTab("auditoria")}
+                              >
+                                <History className="h-3.5 w-3.5" /> Ver auditoria
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <CardTitle className="text-xl font-display text-zinc-900 dark:text-zinc-100 group-hover:text-gold transition-colors">
                           {programa.nome}
@@ -1202,6 +1313,205 @@ function ProgramasCuidadoPage() {
         </TabsContent>
       </Tabs>
 
+      {/* DIÁLOGO DE EXCLUSÃO INTELIGENTE DE PROGRAMA DO CATÁLOGO COM VÍNCULOS */}
+      <Dialog open={Boolean(programaParaExcluir)} onOpenChange={(v) => !v && setProgramaParaExcluir(null)}>
+        <DialogContent className="sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800 font-display text-lg">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Excluir Programa do Catálogo?
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              Verifique os vínculos antes de confirmar a exclusão deste programa modelo.
+            </DialogDescription>
+          </DialogHeader>
+
+          {carregandoVinculos ? (
+            <div className="py-8 text-center text-xs text-muted-foreground animate-pulse">
+              Consultando vínculos e contratos associados...
+            </div>
+          ) : programaParaExcluir && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 bg-muted/40 rounded-lg border space-y-1.5">
+                <div className="flex justify-between font-semibold">
+                  <span>Programa:</span>
+                  <span>{programaParaExcluir.nome}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>ID:</span>
+                  <span className="font-mono">{programaParaExcluir.id}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Status no Catálogo:</span>
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold">{programaParaExcluir.status}</Badge>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Preço Configurado:</span>
+                  <span className="font-bold text-foreground">{brl(Number(programaParaExcluir.preco_do_programa || 0))}</span>
+                </div>
+              </div>
+
+              {/* Status dos Vínculos */}
+              {vinculosInfo && vinculosInfo.total_contratos === 0 ? (
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] leading-relaxed">
+                  ✓ <strong>Sem vínculos comerciais:</strong> Este programa é um rascunho/cópia sem contratos, créditos ou pagamentos. Pode ser excluído permanentemente com segurança.
+                </div>
+              ) : vinculosInfo && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-2 text-[11px]">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    Existem {vinculosInfo.total_contratos} contrato(s) vinculados a este programa:
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 pt-1 border-t border-amber-200">
+                    <span>Ativos: <strong>{vinculosInfo.contratos_ativos_count}</strong></span>
+                    <span>Aguardando: <strong>{vinculosInfo.contratos_pendentes_count}</strong></span>
+                    <span>Cancelados: <strong>{vinculosInfo.contratos_cancelados_count}</strong></span>
+                  </div>
+                  <div className="pt-2 flex items-center gap-2 border-t border-amber-200">
+                    <Checkbox
+                      checked={forcarCancelamentoTestes}
+                      onCheckedChange={(v) => setForcarCancelamentoTestes(Boolean(v))}
+                      id="forcar_cancelamento"
+                    />
+                    <Label htmlFor="forcar_cancelamento" className="text-[11px] font-semibold text-rose-800 cursor-pointer">
+                      Excluir como dados de teste e cancelar todos os vínculos automaticamente
+                    </Label>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Motivo Obrigatório da Exclusão (Auditoria)</Label>
+                <Textarea
+                  value={motivoExcluirPrograma}
+                  onChange={(e) => setMotivoExcluirPrograma(e.target.value)}
+                  placeholder="Informe o motivo da exclusão deste programa (mínimo 3 letras)..."
+                  className="text-xs"
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2 sm:justify-between">
+            {vinculosInfo && vinculosInfo.total_contratos > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs text-amber-800 border-amber-300 hover:bg-amber-50"
+                onClick={() => {
+                  toggleStatusMutation.mutate({ id: programaParaExcluir.id, status: "inativo" });
+                  setProgramaParaExcluir(null);
+                }}
+              >
+                <Archive className="mr-1.5 h-3.5 w-3.5" /> Arquivar (Recomendado)
+              </Button>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setProgramaParaExcluir(null)}>
+                Voltar
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={
+                  excluirProgramaCatalogoMut.isPending || 
+                  motivoExcluirPrograma.trim().length < 3 ||
+                  (vinculosInfo && vinculosInfo.total_contratos > 0 && !forcarCancelamentoTestes)
+                }
+                onClick={() => {
+                  if (motivoExcluirPrograma.trim().length < 3) {
+                    toast.error("Informe o motivo da exclusão.");
+                    return;
+                  }
+                  excluirProgramaCatalogoMut.mutate({
+                    programa_id: programaParaExcluir.id,
+                    motivo: motivoExcluirPrograma,
+                    forcar_cancelamento_testes: forcarCancelamentoTestes
+                  });
+                }}
+              >
+                {excluirProgramaCatalogoMut.isPending ? "Excluindo..." : "Excluir permanentemente"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DE CONSULTA DE VÍNCULOS E DETALHES */}
+      <Dialog open={Boolean(programaParaVerVinculos)} onOpenChange={(v) => !v && setProgramaParaVerVinculos(null)}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary font-display text-lg">
+              <LinkIcon className="h-5 w-5 text-gold" />
+              Vínculos e Detalhes do Programa
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {programaParaVerVinculos?.nome} (ID: {programaParaVerVinculos?.id})
+            </DialogDescription>
+          </DialogHeader>
+
+          {carregandoVinculos ? (
+            <div className="py-8 text-center text-xs text-muted-foreground animate-pulse">
+              Carregando vínculos...
+            </div>
+          ) : vinculosInfo && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="p-3 bg-muted/30 rounded-lg border space-y-1">
+                <div className="flex justify-between">
+                  <span>Preço do Programa:</span>
+                  <strong className="text-gold">{brl(Number(vinculosInfo.programa?.preco_do_programa || 0))}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Validade:</span>
+                  <strong>{vinculosInfo.programa?.validade_em_dias} dias</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Status:</span>
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold">{vinculosInfo.programa?.status}</Badge>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Contratos Vendidos ({vinculosInfo.total_contratos})</Label>
+                {vinculosInfo.contratos.length > 0 ? (
+                  <div className="max-h-48 overflow-y-auto rounded-lg border divide-y bg-card">
+                    {vinculosInfo.contratos.map((c: any) => (
+                      <div key={c.id} className="p-2.5 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-semibold">{c.clientes?.nome || "Cliente"} · Pet: {c.pets?.nome || "Pet"}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Vendido por {brl(Number(c.preco_vendido || 0))} em {new Date(c.criado_em).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                        <Badge className={
+                          c.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800" :
+                          c.status_do_programa === "aguardando_pagamento" ? "bg-amber-100 text-amber-800" :
+                          "bg-zinc-200 text-zinc-700"
+                        }>
+                          {c.status_do_programa}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="p-4 text-center text-muted-foreground italic bg-muted/20 rounded-lg border">
+                    Nenhum contrato vendido para este programa.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" size="sm" onClick={() => setProgramaParaVerVinculos(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* DIÁLOGO DE CONFIRMAÇÃO DE DUPLICAÇÃO DE PROGRAMA */}
       <Dialog open={Boolean(programaParaDuplicar)} onOpenChange={(v) => !v && setProgramaParaDuplicar(null)}>
         <DialogContent className="sm:max-w-[480px]">
@@ -1322,6 +1632,39 @@ function ProgramasCuidadoPage() {
               }}
             >
               {excluirRascunhosMutation.isPending ? "Excluindo..." : "Confirmar Exclusão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DE CONFIRMAÇÃO DE ARQUIVAMENTO DO CATÁLOGO */}
+      <Dialog open={Boolean(programaParaArquivar)} onOpenChange={(v) => !v && setProgramaParaArquivar(null)}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800">
+              <Archive className="h-5 w-5 text-rose-600" />
+              {programaParaArquivar?.status === 'ativo' ? 'Arquivar Programa do Catálogo?' : 'Reativar Programa no Catálogo?'}
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              {programaParaArquivar?.status === 'ativo'
+                ? `O programa "${programaParaArquivar?.nome}" deixará de aparecer para novas vendas. Todos os contratos já vendidos continuarão ativos, válidos e preservados com seus créditos até a expiração.`
+                : `O programa "${programaParaArquivar?.nome}" voltará a ficar disponível no catálogo para novas vendas.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-3">
+            <Button variant="outline" size="sm" onClick={() => setProgramaParaArquivar(null)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              className={programaParaArquivar?.status === 'ativo' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
+              onClick={() => toggleStatusMutation.mutate({
+                id: programaParaArquivar.id,
+                status: programaParaArquivar.status === 'ativo' ? 'inativo' : 'ativo'
+              })}
+              disabled={toggleStatusMutation.isPending}
+            >
+              {toggleStatusMutation.isPending ? "Processando..." : (programaParaArquivar?.status === 'ativo' ? "Sim, arquivar" : "Sim, reativar")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1462,39 +1805,6 @@ function ProgramasCuidadoPage() {
               }}
             >
               {excluirLoteMut.isPending ? "Excluindo..." : "Confirmar Exclusão em Lote"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* DIÁLOGO DE CONFIRMAÇÃO DE ARQUIVAMENTO DO CATÁLOGO */}
-      <Dialog open={Boolean(programaParaArquivar)} onOpenChange={(v) => !v && setProgramaParaArquivar(null)}>
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-rose-800">
-              <Archive className="h-5 w-5 text-rose-600" />
-              {programaParaArquivar?.status === 'ativo' ? 'Arquivar Programa do Catálogo?' : 'Reativar Programa no Catálogo?'}
-            </DialogTitle>
-            <DialogDescription className="text-xs pt-1 leading-relaxed">
-              {programaParaArquivar?.status === 'ativo'
-                ? `O programa "${programaParaArquivar?.nome}" deixará de aparecer para novas vendas. Todos os contratos já vendidos continuarão ativos, válidos e preservados com seus créditos até a expiração.`
-                : `O programa "${programaParaArquivar?.nome}" voltará a ficar disponível no catálogo para novas vendas.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 pt-3">
-            <Button variant="outline" size="sm" onClick={() => setProgramaParaArquivar(null)}>
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              className={programaParaArquivar?.status === 'ativo' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
-              onClick={() => toggleStatusMutation.mutate({
-                id: programaParaArquivar.id,
-                status: programaParaArquivar.status === 'ativo' ? 'inativo' : 'ativo'
-              })}
-              disabled={toggleStatusMutation.isPending}
-            >
-              {toggleStatusMutation.isPending ? "Processando..." : (programaParaArquivar?.status === 'ativo' ? "Sim, arquivar" : "Sim, reativar")}
             </Button>
           </DialogFooter>
         </DialogContent>

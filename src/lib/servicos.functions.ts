@@ -40,3 +40,145 @@ export const upsertServico = createServerFn({ method: "POST" })
       return inserted;
     }
   });
+
+/** Consulta se um serviço possui vínculos operacionais (atendimentos, programas, etc.) */
+export const consultarUsoServico = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    servico_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    // 1. Uso em atendimentos
+    const { count: countAtendimentos } = await sb
+      .from("atendimentos_servicos" as any)
+      .select("id", { count: "exact", head: true })
+      .eq("servico_id", data.servico_id);
+
+    // 2. Uso em programas de cuidado
+    const { count: countProgramas } = await sb
+      .from("programas_de_cuidado_itens" as any)
+      .select("id", { count: "exact", head: true })
+      .eq("servico_id", data.servico_id);
+
+    // 3. Uso em combos
+    const { count: countCombos } = await sb
+      .from("servicos_combo_itens" as any)
+      .select("id", { count: "exact", head: true })
+      .eq("servico_id", data.servico_id);
+
+    const totalUso = (countAtendimentos || 0) + (countProgramas || 0) + (countCombos || 0);
+
+    return {
+      servico_id: data.servico_id,
+      tem_historico: totalUso > 0,
+      total_uso: totalUso,
+      count_atendimentos: countAtendimentos || 0,
+      count_programas: countProgramas || 0,
+      count_combos: countCombos || 0
+    };
+  });
+
+/** Exclui permanentemente ou desativa com segurança caso possua histórico */
+export const excluirServicoSeguro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    servico_id: z.string().uuid(),
+    motivo: z.string().optional()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    // 1. Verifica vínculos
+    const { count: countAtendimentos } = await sb
+      .from("atendimentos_servicos" as any)
+      .select("id", { count: "exact", head: true })
+      .eq("servico_id", data.servico_id);
+
+    const { count: countProgramas } = await sb
+      .from("programas_de_cuidado_itens" as any)
+      .select("id", { count: "exact", head: true })
+      .eq("servico_id", data.servico_id);
+
+    const temHistorico = (countAtendimentos || 0) > 0 || (countProgramas || 0) > 0;
+
+    if (temHistorico) {
+      // Desativa com segurança para preservar relatórios e integridade referencial
+      const { error: uErr } = await sb
+        .from("servicos")
+        .update({ ativo: false } as any)
+        .eq("id", data.servico_id);
+
+      if (uErr) throw uErr;
+
+      return {
+        success: true,
+        acao: "desativado",
+        mensagem: "Serviço possui histórico em atendimentos ou programas. Foi desativado com segurança para preservar seus relatórios."
+      };
+    } else {
+      // Limpa tabelas filhas sem histórico antes de deletar
+      await sb.from("servicos_precos" as any).delete().eq("servico_id", data.servico_id);
+      await sb.from("servicos_combo_itens" as any).delete().eq("servico_id", data.servico_id);
+
+      const { error: dErr } = await sb.from("servicos").delete().eq("id", data.servico_id);
+      if (dErr) throw dErr;
+
+      return {
+        success: true,
+        acao: "excluido_permanente",
+        mensagem: "Serviço excluído permanentemente."
+      };
+    }
+  });
+
+/** Duplica um serviço do catálogo */
+export const duplicarServico = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    servico_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    const { data: original, error: oErr } = await sb
+      .from("servicos")
+      .select("*")
+      .eq("id", data.servico_id)
+      .single();
+
+    if (oErr) throw oErr;
+
+    const { id: _, created_at: __, ...cloneData } = original as any;
+
+    const { data: novo, error: nErr } = await sb
+      .from("servicos")
+      .insert({
+        ...cloneData,
+        nome: `${cloneData.nome} — Cópia`,
+        ativo: true
+      })
+      .select()
+      .single();
+
+    if (nErr) throw nErr;
+
+    // Copia preços por porte se existirem
+    const { data: precosOriginais = [] } = await sb
+      .from("servicos_precos" as any)
+      .select("*")
+      .eq("servico_id", data.servico_id);
+
+    if (precosOriginais && precosOriginais.length > 0) {
+      await sb
+        .from("servicos_precos" as any)
+        .insert(precosOriginais.map((p: any) => ({
+          servico_id: (novo as any).id,
+          porte_id: p.porte_id,
+          valor: p.valor
+        })));
+    }
+
+    return novo;
+  });

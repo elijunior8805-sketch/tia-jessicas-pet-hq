@@ -16,10 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { upsertPrograma } from "@/lib/programas-cuidado.functions";
+import { upsertPrograma, copiarServicoParaPrograma } from "@/lib/programas-cuidado.functions";
 import { getProgramasConfig } from "@/lib/programas-config.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { PackageCheck, Save, Minus, Plus, Percent, DollarSign, Sparkles } from "lucide-react";
+import { PackageCheck, Save, Minus, Plus, Percent, DollarSign, Sparkles, Trash2, Copy, Layers } from "lucide-react";
 
 interface ProgramaFormDialogProps {
   open: boolean;
@@ -53,6 +53,20 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
     enabled: open,
   });
 
+  // Outros programas para destino de cópia de serviços
+  const { data: outrosProgramas = [] } = useQuery({
+    queryKey: ["outros-programas-copia"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("programas_de_cuidado" as any)
+        .select("id, nome")
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: open,
+  });
+
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [validade, setValidade] = useState("30");
@@ -64,6 +78,10 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
   const [tipoDesconto, setTipoDesconto] = useState<"percentual" | "fixo">("percentual");
   const [descontoValor, setDescontoValor] = useState<string>("0");
   const [precoManual, setPrecoManual] = useState<string>("");
+
+  // Estado para copiar serviço para outro programa
+  const [servicoParaCopiar, setServicoParaCopiar] = useState<any | null>(null);
+  const [programaDestinoId, setProgramaDestinoId] = useState<string>("");
 
   // Carrega os dados ao abrir (novo ou edição)
   useEffect(() => {
@@ -99,6 +117,8 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
       setDescontoValor("0");
     }
     setPrecoManual("");
+    setServicoParaCopiar(null);
+    setProgramaDestinoId("");
   }, [open, initial, config]);
 
   const setQuantidade = (id: string, delta: number) =>
@@ -109,6 +129,15 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
       else copia[id] = proximo;
       return copia;
     });
+
+  const removerServicoDoPrograma = (id: string, nomeServico: string) => {
+    setQtd((prev) => {
+      const copia = { ...prev };
+      delete copia[id];
+      return copia;
+    });
+    toast.info(`"${nomeServico}" removido do programa.`);
+  };
 
   const listaFiltrada = useMemo(() => {
     const termo = busca
@@ -186,6 +215,18 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
     onError: (e: any) => toast.error(e?.message ?? "Não foi possível salvar o programa"),
   });
 
+  const copiarServicoMut = useMutation({
+    mutationFn: (vars: { servico_id: string; programa_destino_id: string; quantidade: number }) =>
+      copiarServicoParaPrograma({ data: { ...vars, somar_se_existir: true } }),
+    onSuccess: () => {
+      toast.success("Serviço copiado para o programa de destino com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
+      setServicoParaCopiar(null);
+      setProgramaDestinoId("");
+    },
+    onError: (err: any) => toast.error("Erro ao copiar serviço: " + err.message)
+  });
+
   const handleSave = () => {
     if (!nome.trim()) {
       toast.error("Informe o nome do programa");
@@ -246,11 +287,80 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
             <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="O que o programa inclui?" className="text-xs" rows={2} />
           </div>
 
-          {/* Seleção de Serviços com Pesquisa */}
+          {/* SERVIÇOS ATUALMENTE SELECIONADOS NO PROGRAMA */}
+          {itensSelecionados.length > 0 && (
+            <div className="grid gap-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Layers className="h-4 w-4 text-gold" /> Serviços na Composição ({itensSelecionados.length})
+                </Label>
+                <span className="text-muted-foreground text-[11px]">Subtotal: <strong>{brl(subtotalServicos)}</strong></span>
+              </div>
+              <div className="rounded-lg border divide-y bg-card overflow-hidden">
+                {itensSelecionados.map((it) => (
+                  <div key={it.servico_id} className="p-2.5 flex items-center justify-between gap-2 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{it.nome}</p>
+                      <p className="text-muted-foreground text-[11px]">
+                        {brl(it.valor_unitario_de_referencia)}/un · Total: {brl(it.valor_alocado)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-md">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setQuantidade(it.servico_id, -1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-6 text-center font-bold text-primary">{it.quantidade}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setQuantidade(it.servico_id, 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-gold"
+                        title="Copiar serviço para outro programa"
+                        onClick={() => setServicoParaCopiar(it)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-rose-600 hover:bg-rose-50"
+                        title="Remover este serviço do programa"
+                        onClick={() => removerServicoDoPrograma(it.servico_id, it.nome)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SELEÇÃO / ADIÇÃO DE SERVIÇOS DO CATÁLOGO GERAL */}
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">Serviços Incluídos ({itensSelecionados.length})</Label>
-              <span className="text-muted-foreground">Subtotal Base: <strong>{brl(subtotalServicos)}</strong></span>
+              <Label className="text-xs font-semibold">+ Adicionar Serviços do Catálogo Geral</Label>
+              <span className="text-muted-foreground text-[11px]">{servicos?.length ?? 0} serviços disponíveis</span>
             </div>
             <Input
               value={busca}
@@ -258,7 +368,7 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
               placeholder="Buscar serviço do catálogo (ex: banho simples, hidratação, tosa)..."
               className="text-xs h-8"
             />
-            <ScrollArea className="h-48 rounded-lg border border-sidebar-border/50 bg-card">
+            <ScrollArea className="h-40 rounded-lg border border-sidebar-border/50 bg-card">
               <div className="divide-y">
                 {listaFiltrada.length === 0 && (
                   <p className="p-4 text-center text-muted-foreground italic">Nenhum serviço ativo encontrado.</p>
@@ -384,12 +494,56 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
           </div>
         </div>
 
+        {/* DIÁLOGO EMBUTIDO PARA COPIAR SERVIÇO PARA OUTRO PROGRAMA */}
+        {servicoParaCopiar && (
+          <div className="p-3.5 bg-gold/10 border border-gold/30 rounded-xl space-y-2.5 text-xs animate-in fade-in">
+            <div className="flex items-center justify-between font-semibold">
+              <span className="flex items-center gap-1.5 text-gold">
+                <Copy className="h-4 w-4" /> Copiar "{servicoParaCopiar.nome}" ({servicoParaCopiar.quantidade}x) para outro programa
+              </span>
+              <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setServicoParaCopiar(null)}>Fechar</Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={programaDestinoId} onValueChange={setProgramaDestinoId}>
+                <SelectTrigger className="text-xs h-8 bg-background flex-1">
+                  <SelectValue placeholder="Selecione o programa de destino..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {outrosProgramas
+                    .filter((p: any) => p.id !== initial?.id)
+                    .map((p: any) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.nome}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                className="bg-gold hover:bg-gold/90 text-white text-xs h-8"
+                disabled={!programaDestinoId || copiarServicoMut.isPending}
+                onClick={() => {
+                  copiarServicoMut.mutate({
+                    servico_id: servicoParaCopiar.servico_id,
+                    programa_destino_id: programaDestinoId,
+                    quantidade: servicoParaCopiar.quantidade
+                  });
+                }}
+              >
+                {copiarServicoMut.isPending ? "Copiando..." : "Confirmar Cópia"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <DialogFooter className="gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="text-xs" disabled={mutation.isPending}>
             Cancelar
           </Button>
-          <Button className="bg-gold hover:bg-gold/90 text-white text-xs" onClick={handleSave} disabled={mutation.isPending}>
-            <Save className="mr-1.5 h-4 w-4" />
+          <Button
+            className="bg-gold hover:bg-gold/90 text-white text-xs gap-1.5"
+            onClick={handleSave}
+            disabled={mutation.isPending}
+          >
+            <Save className="h-3.5 w-3.5" />
             {mutation.isPending ? "Salvando..." : "Salvar Programa"}
           </Button>
         </DialogFooter>

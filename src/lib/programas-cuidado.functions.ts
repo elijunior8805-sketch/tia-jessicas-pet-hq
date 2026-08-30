@@ -560,6 +560,198 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
     return clone;
   });
 
+/** Consulta todos os vínculos comerciais e operacionais de um programa do catálogo. */
+export const consultarVinculosPrograma = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    programa_id: z.string().uuid()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    // 1. Programa
+    const { data: prog, error: pErr } = await sb
+      .from("programas_de_cuidado" as any)
+      .select("*, itens:programas_de_cuidado_itens(*, servico:servicos(*))")
+      .eq("id", data.programa_id)
+      .single();
+
+    if (pErr) throw pErr;
+
+    // 2. Contratos vendidos
+    const { data: contratos = [] } = await sb
+      .from("programas_contratados" as any)
+      .select("id, cliente_id, pet_id, status_do_programa, preco_vendido, criado_em, clientes(nome), pets(nome)")
+      .eq("programa_id", data.programa_id);
+
+    const listaContratos = (contratos as any[]) ?? [];
+    const ativos = listaContratos.filter(c => c.status_do_programa === "ativo");
+    const pendentes = listaContratos.filter(c => c.status_do_programa === "aguardando_pagamento");
+    const cancelados = listaContratos.filter(c => c.status_do_programa === "cancelado");
+
+    const podeExcluirDireto = listaContratos.length === 0;
+
+    return {
+      programa: prog,
+      total_contratos: listaContratos.length,
+      contratos_ativos_count: ativos.length,
+      contratos_pendentes_count: pendentes.length,
+      contratos_cancelados_count: cancelados.length,
+      contratos: listaContratos,
+      pode_excluir_direto: podeExcluirDireto,
+      motivo_bloqueio: podeExcluirDireto ? null : `Este programa possui ${listaContratos.length} contrato(s) registrado(s) no sistema.`
+    };
+  });
+
+/** Exclui um programa do catálogo de forma inteligente, tratando vínculos ou desfazendo registros de teste. */
+export const excluirProgramaCatalogo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    programa_id: z.string().uuid(),
+    motivo: z.string().min(3, "Informe o motivo da exclusão"),
+    forcar_cancelamento_testes: z.boolean().default(false)
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+    const nowIso = new Date().toISOString();
+
+    // 1. Busca dados do programa
+    const { data: prog, error: pErr } = await sb
+      .from("programas_de_cuidado" as any)
+      .select("id, nome, status, preco_do_programa")
+      .eq("id", data.programa_id)
+      .single();
+
+    if (pErr) throw pErr;
+
+    // 2. Busca contratos associados
+    const { data: contratos = [] } = await sb
+      .from("programas_contratados" as any)
+      .select("id, status_do_programa")
+      .eq("programa_id", data.programa_id);
+
+    const listaContratos = (contratos as any[]) ?? [];
+
+    if (listaContratos.length > 0 && !data.forcar_cancelamento_testes) {
+      throw new Error(`Não é possível excluir diretamente: existem ${listaContratos.length} contrato(s) vinculado(s). Arquive o programa ou marque a opção de cancelamento de vínculos de teste.`);
+    }
+
+    // 3. Se forçado, cancela todos os contratos vinculados de teste
+    if (listaContratos.length > 0 && data.forcar_cancelamento_testes) {
+      const { cancelarContrato } = await import("./programas-contratos.functions");
+      for (const c of listaContratos) {
+        if (c.status_do_programa !== "cancelado") {
+          await cancelarContrato({
+            data: {
+              contrato_id: c.id,
+              motivo: `Cancelamento de vínculos para exclusão do programa modelo: ${data.motivo}`,
+              estornar_financeiro: true
+            }
+          });
+        }
+      }
+    }
+
+    // 4. Deleta itens do modelo no catálogo
+    await sb
+      .from("programas_de_cuidado_itens" as any)
+      .delete()
+      .eq("programa_id", data.programa_id);
+
+    // 5. Deleta o programa do catálogo
+    const { error: dErr } = await sb
+      .from("programas_de_cuidado" as any)
+      .delete()
+      .eq("id", data.programa_id);
+
+    if (dErr) throw dErr;
+
+    // 6. Registro de Auditoria permanente
+    await sb.from("auditoria_programas" as any).insert({
+      acao: "excluir_programa_catalogo",
+      programa_contratado_id: null,
+      valor_anterior: prog,
+      valor_posterior: null,
+      motivo: data.motivo,
+      usuario_id: userId,
+      created_at: nowIso
+    });
+
+    return {
+      success: true,
+      programa_id: data.programa_id,
+      nome: prog.nome,
+      contratos_cancelados_count: listaContratos.length
+    };
+  });
+
+/** Copia um serviço com sua quantidade para outro programa do catálogo. */
+export const copiarServicoParaPrograma = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    servico_id: z.string().uuid(),
+    programa_destino_id: z.string().uuid(),
+    quantidade: z.number().min(1).default(1),
+    somar_se_existir: z.boolean().default(true)
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    // Busca serviço
+    const { data: servico } = await sb.from("servicos" as any).select("id, nome, valor").eq("id", data.servico_id).single();
+    if (!servico) throw new Error("Serviço não encontrado");
+
+    // Busca itens atuais do destino
+    const { data: itensDestino = [] } = await sb
+      .from("programas_de_cuidado_itens" as any)
+      .select("*")
+      .eq("programa_id", data.programa_destino_id);
+
+    const valorUnit = Number((servico as any).valor || 0);
+    const itemExistente = (itensDestino as any[]).find(i => i.servico_id === data.servico_id);
+
+    if (itemExistente && data.somar_se_existir) {
+      const novaQtd = Number(itemExistente.quantidade || 0) + data.quantidade;
+      await sb
+        .from("programas_de_cuidado_itens" as any)
+        .update({
+          quantidade: novaQtd,
+          valor_alocado: novaQtd * valorUnit
+        })
+        .eq("id", itemExistente.id);
+    } else if (!itemExistente) {
+      await sb
+        .from("programas_de_cuidado_itens" as any)
+        .insert({
+          programa_id: data.programa_destino_id,
+          servico_id: data.servico_id,
+          quantidade: data.quantidade,
+          valor_unitario_de_referencia: valorUnit,
+          valor_alocado: data.quantidade * valorUnit,
+          ordem_de_exibicao: (itensDestino as any[]).length
+        });
+    }
+
+    // Recalcula totais do programa destino
+    const { data: itensAtualizados = [] } = await sb
+      .from("programas_de_cuidado_itens" as any)
+      .select("*")
+      .eq("programa_id", data.programa_destino_id);
+
+    const novoSubtotal = (itensAtualizados as any[]).reduce((acc, i) => acc + Number(i.valor_alocado || 0), 0);
+
+    await sb
+      .from("programas_de_cuidado" as any)
+      .update({
+        valor_normal_dos_servicos: novoSubtotal,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", data.programa_destino_id);
+
+    return { success: true, programa_destino_id: data.programa_destino_id };
+  });
+
 /** Exclui rascunhos de programas selecionados no catálogo garantindo ausência de vínculos comerciais. */
 export const excluirRascunhosProgramas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -584,7 +776,7 @@ export const excluirRascunhosProgramas = createServerFn({ method: "POST" })
         resultados.push({
           id: progId,
           sucesso: false,
-          motivo: "Programa possui contratos vendidos vinculados. Utilize o cancelamento de contratos."
+          motivo: "Programa possui contratos vendidos vinculados. Utilize a opção de exclusão com cancelamento de vínculos."
         });
         continue;
       }
