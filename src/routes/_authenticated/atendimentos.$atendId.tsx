@@ -528,7 +528,7 @@ function AtendimentoDetalhe() {
         pet_id: (atendimento as any).pet_id,
         cliente_id: (atendimento as any).cliente_id,
         servicos: [...rawSolicitados, ...rawExtras].map((s) => ({
-          id: s.id,
+          id: (s as any).id,
           servico_id: s.servico_id,
           nome: s.nome,
           valor: Number(s.valor_total || s.valor_unit || 0),
@@ -577,7 +577,7 @@ function AtendimentoDetalhe() {
             pet_id: (atendimento as any).pet_id,
             cliente_id: (atendimento as any).cliente_id || null,
             servicos_executados: executados.map((s) => ({
-              id: s.id,
+              id: (s as any).id,
               servico_id: s.servico_id,
               nome: s.nome,
               valor: Number(s.valor_total || s.valor_unit || 0),
@@ -846,7 +846,7 @@ function AtendimentoDetalhe() {
             pet_id: (atendimento as any).pet_id,
             cliente_id: (atendimento as any).cliente_id || null,
             servicos_executados: [...solicitados, ...extras].map((s) => ({
-              id: s.id,
+              id: (s as any).id,
               servico_id: s.servico_id,
               nome: s.nome,
               valor: Number(s.valor_total || s.valor_unit || 0),
