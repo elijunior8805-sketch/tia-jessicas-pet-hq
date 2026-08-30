@@ -234,10 +234,13 @@ export function calcularSaldosDoContrato(
 
   // Calcula disponíveis para cada categoria
   let totalDisponiveis = 0;
+  const isCancelado = contrato.status_do_programa === "cancelado";
   const itens = Object.values(categoriasMap).map((it) => {
-    const disponivel = Math.max(0, it.contratados - it.reservados - it.utilizados - it.cancelados - it.expirados);
-    it.disponiveis = isBloqueado ? 0 : disponivel;
-    if (!isBloqueado) totalDisponiveis += disponivel;
+    const disponivel = isCancelado 
+      ? 0 
+      : Math.max(0, it.contratados - it.reservados - it.utilizados - it.cancelados - it.expirados);
+    it.disponiveis = (isBloqueado || isCancelado) ? 0 : disponivel;
+    if (!isBloqueado && !isCancelado) totalDisponiveis += disponivel;
     return it;
   });
 

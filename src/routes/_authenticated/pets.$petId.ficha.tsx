@@ -82,7 +82,7 @@ function FichaOperacional() {
           movimentacoes:programas_creditos_movimentacoes(id, servico_id, quantidade, tipo)
         `)
         .or(`pet_id.eq.${petId},and(cliente_id.eq.${pet!.cliente_id},pet_id.is.null)`)
-        .not("status_do_programa", "eq", "cancelado")
+        .in("status_do_programa", ["ativo", "aguardando_pagamento"])
         .order("criado_em", { ascending: false })
         .limit(1);
       return rows?.[0] ?? null;
