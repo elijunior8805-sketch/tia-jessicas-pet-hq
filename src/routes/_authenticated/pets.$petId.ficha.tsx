@@ -10,6 +10,7 @@ import {
   Pencil, CalendarPlus, FileText, History, User as UserIcon,
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
+import { calcularSaldosDoContrato } from "@/lib/programas-creditos-core";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/ficha")({
   component: FichaOperacional,
@@ -155,50 +156,63 @@ function FichaOperacional() {
       )}
 
       {/* Programa de Cuidado do Pet */}
-      {programaContratado && (
-        <Card className="p-4 mb-4 border-l-4 border-l-primary bg-primary/5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase font-bold text-muted-foreground">Programa de Cuidado</span>
-                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
-                  {(programaContratado as any).status_do_programa}
-                </Badge>
+      {programaContratado && (() => {
+        const resumo = calcularSaldosDoContrato(programaContratado, programaContratado.movimentacoes || []);
+        return (
+          <Card className="p-5 mb-4 border-l-4 border-l-primary bg-primary/[0.03] space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-bold tracking-wider text-muted-foreground">Programa de Cuidado Ativo</span>
+                  <Badge className={cn(
+                    "text-xs",
+                    resumo.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"
+                  )}>
+                    {resumo.status_do_programa === "ativo" ? "Ativo" : "Aguardando pagamento"}
+                  </Badge>
+                </div>
+                <h3 className="font-display font-semibold text-lg text-primary">
+                  {resumo.nome_programa}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Validade: {resumo.data_de_validade ? new Date(resumo.data_de_validade).toLocaleDateString("pt-BR") : "—"} {resumo.dias_restantes > 0 && `(${resumo.dias_restantes} dias restantes)`}
+                </p>
               </div>
-              <h3 className="font-display font-semibold text-lg text-primary">
-                {(programaContratado as any).nome_snapshot}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Válido até {(programaContratado as any).data_de_validade ? new Date((programaContratado as any).data_de_validade).toLocaleDateString("pt-BR") : "—"}
-              </p>
+
+              {/* Botão de Agendamento */}
+              <Link to="/agenda" search={{ cliente: pet.cliente_id, pet: pet.id }}>
+                <Button size="sm" className="gap-1.5 shadow-sm text-xs">
+                  <CalendarPlus className="h-4 w-4" /> Agendar com crédito
+                </Button>
+              </Link>
             </div>
 
-            {/* Créditos */}
-            <div className="flex flex-wrap gap-2">
-              {Array.isArray((programaContratado as any).composicao_snapshot) && (programaContratado as any).composicao_snapshot.map((item: any, idx: number) => {
-                const movsItem = movs.filter((m: any) => m.servico_id === item.servico_id);
-                let contratados = item.quantidade || 1;
-                let consumidos = 0;
-                let reservados = 0;
-                movsItem.forEach((m: any) => {
-                  if (m.tipo === "credito_consumido") consumidos += Number(m.quantidade || 0);
-                  if (m.tipo === "credito_reservado") reservados += Number(m.quantidade || 0);
-                });
-                const disponiveis = Math.max(0, contratados - consumidos - reservados);
-
-                return (
-                  <div key={idx} className="bg-background rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2 shadow-sm">
-                    <span className="font-medium">{item.nome}</span>
-                    <Badge variant="secondary" className="font-bold text-primary">
-                      {disponiveis} disponíveis
+            {/* Pílulas de Créditos por Categoria */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t">
+              {resumo.itens.map((it, idx) => (
+                <div key={idx} className="bg-background rounded-lg border p-2.5 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-primary">
+                      {it.categoria === "banho" ? "Créditos de Banho" : it.nome_categoria}
+                    </span>
+                    <Badge variant="outline" className="bg-background text-primary border-primary/30 font-bold">
+                      {it.disponiveis} disponível{it.disponiveis === 1 ? "" : "is"}
                     </Badge>
                   </div>
-                );
-              })}
+                  <div className="text-[11px] text-muted-foreground flex justify-between">
+                    <span>Contratados: <strong>{it.contratados}</strong></span>
+                    <span>Reservados: <strong>{it.reservados}</strong></span>
+                    <span>Utilizados: <strong>{it.utilizados}</strong></span>
+                  </div>
+                  <div className="text-[10px] text-primary/80 bg-primary/5 rounded px-2 py-0.5 font-medium">
+                    {it.descricao_cobertura}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-5 lg:col-span-1">

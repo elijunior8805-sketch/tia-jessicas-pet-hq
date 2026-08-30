@@ -539,7 +539,10 @@ function AtendimentoDetalhe() {
       
       // Consome a reserva de créditos do programa de cuidado, se houver
       if ((atendimento as any).agendamento_id) {
-        await consumirReserva({ data: { agendamento_id: (atendimento as any).agendamento_id } });
+        await consumirReserva({ data: {
+          agendamento_id: (atendimento as any).agendamento_id,
+          atendimento_id: atendId,
+        } });
         
         // Registrar auditoria do consumo
         await registrarAuditoriaPrograma({

@@ -1563,8 +1563,9 @@ function NovoAgendamentoDialog({
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
 
-    const infoCredito = (creditosPet as any)?.[s.id];
-    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0;
+    const saldosObj = (creditosPet as any)?.saldos || (creditosPet as any);
+    const infoCredito = saldosObj?.[s.id];
+    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0 && !infoCredito.bloqueado;
 
     setItens((prev) => [...prev, {
       servico_id: s.id,
@@ -1834,10 +1835,13 @@ function NovoAgendamentoDialog({
               <div className="space-y-2 rounded-md border border-border/60 p-2 bg-muted/20">
                 {itens.map((it, idx) => (
                   <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_90px_80px_auto] gap-2 items-center">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate flex items-center gap-1">
-                        {it.nome}
-                        {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" />}
+                      <div className="text-sm font-medium truncate flex items-center gap-1.5 flex-wrap">
+                        <span>{it.nome}</span>
+                        {it.usar_credito && (
+                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 font-normal">
+                            ✨ Crédito do Programa
+                          </Badge>
+                        )}
                       </div>
                       {idx === 0 && <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal</div>}
                     </div>
@@ -2124,8 +2128,9 @@ function EditarServicosDialog({
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
 
-    const infoCredito = (creditosPet as any)?.[s.id];
-    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0;
+    const saldosObj = (creditosPet as any)?.saldos || (creditosPet as any);
+    const infoCredito = saldosObj?.[s.id];
+    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0 && !infoCredito.bloqueado;
 
     setItens((prev) => [...prev, {
       servico_id: s.id,
@@ -2256,9 +2261,13 @@ function EditarServicosDialog({
               {itens.map((it, idx) => (
                 <div key={`${it.servico_id}-${idx}`} className="grid grid-cols-[minmax(0,1fr)_100px_80px_auto] gap-2 items-center">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate flex items-center gap-1">
-                      {it.nome}
-                      {it.usar_credito && <PackageCheck className="h-3 w-3 text-gold" />}
+                    <div className="text-sm font-medium truncate flex items-center gap-1.5 flex-wrap">
+                      <span>{it.nome}</span>
+                      {it.usar_credito && (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 font-normal">
+                          ✨ Crédito do Programa
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {idx === 0 && (

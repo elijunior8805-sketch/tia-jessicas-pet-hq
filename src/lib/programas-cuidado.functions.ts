@@ -250,6 +250,13 @@ export const contratarPrograma = createServerFn({ method: "POST" })
 
 
 
+import {
+  identificarCategoriaCredito,
+  calcularSaldosDoContrato,
+  REGRAS_CATEGORIAS_PADRAO,
+  type CategoriaCreditoTipo,
+} from "./programas-creditos-core";
+
 export const getCreditosDisponiveis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
@@ -258,43 +265,90 @@ export const getCreditosDisponiveis = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
 
-    const { data: movs, error } = await sb
-      .from("programas_creditos_movimentacoes" as any)
+    // Busca contratos ativos ou aguardando pagamento do pet
+    const { data: contratos, error: cErr } = await sb
+      .from("programas_contratados" as any)
       .select(`
         *,
-        contratado:programas_contratados!inner (*),
-        servico:servicos (id, nome)
+        pets:pet_id (id, nome),
+        movimentacoes:programas_creditos_movimentacoes (
+          id, servico_id, quantidade, tipo, created_at, motivo, agendamento_id,
+          servicos:servico_id (id, nome, categoria)
+        )
       `)
-      .eq("contratado.pet_id", data.pet_id)
-      .in("contratado.status_do_programa", ["ativo", "aguardando_pagamento"]);
+      .eq("pet_id", data.pet_id)
+      .in("status_do_programa", ["ativo", "aguardando_pagamento"])
+      .order("criado_em", { ascending: false });
 
-    if (error) throw error;
+    if (cErr) throw cErr;
 
-    const saldo: Record<string, { nome: string, disponivel: number, reservado: number, bloqueado: boolean }> = {};
+    // Busca lista de todos os serviços do catálogo para mapeamento de categorias
+    const { data: todosServicos } = await sb
+      .from("servicos" as any)
+      .select("id, nome, categoria, valor")
+      .eq("ativo", true);
 
-    (movs as any[]).forEach(m => {
-      const sId = m.servico_id;
-      if (!saldo[sId]) {
-        saldo[sId] = { nome: m.servico?.nome || "Serviço", disponivel: 0, reservado: 0, bloqueado: false };
-      }
+    const servicosList = (todosServicos as any[]) || [];
 
-      if (m.contratado?.status_do_programa === "aguardando_pagamento") {
-        saldo[sId].bloqueado = true;
-      }
+    const saldosPorServico: Record<string, { nome: string; categoria: string; disponivel: number; reservado: number; bloqueado: boolean }> = {};
+    const saldosPorCategoria: Record<string, {
+      categoria: CategoriaCreditoTipo;
+      nome_categoria: string;
+      descricao_cobertura: string;
+      disponivel: number;
+      reservado: number;
+      bloqueado: boolean;
+      servicos_elegiveis: Array<{ id: string; nome: string }>;
+    }> = {};
 
-      if (['credito_criado', 'reserva_liberada', 'cancelamento', 'estorno'].includes(m.tipo)) {
-        saldo[sId].disponivel += m.quantidade;
-      } else if (['credito_consumido', 'credito_expirado'].includes(m.tipo)) {
-        saldo[sId].disponivel -= m.quantidade;
-      } else if (m.tipo === 'credito_reservado') {
-        saldo[sId].disponivel -= m.quantidade;
-        saldo[sId].reservado += m.quantidade;
-      } else if (m.tipo === 'ajuste_manual') {
-        saldo[sId].disponivel += m.quantidade;
-      }
+    const contratosResumo = (contratos as any[] || []).map((c) => {
+      return calcularSaldosDoContrato(c, c.movimentacoes || []);
     });
 
-    return saldo;
+    contratosResumo.forEach((cRes) => {
+      cRes.itens.forEach((item) => {
+        const cat = item.categoria;
+        if (!saldosPorCategoria[cat]) {
+          const elegiveis = servicosList.filter((s) => identificarCategoriaCredito(s) === cat);
+          saldosPorCategoria[cat] = {
+            categoria: cat,
+            nome_categoria: item.nome_categoria,
+            descricao_cobertura: item.descricao_cobertura,
+            disponivel: 0,
+            reservado: 0,
+            bloqueado: item.bloqueado,
+            servicos_elegiveis: elegiveis.map((s) => ({ id: s.id, nome: s.nome })),
+          };
+        }
+
+        saldosPorCategoria[cat].disponivel += item.disponiveis;
+        saldosPorCategoria[cat].reservado += item.reservados;
+        if (item.bloqueado) saldosPorCategoria[cat].bloqueado = true;
+
+        // Mapeia também para os serviços elegíveis para retrocompatibilidade
+        const elegiveis = saldosPorCategoria[cat].servicos_elegiveis;
+        elegiveis.forEach((el) => {
+          if (!saldosPorServico[el.id]) {
+            saldosPorServico[el.id] = {
+              nome: el.nome,
+              categoria: cat,
+              disponivel: 0,
+              reservado: 0,
+              bloqueado: item.bloqueado,
+            };
+          }
+          saldosPorServico[el.id].disponivel = saldosPorCategoria[cat].disponivel;
+          saldosPorServico[el.id].reservado = saldosPorCategoria[cat].reservado;
+          saldosPorServico[el.id].bloqueado = saldosPorCategoria[cat].bloqueado;
+        });
+      });
+    });
+
+    return {
+      saldos: saldosPorServico, // compatibilidade
+      saldos_por_categoria: saldosPorCategoria,
+      contratos: contratosResumo,
+    };
   });
 
 export const getProgramasCatalogo = createServerFn({ method: "GET" })
@@ -451,49 +505,53 @@ export const reservarCredito = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const userId = context.userId;
 
-    const { data: movs, error: e1 } = await sb
-      .from("programas_creditos_movimentacoes" as any)
+    // 1. Identifica a categoria do serviço solicitado
+    const { data: servicoEscolhido } = await sb
+      .from("servicos" as any)
+      .select("id, nome, categoria")
+      .eq("id", data.servico_id)
+      .single();
+
+    const categoriaRequerida = identificarCategoriaCredito(servicoEscolhido || { id: data.servico_id });
+
+    // 2. Busca contratos ativos do pet com suas movimentações
+    const { data: contratos, error: e1 } = await sb
+      .from("programas_contratados" as any)
       .select(`
         *,
-        contratado:programas_contratados!inner (*)
+        movimentacoes:programas_creditos_movimentacoes (*)
       `)
-      .eq("contratado.pet_id", data.pet_id)
-      .eq("contratado.status_do_programa", "ativo")
-      .eq("servico_id", data.servico_id)
+      .eq("pet_id", data.pet_id)
+      .eq("status_do_programa", "ativo")
       .order("criado_em", { ascending: true });
 
     if (e1) throw e1;
 
-    const saldosPorPrograma: Record<string, number> = {};
-    (movs as any[]).forEach(m => {
-      const pcid = m.programa_contratado_id;
-      if (!saldosPorPrograma[pcid]) saldosPorPrograma[pcid] = 0;
-      
-      if (['credito_criado', 'reserva_liberada', 'cancelamento', 'estorno'].includes(m.tipo)) {
-        saldosPorPrograma[pcid] += m.quantidade;
-      } else if (['credito_consumido', 'credito_expirado', 'credito_reservado'].includes(m.tipo)) {
-        saldosPorPrograma[pcid] -= m.quantidade;
-      } else if (m.tipo === 'ajuste_manual') {
-        saldosPorPrograma[pcid] += m.quantidade;
-      }
-    });
+    let contratoEscolhido: any = null;
 
-    const programaComSaldo = Object.entries(saldosPorPrograma).find(([_, saldo]) => saldo >= data.quantidade);
-    
-    if (!programaComSaldo) {
-      throw new Error("Saldo insuficiente para reserva");
+    for (const c of (contratos as any[] || [])) {
+      const resumo = calcularSaldosDoContrato(c, c.movimentacoes || []);
+      const itemCategoria = resumo.itens.find((it) => it.categoria === categoriaRequerida);
+      if (itemCategoria && itemCategoria.disponiveis >= data.quantidade && !itemCategoria.bloqueado) {
+        contratoEscolhido = c;
+        break;
+      }
+    }
+
+    if (!contratoEscolhido) {
+      throw new Error(`Saldo insuficiente na categoria ${REGRAS_CATEGORIAS_PADRAO[categoriaRequerida]?.nome_categoria || categoriaRequerida} para este pet.`);
     }
 
     const { error: e2 } = await sb
       .from("programas_creditos_movimentacoes" as any)
       .insert({
-        programa_contratado_id: programaComSaldo[0],
+        programa_contratado_id: contratoEscolhido.id,
         servico_id: data.servico_id,
         quantidade: data.quantidade,
         tipo: 'credito_reservado',
         agendamento_id: data.agendamento_id,
         usuario_id: userId,
-        motivo: 'Reserva automática via Agenda',
+        motivo: `Reserva automática via Agenda (${servicoEscolhido?.nome || 'Serviço'})`,
         idempotency_key: `reserva_${data.agendamento_id}_${data.servico_id}`
       });
 
@@ -503,13 +561,18 @@ export const reservarCredito = createServerFn({ method: "POST" })
       data: {
         acao: 'reserva_credito',
         pet_id: data.pet_id,
-        programa_contratado_id: programaComSaldo[0],
-        metadata: { agendamento_id: data.agendamento_id, servico_id: data.servico_id },
-        motivo: 'Reserva via Agenda'
+        programa_contratado_id: contratoEscolhido.id,
+        metadata: {
+          agendamento_id: data.agendamento_id,
+          servico_id: data.servico_id,
+          servico_nome: servicoEscolhido?.nome,
+          categoria_credito: categoriaRequerida,
+        },
+        motivo: `Reserva de crédito para ${servicoEscolhido?.nome || 'serviço'}`
       }
     });
 
-    return { success: true };
+    return { success: true, categoria: categoriaRequerida, contrato_id: contratoEscolhido.id };
   });
 
 export const liberarReserva = createServerFn({ method: "POST" })
@@ -537,7 +600,7 @@ export const liberarReserva = createServerFn({ method: "POST" })
       tipo: 'reserva_liberada',
       agendamento_id: data.agendamento_id,
       usuario_id: userId,
-      motivo: 'Liberação de reserva (Cancelamento/Exclusão)',
+      motivo: 'Liberação de reserva (Cancelamento/Exclusão do agendamento)',
       idempotency_key: `liberacao_${res.id}`
     }));
 
@@ -552,7 +615,9 @@ export const liberarReserva = createServerFn({ method: "POST" })
 export const consumirReserva = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    agendamento_id: z.string().uuid()
+    agendamento_id: z.string().uuid(),
+    atendimento_id: z.string().uuid().optional(),
+    servico_executado_id: z.string().uuid().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
@@ -569,12 +634,13 @@ export const consumirReserva = createServerFn({ method: "POST" })
 
     const consumos = (reservas as any[]).map(res => ({
       programa_contratado_id: res.programa_contratado_id,
-      servico_id: res.servico_id,
+      servico_id: data.servico_executado_id || res.servico_id,
       quantidade: res.quantidade,
       tipo: 'credito_consumido',
       agendamento_id: data.agendamento_id,
+      atendimento_id: data.atendimento_id,
       usuario_id: userId,
-      motivo: 'Consumo definitivo (Finalização)',
+      motivo: 'Consumo definitivo (Conclusão do Atendimento)',
       idempotency_key: `consumo_${res.id}`
     }));
 
@@ -584,6 +650,53 @@ export const consumirReserva = createServerFn({ method: "POST" })
 
     if (e2) throw e2;
     return { success: true, count: consumos.length };
+  });
+
+export const estornarConsumo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    agendamento_id: z.string().uuid(),
+    motivo: z.string().min(3, "Informe o motivo do estorno do crédito"),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    const { data: consumos, error: e1 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .select("*")
+      .eq("agendamento_id", data.agendamento_id)
+      .eq("tipo", "credito_consumido");
+
+    if (e1) throw e1;
+    if (!consumos || consumos.length === 0) return { success: true, count: 0 };
+
+    const estornos = (consumos as any[]).map(c => ({
+      programa_contratado_id: c.programa_contratado_id,
+      servico_id: c.servico_id,
+      quantidade: c.quantidade,
+      tipo: 'estorno_consumo',
+      agendamento_id: data.agendamento_id,
+      usuario_id: userId,
+      motivo: `Estorno de consumo: ${data.motivo}`,
+      idempotency_key: `estorno_${c.id}_${Date.now()}`
+    }));
+
+    const { error: e2 } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .insert(estornos);
+
+    if (e2) throw e2;
+
+    await registrarAuditoriaPrograma({
+      data: {
+        acao: 'estorno_credito',
+        metadata: { agendamento_id: data.agendamento_id, motivo: data.motivo },
+        motivo: data.motivo,
+      }
+    });
+
+    return { success: true, count: estornos.length };
   });
 
 export const reconciliarCreditosPet = createServerFn({ method: "POST" })

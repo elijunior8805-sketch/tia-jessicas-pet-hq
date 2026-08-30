@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { abrirWhatsApp } from "@/lib/whatsapp";
 import { BaixaPagamentoDialog } from "@/components/financeiro/BaixaPagamentoDialog";
 import { repararDadosClienteCompleto } from "@/lib/cliente-financeiro.functions";
+import { calcularSaldosDoContrato } from "@/lib/programas-creditos-core";
 import { toast } from "sonner";
 
 const searchSchema = z.object({
@@ -503,6 +504,7 @@ function ClienteRow({
 function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [abaAtiva, setAbaAtiva] = useState("visao");
   const [pagamentoParaBaixa, setPagamentoParaBaixa] = useState<any | null>(null);
 
   useRealtimeFinanceiro([
@@ -764,7 +766,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
       </header>
 
       {/* Abas */}
-      <Tabs defaultValue="visao" className="flex-1 flex flex-col">
+      <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="flex-1 flex flex-col">
         <div className="border-b border-border overflow-x-auto">
           <TabsList className="h-auto bg-transparent p-0 rounded-none w-full justify-start px-4">
             {[
@@ -807,16 +809,16 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
             </div>
 
             {/* Cartão de Programa de Cuidado na Visão Geral */}
-            <Card className="p-4 border-l-4 border-l-primary">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
-                    <PackageCheck className="h-5 w-5" />
+            <Card className="p-5 border-l-4 border-l-primary bg-primary/[0.03]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0 shadow-sm">
+                    <PackageCheck className="h-6 w-6" />
                   </div>
                   <div>
-                    <div className="text-xs uppercase font-semibold text-muted-foreground">Programa de Cuidado</div>
+                    <div className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Programa de Cuidado</div>
                     {programasContratados && programasContratados.length > 0 ? (
-                      <div className="font-semibold text-primary">
+                      <div className="font-display font-semibold text-base text-primary">
                         {programasContratados[0].nome_snapshot} — {programasContratados[0].pets?.nome ?? "Pet"}
                       </div>
                     ) : (
@@ -828,12 +830,18 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
                   <div className="flex items-center gap-3 justify-between sm:justify-end">
                     <div className="text-left sm:text-right">
                       <div className="text-xs text-muted-foreground">
-                        Expira em {programasContratados[0].data_de_validade ? new Date(programasContratados[0].data_de_validade).toLocaleDateString("pt-BR") : "—"}
+                        Validade: {programasContratados[0].data_de_validade ? new Date(programasContratados[0].data_de_validade).toLocaleDateString("pt-BR") : "—"}
                       </div>
-                      <Badge className="mt-0.5 bg-emerald-100 text-emerald-800 border-emerald-200">
+                      <Badge className={cn(
+                        "mt-1 text-xs",
+                        programasContratados[0].status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"
+                      )}>
                         {programasContratados[0].status_do_programa === "ativo" ? "Ativo" : "Aguardando pagamento"}
                       </Badge>
                     </div>
+                    <Button size="sm" variant="outline" className="gap-1.5 shadow-sm" onClick={() => setAbaAtiva("programas")}>
+                      Ver programa <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -921,103 +929,112 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {programasContratados.map((prog: any) => {
                   const pagProg = (pagamentos ?? []).find((p: any) => p.idempotency_key === `programa_${prog.id}`);
-                  const valorPago = Number(pagProg?.valor_pago ?? (prog.status_do_programa === "ativo" ? prog.preco_vendido : 0));
-                  const saldoPendenteProg = Math.max(0, Number(prog.preco_vendido) - valorPago);
-                  const movs = (prog.movimentacoes as any[]) ?? [];
+                  const resumo = calcularSaldosDoContrato(prog, prog.movimentacoes || [], pagProg);
 
                   return (
-                    <Card key={prog.id} className="p-5 border-border space-y-4">
+                    <Card key={prog.id} className="p-5 border-border space-y-4 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-display font-semibold text-primary text-base">
-                              {prog.nome_snapshot}
+                              {resumo.nome_programa} — {resumo.pet_nome || "Pet"}
                             </h3>
                             <Badge className={cn(
                               "text-xs",
-                              prog.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"
+                              resumo.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"
                             )}>
-                              {prog.status_do_programa === "ativo" ? "Ativo" : "Aguardando pagamento"}
+                              {resumo.status_do_programa === "ativo" ? "Ativo" : "Aguardando pagamento"}
                             </Badge>
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                             <Sparkles className="h-3.5 w-3.5 text-primary" />
-                            <span>Pet: <strong>{prog.pets?.nome ?? "Thor"}</strong></span>
+                            <span>Contratação: {resumo.data_de_inicio ? new Date(resumo.data_de_inicio).toLocaleDateString("pt-BR") : "—"}</span>
                             <span>·</span>
-                            <span>Validade: {prog.data_de_validade ? new Date(prog.data_de_validade).toLocaleDateString("pt-BR") : "—"}</span>
+                            <span>Validade: {resumo.data_de_validade ? new Date(resumo.data_de_validade).toLocaleDateString("pt-BR") : "—"}</span>
+                            {resumo.dias_restantes > 0 && (
+                              <span className="text-primary font-medium">({resumo.dias_restantes} dias restantes)</span>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Composição e Créditos */}
-                      <div className="space-y-2 pt-2 border-t">
+                      {/* Carteiras e Categorias de Crédito */}
+                      <div className="space-y-2.5 pt-2 border-t">
                         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                          Serviços e Créditos do Pacote
+                          Carteira de Créditos e Serviços
                         </div>
-                        {Array.isArray(prog.composicao_snapshot) && prog.composicao_snapshot.map((item: any, idx: number) => {
-                          const movsItem = movs.filter((m: any) => m.servico_id === item.servico_id);
-                          let contratados = item.quantidade || 1;
-                          let consumidos = 0;
-                          let reservados = 0;
 
-                          movsItem.forEach((m: any) => {
-                            if (m.tipo === "credito_consumido") consumidos += Number(m.quantidade || 0);
-                            if (m.tipo === "credito_reservado") reservados += Number(m.quantidade || 0);
-                          });
-
-                          const disponiveis = Math.max(0, contratados - consumidos - reservados);
-
-                          return (
-                            <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/40 border border-border/50">
-                              <span className="font-medium">{item.nome || `Serviço ${idx + 1}`}</span>
-                              <div className="flex items-center gap-3 text-right">
-                                <span className="text-muted-foreground">Contratados: <strong>{contratados}</strong></span>
-                                <span className="text-muted-foreground">Consumidos: <strong>{consumidos}</strong></span>
-                                <Badge variant="outline" className="bg-background text-primary border-primary/30 font-bold">
-                                  {disponiveis} disp.
-                                </Badge>
-                              </div>
+                        {resumo.itens.map((item, idx) => (
+                          <div key={idx} className="p-3 rounded-lg bg-muted/40 border border-border/50 space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-primary text-sm">
+                                {item.categoria === "banho" ? "Créditos de Banho" : item.nome_categoria}
+                              </span>
+                              <Badge variant="outline" className="bg-background text-primary border-primary/30 font-bold px-2 py-0.5 text-xs">
+                                {item.disponiveis} disponível{item.disponiveis === 1 ? "" : "is"}
+                              </Badge>
                             </div>
-                          );
-                        })}
+
+                            <div className="grid grid-cols-4 gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                              <div>Contratados: <strong className="text-foreground">{item.contratados}</strong></div>
+                              <div>Reservados: <strong className="text-foreground">{item.reservados}</strong></div>
+                              <div>Utilizados: <strong className="text-foreground">{item.utilizados}</strong></div>
+                              <div>Disponíveis: <strong className="text-emerald-700 font-bold">{item.disponiveis}</strong></div>
+                            </div>
+
+                            <div className="text-[11px] text-primary/80 bg-primary/5 rounded px-2 py-1 font-medium flex items-center gap-1.5">
+                              <Sparkles className="h-3 w-3 shrink-0" />
+                              <span>{item.descricao_cobertura}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
 
                       {/* Resumo Financeiro do Programa */}
                       <div className="pt-2 border-t space-y-1.5 text-xs">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Valor do Programa:</span>
-                          <span className="font-semibold">{fmtBRL(Number(prog.preco_vendido))}</span>
+                          <span className="font-semibold">{fmtBRL(resumo.preco_vendido)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Valor Quitado:</span>
-                          <span className="font-semibold text-emerald-600">{fmtBRL(valorPago)}</span>
+                          <span className="font-semibold text-emerald-600">{fmtBRL(resumo.valor_pago)}</span>
                         </div>
-                        {saldoPendenteProg > 0 && (
+                        {resumo.saldo_financeiro > 0 && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Saldo em Aberto:</span>
-                            <span className="font-semibold text-amber-600">{fmtBRL(saldoPendenteProg)}</span>
+                            <span className="font-semibold text-amber-600">{fmtBRL(resumo.saldo_financeiro)}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Ações */}
-                      {saldoPendenteProg > 0 && pagProg && (
+                      <div className="pt-1 flex gap-2">
+                        {resumo.saldo_financeiro > 0 && pagProg && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 text-xs gap-1 border-amber-300 text-amber-800 hover:bg-amber-50"
+                            onClick={() => setPagamentoParaBaixa({
+                              id: pagProg.id,
+                              valor_total: resumo.preco_vendido,
+                              valor_pago: resumo.valor_pago,
+                              status: pagProg.status,
+                              descricao: `Programa: ${resumo.nome_programa}`,
+                              cliente_nome: data?.nome,
+                            })}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Baixar pagamento
+                          </Button>
+                        )}
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="w-full text-xs gap-1 border-amber-300 text-amber-800 hover:bg-amber-50"
-                          onClick={() => setPagamentoParaBaixa({
-                            id: pagProg.id,
-                            valor_total: Number(prog.preco_vendido),
-                            valor_pago: valorPago,
-                            status: pagProg.status,
-                            descricao: `Programa: ${prog.nome_snapshot}`,
-                            cliente_nome: data?.nome,
-                          })}
+                          className="flex-1 text-xs gap-1"
+                          onClick={() => navigate({ to: "/agenda", search: { cliente: id, pet: prog.pet_id } as any })}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Baixar pagamento do programa
+                          <CalendarPlus className="h-3.5 w-3.5" /> Agendar com crédito
                         </Button>
-                      )}
+                      </div>
                     </Card>
                   );
                 })}
