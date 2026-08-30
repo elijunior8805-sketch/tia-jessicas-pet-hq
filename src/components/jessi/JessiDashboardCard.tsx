@@ -28,19 +28,19 @@ export function JessiDashboardCard() {
           day: "2-digit",
         }).format(new Date());
 
-        const [atendsRes, pagamentosRes, progRes] = await Promise.all([
-          supabase.from("atendimentos").select("id, valor_executado").eq("data" as any, hoje),
+        const [agendRes, pagamentosRes, progRes] = await Promise.all([
+          supabase.from("agendamentos").select("id, status, servicos(preco)").eq("data", hoje),
           supabase.from("pagamentos").select("id, valor_total, valor_pago").in("status", ["pendente", "atrasado"]).is("arquivado_em", null),
           supabase.from("programas_contratados").select("id").eq("status_do_programa", "ativo"),
         ]);
 
-        const faturamento = (atendsRes.data || []).reduce(
-          (acc: number, curr: any) => acc + Number(curr.valor_executado || 0),
+        const faturamento = (agendRes.data || []).reduce(
+          (acc: number, curr: any) => acc + Number(curr.servicos?.preco || 0),
           0
         );
 
         setResumo({
-          agendamentosHoje: (atendsRes.data || []).length,
+          agendamentosHoje: (agendRes.data || []).length,
           faturamentoPrevisto: faturamento,
           pendenciasRecebimento: (pagamentosRes.data || []).length,
           programasVencendo: (progRes.data || []).length,
