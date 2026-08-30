@@ -166,7 +166,7 @@ export async function registrarPromessaPagamentoIA(
 
   return createIAResponse({
     source: 'registrar_promessa',
-    affected_record_id: data.id,
+    affected_record_id: (data as any)?.id,
     data: data
   });
 }

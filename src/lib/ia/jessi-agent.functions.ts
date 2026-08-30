@@ -33,8 +33,8 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
       data,
       {
         id: userId,
-        nome: profile?.nome || "Proprietário",
-        cargo: profile?.cargo || "Administrador",
+        nome: (profile as any)?.nome || "Proprietário",
+        cargo: (profile as any)?.cargo || "Administrador",
       }
     );
   });

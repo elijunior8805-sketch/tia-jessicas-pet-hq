@@ -83,7 +83,7 @@ export async function gerarResumoProativoJessi(
 
   const atendimentosCount = (atendimentosHoje || []).length;
   const faturamentoHoje = (atendimentosHoje || []).reduce(
-    (acc, curr) => acc + Number(curr.valor_executado || 0),
+    (acc, curr) => acc + Number((curr as any)?.valor_executado || 0),
     0
   );
 
