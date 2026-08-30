@@ -21,8 +21,14 @@ import {
   cancelarContrato,
 } from "@/lib/programas-contratos.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { PackageCheck, Minus, Plus, Save, Ban, AlertTriangle, Sparkles, CheckCircle2, DollarSign } from "lucide-react";
+import { PackageCheck, Minus, Plus, Save, Ban, AlertTriangle, Sparkles, CheckCircle2, DollarSign, FileText, Download, Share2, Eye } from "lucide-react";
 import { REGRAS_CATEGORIAS_PADRAO, identificarCategoriaCredito } from "@/lib/programas-creditos-core";
+import {
+  TermoProgramaData,
+  visualizarTermoProgramaPDF,
+  baixarTermoProgramaPDF,
+  compartilharTermoWhatsApp,
+} from "@/lib/programa-termo-pdf";
 
 const brl = (v: number) =>
   `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -188,6 +194,38 @@ export function ContratoDetalheDialog({ contratoId, onOpenChange }: Props) {
     return true;
   };
 
+  const getTermoData = (): TermoProgramaData | null => {
+    if (!contrato) return null;
+    return {
+      contrato_id: contrato.id,
+      numero_contrato: `PC-${contrato.id.slice(0, 8).toUpperCase()}`,
+      tutor_nome: contrato.clientes?.nome || "Cliente",
+      tutor_documento: contrato.clientes?.cpf || contrato.clientes?.documento || null,
+      tutor_telefone: contrato.clientes?.whatsapp || contrato.clientes?.telefone || null,
+      pet_nome: contrato.pets?.nome || "Pet",
+      pet_raca: contrato.pets?.raca || null,
+      pet_porte: contrato.pets?.porte || null,
+      programa_nome: contrato.nome_snapshot || "Programa de Cuidados",
+      data_contratacao: contrato.criado_em || contrato.data_de_inicio || new Date().toISOString(),
+      data_inicio: contrato.data_de_inicio || new Date().toISOString(),
+      data_validade: validade || contrato.data_de_validade || new Date().toISOString(),
+      validade_em_dias: 30,
+      status_do_programa: contrato.status_do_programa,
+      forma_de_pagamento: contrato.forma_de_pagamento || pagamento?.forma || "Pix",
+      situacao_pagamento: pagamento?.status === "pago" ? "pago" : "pendente",
+      valor_original: Number(contrato.preco_original || contrato.preco_vendido || preco),
+      desconto: Number(contrato.desconto || 0),
+      valor_final: Number(preco || contrato.preco_vendido),
+      servicos_inclusos: itensExibicao.map((it) => ({
+        nome: it.nome,
+        quantidade: qtd[it.servico_id] ?? it.quantidade,
+        valor_unitario: it.valor_unitario,
+      })),
+      emissao_data_hora: new Date().toLocaleString("pt-BR"),
+      versao_termo: "v2.4 (2026)",
+    };
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onOpenChange(false)}>
       <DialogContent className="sm:max-w-[720px] max-h-[92vh] overflow-y-auto">
@@ -335,6 +373,59 @@ export function ContratoDetalheDialog({ contratoId, onOpenChange }: Props) {
                   onChange={(e) => setValidade(e.target.value)}
                   disabled={contrato.status_do_programa === "cancelado"}
                 />
+              </div>
+            </div>
+
+            {/* SEÇÃO TERMO DE CONTRATAÇÃO & USO (PDF & WHATSAPP) */}
+            <div className="p-3.5 rounded-xl border border-[#C8A951]/40 bg-[#F5F2EA]/60 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-[#123F2A]">
+                  <FileText className="h-4 w-4 text-[#C8A951]" />
+                  <span>Termo Oficial de Contratação e Uso (PDF)</span>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-white border-[#C8A951]/40 text-[#123F2A]">
+                  Válido por 30 dias
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Documento formal com identificação exclusiva do tutor e do pet, regras de utilização, vigência e créditos.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const td = getTermoData();
+                    if (td) visualizarTermoProgramaPDF(td);
+                  }}
+                  className="h-8 text-xs bg-white hover:bg-muted/60 border-border/80 gap-1.5"
+                >
+                  <Eye className="h-3.5 w-3.5 text-emerald-800" /> Visualizar Termo
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const td = getTermoData();
+                    if (td) baixarTermoProgramaPDF(td);
+                  }}
+                  className="h-8 text-xs bg-white hover:bg-muted/60 border-border/80 gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5 text-emerald-800" /> Baixar PDF
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    const td = getTermoData();
+                    if (td) compartilharTermoWhatsApp(td);
+                  }}
+                  className="h-8 text-xs bg-emerald-800 hover:bg-emerald-900 text-white font-bold gap-1.5 shadow-2xs"
+                >
+                  <Share2 className="h-3.5 w-3.5" /> Compartilhar WhatsApp
+                </Button>
               </div>
             </div>
 

@@ -54,6 +54,8 @@ import {
 } from "@/lib/programas-contratos.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
 import { ContratoDetalheDialog } from "@/components/gestao/programas/ContratoDetalheDialog";
+import { TermoPosVendaDialog } from "@/components/gestao/programas/TermoPosVendaDialog";
+import { TermoProgramaData } from "@/lib/programa-termo-pdf";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -137,6 +139,7 @@ function ProgramasCuidadoPage() {
   const [openVenda, setOpenVenda] = useState(false);
   const [selectedPrograma, setSelectedPrograma] = useState<any>(null);
   const [vendaStep, setVendaStep] = useState(1);
+  const [termoPosVenda, setTermoPosVenda] = useState<TermoProgramaData | null>(null);
   const [isProgramaModalOpen, setIsProgramaModalOpen] = useState(false);
   const [editingPrograma, setEditingPrograma] = useState<any>(null);
   const [selectedContratoId, setSelectedContratoId] = useState<string | null>(null);
@@ -413,10 +416,42 @@ function ProgramasCuidadoPage() {
 
   const contratarMutation = useMutation({
     mutationFn: (vars: any) => contratarPrograma({ data: vars }),
-    onSuccess: () => {
+    onSuccess: (res: any, vars: any) => {
       invalidarTodosCaches();
-      toast.success("Programa contratado e créditos liberados com sucesso!");
+      toast.success("Programa contratado com sucesso!");
       setOpenVenda(false);
+
+      const contractId = res?.contract_id || "NOVO";
+      const termoData: TermoProgramaData = {
+        contrato_id: contractId,
+        numero_contrato: `PC-${contractId.slice(0, 8).toUpperCase()}`,
+        tutor_nome: selectedCliente?.nome || "Cliente",
+        tutor_documento: selectedCliente?.cpf || selectedCliente?.documento || null,
+        tutor_telefone: selectedCliente?.whatsapp || selectedCliente?.telefone || null,
+        pet_nome: selectedPet?.nome || "Pet",
+        pet_raca: selectedPet?.raca || null,
+        pet_porte: petPorteSelecionado || selectedPet?.porte || null,
+        programa_nome: selectedPrograma?.nome || "Programa de Cuidados",
+        data_contratacao: vars.data_de_inicio || new Date().toISOString(),
+        data_inicio: vars.data_de_inicio || new Date().toISOString(),
+        data_validade: vars.data_de_validade || new Date().toISOString(),
+        validade_em_dias: selectedPrograma?.validade_em_dias || 30,
+        status_do_programa: vars.forma_de_pagamento === "pendente" ? "aguardando_pagamento" : "ativo",
+        forma_de_pagamento: vars.forma_de_pagamento,
+        situacao_pagamento: vars.forma_de_pagamento === "pendente" ? "pendente" : "pago",
+        valor_original: subtotalVenda,
+        desconto: valorDescontoVenda,
+        valor_final: precoFinalVenda,
+        servicos_inclusos: itensCustomizados.map((i) => ({
+          nome: i.nome,
+          quantidade: i.quantidade,
+          valor_unitario: i.valor_unitario,
+        })),
+        emissao_data_hora: new Date().toLocaleString("pt-BR"),
+        versao_termo: "v2.4 (2026)",
+      };
+
+      setTermoPosVenda(termoData);
       resetVenda();
     },
     onError: (err: any) => {
@@ -2446,6 +2481,15 @@ function ProgramasCuidadoPage() {
         onOpenChange={(open) => {
           if (!open) setSelectedContratoId(null);
         }}
+      />
+
+      {/* MODAL PÓS-VENDA DO TERMO DE CONTRATAÇÃO (PDF & WHATSAPP) */}
+      <TermoPosVendaDialog
+        open={!!termoPosVenda}
+        onOpenChange={(open) => {
+          if (!open) setTermoPosVenda(null);
+        }}
+        termoData={termoPosVenda}
       />
     </div>
   );
