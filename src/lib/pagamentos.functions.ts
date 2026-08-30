@@ -156,7 +156,7 @@ export const registrarContatoCobranca = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const obs = `[Cobrança ${data.canal} por ${userId} em ${new Date().toISOString()}] ${data.observacao ?? ""}`.trim();
 
-    const { data: atual, error: readErr } = await supabase
+    const { data: atualRaw, error: readErr } = await supabase
       .from("pagamentos")
       .select("id, status, observacoes")
       .eq("id", data.pagamentoId)
@@ -329,11 +329,12 @@ export const confirmarRecebimento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
-    const { data: atual, error: readErr } = await supabase
+    const { data: atualRaw, error: readErr } = await supabase
       .from("pagamentos" as any)
       .select("id, status, valor_pago, valor_total, categoria_receita, idempotency_key, observacoes")
       .eq("id", data.pagamentoId)
       .single();
+    const atual = atualRaw as any;
 
     if (readErr || !atual) throw new Error("Pagamento não encontrado");
     if (atual.status === "pago") throw new Error("Pagamento já foi recebido integralmente");
@@ -397,11 +398,12 @@ export const cancelarLancamento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     
-    const { data: atual, error: readErr } = await supabase
+    const { data: atualRaw, error: readErr } = await supabase
       .from("pagamentos" as any)
       .select("id, status, categoria_receita, idempotency_key")
       .eq("id", data.pagamentoId)
       .single();
+    const atual = atualRaw as any;
 
     if (readErr || !atual) throw new Error("Pagamento não encontrado");
     if (atual.status !== "pendente" && atual.status !== "parcial") {
@@ -460,11 +462,12 @@ export const estornarPagamento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const { data: atual, error: readErr } = await supabase
+    const { data: atualRaw, error: readErr } = await supabase
       .from("pagamentos" as any)
       .select("id, status, observacoes, categoria_receita, idempotency_key")
       .eq("id", data.pagamentoId)
       .single();
+    const atual = atualRaw as any;
 
     if (readErr || !atual) throw new Error("Pagamento não encontrado");
     if (atual.status !== "pago") throw new Error("Apenas pagamentos com status 'pago' podem ser estornados");
