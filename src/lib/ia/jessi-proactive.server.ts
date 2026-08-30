@@ -109,7 +109,7 @@ export async function gerarCentralOperacionalJessi(
   const levaTrazHoje = listaHoje.filter((a: any) => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
   const faturamentoPrevistoHoje = listaHoje.reduce((acc: number, curr: any) => acc + Number(curr.servicos?.preco || 0), 0);
 
-  const proximo = listaHoje.find((a: any) => a.status === "agendado" || a.status === "confirmado");
+  const proximo: any = listaHoje.find((a: any) => a.status === "agendado" || a.status === "confirmado");
   const proximoAtendimento = proximo ? {
     hora: proximo.hora?.slice(0, 5) || "09:00",
     pet: proximo.pets?.nome || "Pet",
