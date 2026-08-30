@@ -264,3 +264,133 @@ export const cancelarContrato = createServerFn({ method: "POST" })
       saldos_finais: depois.saldos,
     };
   });
+
+/** Cancela ou exclui múltiplos lançamentos de programas de cuidado em lote com estorno e auditoria. */
+export const excluirLancamentosLote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    contrato_ids: z.array(z.string().uuid()).min(1, "Selecione ao menos um contrato"),
+    motivo: z.string().min(3, "Informe o motivo do cancelamento em lote"),
+    is_teste: z.boolean().default(false),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as any;
+    const userId = context.userId;
+    const nowIso = new Date().toISOString();
+    const { carregarContrato } = await import("./programas-contratos.server");
+
+    const resultados: any[] = [];
+    let totalEstornado = 0;
+
+    for (const contratoId of data.contrato_ids) {
+      try {
+        const antes = await carregarContrato(sb, contratoId);
+        const contrato: any = antes.contrato;
+
+        if (contrato.status_do_programa === "cancelado") {
+          resultados.push({ contrato_id: contratoId, status: "ja_cancelado" });
+          continue;
+        }
+
+        const consumidos = Object.values(antes.saldos).reduce((acc, s: any) => acc + s.consumido, 0);
+
+        // 1. Cancelar créditos restantes e liberar reservas
+        for (const s of Object.values(antes.saldos) as any[]) {
+          if (s.reservado > 0) {
+            await sb.from("programas_creditos_movimentacoes").insert({
+              programa_contratado_id: contratoId,
+              servico_id: s.servico_id,
+              quantidade: s.reservado,
+              tipo: "reserva_liberada",
+              data_hora: nowIso,
+              usuario_id: userId,
+              motivo: `Liberação por cancelamento em lote: ${data.motivo}`,
+              idempotency_key: `lote_lib_res_${contratoId}_${s.servico_id}_${Date.now()}`,
+            });
+          }
+
+          const restante = s.criado - s.consumido;
+          if (restante > 0) {
+            await sb.from("programas_creditos_movimentacoes").insert({
+              programa_contratado_id: contratoId,
+              servico_id: s.servico_id,
+              quantidade: restante,
+              tipo: "cancelamento",
+              data_hora: nowIso,
+              usuario_id: userId,
+              motivo: data.motivo,
+              idempotency_key: `lote_canc_${contratoId}_${s.servico_id}_${Date.now()}`,
+            });
+          }
+        }
+
+        // 2. Atualizar contrato
+        await sb
+          .from("programas_contratados")
+          .update({
+            status_do_programa: "cancelado",
+            cancelado_em: nowIso,
+            cancelado_por: userId,
+            motivo_cancelamento: data.motivo,
+            atualizado_em: nowIso,
+          })
+          .eq("id", contratoId);
+
+        // 3. Estornar pagamento
+        let pagId = null;
+        const { data: pagamentoContrato } = await sb
+          .from("pagamentos")
+          .select("*")
+          .eq("idempotency_key", `programa_${contratoId}`)
+          .is("arquivado_em", null)
+          .maybeSingle();
+
+        const pagAlvo = pagamentoContrato || antes.pagamento;
+        if (pagAlvo) {
+          pagId = (pagAlvo as any).id;
+          totalEstornado += Number((pagAlvo as any).valor_pago || 0);
+          await sb
+            .from("pagamentos")
+            .update({
+              status: "cancelado",
+              valor_pago: 0,
+              arquivado_em: nowIso,
+              arquivado_motivo: `Cancelamento em lote: ${data.motivo}`,
+              observacoes: (pagAlvo.observacoes ? `${pagAlvo.observacoes}\n` : "") + `[Cancelamento em Lote: ${data.motivo}]`,
+            })
+            .eq("id", pagId);
+        }
+
+        // 4. Auditoria
+        await sb.from("auditoria_programas").insert({
+          acao: data.is_teste ? "excluir_teste_lote" : "cancelar_lote",
+          cliente_id: contrato.cliente_id,
+          pet_id: contrato.pet_id,
+          programa_contratado_id: contratoId,
+          valor_anterior: { status: contrato.status_do_programa, preco_vendido: contrato.preco_vendido },
+          valor_posterior: { status: "cancelado", creditos_consumidos: consumidos, pagamento_estornado: pagId },
+          motivo: data.motivo,
+          usuario_id: userId,
+          created_at: nowIso,
+        });
+
+        resultados.push({
+          contrato_id: contratoId,
+          status: "cancelado",
+          cliente_nome: contrato.clientes?.nome,
+          pet_nome: contrato.pets?.nome,
+          creditos_consumidos: consumidos,
+          pagamento_estornado: pagId,
+        });
+      } catch (err: any) {
+        resultados.push({ contrato_id: contratoId, status: "erro", error: err.message });
+      }
+    }
+
+    return {
+      success: true,
+      total_processados: data.contrato_ids.length,
+      total_estornado: totalEstornado,
+      resultados,
+    };
+  });

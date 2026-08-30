@@ -202,122 +202,35 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
       }
     }
 
-    // 3. Localizar ou criar o Programa de Cuidado (2 Banhos Simples, 1 Hidratação Profunda)
+    // 3. Sincronizar contratos e créditos apenas se houver contrato existente ativo
     const { data: contratosExistentes } = await sb
       .from("programas_contratados" as any)
       .select("*, programas_creditos_movimentacoes(*)")
       .eq("cliente_id", clienteId)
-      .neq("status_do_programa", "cancelado");
+      .in("status_do_programa", ["ativo", "aguardando_pagamento"]);
 
     let contract_id = "";
     let programaCriado = false;
     let creditosCriados: any[] = [];
 
-    // Localizar serviços no catálogo para compor os créditos
-    const { data: servicos } = await sb.from("servicos" as any).select("id, nome, valor");
-    const banhoSimples: any = (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("banho simples"))
-      || (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("banho"))
-      || servicos?.[0];
-
-    const hidratacao: any = (servicos ?? []).find((s: any) => s.nome?.toLowerCase().includes("hidratação") || s.nome?.toLowerCase().includes("hidratacao"))
-      || servicos?.[1] || banhoSimples;
-
-    if (!contratosExistentes || contratosExistentes.length === 0) {
-      // Criar o contrato com a composição oficial
-      const validadeDate = new Date();
-      validadeDate.setDate(validadeDate.getDate() + 30);
-
-      const composicao = [
-        { servico_id: banhoSimples.id, nome: banhoSimples.nome || "Banho Simples", quantidade: 2, valor_unitario: Number(banhoSimples.valor || 140) },
-        { servico_id: hidratacao.id, nome: hidratacao.nome || "Hidratação Profunda", quantidade: 1, valor_unitario: Number(hidratacao.valor || 200) },
-      ];
-
-      const { data: novoContrato, error: ncErr } = await sb
-        .from("programas_contratados" as any)
-        .insert({
-          cliente_id: clienteId,
-          pet_id: petThor?.id || null,
-          nome_snapshot: "Cuidado & Hidratação",
-          composicao_snapshot: composicao,
-          regras_snapshot: "Válido por 30 dias. Inclui 2 Banhos Simples e 1 Hidratação Profunda.",
-          preco_original: 480.00,
-          preco_vendido: 480.00,
-          desconto: 0,
-          fracionado: false,
-          data_de_inicio: new Date().toISOString().slice(0, 10),
-          data_de_validade: validadeDate.toISOString().slice(0, 10),
-          status_do_programa: "ativo",
-          forma_de_pagamento: "pix",
-          observacoes: "Contratação de programa de cuidado",
-          idempotency_key: `programa_eli_thor_${Date.now()}`,
-          criado_por: userId,
-        })
-        .select()
-        .single();
-
-      if (!ncErr && novoContrato) {
-        contract_id = (novoContrato as any).id;
-        programaCriado = true;
-
-        // Criar créditos de movimentação
-        const movs = [
-          {
-            programa_contratado_id: contract_id,
-            servico_id: banhoSimples.id,
-            quantidade: 2,
-            tipo: "credito_criado",
-            data_hora: nowIso,
-            usuario_id: userId,
-            motivo: "Contratação inicial - Banho Simples (2x)",
-            idempotency_key: `cred_banho_${contract_id}`,
-          },
-          {
-            programa_contratado_id: contract_id,
-            servico_id: hidratacao.id,
-            quantidade: 1,
-            tipo: "credito_criado",
-            data_hora: nowIso,
-            usuario_id: userId,
-            motivo: "Contratação inicial - Hidratação Profunda (1x)",
-            idempotency_key: `cred_hidra_${contract_id}`,
-          },
-        ];
-
-        const { data: movsInserted } = await sb
-          .from("programas_creditos_movimentacoes" as any)
-          .insert(movs)
-          .select();
-
-        creditosCriados = movsInserted ?? [];
-      }
-    } else {
+    if (contratosExistentes && contratosExistentes.length > 0) {
       const c = contratosExistentes[0] as any;
       contract_id = c.id;
+
       // Verificar se os créditos existem
       const movs = c.programas_creditos_movimentacoes ?? [];
-      if (movs.length === 0) {
-        const movsToInsert = [
-          {
-            programa_contratado_id: contract_id,
-            servico_id: banhoSimples.id,
-            quantidade: 2,
-            tipo: "credito_criado",
-            data_hora: nowIso,
-            usuario_id: userId,
-            motivo: "Reparo de créditos - Banho Simples (2x)",
-            idempotency_key: `reparo_cred_banho_${contract_id}`,
-          },
-          {
-            programa_contratado_id: contract_id,
-            servico_id: hidratacao.id,
-            quantidade: 1,
-            tipo: "credito_criado",
-            data_hora: nowIso,
-            usuario_id: userId,
-            motivo: "Reparo de créditos - Hidratação Profunda (1x)",
-            idempotency_key: `reparo_cred_hidra_${contract_id}`,
-          },
-        ];
+      if (movs.length === 0 && Array.isArray(c.composicao_snapshot) && c.composicao_snapshot.length > 0) {
+        const movsToInsert = c.composicao_snapshot.map((item: any) => ({
+          programa_contratado_id: contract_id,
+          servico_id: item.servico_id,
+          quantidade: Number(item.quantidade || 1),
+          tipo: "credito_criado",
+          data_hora: nowIso,
+          usuario_id: userId,
+          motivo: "Sincronização de créditos do contrato",
+          idempotency_key: `sinc_cred_${contract_id}_${item.servico_id}`,
+        }));
+
         const { data: movsInserted } = await sb
           .from("programas_creditos_movimentacoes" as any)
           .insert(movsToInsert)

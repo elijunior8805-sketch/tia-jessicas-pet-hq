@@ -23,7 +23,13 @@ import {
   CalendarPlus,
   HelpCircle,
   Percent,
-  DollarSign
+  DollarSign,
+  MoreVertical,
+  Ban,
+  CheckSquare,
+  Square,
+  Eye,
+  FileSpreadsheet
 } from "lucide-react";
 
 import { useState, useMemo, useEffect } from "react";
@@ -34,10 +40,23 @@ import {
   contratarPrograma,
   reconciliarCreditosPet
 } from "@/lib/programas-cuidado.functions";
+import { 
+  cancelarContrato, 
+  excluirLancamentosLote 
+} from "@/lib/programas-contratos.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
 import { ContratoDetalheDialog } from "@/components/gestao/programas/ContratoDetalheDialog";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { ProgramasConfigTab } from "@/components/gestao/programas/ProgramasConfigTab";
 import { getProgramasConfig } from "@/lib/programas-config.functions";
 import { REGRAS_CATEGORIAS_PADRAO, identificarCategoriaCredito } from "@/lib/programas-creditos-core";
@@ -62,6 +81,7 @@ import {
   DialogTitle,
   DialogFooter
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -98,6 +118,13 @@ function ProgramasCuidadoPage() {
   const [editingPrograma, setEditingPrograma] = useState<any>(null);
   const [selectedContratoId, setSelectedContratoId] = useState<string | null>(null);
   const [programaParaArquivar, setProgramaParaArquivar] = useState<any | null>(null);
+
+  // Seleção e Cancelamento em Lote / Individual
+  const [selectedContratosIds, setSelectedContratosIds] = useState<string[]>([]);
+  const [contratoParaCancelar, setContratoParaCancelar] = useState<any | null>(null);
+  const [motivoCancelamentoIndividual, setMotivoCancelamentoIndividual] = useState("");
+  const [openExcluirLoteDialog, setOpenExcluirLoteDialog] = useState(false);
+  const [motivoExcluirLote, setMotivoExcluirLote] = useState("");
 
   // Estados da Venda Personalizada
   const [searchCliente, setSearchCliente] = useState("");
@@ -211,26 +238,59 @@ function ProgramasCuidadoPage() {
     );
   }, [selectedPet, petPorteSelecionado, todosServicos, servicosPrecos, portes]);
 
+  const invalidarTodosCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
+    queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
+    queryClient.invalidateQueries({ queryKey: ["cliente-ficha-programas"] });
+    queryClient.invalidateQueries({ queryKey: ["cliente-ficha-pagamentos-v2"] });
+    queryClient.invalidateQueries({ queryKey: ["cliente-ficha-detalhe"] });
+    queryClient.invalidateQueries({ queryKey: ["pet-programa-ativo"] });
+    queryClient.invalidateQueries({ queryKey: ["creditos-disponiveis-pet"] });
+    queryClient.invalidateQueries({ queryKey: ["financial-kpis"] });
+    queryClient.invalidateQueries({ queryKey: ["pagamentos-lista"] });
+    queryClient.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+    queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
+  };
+
   const contratarMutation = useMutation({
     mutationFn: (vars: any) => contratarPrograma({ data: vars }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
-      queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
-      queryClient.invalidateQueries({ queryKey: ["cliente-ficha-programas"] });
-      queryClient.invalidateQueries({ queryKey: ["cliente-ficha-pagamentos-v2"] });
-      queryClient.invalidateQueries({ queryKey: ["cliente-ficha-detalhe"] });
-      queryClient.invalidateQueries({ queryKey: ["pet-programa-ativo"] });
-      queryClient.invalidateQueries({ queryKey: ["creditos-disponiveis-pet"] });
-      queryClient.invalidateQueries({ queryKey: ["financial-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["pagamentos-lista"] });
-      queryClient.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
-      queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
+      invalidarTodosCaches();
       toast.success("Programa contratado e créditos liberados com sucesso!");
       setOpenVenda(false);
       resetVenda();
     },
     onError: (err: any) => {
       toast.error("Erro ao contratar: " + err.message);
+    }
+  });
+
+  const cancelarIndividualMut = useMutation({
+    mutationFn: (vars: { contrato_id: string; motivo: string }) =>
+      cancelarContrato({ data: { contrato_id: vars.contrato_id, motivo: vars.motivo, estornar_financeiro: true } }),
+    onSuccess: () => {
+      invalidarTodosCaches();
+      toast.success("Programa cancelado e efeitos estornados com sucesso!");
+      setContratoParaCancelar(null);
+      setMotivoCancelamentoIndividual("");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao cancelar programa: " + err.message);
+    }
+  });
+
+  const excluirLoteMut = useMutation({
+    mutationFn: (vars: { contrato_ids: string[]; motivo: string }) =>
+      excluirLancamentosLote({ data: { contrato_ids: vars.contrato_ids, motivo: vars.motivo, is_teste: true } }),
+    onSuccess: (res: any) => {
+      invalidarTodosCaches();
+      toast.success(`${res.total_processados} lançamento(s) cancelado(s) com estorno integral!`);
+      setSelectedContratosIds([]);
+      setOpenExcluirLoteDialog(false);
+      setMotivoExcluirLote("");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir lançamentos em lote: " + err.message);
     }
   });
 
@@ -334,7 +394,7 @@ function ProgramasCuidadoPage() {
     }
   });
 
-  const { data: programasAtivos } = useQuery({
+  const { data: todosContratos = [] } = useQuery({
     queryKey: ["programas-ativos"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -342,20 +402,20 @@ function ProgramasCuidadoPage() {
         .select("*, clientes(nome), pets(nome, raca)")
         .order("criado_em", { ascending: false });
       if (error) throw error;
-      return data as any[];
+      return (data ?? []) as any[];
     },
   });
 
-  const { data: movimentacoes } = useQuery({
+  const { data: movimentacoes = [] } = useQuery({
     queryKey: ["creditos-movimentacoes"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("programas_creditos_movimentacoes" as any)
         .select("*, pets(nome)")
         .order("data_hora", { ascending: false })
-        .limit(50);
+        .limit(100);
       if (error) throw error;
-      return data as any[];
+      return (data ?? []) as any[];
     },
   });
 
@@ -399,6 +459,35 @@ function ProgramasCuidadoPage() {
     }
   }, [subtotalVenda, tipoDescontoVenda, descontoValorVenda]);
 
+  // Contratos filtrados conforme subaba
+  const contratosFiltrados = useMemo(() => {
+    if (activeSubTabAtivos === "todos") return todosContratos;
+    if (activeSubTabAtivos === "ativo") return todosContratos.filter((c) => c.status_do_programa === "ativo");
+    if (activeSubTabAtivos === "aguardando_pagamento") return todosContratos.filter((c) => c.status_do_programa === "aguardando_pagamento");
+    if (activeSubTabAtivos === "cancelado") return todosContratos.filter((c) => c.status_do_programa === "cancelado");
+    return todosContratos;
+  }, [todosContratos, activeSubTabAtivos]);
+
+  const valorTotalSelecionados = useMemo(() => {
+    return todosContratos
+      .filter((c) => selectedContratosIds.includes(c.id))
+      .reduce((acc, c) => acc + Number(c.preco_vendido || 0), 0);
+  }, [todosContratos, selectedContratosIds]);
+
+  const handleToggleSelectAll = () => {
+    if (selectedContratosIds.length === contratosFiltrados.length && contratosFiltrados.length > 0) {
+      setSelectedContratosIds([]);
+    } else {
+      setSelectedContratosIds(contratosFiltrados.map((c) => c.id));
+    }
+  };
+
+  const handleToggleSelectContrato = (id: string) => {
+    setSelectedContratosIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6 px-4 md:px-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -408,7 +497,7 @@ function ProgramasCuidadoPage() {
             Programas de Cuidado
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 font-medium">
-            Gerencie planos pré-pagos e fidelidade com inteligência e elegância.
+            Gerencie planos pré-pagos e fidelidade com inteligência, controle de créditos e auditoria.
           </p>
         </div>
         
@@ -432,7 +521,7 @@ function ProgramasCuidadoPage() {
           </TabsTrigger>
           <TabsTrigger value="ativos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <PackageCheck className="mr-2 h-4 w-4" />
-            Programas Ativos ({programasAtivos?.length ?? 0})
+            Programas Ativos ({todosContratos.filter(c => c.status_do_programa !== 'cancelado').length})
           </TabsTrigger>
           <TabsTrigger value="creditos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <CreditCard className="mr-2 h-4 w-4" />
@@ -602,79 +691,219 @@ function ProgramasCuidadoPage() {
         {/* PROGRAMAS ATIVOS / CONTRATADOS */}
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b">
               <div>
-                <CardTitle className="text-lg">Programas em Vigor</CardTitle>
-                <CardDescription>Clique em qualquer contrato para visualizar detalhes, editar créditos ou cancelar com segurança.</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <PackageCheck className="h-5 w-5 text-gold" />
+                  Programas e Contratos de Clientes
+                </CardTitle>
+                <CardDescription>
+                  Gerencie lançamentos, edite créditos, cancele ou exclua vendas de teste com estorno automático e retorno ao baseline.
+                </CardDescription>
               </div>
-              <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+              
+              <div className="flex flex-wrap items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
                 <Button 
                   variant={activeSubTabAtivos === "todos" ? "secondary" : "ghost"} 
                   size="sm" 
-                  className="h-8 text-xs px-3"
+                  className="h-8 text-xs px-3 rounded-lg"
                   onClick={() => setActiveSubTabAtivos("todos")}
                 >
-                  Todos ({programasAtivos?.length ?? 0})
+                  Todos ({todosContratos.length})
                 </Button>
                 <Button 
                   variant={activeSubTabAtivos === "ativo" ? "secondary" : "ghost"} 
                   size="sm" 
-                  className="h-8 text-xs px-3"
+                  className="h-8 text-xs px-3 rounded-lg"
                   onClick={() => setActiveSubTabAtivos("ativo")}
                 >
-                  Ativos
+                  Ativos ({todosContratos.filter(c => c.status_do_programa === "ativo").length})
                 </Button>
                 <Button 
                   variant={activeSubTabAtivos === "aguardando_pagamento" ? "secondary" : "ghost"} 
                   size="sm" 
-                  className="h-8 text-xs px-3"
+                  className="h-8 text-xs px-3 rounded-lg"
                   onClick={() => setActiveSubTabAtivos("aguardando_pagamento")}
                 >
-                  Aguardando Pagamento
+                  Aguardando Pagamento ({todosContratos.filter(c => c.status_do_programa === "aguardando_pagamento").length})
+                </Button>
+                <Button 
+                  variant={activeSubTabAtivos === "cancelado" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3 rounded-lg"
+                  onClick={() => setActiveSubTabAtivos("cancelado")}
+                >
+                  Cancelados ({todosContratos.filter(c => c.status_do_programa === "cancelado").length})
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              {programasAtivos && programasAtivos.length > 0 ? (
-                <div className="divide-y border rounded-xl overflow-hidden">
-                  {programasAtivos
-                    .filter((p: any) => activeSubTabAtivos === "todos" || p.status_do_programa === activeSubTabAtivos)
-                    .map((contrato: any) => (
+
+            {/* Barra de Ações em Lote quando há seleção */}
+            {selectedContratosIds.length > 0 && (
+              <div className="p-3.5 bg-gold/10 border-b border-gold/20 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3 text-xs">
+                  <Badge className="bg-gold text-white font-bold">{selectedContratosIds.length} selecionado(s)</Badge>
+                  <span className="text-muted-foreground">Valor total envolvido: <strong>{brl(valorTotalSelecionados)}</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs bg-white"
+                    onClick={() => setSelectedContratosIds([])}
+                  >
+                    Desmarcar todos
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-8 text-xs gap-1.5 shadow-sm"
+                    onClick={() => setOpenExcluirLoteDialog(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir / Cancelar Selecionados
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <CardContent className="p-0">
+              {contratosFiltrados && contratosFiltrados.length > 0 ? (
+                <div className="divide-y overflow-hidden">
+                  {/* Cabeçalho da Lista com Selecionar Todos */}
+                  <div className="p-3 bg-muted/20 flex items-center justify-between text-xs text-muted-foreground font-semibold px-4">
+                    <div className="flex items-center gap-3">
+                      <Checkbox 
+                        checked={selectedContratosIds.length === contratosFiltrados.length && contratosFiltrados.length > 0}
+                        onCheckedChange={handleToggleSelectAll}
+                        aria-label="Selecionar todos os contratos filtrados"
+                      />
+                      <span>Selecionar Todos</span>
+                    </div>
+                    <span>Lançamentos ({contratosFiltrados.length})</span>
+                  </div>
+
+                  {contratosFiltrados.map((contrato: any) => {
+                    const isSelected = selectedContratosIds.includes(contrato.id);
+                    const isCancelado = contrato.status_do_programa === "cancelado";
+                    return (
                       <div 
                         key={contrato.id} 
-                        className="p-4 hover:bg-muted/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
-                        onClick={() => setSelectedContratoId(contrato.id)}
+                        className={`p-4 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                          isSelected ? 'bg-gold/5' : isCancelado ? 'bg-muted/20 opacity-75' : 'hover:bg-muted/30'
+                        }`}
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-primary text-base">{contrato.nome_snapshot}</h4>
-                            <Badge className={contrato.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}>
-                              {contrato.status_do_programa === "ativo" ? "Ativo" : "Aguardando pagamento"}
-                            </Badge>
+                        <div className="flex items-start gap-3">
+                          <div className="pt-1">
+                            <Checkbox 
+                              checked={isSelected}
+                              onCheckedChange={() => handleToggleSelectContrato(contrato.id)}
+                              aria-label={`Selecionar contrato ${contrato.nome_snapshot}`}
+                            />
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                            <span>Tutor: <strong>{contrato.clientes?.nome || "Cliente"}</strong></span>
-                            <span>Pet: <strong>{contrato.pets?.nome || "Pet"}</strong></span>
-                            <span>Validade: <strong>{contrato.data_de_validade ? new Date(contrato.data_de_validade).toLocaleDateString("pt-BR") : "—"}</strong></span>
+
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-semibold text-primary text-base">{contrato.nome_snapshot}</h4>
+                              <Badge className={
+                                contrato.status_do_programa === "ativo" 
+                                  ? "bg-emerald-100 text-emerald-800" 
+                                  : contrato.status_do_programa === "aguardando_pagamento"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-zinc-200 text-zinc-700"
+                              }>
+                                {contrato.status_do_programa === "ativo" 
+                                  ? "Ativo" 
+                                  : contrato.status_do_programa === "aguardando_pagamento" 
+                                  ? "Aguardando pagamento" 
+                                  : "Cancelado"}
+                              </Badge>
+                              {contrato.forma_de_pagamento && (
+                                <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                                  {contrato.forma_de_pagamento}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                              <span>Tutor: <strong>{contrato.clientes?.nome || "Cliente"}</strong></span>
+                              <span>Pet: <strong>{contrato.pets?.nome || "Pet"}</strong></span>
+                              <span>Início: <strong>{contrato.data_de_inicio ? new Date(contrato.data_de_inicio).toLocaleDateString("pt-BR") : "—"}</strong></span>
+                              <span>Validade: <strong>{contrato.data_de_validade ? new Date(contrato.data_de_validade).toLocaleDateString("pt-BR") : "—"}</strong></span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-2 md:pt-0">
-                          <div className="text-right">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground">Valor Contratado</span>
+                        <div className="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 pt-2 md:pt-0">
+                          <div className="text-right mr-2">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">Valor</span>
                             <p className="text-sm font-bold text-gold">{brl(Number(contrato.preco_vendido || 0))}</p>
                           </div>
-                          <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                            Ver detalhes <ChevronRight className="h-4 w-4" />
-                          </Button>
+
+                          {/* BOTÃO CLARAMENTE IDENTIFICADO COMO AÇÕES */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-9 px-3 gap-1.5 text-xs font-semibold">
+                                Ações <ChevronRight className="h-3.5 w-3.5 rotate-90" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuLabel className="text-xs">Opções do Lançamento</DropdownMenuLabel>
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2"
+                                onClick={() => setSelectedContratoId(contrato.id)}
+                              >
+                                <Eye className="h-3.5 w-3.5 text-primary" /> Ver detalhes
+                              </DropdownMenuItem>
+                              
+                              {!isCancelado && (
+                                <>
+                                  <DropdownMenuItem 
+                                    className="text-xs cursor-pointer gap-2"
+                                    onClick={() => setSelectedContratoId(contrato.id)}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5 text-gold" /> Editar lançamento
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    className="text-xs cursor-pointer gap-2 text-rose-600 focus:text-rose-700"
+                                    onClick={() => {
+                                      setContratoParaCancelar(contrato);
+                                      setMotivoCancelamentoIndividual("");
+                                    }}
+                                  >
+                                    <Ban className="h-3.5 w-3.5" /> Cancelar programa
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className="text-xs cursor-pointer gap-2 text-rose-600 focus:text-rose-700"
+                                    onClick={() => {
+                                      setContratoParaCancelar(contrato);
+                                      setMotivoCancelamentoIndividual("Exclusão de lançamento de teste e estorno de efeitos");
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" /> Excluir lançamento de teste
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-xs cursor-pointer gap-2 text-muted-foreground"
+                                onClick={() => setActiveTab("auditoria")}
+                              >
+                                <History className="h-3.5 w-3.5" /> Consultar auditoria
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="py-10 text-center text-muted-foreground">
+                <div className="py-14 text-center text-muted-foreground">
                   <PackageCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p>Nenhuma contratação encontrada no momento.</p>
+                  <p className="font-semibold text-sm">Nenhum contrato encontrado nesta visualização.</p>
+                  <p className="text-xs mt-1 text-muted-foreground">Utilize o catálogo para realizar novas vendas ou altere o filtro acima.</p>
                 </div>
               )}
             </CardContent>
@@ -686,7 +915,7 @@ function ProgramasCuidadoPage() {
           <Card className="border-sidebar-border/60">
             <CardHeader>
               <CardTitle className="text-lg">Livro Razão de Créditos</CardTitle>
-              <CardDescription>Histórico detalhado de todas as movimentações de saldo (Criação, Reserva, Consumo, Liberação, Estorno).</CardDescription>
+              <CardDescription>Histórico detalhado de todas as movimentações de saldo (Criação, Reserva, Consumo, Liberação, Cancelamento, Estorno).</CardDescription>
             </CardHeader>
             <CardContent>
               {movimentacoes && movimentacoes.length > 0 ? (
@@ -705,7 +934,7 @@ function ProgramasCuidadoPage() {
                       {movimentacoes.map((m: any) => (
                         <tr key={m.id} className="hover:bg-muted/5 transition-colors">
                           <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                            {format(new Date(m.created_at), 'dd/MM/yy HH:mm')}
+                            {m.data_hora ? format(new Date(m.data_hora), 'dd/MM/yy HH:mm') : '—'}
                           </td>
                           <td className="px-4 py-3 font-medium">{m.pets?.nome || "Pet"}</td>
                           <td className="px-4 py-3">
@@ -716,6 +945,7 @@ function ProgramasCuidadoPage() {
                                 m.tipo === 'credito_reservado' ? 'border-amber-200 text-amber-600 bg-amber-50/50' :
                                 m.tipo === 'credito_consumido' ? 'border-blue-200 text-blue-600 bg-blue-50/50' :
                                 m.tipo === 'reserva_liberada' ? 'border-purple-200 text-purple-600 bg-purple-50/50' :
+                                m.tipo === 'cancelamento' ? 'border-rose-200 text-rose-600 bg-rose-50/50' :
                                 'border-gray-200 text-gray-600'
                               }`}
                             >
@@ -814,7 +1044,147 @@ function ProgramasCuidadoPage() {
         </TabsContent>
       </Tabs>
 
-      {/* DIÁLOGO DE CONFIRMAÇÃO DE ARQUIVAMENTO */}
+      {/* DIÁLOGO DE CANCELAMENTO / EXCLUSÃO INDIVIDUAL */}
+      <Dialog open={Boolean(contratoParaCancelar)} onOpenChange={(v) => !v && setContratoParaCancelar(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800 font-display text-lg">
+              <AlertTriangle className="h-5 w-5 text-rose-600" />
+              Cancelar e Estornar Venda do Programa?
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              O contrato deixará de existir nas áreas operacionais. Os créditos não utilizados serão cancelados e os efeitos financeiros serão integralmente estornados.
+            </DialogDescription>
+          </DialogHeader>
+
+          {contratoParaCancelar && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 bg-muted/40 rounded-lg border space-y-1">
+                <div className="flex justify-between font-semibold">
+                  <span>Programa:</span>
+                  <span>{contratoParaCancelar.nome_snapshot}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Tutor / Pet:</span>
+                  <span>{contratoParaCancelar.clientes?.nome} · {contratoParaCancelar.pets?.nome}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Valor Contratado:</span>
+                  <span className="font-bold text-foreground">{brl(Number(contratoParaCancelar.preco_vendido || 0))}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Motivo Obrigatório (Auditoria)</Label>
+                <Textarea
+                  value={motivoCancelamentoIndividual}
+                  onChange={(e) => setMotivoCancelamentoIndividual(e.target.value)}
+                  placeholder="Informe o motivo do cancelamento / exclusão (mínimo 3 letras)..."
+                  className="text-xs"
+                  rows={2}
+                />
+              </div>
+
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] leading-relaxed">
+                ✓ Contrato removido de Programas Ativos, Ficha do Cliente e Pet.<br />
+                ✓ Créditos cancelados e desabilitados na Agenda.<br />
+                ✓ Estorno financeiro efetuado e Dashboard recalculado.
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setContratoParaCancelar(null)}>
+              Voltar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={cancelarIndividualMut.isPending || motivoCancelamentoIndividual.trim().length < 3}
+              onClick={() => {
+                if (motivoCancelamentoIndividual.trim().length < 3) {
+                  toast.error("Informe o motivo do cancelamento.");
+                  return;
+                }
+                cancelarIndividualMut.mutate({
+                  contrato_id: contratoParaCancelar.id,
+                  motivo: motivoCancelamentoIndividual,
+                });
+              }}
+            >
+              {cancelarIndividualMut.isPending ? "Processando..." : "Confirmar Cancelamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DE EXCLUSÃO EM LOTE */}
+      <Dialog open={openExcluirLoteDialog} onOpenChange={setOpenExcluirLoteDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800 font-display text-lg">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Excluir {selectedContratosIds.length} Lançamento(s) Selecionado(s)?
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              Esta ação cancelará atomicamente todos os contratos selecionados, estornará os lançamentos financeiros no caixa e zerará seus créditos disponíveis.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="p-3 bg-muted/40 rounded-lg border space-y-1.5">
+              <div className="flex justify-between">
+                <span>Total de contratos:</span>
+                <strong>{selectedContratosIds.length}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Valor total envolvido:</span>
+                <strong className="text-gold">{brl(valorTotalSelecionados)}</strong>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Motivo da Exclusão em Lote (Obrigatório)</Label>
+              <Textarea
+                value={motivoExcluirLote}
+                onChange={(e) => setMotivoExcluirLote(e.target.value)}
+                placeholder="Informe o motivo da exclusão em lote (mínimo 3 letras)..."
+                className="text-xs"
+                rows={2}
+              />
+            </div>
+
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+              ⚠️ Atenção: Todos os contratos selecionados serão retirados das fichas dos clientes e pets, os créditos serão cancelados e o Financeiro e Dashboard serão recalculados.
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setOpenExcluirLoteDialog(false)}>
+              Voltar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={excluirLoteMut.isPending || motivoExcluirLote.trim().length < 3}
+              onClick={() => {
+                if (motivoExcluirLote.trim().length < 3) {
+                  toast.error("Informe o motivo da exclusão em lote.");
+                  return;
+                }
+                excluirLoteMut.mutate({
+                  contrato_ids: selectedContratosIds,
+                  motivo: motivoExcluirLote,
+                });
+              }}
+            >
+              {excluirLoteMut.isPending ? "Excluindo..." : "Confirmar Exclusão em Lote"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DE CONFIRMAÇÃO DE ARQUIVAMENTO DO CATÁLOGO */}
       <Dialog open={Boolean(programaParaArquivar)} onOpenChange={(v) => !v && setProgramaParaArquivar(null)}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
@@ -1339,7 +1709,7 @@ function AuditoriaProgramasTab() {
           <History className="h-5 w-5 text-gold" />
           Log de Auditoria
         </CardTitle>
-        <CardDescription>Histórico detalhado de ações no módulo de programas.</CardDescription>
+        <CardDescription>Histórico detalhado e perene de vendas, cancelamentos, edições e estornos no módulo de programas.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">

@@ -593,7 +593,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
           movimentacoes:programas_creditos_movimentacoes(id, servico_id, quantidade, tipo, data_hora, motivo)
         `)
         .eq("cliente_id", id)
-        .not("status_do_programa", "eq", "cancelado")
+        .in("status_do_programa", ["ativo", "aguardando_pagamento"])
         .order("criado_em", { ascending: false });
       return (rows as any[]) ?? [];
     },
@@ -621,22 +621,10 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
       qc.invalidateQueries({ queryKey: ["clientes-saldos-dinamico"] });
       qc.invalidateQueries({ queryKey: ["fin-pag"] });
       qc.invalidateQueries({ queryKey: ["dashboard-metrics"] });
-      toast.success("Dados e programas sincronizados com sucesso!");
+      toast.success("Dados sincronizados com sucesso!");
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao sincronizar"),
   });
-
-  // Auto-verificação de consistência para Eli Júnior e novos programas
-  useEffect(() => {
-    if (data?.email === "elijunior8805@gmail.com" || data?.nome?.toLowerCase().includes("eli")) {
-      const temDivergencia = (pagamentos ?? []).some((p: any) => [280, 50, 80, 410].includes(Number(p.valor_total)) && p.status !== "pago");
-      const semPrograma = !programasContratados || programasContratados.length === 0;
-      if (temDivergencia || semPrograma) {
-        repararMut.mutate();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, data?.email]);
 
   if (isLoading) {
     return (

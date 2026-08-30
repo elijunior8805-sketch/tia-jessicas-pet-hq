@@ -98,7 +98,7 @@ function ClienteDetalhe() {
           pets:pet_id(nome)
         `)
         .eq("cliente_id", id)
-        .not("status_do_programa", "eq", "cancelado")
+        .in("status_do_programa", ["ativo", "aguardando_pagamento"])
         .order("criado_em", { ascending: false });
       return rows ?? [];
     },
