@@ -590,7 +590,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
           data_de_inicio, data_de_validade, status_do_programa,
           forma_de_pagamento, observacoes, criado_em,
           pets:pet_id(id, nome, raca),
-          movimentacoes:programas_creditos_movimentacoes(id, servico_id, quantidade, tipo, created_at, motivo)
+          movimentacoes:programas_creditos_movimentacoes(id, servico_id, quantidade, tipo, data_hora, motivo)
         `)
         .eq("cliente_id", id)
         .not("status_do_programa", "eq", "cancelado")

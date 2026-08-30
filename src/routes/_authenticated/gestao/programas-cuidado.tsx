@@ -217,6 +217,14 @@ function ProgramasCuidadoPage() {
       queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
       queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente-ficha-programas"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente-ficha-pagamentos-v2"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente-ficha-detalhe"] });
+      queryClient.invalidateQueries({ queryKey: ["pet-programa-ativo"] });
+      queryClient.invalidateQueries({ queryKey: ["creditos-disponiveis-pet"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["pagamentos-lista"] });
+      queryClient.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+      queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
       toast.success("Programa contratado e créditos liberados com sucesso!");
       setOpenVenda(false);
       resetVenda();
@@ -332,7 +340,7 @@ function ProgramasCuidadoPage() {
       const { data, error } = await supabase
         .from("programas_contratados" as any)
         .select("*, clientes(nome), pets(nome, raca)")
-        .order("created_at", { ascending: false });
+        .order("criado_em", { ascending: false });
       if (error) throw error;
       return data as any[];
     },
@@ -344,7 +352,7 @@ function ProgramasCuidadoPage() {
       const { data, error } = await supabase
         .from("programas_creditos_movimentacoes" as any)
         .select("*, pets(nome)")
-        .order("created_at", { ascending: false })
+        .order("data_hora", { ascending: false })
         .limit(50);
       if (error) throw error;
       return data as any[];

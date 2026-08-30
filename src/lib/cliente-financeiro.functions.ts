@@ -266,6 +266,7 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
             servico_id: banhoSimples.id,
             quantidade: 2,
             tipo: "credito_criado",
+            data_hora: nowIso,
             usuario_id: userId,
             motivo: "Contratação inicial - Banho Simples (2x)",
             idempotency_key: `cred_banho_${contract_id}`,
@@ -275,6 +276,7 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
             servico_id: hidratacao.id,
             quantidade: 1,
             tipo: "credito_criado",
+            data_hora: nowIso,
             usuario_id: userId,
             motivo: "Contratação inicial - Hidratação Profunda (1x)",
             idempotency_key: `cred_hidra_${contract_id}`,
@@ -300,6 +302,7 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
             servico_id: banhoSimples.id,
             quantidade: 2,
             tipo: "credito_criado",
+            data_hora: nowIso,
             usuario_id: userId,
             motivo: "Reparo de créditos - Banho Simples (2x)",
             idempotency_key: `reparo_cred_banho_${contract_id}`,
@@ -309,6 +312,7 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
             servico_id: hidratacao.id,
             quantidade: 1,
             tipo: "credito_criado",
+            data_hora: nowIso,
             usuario_id: userId,
             motivo: "Reparo de créditos - Hidratação Profunda (1x)",
             idempotency_key: `reparo_cred_hidra_${contract_id}`,
@@ -319,6 +323,27 @@ export const repararDadosClienteCompleto = createServerFn({ method: "POST" })
           .insert(movsToInsert)
           .select();
         creditosCriados = movsInserted ?? [];
+      }
+    }
+
+    // Vincular pagamento existente de programa com o contrato (se houver pagamento órfão)
+    if (contract_id) {
+      const { data: pagamentosPrograma } = await sb
+        .from("pagamentos" as any)
+        .select("id, status, forma, valor_total, valor_pago")
+        .eq("cliente_id", clienteId)
+        .eq("categoria_receita", "programa_cuidado")
+        .is("arquivado_em", null);
+
+      if (pagamentosPrograma && pagamentosPrograma.length > 0) {
+        const pagProg = pagamentosPrograma[0] as any;
+        await sb
+          .from("pagamentos" as any)
+          .update({
+            idempotency_key: `programa_${contract_id}`,
+            data_pagamento: pagProg.status === "pago" ? (pagProg.data_pagamento || nowIso.slice(0, 10)) : null,
+          })
+          .eq("id", pagProg.id);
       }
     }
 

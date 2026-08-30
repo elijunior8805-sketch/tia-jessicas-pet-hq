@@ -160,6 +160,9 @@ export const contratarPrograma = createServerFn({ method: "POST" })
     };
 
     try {
+      const nowIso = new Date().toISOString();
+      const dataVenda = data.data_de_inicio || nowIso.slice(0, 10);
+
       const { data: contratado, error: cError } = await sb
         .from("programas_contratados" as any)
         .insert({
@@ -173,13 +176,15 @@ export const contratarPrograma = createServerFn({ method: "POST" })
           preco_vendido: precoFinal,
           desconto: descontoCalculado,
           fracionado,
+          data_da_venda: dataVenda,
           data_de_inicio: data.data_de_inicio,
           data_de_validade: data.data_de_validade,
           status_do_programa: forma === 'pendente' ? 'aguardando_pagamento' : 'ativo',
           forma_de_pagamento: data.forma_de_pagamento,
           observacoes: data.observacoes,
           idempotency_key: data.idempotency_key,
-          criado_por: userId
+          criado_por: userId,
+          criado_em: nowIso,
         })
         .select()
         .single();
@@ -193,6 +198,7 @@ export const contratarPrograma = createServerFn({ method: "POST" })
         servico_id: item.servico_id,
         quantidade: item.quantidade,
         tipo: 'credito_criado',
+        data_hora: nowIso,
         usuario_id: userId,
         motivo: fracionado ? 'Contratação fracionada' : 'Contratação de programa',
         idempotency_key: `${data.idempotency_key}_${item.servico_id}`
@@ -213,8 +219,8 @@ export const contratarPrograma = createServerFn({ method: "POST" })
           valor_pago: forma === 'pendente' ? 0 : precoFinal,
           forma,
           status: forma === 'pendente' ? 'pendente' : 'pago',
-          data_pagamento: forma === 'pendente' ? null : data.data_de_inicio,
-          vencimento: forma === 'pendente' ? data.data_de_inicio : null,
+          data_pagamento: forma === 'pendente' ? null : dataVenda,
+          vencimento: forma === 'pendente' ? dataVenda : null,
           categoria_receita: 'programa_cuidado',
           descricao: `Programa: ${(programa as any).nome}${fracionado ? ' (fracionado)' : ''}`,
           idempotency_key: `programa_${contratoId}`,
@@ -233,6 +239,7 @@ export const contratarPrograma = createServerFn({ method: "POST" })
         valor_posterior: contratado as any,
         motivo: 'Contratação de programa',
         usuario_id: userId,
+        created_at: nowIso,
       });
 
       // Read-back obrigatório
@@ -285,7 +292,7 @@ export const getCreditosDisponiveis = createServerFn({ method: "GET" })
         *,
         pets:pet_id (id, nome),
         movimentacoes:programas_creditos_movimentacoes (
-          id, servico_id, quantidade, tipo, created_at, motivo, agendamento_id,
+          id, servico_id, quantidade, tipo, data_hora, motivo, agendamento_id,
           servicos:servico_id (id, nome, categoria)
         )
       `)
