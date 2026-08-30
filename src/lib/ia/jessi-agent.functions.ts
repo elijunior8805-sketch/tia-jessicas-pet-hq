@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { processarMensagemJessiCore } from "./jessi-agent.server";
+import { gerarCentralOperacionalJessi } from "./jessi-proactive.server";
 
 /**
  * Server Function Pública para a Assistente Operacional Jessi
@@ -37,4 +38,24 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
         cargo: (profile as any)?.cargo || "Administrador",
       }
     );
+  });
+
+/**
+ * Server Function para carregar a Central Operacional Proativa com dados reais
+ */
+export const obterCentralOperacionalJessiFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("nome, cargo")
+      .eq("id", userId)
+      .maybeSingle();
+
+    return await gerarCentralOperacionalJessi(supabase, {
+      id: userId,
+      nome: (profile as any)?.nome || "Eli",
+    });
   });

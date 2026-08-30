@@ -7,12 +7,13 @@ import { ProgramaCard } from "./cards/ProgramaCard";
 import { ComprovanteCard } from "./cards/ComprovanteCard";
 import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
 import { AlertaCard } from "./cards/AlertaCard";
-import { Sparkles, User } from "lucide-react";
+import { Sparkles, User, ArrowRight } from "lucide-react";
 
 interface JessiChatProps {
   messages: JessiMessage[];
   onConfirmAction?: (pendingAction: any) => void;
   onCancelAction?: () => void;
+  onSendMessage?: (text: string) => void;
   isLoading?: boolean;
 }
 
@@ -20,6 +21,7 @@ export const JessiChat: React.FC<JessiChatProps> = ({
   messages,
   onConfirmAction,
   onCancelAction,
+  onSendMessage,
   isLoading,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -39,13 +41,13 @@ export const JessiChat: React.FC<JessiChatProps> = ({
             className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"}`}
           >
             {isAssistant && (
-              <div className="h-8 w-8 rounded-full bg-emerald-800 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                <Sparkles className="h-4 w-4" />
+              <div className="h-8 w-8 rounded-full bg-emerald-800 text-[#F5E6BE] flex items-center justify-center shrink-0 shadow-2xs border border-[#C8A951]/40">
+                <Sparkles className="h-4 w-4 text-[#C8A951]" />
               </div>
             )}
 
             <div
-              className={`max-w-[85%] md:max-w-[75%] space-y-3 rounded-2xl p-3.5 md:p-4 text-xs md:text-sm ${
+              className={`max-w-[88%] md:max-w-[78%] space-y-3 rounded-2xl p-3.5 md:p-4 text-xs md:text-sm ${
                 isAssistant
                   ? "bg-card border border-border/80 text-foreground shadow-xs"
                   : "bg-emerald-800 text-white shadow-xs rounded-br-xs"
@@ -60,13 +62,13 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                   {msg.cards.map((card, cIdx) => {
                     switch (card.type) {
                       case "agenda":
-                        return <AgendaCard key={cIdx} data={card.data} />;
+                        return <AgendaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "cliente":
-                        return <ClienteCard key={cIdx} data={card.data} />;
+                        return <ClienteCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "financeiro":
-                        return <FinanceiroCard key={cIdx} data={card.data} />;
+                        return <FinanceiroCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "programa":
-                        return <ProgramaCard key={cIdx} data={card.data} />;
+                        return <ProgramaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "comprovante":
                         return <ComprovanteCard key={cIdx} data={card.data} />;
                       case "confirmacao":
@@ -88,6 +90,33 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                 </div>
               )}
 
+              {/* Botões de Ações de Continuidade quando houver ação pendente */}
+              {isAssistant && msg.pendingAction && (
+                <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-300 space-y-2">
+                  <span className="font-semibold text-xs text-amber-950 block">
+                    Confirmação Necessária: {msg.pendingAction.title}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => onConfirmAction?.(msg.pendingAction)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold shadow-2xs"
+                    >
+                      Pode confirmar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={onCancelAction}
+                      className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted text-xs font-medium"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div
                 className={`text-[10px] text-right ${
                   isAssistant ? "text-muted-foreground" : "text-emerald-200"
@@ -99,24 +128,18 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                 })}
               </div>
             </div>
-
-            {!isAssistant && (
-              <div className="h-8 w-8 rounded-full bg-muted border border-border text-foreground flex items-center justify-center shrink-0">
-                <User className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
           </div>
         );
       })}
 
       {isLoading && (
-        <div className="flex gap-3 justify-start">
-          <div className="h-8 w-8 rounded-full bg-emerald-800 text-white flex items-center justify-center shrink-0 animate-pulse">
+        <div className="flex gap-3 justify-start items-center">
+          <div className="h-8 w-8 rounded-full bg-emerald-800 text-[#C8A951] flex items-center justify-center shrink-0 animate-pulse">
             <Sparkles className="h-4 w-4" />
           </div>
-          <div className="rounded-2xl bg-card border border-border/80 p-3 text-xs text-muted-foreground flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-700 animate-ping" />
-            <span>Jessi está consultando e preparando a resposta...</span>
+          <div className="rounded-2xl bg-card border border-border/80 p-3.5 text-xs text-muted-foreground shadow-xs flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-600 animate-ping" />
+            <span>Consultando dados e verificando regras operacionais...</span>
           </div>
         </div>
       )}

@@ -44,14 +44,19 @@ export async function processarMensagemJessiCore(
   let intencao: IAIntent | undefined;
 
   try {
-    // 1. Caso o usuário esteja respondendo a uma confirmação de ação pendente
-    if (input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) {
-      const toolNome = input.dadosConfirmacao.tool;
-      const params = input.dadosConfirmacao.params;
+    // 1. Caso o usuário esteja confirmando por texto ("pode confirmar", "confirmar", "sim", "confirmo")
+    const textoLimpo = (input.mensagem || "").toLowerCase().trim();
+    if (
+      (input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) ||
+      ((textoLimpo === "pode confirmar" || textoLimpo === "confirmar" || textoLimpo === "confirma" || textoLimpo === "sim" || textoLimpo === "pode agendar") && input.contexto?.acaoPendente)
+    ) {
+      const pending = input.contexto?.acaoPendente;
+      const toolNome = input.dadosConfirmacao?.tool || pending?.tool || "criar_agendamento";
+      const params = input.dadosConfirmacao?.params || pending?.params || {};
 
-      const resultadoAcao = await despacharFerramentaJessi(sb, toolNome, params, { user });
+      const resultadoAcao = await despacharFerramentaJessi(sb, toolNome, params, { user, contexto: input.contexto });
 
-      respostaTexto = resultadoAcao.summary || "Ação executada e confirmada com sucesso.";
+      respostaTexto = resultadoAcao.summary || "Ação confirmada e registrada com sucesso!";
       cards.push({
         type: "confirmacao",
         data: {
@@ -81,7 +86,7 @@ export async function processarMensagemJessiCore(
       };
     }
 
-    // 2. Classifica a mensagem do usuário
+    // 2. Classifica a mensagem do usuário herdando o contexto
     intencao = await classificarComandoIA(input.mensagem, {
       user,
       mensagens: input.historico?.slice(-6),
@@ -90,7 +95,13 @@ export async function processarMensagemJessiCore(
 
     const nomeIntencao = intencao.intencao;
     const toolNome = intencao.ferramenta || nomeIntencao;
-    const params = intencao.parametros || {};
+    const params = {
+      ...(intencao.parametros || {}),
+      cliente_id: intencao.parametros?.cliente_id || input.contexto?.clienteSelecionadoId,
+      cliente_nome: intencao.parametros?.cliente_nome || input.contexto?.clienteSelecionadoNome,
+      pet_id: intencao.parametros?.pet_id || input.contexto?.petSelecionadoId,
+      pet_nome: intencao.parametros?.pet_nome || input.contexto?.petSelecionadoNome,
+    };
 
     // 3. Verifica se a ferramenta existe no registro
     const toolDef = JESSI_TOOLS[toolNome] || JESSI_TOOLS[nomeIntencao];
@@ -129,14 +140,19 @@ export async function processarMensagemJessiCore(
 
         respostaTexto = intencao.resposta_ia || resQuery.summary || "Consulta realizada com sucesso.";
 
-        // Identifica card especializado
+        // Identifica card especializado e atualiza contexto
         if (toolDef.especialista === "agenda") {
           cards.push({ type: "agenda", data: resQuery.data });
         } else if (toolDef.especialista === "clientes_pets") {
           cards.push({ type: "cliente", data: resQuery.data });
-          if (Array.isArray(resQuery.data) && resQuery.data.length === 1) {
-            novoContexto.clienteSelecionadoId = resQuery.data[0].id;
-            novoContexto.clienteSelecionadoNome = resQuery.data[0].nome;
+          if (Array.isArray(resQuery.data) && resQuery.data.length >= 1) {
+            const cli = resQuery.data[0];
+            novoContexto.clienteSelecionadoId = cli.id;
+            novoContexto.clienteSelecionadoNome = cli.nome;
+            if (cli.pets && cli.pets.length > 0) {
+              novoContexto.petSelecionadoId = cli.pets[0].id;
+              novoContexto.petSelecionadoNome = cli.pets[0].nome;
+            }
           }
         } else if (toolDef.especialista === "financeiro") {
           cards.push({ type: "financeiro", data: resQuery.data });
@@ -146,7 +162,7 @@ export async function processarMensagemJessiCore(
       }
     } else {
       // Resposta conversacional direta
-      respostaTexto = intencao.resposta_ia || "Entendido. Como posso ajudar com a agenda, clientes ou financeiro hoje?";
+      respostaTexto = intencao.resposta_ia || "Entendido. Como posso ajudar com a agenda, clientes, programas ou financeiro hoje?";
     }
 
     // 4. Registra auditoria

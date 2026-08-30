@@ -7,15 +7,17 @@ import { JessiWelcome } from "./JessiWelcome";
 import { JessiInputBar } from "./JessiInputBar";
 import { JessiContextPanel } from "./JessiContextPanel";
 import { JessiStatusIndicator, JessiStatus } from "./JessiStatusIndicator";
-import { processarMensagemJessi } from "@/lib/ia/jessi-agent.functions";
+import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia/jessi-agent.functions";
 import { JessiMessage, JessiPendingAction } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
+import { JessiProactiveCentral } from "@/lib/ia/jessi-proactive.server";
 import { Sparkles, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const JessiLayout: React.FC = () => {
   const processarMensagemFn = useServerFn(processarMensagemJessi);
+  const obterCentralFn = useServerFn(obterCentralOperacionalJessiFn);
 
   const [messages, setMessages] = useState<JessiMessage[]>([]);
   const [inputText, setInputText] = useState("");
@@ -24,11 +26,29 @@ export const JessiLayout: React.FC = () => {
   const [statusDetalhe, setStatusDetalhe] = useState<string | undefined>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [centralData, setCentralData] = useState<JessiProactiveCentral | null>(null);
+  const [isLoadingCentral, setIsLoadingCentral] = useState(true);
   const [contexto, setContexto] = useState<JessiContextState>({
     dataReferencia: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
   });
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [moduloAtivo, setModuloAtivo] = useState("rotina");
+
+  // Carrega a Central Operacional Proativa com dados 100% reais do banco na inicialização
+  React.useEffect(() => {
+    async function carregarCentral() {
+      try {
+        setIsLoadingCentral(true);
+        const res = await obterCentralFn();
+        setCentralData(res);
+      } catch (err) {
+        console.warn("Aviso ao carregar central proativa da Jessi:", err);
+      } finally {
+        setIsLoadingCentral(false);
+      }
+    }
+    carregarCentral();
+  }, []);
 
   // Hook real de reconhecimento de voz
   const {
@@ -298,12 +318,17 @@ export const JessiLayout: React.FC = () => {
         {/* Mensagens ou Welcome Screen */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {messages.length === 0 ? (
-            <JessiWelcome onQuickAction={handleSendMessage} />
+            <JessiWelcome 
+              onQuickAction={handleSendMessage} 
+              centralData={centralData}
+              isLoadingCentral={isLoadingCentral}
+            />
           ) : (
             <JessiChat
               messages={messages}
               onConfirmAction={handleConfirmAction}
               onCancelAction={handleCancelAction}
+              onSendMessage={handleSendMessage}
               isLoading={isLoading}
             />
           )}
