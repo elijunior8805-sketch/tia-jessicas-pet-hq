@@ -1064,7 +1064,7 @@ export const verificarElegibilidadeCredito = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
 
-    // 1. Busca contratos ativos do pet
+    // 1. Busca contratos do pet
     let query = sb
       .from("programas_contratados" as any)
       .select(`
@@ -1073,12 +1073,8 @@ export const verificarElegibilidadeCredito = createServerFn({ method: "POST" })
         movimentacoes:programas_creditos_movimentacoes (*)
       `)
       .eq("pet_id", data.pet_id)
-      .eq("status_do_programa", "ativo")
+      .in("status_do_programa", ["ativo", "aguardando_pagamento"])
       .order("criado_em", { ascending: true });
-
-    if (data.cliente_id) {
-      query = query.eq("cliente_id", data.cliente_id);
-    }
 
     const { data: contratos, error: cErr } = await query;
     if (cErr) throw cErr;
@@ -1100,35 +1096,40 @@ export const verificarElegibilidadeCredito = createServerFn({ method: "POST" })
     const contratosResumo = contratosList.map(c => calcularSaldosDoContrato(c, c.movimentacoes || []));
 
     // Clona mapa de saldos disponíveis por categoria para consumir virtualmente na avaliação
-    const saldosDisponiveisMap: Record<string, { disponivel: number; contrato: any; item: any }> = {};
+    const saldosDisponiveisMap: Record<string, { disponivel: number; reservado: number; contrato: any; item: any }> = {};
     for (const cRes of contratosResumo) {
       for (const item of cRes.itens) {
-        if (!item.bloqueado && item.disponiveis > 0) {
+        if (!item.bloqueado && (item.disponiveis > 0 || item.reservados > 0)) {
           const key = item.categoria;
           if (!saldosDisponiveisMap[key]) {
             saldosDisponiveisMap[key] = {
               disponivel: item.disponiveis,
+              reservado: item.reservados,
               contrato: cRes,
               item
             };
           } else {
             saldosDisponiveisMap[key].disponivel += item.disponiveis;
+            saldosDisponiveisMap[key].reservado += item.reservados;
           }
         }
       }
     }
 
+    const servicosInput = data.servicos.length > 0 ? data.servicos : [{ nome: "Banho Simples", valor: 60, categoria: "banho" }];
     const servicosCobertos: any[] = [];
     const servicosExtras: any[] = [];
     let totalCoberto = 0;
     let totalExtras = 0;
 
-    for (const serv of data.servicos) {
+    for (const serv of servicosInput) {
       const cat = identificarCategoriaCredito(serv);
       const saldoCat = saldosDisponiveisMap[cat];
 
-      if (saldoCat && saldoCat.disponivel > 0) {
-        saldoCat.disponivel -= 1;
+      if (saldoCat && (saldoCat.disponivel > 0 || saldoCat.reservado > 0)) {
+        if (saldoCat.disponivel > 0) saldoCat.disponivel -= 1;
+        else if (saldoCat.reservado > 0) saldoCat.reservado -= 1;
+
         const valorServ = Number(serv.valor || 0);
         totalCoberto += valorServ;
         servicosCobertos.push({
@@ -1149,11 +1150,12 @@ export const verificarElegibilidadeCredito = createServerFn({ method: "POST" })
     }
 
     const primeiroContrato = contratosResumo[0];
-    const itemBanho = primeiroContrato?.itens.find(i => i.categoria === "banho");
+    const itemBanho = primeiroContrato?.itens.find(i => i.categoria === "banho") || primeiroContrato?.itens[0];
+    const temCreditoBanhoDisponivel = (itemBanho?.disponiveis ?? 0) > 0 || (itemBanho?.reservados ?? 0) > 0;
 
     return {
       possui_programa: true,
-      possui_credito_elegivel: servicosCobertos.length > 0,
+      possui_credito_elegivel: servicosCobertos.length > 0 || temCreditoBanhoDisponivel,
       servicos_cobertos: servicosCobertos,
       servicos_extras: servicosExtras,
       total_coberto: totalCoberto,

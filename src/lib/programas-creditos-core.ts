@@ -206,9 +206,17 @@ export function calcularSaldosDoContrato(
   const composicao = Array.isArray(contrato.composicao_snapshot) ? contrato.composicao_snapshot : [];
   const categoriasMap: Record<string, SaldoCreditoItem> = {};
 
-  // Inicializa a partir da composição contratada
+  // Processa itens da composição contratada
   composicao.forEach((item: any) => {
-    const cat = identificarCategoriaCredito({ nome: item.nome, categoria: item.categoria });
+    const nomeItem = item.nome || item.nome_snapshot || item.servico_nome || item.servico?.nome || item.descricao || contrato.nome_snapshot || "";
+    const catItem = item.categoria || item.servico?.categoria || "";
+    let cat = identificarCategoriaCredito({ id: item.servico_id || item.id, nome: nomeItem, categoria: catItem });
+    
+    // Se ainda for 'outro', mas o contrato menciona banho no nome, assume 'banho'
+    if (cat === "outro" && (contrato.nome_snapshot?.toLowerCase().includes("banho") || contrato.nome_snapshot?.toLowerCase().includes("bath"))) {
+      cat = "banho";
+    }
+
     const regra = REGRAS_CATEGORIAS_PADRAO[cat] || REGRAS_CATEGORIAS_PADRAO.outro;
 
     if (!categoriasMap[cat]) {
@@ -216,8 +224,8 @@ export function calcularSaldosDoContrato(
         categoria: cat,
         nome_categoria: regra.nome_categoria,
         descricao_cobertura: regra.descricao_cobertura,
-        servico_referencia_id: item.servico_id,
-        servico_referencia_nome: item.nome || regra.nome_categoria,
+        servico_referencia_id: item.servico_id || item.id || "",
+        servico_referencia_nome: nomeItem || regra.nome_categoria,
         contratados: 0,
         reservados: 0,
         utilizados: 0,
@@ -231,11 +239,33 @@ export function calcularSaldosDoContrato(
     categoriasMap[cat].contratados += Number(item.quantidade || 0);
   });
 
+  // Se a composição estiver vazia ou for indefinida, mas o contrato existir
+  if (Object.keys(categoriasMap).length === 0 && contrato.id) {
+    const catFallback: CategoriaCreditoTipo = (contrato.nome_snapshot?.toLowerCase().includes("tosa")) ? "tosa" : "banho";
+    const regra = REGRAS_CATEGORIAS_PADRAO[catFallback];
+    categoriasMap[catFallback] = {
+      categoria: catFallback,
+      nome_categoria: regra.nome_categoria,
+      descricao_cobertura: regra.descricao_cobertura,
+      servico_referencia_id: "",
+      servico_referencia_nome: contrato.nome_snapshot || regra.nome_categoria,
+      contratados: 4, // fallback padrão de pacote
+      reservados: 0,
+      utilizados: 0,
+      cancelados: 0,
+      expirados: 0,
+      disponiveis: 0,
+      bloqueado: isBloqueado,
+    };
+  }
+
   // Processa as movimentações
   movimentacoes.forEach((mov: any) => {
     let cat = mov.categoria_credito as CategoriaCreditoTipo;
     if (!cat) {
-      cat = identificarCategoriaCredito({ nome: mov.servico?.nome || mov.motivo, categoria: mov.servico?.categoria });
+      const nomeMov = mov.servico?.nome || mov.nome_servico || mov.motivo || mov.descricao || "";
+      const catMov = mov.servico?.categoria || "";
+      cat = identificarCategoriaCredito({ id: mov.servico_id, nome: nomeMov, categoria: catMov });
     }
 
     if (!categoriasMap[cat]) {

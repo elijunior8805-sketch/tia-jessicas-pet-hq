@@ -1625,12 +1625,15 @@ function AtendimentoDetalhe() {
                       <SelectValue placeholder="Selecione a forma de quitação do banho" />
                     </SelectTrigger>
                     <SelectContent>
-                      {elegibilidadeCredito?.possui_credito_elegivel && (
+                      {(elegibilidadeCredito?.possui_credito_elegivel || elegibilidadeCredito?.possui_programa || (elegibilidadeCredito?.resumo?.creditos_banho_disponiveis ?? 0) > 0 || (elegibilidadeCredito?.resumo?.creditos_banho_reservados ?? 0) > 0) && (
                         <SelectItem
                           value="credito_programa"
                           className="font-semibold text-emerald-900 bg-emerald-50 focus:bg-emerald-100"
                         >
-                          🐾 Crédito de banho — Programa de Cuidados ({elegibilidadeCredito.resumo?.creditos_banho_disponiveis ?? 0} disponíveis)
+                          {elegibilidadeCredito?.resumo?.creditos_banho_reservados && elegibilidadeCredito.resumo.creditos_banho_reservados > 0
+                            ? "🐾 Crédito de banho reservado para este atendimento"
+                            : `🐾 Crédito de banho — Programa de Cuidados (${elegibilidadeCredito?.resumo?.creditos_banho_disponiveis ?? 1} disponíveis)`
+                          }
                         </SelectItem>
                       )}
                       {FORMAS_PAGAMENTO.map((f) => (
