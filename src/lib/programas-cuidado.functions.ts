@@ -470,10 +470,35 @@ export const toggleProgramaStatus = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+/** Normaliza o nome da cópia evitando repetições de '(Cópia)' e gerando numeração limpa. */
+export function normalizarNomeCopia(nomeOriginal: string, nomesExistentes: string[]): string {
+  let base = nomeOriginal
+    .replace(/(\s*[-—–]\s*C[óo]pia(\s*\d+)?|\s*\([Cc][óo]pia(\s*\d+)?\))+$/gi, "")
+    .trim();
+
+  if (!base) base = "Programa de Cuidado";
+
+  const sugestaoPrimeira = `${base} — Cópia`;
+  if (!nomesExistentes.some((n) => n.toLowerCase() === sugestaoPrimeira.toLowerCase())) {
+    return sugestaoPrimeira;
+  }
+
+  let counter = 2;
+  while (counter < 100) {
+    const sugestao = `${base} — Cópia ${counter}`;
+    if (!nomesExistentes.some((n) => n.toLowerCase() === sugestao.toLowerCase())) {
+      return sugestao;
+    }
+    counter++;
+  }
+  return `${base} — Cópia ${Date.now().toString().slice(-4)}`;
+}
+
 export const duplicarPrograma = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
-    id: z.string().uuid()
+    id: z.string().uuid(),
+    idempotency_key: z.string().optional()
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
@@ -487,30 +512,125 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
 
     if (oError) throw oError;
 
+    // Busca nomes de todos os programas para calcular a numeração correta
+    const { data: todosProgramas } = await sb
+      .from("programas_de_cuidado" as any)
+      .select("nome");
+
+    const nomesExistentes = (todosProgramas ?? []).map((p: any) => p.nome as string);
+    const novoNome = normalizarNomeCopia(original.nome, nomesExistentes);
+
     const { id: _, criado_em: __, updated_at: ___, itens, ...cloneData } = original as any;
     const { data: clone, error: cError } = await sb
       .from("programas_de_cuidado" as any)
       .insert({
         ...cloneData,
-        nome: `${cloneData.nome} (Cópia)`,
+        nome: novoNome,
         status: "rascunho",
-        criado_por: userId
+        criado_por: userId,
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
 
     if (cError) throw cError;
 
-    const { error: iError } = await sb
-      .from("programas_de_cuidado_itens" as any)
-      .insert(itens.map((item: any) => {
-        const { id: ____, programa_id: _____, ...itemData } = item;
-        return { ...itemData, programa_id: (clone as any).id };
-      }));
+    if (itens && itens.length > 0) {
+      const { error: iError } = await sb
+        .from("programas_de_cuidado_itens" as any)
+        .insert(itens.map((item: any) => {
+          const { id: ____, programa_id: _____, ...itemData } = item;
+          return { ...itemData, programa_id: (clone as any).id };
+        }));
 
-    if (iError) throw iError;
+      if (iError) throw iError;
+    }
+
+    // Registro na Auditoria
+    await sb.from("auditoria_programas" as any).insert({
+      acao: "duplicar_programa",
+      programa_contratado_id: null,
+      valor_anterior: { original_id: data.id, nome: original.nome },
+      valor_posterior: { clone_id: clone.id, nome: novoNome, status: "rascunho" },
+      motivo: `Duplicação do programa ${original.nome}`,
+      usuario_id: userId,
+      created_at: new Date().toISOString()
+    });
 
     return clone;
+  });
+
+/** Exclui rascunhos de programas selecionados no catálogo garantindo ausência de vínculos comerciais. */
+export const excluirRascunhosProgramas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    programa_ids: z.array(z.string().uuid()).min(1, "Selecione ao menos um programa"),
+    motivo: z.string().min(3, "Informe o motivo da exclusão")
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+    const resultados: any[] = [];
+
+    for (const progId of data.programa_ids) {
+      // 1. Verifica se possui contratos vendidos
+      const { data: contratos, error: cErr } = await sb
+        .from("programas_contratados" as any)
+        .select("id")
+        .eq("programa_id", progId)
+        .limit(1);
+
+      if (contratos && contratos.length > 0) {
+        resultados.push({
+          id: progId,
+          sucesso: false,
+          motivo: "Programa possui contratos vendidos vinculados. Utilize o cancelamento de contratos."
+        });
+        continue;
+      }
+
+      // 2. Busca dados do programa para auditoria
+      const { data: prog } = await sb
+        .from("programas_de_cuidado" as any)
+        .select("id, nome, status")
+        .eq("id", progId)
+        .maybeSingle();
+
+      // 3. Deleta itens do programa
+      await sb
+        .from("programas_de_cuidado_itens" as any)
+        .delete()
+        .eq("programa_id", progId);
+
+      // 4. Deleta o programa do catálogo
+      const { error: dErr } = await sb
+        .from("programas_de_cuidado" as any)
+        .delete()
+        .eq("id", progId);
+
+      if (dErr) {
+        resultados.push({ id: progId, sucesso: false, motivo: dErr.message });
+      } else {
+        // Auditoria
+        await sb.from("auditoria_programas" as any).insert({
+          acao: "excluir_rascunho_catalogo",
+          programa_contratado_id: null,
+          valor_anterior: prog,
+          valor_posterior: null,
+          motivo: data.motivo,
+          usuario_id: userId,
+          created_at: new Date().toISOString()
+        });
+
+        resultados.push({ id: progId, sucesso: true, nome: prog?.nome });
+      }
+    }
+
+    return {
+      success: true,
+      total_processados: data.programa_ids.length,
+      resultados
+    };
   });
 
 export const reservarCredito = createServerFn({ method: "POST" })

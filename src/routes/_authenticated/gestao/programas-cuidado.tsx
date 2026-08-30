@@ -29,7 +29,8 @@ import {
   CheckSquare,
   Square,
   Eye,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Copy
 } from "lucide-react";
 
 import { useState, useMemo, useEffect } from "react";
@@ -37,6 +38,8 @@ import {
   getProgramasCatalogo, 
   toggleProgramaStatus,
   duplicarPrograma,
+  excluirRascunhosProgramas,
+  normalizarNomeCopia,
   contratarPrograma,
   reconciliarCreditosPet
 } from "@/lib/programas-cuidado.functions";
@@ -104,12 +107,24 @@ export const Route = createFileRoute("/_authenticated/gestao/programas-cuidado")
 
 function ProgramasCuidadoPage() {
   const queryClient = useQueryClient();
-  const { data: programas } = useSuspenseQuery({
+  const { data: programasRaw = [] } = useSuspenseQuery({
     queryKey: ["programas-catalogo"],
     queryFn: () => getProgramasCatalogo(),
   });
 
+  // Deduplicação defensiva no frontend para garantir unicidade por ID
+  const programas = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const p of (programasRaw as any[]) ?? []) {
+      if (p?.id && !map.has(p.id)) {
+        map.set(p.id, p);
+      }
+    }
+    return Array.from(map.values());
+  }, [programasRaw]);
+
   const [activeTab, setActiveTab] = useState("catalogo");
+  const [activeSubTabCatalogo, setActiveSubTabCatalogo] = useState<"todos" | "ativo" | "rascunho" | "inativo">("todos");
   const [activeSubTabAtivos, setActiveSubTabAtivos] = useState("todos");
   const [openVenda, setOpenVenda] = useState(false);
   const [selectedPrograma, setSelectedPrograma] = useState<any>(null);
@@ -119,7 +134,13 @@ function ProgramasCuidadoPage() {
   const [selectedContratoId, setSelectedContratoId] = useState<string | null>(null);
   const [programaParaArquivar, setProgramaParaArquivar] = useState<any | null>(null);
 
-  // Seleção e Cancelamento em Lote / Individual
+  // Duplicação e Exclusão de Rascunhos do Catálogo
+  const [selectedRascunhosIds, setSelectedRascunhosIds] = useState<string[]>([]);
+  const [programaParaDuplicar, setProgramaParaDuplicar] = useState<any | null>(null);
+  const [openExcluirRascunhosDialog, setOpenExcluirRascunhosDialog] = useState(false);
+  const [motivoExcluirRascunhos, setMotivoExcluirRascunhos] = useState("");
+
+  // Seleção e Cancelamento de Contratos Vendidos em Lote / Individual
   const [selectedContratosIds, setSelectedContratosIds] = useState<string[]>([]);
   const [contratoParaCancelar, setContratoParaCancelar] = useState<any | null>(null);
   const [motivoCancelamentoIndividual, setMotivoCancelamentoIndividual] = useState("");
@@ -239,6 +260,7 @@ function ProgramasCuidadoPage() {
   }, [selectedPet, petPorteSelecionado, todosServicos, servicosPrecos, portes]);
 
   const invalidarTodosCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
     queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
     queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
     queryClient.invalidateQueries({ queryKey: ["cliente-ficha-programas"] });
@@ -251,6 +273,35 @@ function ProgramasCuidadoPage() {
     queryClient.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
     queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
   };
+
+  const duplicarMutation = useMutation({
+    mutationFn: (vars: { id: string }) => duplicarPrograma({ data: { id: vars.id } }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
+      queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
+      toast.success(`Programa duplicado com sucesso como "${res.nome}"!`);
+      setProgramaParaDuplicar(null);
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao duplicar programa: " + err.message);
+    }
+  });
+
+  const excluirRascunhosMutation = useMutation({
+    mutationFn: (vars: { programa_ids: string[]; motivo: string }) =>
+      excluirRascunhosProgramas({ data: vars }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
+      queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
+      toast.success(`${res.total_processados} rascunho(s) excluído(s) com sucesso!`);
+      setSelectedRascunhosIds([]);
+      setOpenExcluirRascunhosDialog(false);
+      setMotivoExcluirRascunhos("");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir rascunhos: " + err.message);
+    }
+  });
 
   const contratarMutation = useMutation({
     mutationFn: (vars: any) => contratarPrograma({ data: vars }),
@@ -312,7 +363,6 @@ function ProgramasCuidadoPage() {
   const handleOpenVenda = (programa: any) => {
     setSelectedPrograma(programa);
     
-    // Inicializa a composição base do programa com os serviços do catálogo
     const itensBase = (programa.itens ?? []).map((i: any) => ({
       servico_id: i.servico_id,
       nome: i.servico?.nome || "Serviço",
@@ -321,7 +371,6 @@ function ProgramasCuidadoPage() {
     }));
     setItensCustomizados(itensBase);
 
-    // Identifica desconto padrão do catálogo se houver
     const sub = Number(programa.valor_normal_dos_servicos || 0);
     const preco = Number(programa.preco_do_programa || 0);
     const desc = Math.max(0, sub - preco);
@@ -419,14 +468,6 @@ function ProgramasCuidadoPage() {
     },
   });
 
-  const duplicarMutation = useMutation({
-    mutationFn: (id: string) => duplicarPrograma({ data: { id } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
-      toast.success("Programa duplicado com sucesso");
-    }
-  });
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ativo": return <Badge className="bg-green-500/10 text-green-600 border-green-200">Ativo</Badge>;
@@ -435,6 +476,37 @@ function ProgramasCuidadoPage() {
       default: return null;
     }
   };
+
+  // Programas do Catálogo filtrados por subaba
+  const programasCatalogoFiltrados = useMemo(() => {
+    if (activeSubTabCatalogo === "todos") return programas;
+    return programas.filter((p: any) => p.status === activeSubTabCatalogo);
+  }, [programas, activeSubTabCatalogo]);
+
+  const rascunhosProgramas = useMemo(() => {
+    return programas.filter((p: any) => p.status === "rascunho");
+  }, [programas]);
+
+  const handleToggleSelectAllRascunhos = () => {
+    if (selectedRascunhosIds.length === rascunhosProgramas.length && rascunhosProgramas.length > 0) {
+      setSelectedRascunhosIds([]);
+    } else {
+      setSelectedRascunhosIds(rascunhosProgramas.map((p) => p.id));
+    }
+  };
+
+  const handleToggleSelectRascunho = (id: string) => {
+    setSelectedRascunhosIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Nome previsto para a duplicação em confirmação
+  const nomePreviaDuplicacao = useMemo(() => {
+    if (!programaParaDuplicar) return "";
+    const nomes = programas.map((p: any) => p.nome as string);
+    return normalizarNomeCopia(programaParaDuplicar.nome, nomes);
+  }, [programaParaDuplicar, programas]);
 
   // Cálculo financeiro em tempo real da venda
   const subtotalVenda = useMemo(() => {
@@ -517,7 +589,7 @@ function ProgramasCuidadoPage() {
         <TabsList className="bg-zinc-100/80 dark:bg-zinc-900/80 p-1.5 mb-8 flex-wrap h-auto overflow-x-auto justify-start rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-sm gap-1">
           <TabsTrigger value="catalogo" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <Sparkles className="mr-2 h-4 w-4" />
-            Catálogo
+            Catálogo ({programas.length})
           </TabsTrigger>
           <TabsTrigger value="ativos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <PackageCheck className="mr-2 h-4 w-4" />
@@ -543,146 +615,232 @@ function ProgramasCuidadoPage() {
 
         {/* CATÁLOGO DE PROGRAMAS */}
         <TabsContent value="catalogo" className="space-y-6 outline-none">
-          {programas && programas.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {programas.map((programa: any) => (
-                <Card key={programa.id} className="group overflow-hidden border-sidebar-border/60 hover:shadow-lg hover:shadow-gold/10 transition-all duration-300 bg-white dark:bg-zinc-950 flex flex-col justify-between">
-                  <div>
-                    <CardHeader className="pb-3 border-b border-sidebar-border/40 bg-zinc-50/50 dark:bg-zinc-900/50">
-                      <div className="flex justify-between items-start mb-2">
-                        {getStatusBadge(programa.status)}
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-gold"
-                            title="Editar programa"
-                            onClick={() => {
-                              setEditingPrograma(programa);
-                              setIsProgramaModalOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-gold" 
-                            title="Duplicar programa"
-                            onClick={() => duplicarMutation.mutate(programa.id)}
-                          >
-                            <Plus className="h-4 w-4 rotate-45" />
-                          </Button>
-                        </div>
-                      </div>
-                      <CardTitle className="text-xl font-display text-zinc-900 dark:text-zinc-100 group-hover:text-gold transition-colors">
-                        {programa.nome}
-                      </CardTitle>
-                      <CardDescription className="line-clamp-2 min-h-[2.5rem] mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                        {programa.descricao || "Sem descrição definida."}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-5 space-y-5 pb-5">
-                      <div className="space-y-3">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                          Serviços Incluídos
-                        </p>
-                        <ul className="space-y-2">
-                          {programa.itens?.map((item: any) => {
-                            const cat = identificarCategoriaCredito({ nome: item.servico?.nome, categoria: item.servico?.categoria });
-                            const regra = REGRAS_CATEGORIAS_PADRAO[cat];
-                            return (
-                              <li key={item.id} className="text-sm bg-zinc-50 dark:bg-zinc-900 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800 space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="flex items-center gap-2">
-                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-gold">
-                                      {item.quantidade}x
-                                    </Badge>
-                                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                                      {item.servico?.nome || "Serviço"}
-                                    </span>
-                                  </span>
-                                </div>
-                                {regra && (
-                                  <p className="text-[10px] text-primary/75 pl-7">
-                                    {regra.descricao_cobertura}
-                                  </p>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
+          {/* Barra de Filtros e Exclusão de Rascunhos */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-3 rounded-xl border border-sidebar-border/60">
+            <div className="flex flex-wrap items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
+              <Button 
+                variant={activeSubTabCatalogo === "todos" ? "secondary" : "ghost"} 
+                size="sm" 
+                className="h-8 text-xs px-3 rounded-lg"
+                onClick={() => setActiveSubTabCatalogo("todos")}
+              >
+                Todos ({programas.length})
+              </Button>
+              <Button 
+                variant={activeSubTabCatalogo === "ativo" ? "secondary" : "ghost"} 
+                size="sm" 
+                className="h-8 text-xs px-3 rounded-lg"
+                onClick={() => setActiveSubTabCatalogo("ativo")}
+              >
+                Ativos ({programas.filter(p => p.status === "ativo").length})
+              </Button>
+              <Button 
+                variant={activeSubTabCatalogo === "rascunho" ? "secondary" : "ghost"} 
+                size="sm" 
+                className="h-8 text-xs px-3 rounded-lg"
+                onClick={() => setActiveSubTabCatalogo("rascunho")}
+              >
+                Rascunhos ({rascunhosProgramas.length})
+              </Button>
+              <Button 
+                variant={activeSubTabCatalogo === "inativo" ? "secondary" : "ghost"} 
+                size="sm" 
+                className="h-8 text-xs px-3 rounded-lg"
+                onClick={() => setActiveSubTabCatalogo("inativo")}
+              >
+                Arquivados ({programas.filter(p => p.status === "inativo").length})
+              </Button>
+            </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gold/5 border border-gold/10 p-3 rounded-xl">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-gold/70">Validade</p>
-                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{programa.validade_em_dias} dias</p>
+            {/* Ação em lote para rascunhos */}
+            {rascunhosProgramas.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={handleToggleSelectAllRascunhos}
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  {selectedRascunhosIds.length === rascunhosProgramas.length && rascunhosProgramas.length > 0
+                    ? "Desmarcar rascunhos"
+                    : `Selecionar todos (${rascunhosProgramas.length})`}
+                </Button>
+                {selectedRascunhosIds.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs gap-1.5 shadow-sm"
+                    onClick={() => setOpenExcluirRascunhosDialog(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir {selectedRascunhosIds.length} rascunho(s)
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {programasCatalogoFiltrados && programasCatalogoFiltrados.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {programasCatalogoFiltrados.map((programa: any) => {
+                const isRascunho = programa.status === "rascunho";
+                const isSelectedRascunho = selectedRascunhosIds.includes(programa.id);
+
+                return (
+                  <Card key={programa.id} className={`group overflow-hidden border-sidebar-border/60 hover:shadow-lg hover:shadow-gold/10 transition-all duration-300 bg-white dark:bg-zinc-950 flex flex-col justify-between ${isSelectedRascunho ? 'ring-2 ring-gold border-gold' : ''}`}>
+                    <div>
+                      <CardHeader className="pb-3 border-b border-sidebar-border/40 bg-zinc-50/50 dark:bg-zinc-900/50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            {isRascunho && (
+                              <Checkbox 
+                                checked={isSelectedRascunho}
+                                onCheckedChange={() => handleToggleSelectRascunho(programa.id)}
+                                aria-label={`Selecionar rascunho ${programa.nome}`}
+                              />
+                            )}
+                            {getStatusBadge(programa.status)}
+                          </div>
+
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-gold"
+                              title="Editar programa"
+                              onClick={() => {
+                                setEditingPrograma(programa);
+                                setIsProgramaModalOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-gold" 
+                              title="Duplicar programa"
+                              onClick={() => setProgramaParaDuplicar(programa)}
+                              disabled={duplicarMutation.isPending}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Transporte</p>
-                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                            {programa.inclui_transporte ? "Incluso" : "Não incluso"}
+                        <CardTitle className="text-xl font-display text-zinc-900 dark:text-zinc-100 group-hover:text-gold transition-colors">
+                          {programa.nome}
+                        </CardTitle>
+                        <CardDescription className="line-clamp-2 min-h-[2.5rem] mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                          {programa.descricao || "Sem descrição definida."}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-5 space-y-5 pb-5">
+                        <div className="space-y-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                            Serviços Incluídos
+                          </p>
+                          <ul className="space-y-2">
+                            {programa.itens?.map((item: any) => {
+                              const cat = identificarCategoriaCredito({ nome: item.servico?.nome, categoria: item.servico?.categoria });
+                              const regra = REGRAS_CATEGORIAS_PADRAO[cat];
+                              return (
+                                <li key={item.id} className="text-sm bg-zinc-50 dark:bg-zinc-900 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800 space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-gold">
+                                        {item.quantidade}x
+                                      </Badge>
+                                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                                        {item.servico?.nome || "Serviço"}
+                                      </span>
+                                    </span>
+                                  </div>
+                                  {regra && (
+                                    <p className="text-[10px] text-primary/75 pl-7">
+                                      {regra.descricao_cobertura}
+                                    </p>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gold/5 border border-gold/10 p-3 rounded-xl">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gold/70">Validade</p>
+                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{programa.validade_em_dias} dias</p>
+                          </div>
+                          <div className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Transporte</p>
+                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                              {programa.inclui_transporte ? "Incluso" : "Não incluso"}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </div>
+
+                    <CardFooter className="flex flex-col gap-4 pt-5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/30">
+                      <div className="w-full flex justify-between items-end">
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-zinc-400 dark:text-zinc-600 line-through decoration-zinc-300 dark:decoration-zinc-700">
+                            R$ {Number(programa.valor_normal_dos_servicos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-3xl font-display font-bold text-gold">
+                            <span className="text-sm font-normal mr-1">R$</span>
+                            {Number(programa.preco_do_programa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
+                        {programa.economia > 0 && (
+                          <div className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm mb-1 animate-pulse">
+                            ECONOMIZE R$ {Number(programa.economia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </div>
-
-                  <CardFooter className="flex flex-col gap-4 pt-5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/30">
-                    <div className="w-full flex justify-between items-end">
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-bold text-zinc-400 dark:text-zinc-600 line-through decoration-zinc-300 dark:decoration-zinc-700">
-                          R$ {Number(programa.valor_normal_dos_servicos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-3xl font-display font-bold text-gold">
-                          <span className="text-sm font-normal mr-1">R$</span>
-                          {Number(programa.preco_do_programa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      {programa.economia > 0 && (
-                        <div className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm mb-1 animate-pulse">
-                          ECONOMIZE R$ {Number(programa.economia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="w-full flex gap-2">
-                      <Button 
-                        className="flex-1 bg-gold hover:bg-gold/90 text-white font-bold h-11 rounded-xl shadow-lg shadow-gold/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                        onClick={() => handleOpenVenda(programa)}
-                      >
-                        Vender Agora
-                      </Button>
                       
-                      {/* Botão de Arquivar com Confirmação */}
-                      <Button 
-                        variant="secondary" 
-                        size="icon"
-                        className={`h-11 w-11 rounded-xl shadow-sm ${programa.status === 'ativo' ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
-                        title={programa.status === 'ativo' ? 'Arquivar programa do catálogo' : 'Reativar programa'}
-                        onClick={() => setProgramaParaArquivar(programa)}
-                      >
-                        {programa.status === 'ativo' ? <Archive className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
+                      <div className="w-full flex gap-2">
+                        <Button 
+                          className="flex-1 bg-gold hover:bg-gold/90 text-white font-bold h-11 rounded-xl shadow-lg shadow-gold/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                          onClick={() => handleOpenVenda(programa)}
+                          disabled={programa.status === "inativo"}
+                        >
+                          Vender Agora
+                        </Button>
+                        
+                        {/* Botão de Arquivar com Confirmação */}
+                        <Button 
+                          variant="secondary" 
+                          size="icon"
+                          className={`h-11 w-11 rounded-xl shadow-sm ${programa.status === 'ativo' ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                          title={programa.status === 'ativo' ? 'Arquivar programa do catálogo' : 'Reativar programa'}
+                          onClick={() => setProgramaParaArquivar(programa)}
+                        >
+                          {programa.status === 'ativo' ? <Archive className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-zinc-950 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
               <div className="w-16 h-16 rounded-full bg-gold/5 flex items-center justify-center mb-6">
                 <PackageCheck className="h-8 w-8 text-gold/40" />
               </div>
-              <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100">Nenhum programa no catálogo</h3>
-              <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs text-center">Comece criando o seu primeiro programa de fidelidade para atrair mais clientes.</p>
+              <h3 className="text-xl font-display font-bold text-zinc-900 dark:text-zinc-100">Nenhum programa encontrado nesta visualização</h3>
+              <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs text-center">Altere o filtro acima ou crie um novo programa no catálogo.</p>
               <Button 
                 className="mt-8 bg-gold hover:bg-gold/90 text-white font-bold px-8 h-12 rounded-xl shadow-lg shadow-gold/20"
-                onClick={() => setIsProgramaModalOpen(true)}
+                onClick={() => {
+                  setEditingPrograma(null);
+                  setIsProgramaModalOpen(true);
+                }}
               >
                 <Plus className="mr-2 h-5 w-5" />
-                Criar Primeiro Programa
+                Criar Novo Programa
               </Button>
             </div>
           )}
@@ -1044,7 +1202,132 @@ function ProgramasCuidadoPage() {
         </TabsContent>
       </Tabs>
 
-      {/* DIÁLOGO DE CANCELAMENTO / EXCLUSÃO INDIVIDUAL */}
+      {/* DIÁLOGO DE CONFIRMAÇÃO DE DUPLICAÇÃO DE PROGRAMA */}
+      <Dialog open={Boolean(programaParaDuplicar)} onOpenChange={(v) => !v && setProgramaParaDuplicar(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary font-display text-lg">
+              <Copy className="h-5 w-5 text-gold" />
+              Duplicar Programa do Catálogo?
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              Uma nova cópia independente será criada como rascunho com o nome padronizado. Clientes, créditos e contratos existentes não serão alterados ou copiados.
+            </DialogDescription>
+          </DialogHeader>
+
+          {programaParaDuplicar && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 bg-muted/40 rounded-lg border space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Programa Original:</span>
+                  <span className="font-semibold">{programaParaDuplicar.nome}</span>
+                </div>
+                <div className="flex justify-between text-gold">
+                  <span className="text-muted-foreground">Novo Nome Gerado:</span>
+                  <span className="font-bold">{nomePreviaDuplicacao}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Preço Configurado:</span>
+                  <span className="font-semibold text-foreground">{brl(Number(programaParaDuplicar.preco_do_programa || 0))}</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-gold/5 border border-gold/20 text-[11px] leading-relaxed text-muted-foreground">
+                ✓ A cópia conterá a mesma composição de serviços e regras comerciais.<br />
+                ✓ O status inicial será <strong>Rascunho</strong> para que você possa revisar antes de ativar.
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setProgramaParaDuplicar(null)} disabled={duplicarMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              className="bg-gold hover:bg-gold/90 text-white gap-1.5"
+              disabled={duplicarMutation.isPending}
+              onClick={() => {
+                if (programaParaDuplicar) {
+                  duplicarMutation.mutate({ id: programaParaDuplicar.id });
+                }
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {duplicarMutation.isPending ? "Duplicando..." : "Sim, Duplicar como Rascunho"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DE EXCLUSÃO DE RASCUNHOS SELECIONADOS NO CATÁLOGO */}
+      <Dialog open={openExcluirRascunhosDialog} onOpenChange={setOpenExcluirRascunhosDialog}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800 font-display text-lg">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Excluir {selectedRascunhosIds.length} Rascunho(s) Selecionado(s)?
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              Os rascunhos selecionados serão excluídos permanentemente do catálogo. Esta operação não afeta nenhum contrato vendido ou histórico de clientes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="max-h-40 overflow-y-auto rounded-lg border divide-y bg-muted/20">
+              {programas
+                .filter((p: any) => selectedRascunhosIds.includes(p.id))
+                .map((p: any) => (
+                  <div key={p.id} className="p-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-semibold text-foreground">{p.nome}</span>
+                      <p className="text-[10px] text-muted-foreground">ID: {p.id.slice(0, 8)}... · {p.validade_em_dias} dias</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-800 bg-amber-50">
+                      Rascunho
+                    </Badge>
+                  </div>
+                ))}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Motivo da Exclusão (Obrigatório para Auditoria)</Label>
+              <Textarea
+                value={motivoExcluirRascunhos}
+                onChange={(e) => setMotivoExcluirRascunhos(e.target.value)}
+                placeholder="Informe o motivo da exclusão dos rascunhos (mínimo 3 letras)..."
+                className="text-xs"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setOpenExcluirRascunhosDialog(false)} disabled={excluirRascunhosMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={excluirRascunhosMutation.isPending || motivoExcluirRascunhos.trim().length < 3}
+              onClick={() => {
+                if (motivoExcluirRascunhos.trim().length < 3) {
+                  toast.error("Informe o motivo da exclusão dos rascunhos.");
+                  return;
+                }
+                excluirRascunhosMutation.mutate({
+                  programa_ids: selectedRascunhosIds,
+                  motivo: motivoExcluirRascunhos,
+                });
+              }}
+            >
+              {excluirRascunhosMutation.isPending ? "Excluindo..." : "Confirmar Exclusão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DE CANCELAMENTO / EXCLUSÃO INDIVIDUAL DE CONTRATO VENDIDO */}
       <Dialog open={Boolean(contratoParaCancelar)} onOpenChange={(v) => !v && setContratoParaCancelar(null)}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
@@ -1118,7 +1401,7 @@ function ProgramasCuidadoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO DE EXCLUSÃO EM LOTE */}
+      {/* DIÁLOGO DE EXCLUSÃO EM LOTE DE CONTRATOS */}
       <Dialog open={openExcluirLoteDialog} onOpenChange={setOpenExcluirLoteDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -1718,7 +2001,7 @@ function AuditoriaProgramasTab() {
               <tr>
                 <th className="p-4">Data</th>
                 <th className="p-4">Ação</th>
-                <th className="p-4">Cliente/Pet</th>
+                <th className="p-4">Detalhes</th>
                 <th className="p-4">Motivo</th>
               </tr>
             </thead>
@@ -1734,8 +2017,8 @@ function AuditoriaProgramasTab() {
                     </Badge>
                   </td>
                   <td className="p-4">
-                    <div className="font-semibold text-xs">{log.clientes?.nome || '-'}</div>
-                    <div className="text-[10px] text-muted-foreground">{log.pets?.nome || '-'}</div>
+                    <div className="font-semibold text-xs">{log.clientes?.nome || log.valor_posterior?.nome || '-'}</div>
+                    <div className="text-[10px] text-muted-foreground">{log.pets?.nome || log.valor_anterior?.nome || '-'}</div>
                   </td>
                   <td className="p-4 text-xs italic text-muted-foreground/80">{log.motivo || '-'}</td>
                 </tr>
