@@ -1858,7 +1858,7 @@ function FinanceiroPage() {
               valor_total: valorTotalReceita(pagamentoParaBaixa),
               valor_pago: Number(pagamentoParaBaixa.valor_pago || 0),
               status: pagamentoParaBaixa.status,
-              descricao: pagamentoParaBaixa.descricao,
+              descricao: pagamentoParaBaixa.descricao ?? undefined,
               cliente_nome: pagamentoParaBaixa.cliente?.nome,
             }}
             onSuccess={refreshAll}
@@ -1874,7 +1874,7 @@ function FinanceiroPage() {
               valor_total: valorTotalReceita(pagamentoParaCancelar),
               valor_pago: Number(pagamentoParaCancelar.valor_pago || 0),
               status: pagamentoParaCancelar.status,
-              descricao: pagamentoParaCancelar.descricao,
+              descricao: pagamentoParaCancelar.descricao ?? undefined,
               cliente_nome: pagamentoParaCancelar.cliente?.nome,
             }}
             onSuccess={refreshAll}

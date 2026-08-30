@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { calcularSaldosDoContrato } from "@/lib/programas-creditos-core";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/ficha")({
   component: FichaOperacional,
@@ -157,7 +158,7 @@ function FichaOperacional() {
 
       {/* Programa de Cuidado do Pet */}
       {programaContratado && (() => {
-        const resumo = calcularSaldosDoContrato(programaContratado, programaContratado.movimentacoes || []);
+        const resumo = calcularSaldosDoContrato(programaContratado as any, (programaContratado as any).movimentacoes || []);
         return (
           <Card className="p-5 mb-4 border-l-4 border-l-primary bg-primary/[0.03] space-y-3">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
