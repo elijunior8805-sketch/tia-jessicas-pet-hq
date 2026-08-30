@@ -20,10 +20,10 @@ import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedReativacaoRouteImport } from './routes/_authenticated/reativacao'
 import { Route as AuthenticatedQualidadeIaRouteImport } from './routes/_authenticated/qualidade-ia'
-import { Route as AuthenticatedJessiRouteImport } from './routes/_authenticated/jessi'
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
 import { Route as AuthenticatedLevaTrazRouteImport } from './routes/_authenticated/leva-traz'
 import { Route as AuthenticatedLembretesRouteImport } from './routes/_authenticated/lembretes'
+import { Route as AuthenticatedJessiRouteImport } from './routes/_authenticated/jessi'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -110,12 +110,6 @@ const AuthenticatedQualidadeIaRoute =
     path: '/qualidade-ia',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedJessiRoute =
-  AuthenticatedJessiRouteImport.update({
-    id: '/jessi',
-    path: '/jessi',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedPagamentosAbertosRoute =
   AuthenticatedPagamentosAbertosRouteImport.update({
     id: '/pagamentos-abertos',
@@ -130,6 +124,11 @@ const AuthenticatedLevaTrazRoute = AuthenticatedLevaTrazRouteImport.update({
 const AuthenticatedLembretesRoute = AuthenticatedLembretesRouteImport.update({
   id: '/lembretes',
   path: '/lembretes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedJessiRoute = AuthenticatedJessiRouteImport.update({
+  id: '/jessi',
+  path: '/jessi',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
@@ -456,7 +455,6 @@ export interface FileRouteTypes {
     | '/leva-traz'
     | '/pagamentos-abertos'
     | '/qualidade-ia'
-    | '/jessi'
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
@@ -502,7 +500,6 @@ export interface FileRouteTypes {
     | '/leva-traz'
     | '/pagamentos-abertos'
     | '/qualidade-ia'
-    | '/jessi'
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
@@ -548,7 +545,6 @@ export interface FileRouteTypes {
     | '/_authenticated/leva-traz'
     | '/_authenticated/pagamentos-abertos'
     | '/_authenticated/qualidade-ia'
-    | '/_authenticated/jessi'
     | '/_authenticated/reativacao'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
@@ -927,11 +923,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedJessiRoute: typeof AuthenticatedJessiRoute
   AuthenticatedLembretesRoute: typeof AuthenticatedLembretesRoute
   AuthenticatedLevaTrazRoute: typeof AuthenticatedLevaTrazRoute
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
   AuthenticatedQualidadeIaRoute: typeof AuthenticatedQualidadeIaRoute
-  AuthenticatedJessiRoute: typeof AuthenticatedJessiRoute
   AuthenticatedReativacaoRoute: typeof AuthenticatedReativacaoRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
@@ -964,11 +960,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedJessiRoute: AuthenticatedJessiRoute,
   AuthenticatedLembretesRoute: AuthenticatedLembretesRoute,
   AuthenticatedLevaTrazRoute: AuthenticatedLevaTrazRoute,
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,
   AuthenticatedQualidadeIaRoute: AuthenticatedQualidadeIaRoute,
-  AuthenticatedJessiRoute: AuthenticatedJessiRoute,
   AuthenticatedReativacaoRoute: AuthenticatedReativacaoRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
