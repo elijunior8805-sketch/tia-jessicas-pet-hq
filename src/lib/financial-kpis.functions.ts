@@ -1,13 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const getFinancialKPIs = createServerFn({ method: "GET" })
-  .validator((data: unknown) => z.object({ from: z.string(), to: z.string() }).parse(data))
-  .handler(async ({ data: { from, to } }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ from: z.string(), to: z.string() }).parse(data))
+  .handler(async ({ data: { from, to }, context }) => {
+    const supabase = context.supabase;
 
     // 1. Fetch unified indicators from view
-    const { data: indicators, error: indError } = await supabaseAdmin
+    const { data: indicators, error: indError } = await supabase
       .from("vw_financeiro_indicadores")
       .select("*")
       .gte("data_referencia", from)
@@ -45,7 +47,7 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     });
 
     // 3. Pending values (Accrual balance)
-    const { data: pendingReceivables, error: pendingError } = await supabaseAdmin
+    const { data: pendingReceivables, error: pendingError } = await supabase
       .from("pagamentos")
       .select("valor_total, valor_pago, vencimento")
       .neq("status", "pago")
@@ -95,7 +97,7 @@ export const getFinancialKPIs = createServerFn({ method: "GET" })
     };
 
     // 4. Log audit data (fire and forget for performance)
-    supabaseAdmin.from("auditoria_financeira").insert({
+    supabase.from("auditoria_financeira").insert({
       periodo_de: from,
       periodo_ate: to,
       fuso_horario: timezone,
