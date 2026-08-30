@@ -80,6 +80,7 @@
 
 :root {
   --radius: 1rem;
+  --mobile-bottom-nav-height: 60px;
 
   /* Fundo creme #F5F2EA */
   --background: oklch(0.955 0.014 92);
