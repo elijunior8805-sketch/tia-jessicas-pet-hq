@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { PawPrint } from "lucide-react";
+import { PawPrint, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
@@ -17,6 +17,7 @@ function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -68,28 +69,47 @@ function ResetPasswordPage() {
         </div>
 
         {!ready ? (
-          <p className="text-center text-sm text-muted-foreground">
-            Validando link de recuperação...
-          </p>
+          <div className="text-center space-y-3 p-6 card-premium">
+            <p className="text-sm text-muted-foreground">
+              Validando link de recuperação...
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Se esta mensagem não sumir em instantes, o link pode ter expirado. Solicite um novo link na tela de login.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: "/auth" })}>
+              Voltar ao login
+            </Button>
+          </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 card-premium p-6">
             <div className="space-y-2">
               <Label htmlFor="password">Nova senha</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirmar nova senha</Label>
               <Input
                 id="confirm"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
@@ -98,7 +118,7 @@ function ResetPasswordPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Salvando..." : "Redefinir senha"}
+              {loading ? "Salvando..." : "Redefinir senha e entrar"}
             </Button>
           </form>
         )}

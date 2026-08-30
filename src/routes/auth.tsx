@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 import logoAsset from "@/assets/spa-de-pet-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
@@ -118,10 +119,17 @@ function AuthPage() {
     toast.error(friendlyAuthError(err));
   }
 
+  const [showPassword, setShowPassword] = useState(false);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      toast.error("Informe seu e-mail.");
+      return;
+    }
     setLoading(true);
-    const { error } = await withRetry(() => supabase.auth.signInWithPassword({ email, password }));
+    const { error } = await withRetry(() => supabase.auth.signInWithPassword({ email: cleanEmail, password }));
     setLoading(false);
     if (error) return handleAuthError("login", error);
     toast.success("Bem-vinda de volta!");
@@ -130,12 +138,12 @@ function AuthPage() {
 
   // Cadastro público desativado: contas são criadas apenas pela administração.
 
-
   async function handleReset() {
     if (resetCooldown > 0) return;
-    if (!email) return toast.error("Informe seu e-mail acima primeiro");
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return toast.error("Informe seu e-mail no campo acima primeiro");
     const { error } = await withRetry(() =>
-      supabase.auth.resetPasswordForEmail(email, {
+      supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       }),
     );
@@ -159,11 +167,37 @@ function AuthPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="l-email">E-mail</Label>
-              <Input id="l-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+              <Input
+                id="l-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                placeholder="seu.email@exemplo.com"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="l-pass">Senha</Label>
-              <Input id="l-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+              <div className="relative">
+                <Input
+                  id="l-pass"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Entrando…" : "Entrar"}
