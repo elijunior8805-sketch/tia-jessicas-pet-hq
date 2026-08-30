@@ -489,6 +489,9 @@ function AtendimentoDetalhe() {
   const [desc, setDesc] = useState(0);
   const [valorPagoInput, setValorPagoInput] = useState(0);
   const [formaPag, setFormaPag] = useState<string>("");
+  const [formaQuitacaoBanho, setFormaQuitacaoBanho] = useState<string>("credito_programa");
+  const [formaPagExtras, setFormaPagExtras] = useState<string>("pix");
+  const [valorPagoExtrasInput, setValorPagoExtrasInput] = useState<number>(0);
   const [usarCreditoPrograma, setUsarCreditoPrograma] = useState(true);
   const [focinheira, setFocinheira] = useState(false);
   const [pausa, setPausa] = useState(false);
@@ -507,7 +510,15 @@ function AtendimentoDetalhe() {
     setTaxa(Number((atendimento as any).taxa_leva_traz ?? 0));
     setDesc(Number((atendimento as any).desconto ?? 0));
     setValorPagoInput(Number((atendimento as any).valor_pago ?? 0));
-    setFormaPag((atendimento as any).pagamento_forma ?? "");
+    setValorPagoExtrasInput(Number((atendimento as any).valor_pago ?? 0));
+    const savedForma = (atendimento as any).pagamento_forma ?? "";
+    setFormaPag(savedForma);
+    if (savedForma === "credito_programa") {
+      setFormaQuitacaoBanho("credito_programa");
+    } else if (savedForma) {
+      setFormaQuitacaoBanho(savedForma);
+      setFormaPagExtras(savedForma);
+    }
     setFocinheira(!!(atendimento as any).usou_focinheira);
     setPausa(!!(atendimento as any).precisou_pausa);
   }, [atendimento?.id]);
@@ -537,6 +548,12 @@ function AtendimentoDetalhe() {
       }
     })
   });
+
+  useEffect(() => {
+    if (elegibilidadeCredito?.possui_credito_elegivel && !(atendimento as any)?.pagamento_forma) {
+      setFormaQuitacaoBanho("credito_programa");
+    }
+  }, [elegibilidadeCredito?.possui_credito_elegivel, atendimento]);
 
   // Hooks must run on every render — declare BEFORE any early return.
   const encerrarMut = useMutation({
@@ -684,9 +701,20 @@ function AtendimentoDetalhe() {
   const valorExtras = sumItens(extras);
   const subtotalBruto = valorSolicitados + valorExtras;
 
-  // Total efetivo a receber do cliente (extras + taxa - desc, com banho coberto a R$ 0)
-  const total = Math.max(0, servicosComCobertura.valorExtrasReal + Number(taxa || 0) - Number(desc || 0));
-  const subtotal = servicosComCobertura.valorExtrasReal;
+  const isBanhoQuitadoComCredito = formaQuitacaoBanho === "credito_programa" && !!elegibilidadeCredito?.possui_credito_elegivel;
+  const valorCobradoBanho = isBanhoQuitadoComCredito ? 0 : valorSolicitados;
+  const valorCobradoExtras = valorExtras;
+  const valorCobertoPrograma = isBanhoQuitadoComCredito ? valorSolicitados : 0;
+
+  // Total financeiro dos serviços extras (extras + taxa - desconto)
+  const totalExtrasFinanceiro = Math.max(0, valorCobradoExtras + Number(taxa || 0) - Number(desc || 0));
+
+  // Total efetivo a receber do cliente (extras + taxa - desc, com banho a R$ 0 se em crédito)
+  const total = isBanhoQuitadoComCredito
+    ? totalExtrasFinanceiro
+    : Math.max(0, valorSolicitados + valorCobradoExtras + Number(taxa || 0) - Number(desc || 0));
+
+  const subtotal = isBanhoQuitadoComCredito ? valorCobradoExtras : subtotalBruto;
 
   const st = (n: number) => getEtapaStatus(atendimento, n);
 
@@ -816,28 +844,8 @@ function AtendimentoDetalhe() {
   // ---- Pagamento ----
 
   const confirmarPagamento = async () => {
-    const precisaPagamentoFinanceiro = total > 0;
-
-    if (precisaPagamentoFinanceiro && !formaPag) {
-      toast.error("Selecione a forma de pagamento dos serviços extras");
-      return;
-    }
-
-    const pago = !precisaPagamentoFinanceiro ? true : ["dinheiro", "pix", "debito", "credito"].includes(formaPag);
-    const parcial = precisaPagamentoFinanceiro && formaPag === "parcial";
-    const valorPago = !precisaPagamentoFinanceiro
-      ? 0
-      : pago
-      ? total
-      : parcial
-      ? Number(valorPagoInput || 0)
-      : 0;
-
-    const status = pago ? "pago" : parcial && valorPago > 0 && valorPago < total ? "parcial" : "pendente";
-    const formaFinal = !precisaPagamentoFinanceiro ? "credito_programa" : formaPag;
-
-    // Se utilizar crédito do programa, registra o consumo no backend de forma idempotente
-    if (usarCreditoPrograma && elegibilidadeCredito?.possui_credito_elegivel) {
+    if (isBanhoQuitadoComCredito) {
+      // 1. Consome o crédito do programa no backend com chave de idempotência
       try {
         await consumirCreditoAtendimento({
           data: {
@@ -857,10 +865,89 @@ function AtendimentoDetalhe() {
       } catch (err: any) {
         console.error("Erro ao consumir crédito no pagamento:", err);
       }
+
+      // Caso A: Somente Banho (total a receber = R$ 0,00)
+      if (totalExtrasFinanceiro === 0) {
+        await patchMut.mutateAsync({
+          pagamento_forma: "credito_programa",
+          pagamento_status: "pago",
+          valor_pago: 0,
+          taxa_leva_traz: Number(taxa || 0),
+          desconto: Number(desc || 0),
+        });
+
+        const hojeISO = new Date().toISOString().slice(0, 10);
+        const pagPayload: any = {
+          atendimento_id: atendId,
+          cliente_id: (atendimento as any).cliente_id,
+          valor_total: 0,
+          valor_pago: 0,
+          forma: "credito_programa",
+          status: "pago",
+          vencimento: hojeISO,
+          data_pagamento: hojeISO,
+          descricao: `Atendimento de ${pet?.nome || 'Pet'} quitado com 1 crédito do Programa de Cuidados`,
+        };
+        const { data: existing } = await supabase.from("pagamentos")
+          .select("id").eq("atendimento_id", atendId).maybeSingle();
+        if (existing) await supabase.from("pagamentos").update(pagPayload).eq("id", existing.id);
+        else await supabase.from("pagamentos").insert(pagPayload);
+
+        await confirmarEtapa(7);
+        return;
+      }
+
+      // Caso B: Banho com Extras (total extras a receber > R$ 0,00)
+      if (!formaPagExtras) {
+        toast.error("Selecione a forma de pagamento dos serviços extras");
+        return;
+      }
+      const pago = ["dinheiro", "pix", "debito", "credito"].includes(formaPagExtras);
+      const parcial = formaPagExtras === "parcial";
+      const valorPago = pago ? totalExtrasFinanceiro : parcial ? Number(valorPagoExtrasInput || 0) : 0;
+      const status = pago ? "pago" : parcial && valorPago > 0 && valorPago < totalExtrasFinanceiro ? "parcial" : "pendente";
+
+      await patchMut.mutateAsync({
+        pagamento_forma: formaPagExtras,
+        pagamento_status: status,
+        valor_pago: valorPago,
+        taxa_leva_traz: Number(taxa || 0),
+        desconto: Number(desc || 0),
+      });
+
+      const hojeISO = new Date().toISOString().slice(0, 10);
+      const pagPayload: any = {
+        atendimento_id: atendId,
+        cliente_id: (atendimento as any).cliente_id,
+        valor_total: totalExtrasFinanceiro, // Registra apenas os extras, sem somar o banho já quitado no programa!
+        valor_pago: valorPago,
+        forma: formaPagExtras,
+        status: status,
+        vencimento: hojeISO,
+        data_pagamento: pago ? hojeISO : null,
+        descricao: `Serviços extras de ${pet?.nome || 'Pet'} (Banho quitado com 1 crédito do Programa)`,
+      };
+      const { data: existing } = await supabase.from("pagamentos")
+        .select("id").eq("atendimento_id", atendId).maybeSingle();
+      if (existing) await supabase.from("pagamentos").update(pagPayload).eq("id", existing.id);
+      else await supabase.from("pagamentos").insert(pagPayload);
+
+      await confirmarEtapa(7);
+      return;
     }
 
+    // Caso C: Banho NÃO quitado por crédito (pagamento financeiro integral)
+    if (!formaQuitacaoBanho) {
+      toast.error("Selecione a forma de pagamento");
+      return;
+    }
+    const pago = ["dinheiro", "pix", "debito", "credito"].includes(formaQuitacaoBanho);
+    const parcial = formaQuitacaoBanho === "parcial";
+    const valorPago = pago ? total : parcial ? Number(valorPagoInput || 0) : 0;
+    const status = pago ? "pago" : parcial && valorPago > 0 && valorPago < total ? "parcial" : "pendente";
+
     await patchMut.mutateAsync({
-      pagamento_forma: formaFinal,
+      pagamento_forma: formaQuitacaoBanho,
       pagamento_status: status,
       valor_pago: valorPago,
       taxa_leva_traz: Number(taxa || 0),
@@ -871,15 +958,13 @@ function AtendimentoDetalhe() {
     const pagPayload: any = {
       atendimento_id: atendId,
       cliente_id: (atendimento as any).cliente_id,
-      valor_total: total, // Apenas os extras e taxas, SEM somar o banho já quitado no programa!
+      valor_total: total,
       valor_pago: valorPago,
-      forma: formaFinal,
+      forma: formaQuitacaoBanho,
       status: status,
       vencimento: hojeISO,
       data_pagamento: pago ? hojeISO : null,
-      descricao: !precisaPagamentoFinanceiro
-        ? `Atendimento de ${pet?.nome || 'Pet'} quitado com crédito do Programa`
-        : `Serviços extras de ${pet?.nome || 'Pet'} (Programa de Cuidados)`,
+      descricao: `Atendimento de ${pet?.nome || 'Pet'}`,
     };
     const { data: existing } = await supabase.from("pagamentos")
       .select("id").eq("atendimento_id", atendId).maybeSingle();
@@ -1442,93 +1527,60 @@ function AtendimentoDetalhe() {
                 <EtapaBadge st={st(7)} />
               </div>
 
-              {/* CARD DE DESTAQUE: CRÉDITOS DO PROGRAMA DE CUIDADOS */}
-              {elegibilidadeCredito?.possui_credito_elegivel && (
-                <div className="p-3.5 mb-3.5 bg-[#F5F2EA] border border-[#C8A951]/40 rounded-xl space-y-2 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-bold text-xs text-[#123F2A]">
-                      <PackageCheck className="h-4 w-4 text-[#C8A951]" />
-                      <span>Programa de Cuidados Ativo</span>
-                    </div>
-                    {elegibilidadeCredito.resumo?.data_validade && (
-                      <Badge variant="outline" className="text-[10px] bg-white border-[#C8A951]/40 text-[#123F2A]">
-                        Validade: {new Date(elegibilidadeCredito.resumo.data_validade).toLocaleDateString("pt-BR")}
-                      </Badge>
-                    )}
+              {/* DISCRIMINAÇÃO DETALHADA E CORRETA DOS SERVIÇOS */}
+              <div className="space-y-2.5 text-sm">
+                {/* 1. SERVIÇO PRINCIPAL SOLICITADO */}
+                <div className="space-y-1 pb-2 border-b border-border/60">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Serviço Principal Solicitado:
                   </div>
-                  <p className="text-[11px] text-foreground/80 leading-relaxed">
-                    <strong>{pet?.nome || "O pet"}</strong> possui crédito de banho disponível no programa{" "}
-                    <em>{elegibilidadeCredito.resumo?.nome_programa}</em>.
-                  </p>
-                  <div className="flex items-center justify-between pt-1.5 border-t border-[#C8A951]/20">
-                    <Label htmlFor="toggle-credito" className="text-xs font-semibold text-[#123F2A] cursor-pointer">
-                      Utilizar 1 crédito para cobrir este banho
-                    </Label>
-                    <Switch
-                      id="toggle-credito"
-                      checked={usarCreditoPrograma}
-                      onCheckedChange={setUsarCreditoPrograma}
-                      disabled={readOnly}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* DISCRIMINAÇÃO DETALHADA DOS SERVIÇOS */}
-              <div className="space-y-2 text-sm">
-                {servicosComCobertura.cobertos.length > 0 && (
-                  <div className="space-y-1.5 pb-2 border-b border-border/60">
-                    <span className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      Serviços Cobertos pelo Programa:
-                    </span>
-                    {servicosComCobertura.cobertos.map((sc: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-xs bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-200">
-                        <span className="font-medium text-emerald-950">🐾 {sc.nome}</span>
-                        <Badge variant="outline" className="bg-white text-emerald-800 border-emerald-300 text-[10px]">
-                          1 Crédito (R$ 0,00)
-                        </Badge>
+                  {solicitados.length > 0 ? (
+                    solicitados.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs py-0.5">
+                        <span className="font-medium">{s.nome}</span>
+                        <span className="tabular-nums font-semibold">
+                          {isBanhoQuitadoComCredito ? (
+                            <span className="text-emerald-800">Quitado (R$ 0,00)</span>
+                          ) : (
+                            brl(Number(s.valor_total || s.valor_unit || 0))
+                          )}
+                        </span>
                       </div>
-                    ))}
-                    <div className="flex justify-between text-[11px] text-muted-foreground pt-0.5">
-                      <span>Total coberto pelo programa:</span>
-                      <strong className="text-emerald-800">{brl(servicosComCobertura.valorCoberto)} — não cobrar</strong>
-                    </div>
-                  </div>
-                )}
+                    ))
+                  ) : (
+                    <div className="text-xs text-muted-foreground italic">Nenhum serviço principal registrado</div>
+                  )}
+                </div>
 
-                {servicosComCobertura.extrasList.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Serviços Extras a Pagar:
-                    </span>
-                    {servicosComCobertura.extrasList.map((se: any, i: number) => (
+                {/* 2. SERVIÇOS EXTRAS */}
+                {extras.length > 0 && (
+                  <div className="space-y-1 pb-2 border-b border-border/60">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Serviços Extras / Adicionais:
+                    </div>
+                    {extras.map((se, i) => (
                       <div key={i} className="flex justify-between text-xs py-0.5">
                         <span>{se.nome}</span>
                         <span className="font-medium tabular-nums">{brl(Number(se.valor_total || se.valor_unit || se.valor || 0))}</span>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {servicosComCobertura.extrasList.length === 0 && servicosComCobertura.cobertos.length === 0 && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Serviço solicitado</span>
-                      <span className="font-medium tabular-nums">{brl(valorSolicitados)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Serviços extras</span>
-                      <span className="font-medium tabular-nums">{brl(valorExtras)}</span>
+                    <div className="flex justify-between text-xs text-muted-foreground pt-1 font-medium">
+                      <span>Subtotal dos Extras:</span>
+                      <span>{brl(valorExtras)}</span>
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between border-t pt-2">
-                  <span className="text-muted-foreground">Subtotal a pagar</span>
-                  <span className="font-medium tabular-nums">{brl(subtotal)}</span>
-                </div>
+                {/* 3. TOTAL COBERTO PELO PROGRAMA */}
+                {isBanhoQuitadoComCredito && (
+                  <div className="p-2 rounded-lg bg-emerald-50/80 border border-emerald-200 text-xs flex justify-between items-center text-emerald-950">
+                    <span className="font-medium">✨ Total coberto pelo Programa:</span>
+                    <strong className="text-emerald-800">{brl(valorSolicitados)} (1 crédito de banho)</strong>
+                  </div>
+                )}
 
-                <div className="flex items-center justify-between gap-3 pt-2">
+                {/* 4. TAXAS E DESCONTOS */}
+                <div className="flex items-center justify-between gap-3 pt-1">
                   <Label className="text-sm text-muted-foreground">Taxa leva-e-traz (R$)</Label>
                   <Input type="number" min={0} step="0.01" value={taxa}
                     disabled={readOnly}
@@ -1544,12 +1596,12 @@ function AtendimentoDetalhe() {
                 </div>
               </div>
 
-              {/* TOTAL A RECEBER */}
-              <div className="border-t mt-3 pt-4 flex items-center justify-between">
+              {/* TOTAL A RECEBER AGORA */}
+              <div className="border-t mt-3 pt-3 flex items-center justify-between">
                 <div>
-                  <span className="font-display text-lg">Total a Receber</span>
-                  {servicosComCobertura.cobertos.length > 0 && (
-                    <p className="text-[11px] text-emerald-800 font-medium">Banho coberto pelo Programa</p>
+                  <span className="font-display text-lg">Total a Receber Agora</span>
+                  {isBanhoQuitadoComCredito && (
+                    <p className="text-[11px] text-emerald-800 font-medium">Banho quitado via Programa de Cuidados</p>
                   )}
                 </div>
                 <span className={`font-display text-3xl tabular-nums ${total === 0 ? "text-emerald-800 font-bold" : "text-primary"}`}>
@@ -1557,14 +1609,88 @@ function AtendimentoDetalhe() {
                 </span>
               </div>
 
-              <div className="mt-4 space-y-3">
-                {total > 0 ? (
-                  <div>
-                    <Label>Forma de pagamento (Serviços Extras: {brl(total)})</Label>
-                    <Select value={formaPag || undefined} disabled={readOnly}
-                      onValueChange={(v) => setFormaPag(v)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione a forma de pagamento" />
+              {/* SELETORES SEPARADOS DE QUITAÇÃO */}
+              <div className="mt-4 space-y-4">
+                {/* CAMPO 1: FORMA DE QUITAÇÃO DO BANHO PRINCIPAL */}
+                <div className="p-3 bg-muted/20 border border-border/70 rounded-xl space-y-2">
+                  <Label className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                    Forma de Quitação do Banho ({brl(valorSolicitados)})
+                  </Label>
+                  <Select
+                    value={formaQuitacaoBanho}
+                    disabled={readOnly}
+                    onValueChange={(v) => setFormaQuitacaoBanho(v)}
+                  >
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Selecione a forma de quitação do banho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {elegibilidadeCredito?.possui_credito_elegivel && (
+                        <SelectItem
+                          value="credito_programa"
+                          className="font-semibold text-emerald-900 bg-emerald-50 focus:bg-emerald-100"
+                        >
+                          🐾 Crédito de banho — Programa de Cuidados ({elegibilidadeCredito.resumo?.creditos_banho_disponiveis ?? 0} disponíveis)
+                        </SelectItem>
+                      )}
+                      {FORMAS_PAGAMENTO.map((f) => (
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                      ))}
+                      <SelectItem value="parcial">Pagamento parcial</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* BOX DE CONFIRMAÇÃO DO CONSUMO DO CRÉDITO */}
+                  {isBanhoQuitadoComCredito && elegibilidadeCredito && (
+                    <div className="mt-2 p-2.5 bg-[#F5F2EA] border border-[#C8A951]/40 rounded-lg text-xs space-y-1.5 animate-in fade-in">
+                      <div className="flex items-center gap-1.5 font-bold text-[#123F2A]">
+                        <PackageCheck className="h-4 w-4 text-[#C8A951]" />
+                        <span>Confirmação de Uso do Crédito</span>
+                      </div>
+                      <p className="text-[11px] text-foreground/80 leading-relaxed">
+                        <strong>{pet?.nome || "O pet"}</strong> possui{" "}
+                        <strong>{elegibilidadeCredito.resumo?.creditos_banho_disponiveis} créditos de banho</strong> disponíveis
+                        no Programa <em>{elegibilidadeCredito.resumo?.nome_programa}</em>.
+                      </p>
+                      <div className="grid grid-cols-2 gap-1 pt-1 border-t border-[#C8A951]/30 text-[11px]">
+                        <div><span className="text-muted-foreground">Tutor:</span> {cliente?.nome ?? "—"}</div>
+                        <div><span className="text-muted-foreground">Pet:</span> {pet?.nome ?? "—"}</div>
+                        <div><span className="text-muted-foreground">A consumir:</span> <strong className="text-emerald-800">1 crédito</strong></div>
+                        <div><span className="text-muted-foreground">Saldo após uso:</span> <strong>{Math.max(0, (elegibilidadeCredito.resumo?.creditos_banho_disponiveis ?? 1) - 1)} crédito(s)</strong></div>
+                        <div className="col-span-2 text-[10px] text-muted-foreground">
+                          Validade do contrato: {elegibilidadeCredito.resumo?.data_validade ? new Date(elegibilidadeCredito.resumo.data_validade).toLocaleDateString("pt-BR") : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isBanhoQuitadoComCredito && formaQuitacaoBanho === "parcial" && (
+                    <div className="pt-1">
+                      <Label className="text-xs">Valor pago do banho agora (R$)</Label>
+                      <Input
+                        type="number" min={0} step="0.01"
+                        value={valorPagoInput}
+                        disabled={readOnly}
+                        onChange={(e) => setValorPagoInput(Number(e.target.value || 0))}
+                        className="mt-1 h-9"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* CAMPO 2: FORMA DE PAGAMENTO DOS SERVIÇOS EXTRAS */}
+                {isBanhoQuitadoComCredito && totalExtrasFinanceiro > 0 && (
+                  <div className="p-3 bg-muted/20 border border-border/70 rounded-xl space-y-2 animate-in fade-in">
+                    <Label className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                      Forma de Pagamento dos Serviços Extras ({brl(totalExtrasFinanceiro)})
+                    </Label>
+                    <Select
+                      value={formaPagExtras}
+                      disabled={readOnly}
+                      onValueChange={(v) => setFormaPagExtras(v)}
+                    >
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="Selecione a forma de pagamento dos extras" />
                       </SelectTrigger>
                       <SelectContent>
                         {FORMAS_PAGAMENTO.map((f) => (
@@ -1573,40 +1699,51 @@ function AtendimentoDetalhe() {
                         <SelectItem value="parcial">Pagamento parcial</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
-                    <span>Atendimento quitado integralmente com crédito do Programa. Nenhuma cobrança financeira necessária.</span>
+
+                    {formaPagExtras === "parcial" && (
+                      <div className="pt-1">
+                        <Label className="text-xs">Valor pago dos extras agora (R$)</Label>
+                        <Input
+                          type="number" min={0} step="0.01"
+                          value={valorPagoExtrasInput}
+                          disabled={readOnly}
+                          onChange={(e) => setValorPagoExtrasInput(Number(e.target.value || 0))}
+                          className="mt-1 h-9"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Restante dos extras em aberto: {brl(Math.max(0, totalExtrasFinanceiro - Number(valorPagoExtrasInput || 0)))}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {total > 0 && formaPag === "parcial" && (
-                  <div>
-                    <Label>Valor pago agora (R$)</Label>
-                    <Input type="number" min={0} step="0.01" value={valorPagoInput}
-                      disabled={readOnly}
-                      onChange={(e) => setValorPagoInput(Number(e.target.value || 0))}
-                      className="mt-1" />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Restante em aberto: {brl(Math.max(0, total - Number(valorPagoInput || 0)))}
-                    </p>
+                {/* AVISO DE ATENDIMENTO 100% QUITADO */}
+                {isBanhoQuitadoComCredito && totalExtrasFinanceiro === 0 && (
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
+                    <span>Atendimento 100% quitado com crédito do Programa. Nenhuma cobrança financeira necessária.</span>
                   </div>
                 )}
 
                 {pagStatus && (
                   <p className="text-xs text-muted-foreground">
-                    Status atual: <span className="font-medium">{pagStatus}</span>
+                    Status do pagamento: <span className="font-medium capitalize">{pagStatus}</span>
                   </p>
                 )}
 
-                <Button className="w-full h-11 uppercase bg-emerald-800 hover:bg-emerald-900 text-white font-bold"
-                  disabled={readOnly || (total > 0 && !formaPag)}
-                  onClick={confirmarPagamento}>
+                {/* BOTÃO PRINCIPAL DE CONCLUSÃO / CONFIRMAÇÃO */}
+                <Button
+                  className="w-full h-11 uppercase bg-emerald-800 hover:bg-emerald-900 text-white font-bold tracking-wider"
+                  disabled={readOnly || (!isBanhoQuitadoComCredito && !formaQuitacaoBanho) || (isBanhoQuitadoComCredito && totalExtrasFinanceiro > 0 && !formaPagExtras)}
+                  onClick={confirmarPagamento}
+                >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {total === 0 
-                    ? "Concluir atendimento e consumir 1 crédito"
-                    : `Confirmar recebimento dos extras (${brl(total)})${usarCreditoPrograma ? " e usar crédito" : ""}`
+                  {isBanhoQuitadoComCredito
+                    ? totalExtrasFinanceiro === 0
+                      ? "Concluir atendimento e consumir 1 crédito"
+                      : `Confirmar recebimento dos extras (${brl(totalExtrasFinanceiro)}) e usar 1 crédito`
+                    : `Confirmar pagamento (${brl(total)})`
                   }
                 </Button>
               </div>
