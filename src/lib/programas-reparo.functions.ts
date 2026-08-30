@@ -42,11 +42,12 @@ export const diagnosticarContratacao = createServerFn({ method: "POST" })
         .select("id, servico_id, quantidade, tipo")
         .eq("programa_contratado_id", contrato.id);
 
-      const { data: pagamentoContrato } = await sb
+      const { data: pagamentoContratoRaw } = await sb
         .from("pagamentos" as any)
         .select("id, valor_total, valor_pago, status")
         .eq("idempotency_key", `programa_${contrato.id}`)
         .maybeSingle();
+      const pagamentoContrato = pagamentoContratoRaw as any;
 
       if (pagamentoContrato) {
         pagamentosVinculados.add(pagamentoContrato.id);
@@ -132,11 +133,12 @@ export const repararContratacao = createServerFn({ method: "POST" })
     }
 
     // 1. Validar pagamento
-    const { data: pagamento, error: pErr } = await sb
+    const { data: pagamentoRaw, error: pErr } = await sb
       .from("pagamentos" as any)
       .select("*")
       .eq("id", data.pagamento_id)
       .single();
+    const pagamento = pagamentoRaw as any;
 
     if (pErr || !pagamento) throw new Error("Pagamento não encontrado.");
     if (pagamento.categoria_receita !== "programa_cuidado") {
