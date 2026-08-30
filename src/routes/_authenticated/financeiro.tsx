@@ -59,6 +59,8 @@ import { ReciboDialog } from "@/components/recibo-dialog";
 import type { ReciboData } from "@/lib/recibo-pdf";
 import { generateFinanceiroPDF } from "@/lib/financeiro-pdf";
 import { generateFinanceiroCSV } from "@/lib/financeiro-csv";
+import { BaixaPagamentoDialog } from "@/components/financeiro/BaixaPagamentoDialog";
+import { CancelarLancamentoDialog } from "@/components/financeiro/CancelarLancamentoDialog";
 import { toast } from "sonner";
 
 import {
@@ -647,6 +649,8 @@ function FinanceiroPage() {
   }, [fBloco, fFormas, fStatus, fCategoria, fCliente]);
 
   const [recibo, setRecibo] = useState<ReciboState | null>(null);
+  const [pagamentoParaBaixa, setPagamentoParaBaixa] = useState<Pag | null>(null);
+  const [pagamentoParaCancelar, setPagamentoParaCancelar] = useState<Pag | null>(null);
 
   const { data: empresa } = useQuery({
     queryKey: ["empresa-config-fin"],
@@ -1599,20 +1603,23 @@ function FinanceiroPage() {
                                 <DropdownMenuContent align="end">
                                   {p.status !== "pago" && p.status !== "cancelado" && (
                                     <>
-                                      <DropdownMenuItem onClick={() => marcarPagRecebido.mutate(p)}>
-                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Marcar como recebido
+                                      <DropdownMenuItem onClick={() => setPagamentoParaBaixa(p)}>
+                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Baixar pagamento
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => { if (confirm("Cancelar este pagamento?")) cancelarPag.mutate(p); }}
-                                      >
-                                        <X className="mr-2 h-4 w-4" /> Cancelar
+                                      <DropdownMenuItem onClick={() => setPagamentoParaCancelar(p)}>
+                                        <X className="mr-2 h-4 w-4" /> Cancelar lançamento
                                       </DropdownMenuItem>
                                     </>
                                   )}
                                   {p.status === "pago" && (
-                                    <DropdownMenuItem onClick={() => abrirReciboReceita(p)}>
-                                      <FileText className="mr-2 h-4 w-4" /> Emitir recibo
-                                    </DropdownMenuItem>
+                                    <>
+                                      <DropdownMenuItem onClick={() => abrirReciboReceita(p)}>
+                                        <FileText className="mr-2 h-4 w-4" /> Emitir recibo
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setPagamentoParaCancelar(p)}>
+                                        <X className="mr-2 h-4 w-4 text-rose-500" /> Estornar pagamento
+                                      </DropdownMenuItem>
+                                    </>
                                   )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -1664,20 +1671,23 @@ function FinanceiroPage() {
                             <DropdownMenuContent align="end">
                               {p.status !== "pago" && p.status !== "cancelado" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => marcarPagRecebido.mutate(p)}>
-                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Receber
+                                  <DropdownMenuItem onClick={() => setPagamentoParaBaixa(p)}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Baixar
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => { if (confirm("Cancelar este pagamento?")) cancelarPag.mutate(p); }}
-                                  >
+                                  <DropdownMenuItem onClick={() => setPagamentoParaCancelar(p)}>
                                     <X className="mr-2 h-4 w-4" /> Cancelar
                                   </DropdownMenuItem>
                                 </>
                               )}
                               {p.status === "pago" && (
-                                <DropdownMenuItem onClick={() => abrirReciboReceita(p)}>
-                                  <FileText className="mr-2 h-4 w-4" /> Recibo
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuItem onClick={() => abrirReciboReceita(p)}>
+                                    <FileText className="mr-2 h-4 w-4" /> Recibo
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setPagamentoParaCancelar(p)}>
+                                    <X className="mr-2 h-4 w-4 text-rose-500" /> Estornar
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1836,6 +1846,38 @@ function FinanceiroPage() {
             data={recibo.data}
             telefone={recibo.telefone}
             referenciaId={recibo.referenciaId}
+          />
+        )}
+
+        {pagamentoParaBaixa && (
+          <BaixaPagamentoDialog
+            open={!!pagamentoParaBaixa}
+            onOpenChange={(v) => !v && setPagamentoParaBaixa(null)}
+            pagamento={{
+              id: pagamentoParaBaixa.id,
+              valor_total: valorTotalReceita(pagamentoParaBaixa),
+              valor_pago: Number(pagamentoParaBaixa.valor_pago || 0),
+              status: pagamentoParaBaixa.status,
+              descricao: pagamentoParaBaixa.descricao,
+              cliente_nome: pagamentoParaBaixa.cliente?.nome,
+            }}
+            onSuccess={refreshAll}
+          />
+        )}
+
+        {pagamentoParaCancelar && (
+          <CancelarLancamentoDialog
+            open={!!pagamentoParaCancelar}
+            onOpenChange={(v) => !v && setPagamentoParaCancelar(null)}
+            pagamento={{
+              id: pagamentoParaCancelar.id,
+              valor_total: valorTotalReceita(pagamentoParaCancelar),
+              valor_pago: Number(pagamentoParaCancelar.valor_pago || 0),
+              status: pagamentoParaCancelar.status,
+              descricao: pagamentoParaCancelar.descricao,
+              cliente_nome: pagamentoParaCancelar.cliente?.nome,
+            }}
+            onSuccess={refreshAll}
           />
         )}
       </div>

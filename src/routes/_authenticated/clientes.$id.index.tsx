@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader } from "@/components/page-shell";
@@ -7,12 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, MessageCircle, MapPin, Phone, Mail, Star, PawPrint, Plus, FileText,
-  Pencil, Archive, CalendarPlus, ExternalLink, ClipboardList, DollarSign, AlertTriangle,
+  Pencil, Archive, CalendarPlus, ExternalLink, ClipboardList, DollarSign, AlertTriangle, CheckCircle2
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import { toast } from "sonner";
 import { abrirWhatsApp } from "@/lib/whatsapp";
+import { BaixaPagamentoDialog } from "@/components/financeiro/BaixaPagamentoDialog";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id/")({
   component: ClienteDetalhe,
@@ -28,6 +30,8 @@ function ClienteDetalhe() {
     ["cliente-atends", id],
     ["cliente", id],
   ]);
+
+  const [pagamentoParaBaixa, setPagamentoParaBaixa] = useState<any | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["cliente", id],
@@ -349,6 +353,25 @@ function ClienteDetalhe() {
                           <span className="font-medium text-amber-700">{saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>
                       )}
+                      {saldo > 0 && pagProg && (
+                        <div className="pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full h-7 text-xs gap-1 border-amber-300 text-amber-800 hover:bg-amber-50"
+                            onClick={() => setPagamentoParaBaixa({
+                              id: pagProg.id,
+                              valor_total: Number(prog.preco_vendido),
+                              valor_pago: valorPago,
+                              status: pagProg.status,
+                              descricao: `Programa: ${prog.nome_snapshot}`,
+                              cliente_nome: data?.nome,
+                            })}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Baixar pagamento
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -408,13 +431,30 @@ function ClienteDetalhe() {
               </div>
               <ul className="space-y-1 text-xs">
                 {pendencias.slice(0, 6).map((p: any) => (
-                  <li key={p.id} className="flex justify-between gap-2">
+                  <li key={p.id} className="flex justify-between items-center gap-2 hover:bg-muted/40 p-1 rounded">
                     <span className="truncate">
                       {p.vencimento ? new Date(p.vencimento).toLocaleDateString("pt-BR") : "—"} · {p.status === 'pendente' ? 'Aguardando pagamento' : p.status === 'parcial' ? 'Pagamento parcial' : p.status === 'pago' ? `Pago via ${p.forma ?? '—'}` : p.status === 'cancelado' ? 'Cancelado' : p.status}
                     </span>
-                    <span className="font-medium">
-                      {(Number(p.valor) - Number(p.valor_pago || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-medium">
+                        {(Number(p.valor) - Number(p.valor_pago || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-[11px] text-primary"
+                        onClick={() => setPagamentoParaBaixa({
+                          id: p.id,
+                          valor_total: Number(p.valor),
+                          valor_pago: Number(p.valor_pago || 0),
+                          status: p.status,
+                          descricao: p.descricao,
+                          cliente_nome: data?.nome,
+                        })}
+                      >
+                        Baixar
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -422,6 +462,19 @@ function ClienteDetalhe() {
           )}
         </Card>
       </div>
+
+      {pagamentoParaBaixa && (
+        <BaixaPagamentoDialog
+          open={!!pagamentoParaBaixa}
+          onOpenChange={(v) => !v && setPagamentoParaBaixa(null)}
+          pagamento={pagamentoParaBaixa}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ["cliente-pagamentos", id] });
+            qc.invalidateQueries({ queryKey: ["cliente-programas", id] });
+            qc.invalidateQueries({ queryKey: ["cliente", id] });
+          }}
+        />
+      )}
     </PageShell>
   );
 }
