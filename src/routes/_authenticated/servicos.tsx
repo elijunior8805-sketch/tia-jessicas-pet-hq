@@ -224,19 +224,6 @@ function ServicosPage() {
             onDelete={(id) => removerServico.mutate(id)}
           />
         </TabsContent>
-          <ServicosList
-            items={filtrados}
-            portes={portes}
-            precos={precos}
-            loading={isLoading}
-            isCombo
-            comboItens={comboItens}
-            allServicos={servicos}
-            onEdit={(s) => { setEditing(s); setOpenForm(true); }}
-            onCombo={(s) => setOpenCombo(s)}
-            onDelete={(id) => removerServico.mutate(id)}
-          />
-        </TabsContent>
       </Tabs>
 
       <ServicoFormDialog
