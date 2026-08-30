@@ -518,7 +518,7 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
       .select("nome");
 
     const nomesExistentes = (todosProgramas ?? []).map((p: any) => p.nome as string);
-    const novoNome = normalizarNomeCopia(original.nome, nomesExistentes);
+    const novoNome = normalizarNomeCopia((original as any).nome, nomesExistentes);
 
     const { id: _, criado_em: __, updated_at: ___, itens, ...cloneData } = original as any;
     const { data: clone, error: cError } = await sb
@@ -550,9 +550,9 @@ export const duplicarPrograma = createServerFn({ method: "POST" })
     await sb.from("auditoria_programas" as any).insert({
       acao: "duplicar_programa",
       programa_contratado_id: null,
-      valor_anterior: { original_id: data.id, nome: original.nome },
-      valor_posterior: { clone_id: clone.id, nome: novoNome, status: "rascunho" },
-      motivo: `Duplicação do programa ${original.nome}`,
+      valor_anterior: { original_id: data.id, nome: (original as any).nome },
+      valor_posterior: { clone_id: (clone as any).id, nome: novoNome, status: "rascunho" },
+      motivo: `Duplicação do programa ${(original as any).nome}`,
       usuario_id: userId,
       created_at: new Date().toISOString()
     });
@@ -681,7 +681,7 @@ export const excluirProgramaCatalogo = createServerFn({ method: "POST" })
     return {
       success: true,
       programa_id: data.programa_id,
-      nome: prog.nome,
+      nome: (prog as any).nome,
       contratos_cancelados_count: listaContratos.length
     };
   });
@@ -814,7 +814,7 @@ export const excluirRascunhosProgramas = createServerFn({ method: "POST" })
           created_at: new Date().toISOString()
         });
 
-        resultados.push({ id: progId, sucesso: true, nome: prog?.nome });
+        resultados.push({ id: progId, sucesso: true, nome: (prog as any)?.nome });
       }
     }
 
