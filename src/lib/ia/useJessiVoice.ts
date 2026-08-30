@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { VoiceRecognizer, VoiceRecognitionStatus, consolidarTranscricao } from "./ia-voz";
-import { normalizarTextoComando } from "./ia-nomes";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
