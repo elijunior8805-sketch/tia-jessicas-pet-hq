@@ -131,72 +131,136 @@ export const atualizarContrato = createServerFn({ method: "POST" })
     return await carregarContrato(sb, data.contrato_id);
   });
 
-/** Cancela um pacote comprado preservando todo o histórico. */
+/** Cancela um pacote comprado preservando todo o histórico e estornando efeitos financeiros/operacionais. */
 export const cancelarContrato = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({
     contrato_id: z.string().uuid(),
     motivo: z.string().min(3, "Informe o motivo do cancelamento"),
-    estornar_financeiro: z.boolean().default(false),
+    estornar_financeiro: z.boolean().default(true),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
     const userId = context.userId;
+    const nowIso = new Date().toISOString();
     const { carregarContrato } = await import("./programas-contratos.server");
 
     const antes = await carregarContrato(sb, data.contrato_id);
     const contrato: any = antes.contrato;
 
     if (contrato.status_do_programa === "cancelado") {
-      return { ja_cancelado: true };
+      return { ja_cancelado: true, contrato_id: data.contrato_id };
     }
 
     const consumidos = Object.values(antes.saldos).reduce((acc, s: any) => acc + s.consumido, 0);
+    const cancelamentosCreditos: any[] = [];
 
-    // Zera créditos ainda disponíveis (histórico preservado no livro razão)
+    // 1. Zera créditos disponíveis e libera reservas (histórico preservado no livro razão)
     for (const s of Object.values(antes.saldos) as any[]) {
+      if (s.reservado > 0) {
+        // Libera reservas existentes
+        await sb.from("programas_creditos_movimentacoes").insert({
+          programa_contratado_id: data.contrato_id,
+          servico_id: s.servico_id,
+          quantidade: s.reservado,
+          tipo: "reserva_liberada",
+          data_hora: nowIso,
+          usuario_id: userId,
+          motivo: `Liberação por cancelamento de contrato: ${data.motivo}`,
+          idempotency_key: `canc_lib_res_${data.contrato_id}_${s.servico_id}_${Date.now()}`,
+        });
+      }
+
       const restante = s.criado - s.consumido;
-      if (restante <= 0) continue;
-      const { error } = await sb.from("programas_creditos_movimentacoes").insert({
-        programa_contratado_id: data.contrato_id,
-        servico_id: s.servico_id,
-        quantidade: restante,
-        tipo: "cancelamento",
-        usuario_id: userId,
-        motivo: data.motivo,
-      });
-      if (error) throw error;
+      if (restante > 0) {
+        const { data: movCanc } = await sb.from("programas_creditos_movimentacoes").insert({
+          programa_contratado_id: data.contrato_id,
+          servico_id: s.servico_id,
+          quantidade: restante,
+          tipo: "cancelamento",
+          data_hora: nowIso,
+          usuario_id: userId,
+          motivo: data.motivo,
+          idempotency_key: `canc_cred_${data.contrato_id}_${s.servico_id}_${Date.now()}`,
+        }).select();
+        if (movCanc) cancelamentosCreditos.push(...movCanc);
+      }
     }
 
+    // 2. Atualiza status do contrato para cancelado
     const { error: uErr } = await sb
       .from("programas_contratados")
       .update({
         status_do_programa: "cancelado",
-        cancelado_em: new Date().toISOString(),
+        cancelado_em: nowIso,
         cancelado_por: userId,
         motivo_cancelamento: data.motivo,
-        atualizado_em: new Date().toISOString(),
+        atualizado_em: nowIso,
       })
       .eq("id", data.contrato_id);
     if (uErr) throw uErr;
 
-    if (data.estornar_financeiro && antes.pagamento) {
-      await sb
+    // 3. Estorno e cancelamento no financeiro
+    let pagamentoEstornado = null;
+    const { data: pagamentoContrato } = await sb
+      .from("pagamentos")
+      .select("*")
+      .eq("idempotency_key", `programa_${data.contrato_id}`)
+      .is("arquivado_em", null)
+      .maybeSingle();
+
+    const pagamentoAlvo = pagamentoContrato || antes.pagamento;
+    if (pagamentoAlvo) {
+      const { data: pagUpd, error: pErr } = await sb
         .from("pagamentos")
-        .update({ status: "cancelado" })
-        .eq("id", (antes.pagamento as any).id);
+        .update({
+          status: "cancelado",
+          valor_pago: 0,
+          arquivado_em: nowIso,
+          arquivado_motivo: `Cancelamento de venda do programa: ${data.motivo}`,
+          observacoes: (pagamentoAlvo.observacoes ? `${pagamentoAlvo.observacoes}\n` : "") + `[Estorno/Cancelamento de Venda: ${data.motivo} em ${nowIso}]`,
+        })
+        .eq("id", (pagamentoAlvo as any).id)
+        .select()
+        .single();
+
+      if (!pErr && pagUpd) {
+        pagamentoEstornado = pagUpd;
+      }
     }
 
+    // 4. Registro na Auditoria de Programas
     await sb.from("auditoria_programas").insert({
-      acao: "cancelar_contrato",
+      acao: "cancelar_venda",
       cliente_id: contrato.cliente_id,
       pet_id: contrato.pet_id,
       programa_contratado_id: data.contrato_id,
-      valor_anterior: { status: contrato.status_do_programa },
-      valor_posterior: { status: "cancelado", creditos_consumidos: consumidos },
+      valor_anterior: {
+        status: contrato.status_do_programa,
+        preco_vendido: contrato.preco_vendido,
+        pagamento: pagamentoAlvo,
+      },
+      valor_posterior: {
+        status: "cancelado",
+        creditos_consumidos: consumidos,
+        creditos_cancelados_count: cancelamentosCreditos.length,
+        pagamento_estornado: pagamentoEstornado?.id,
+      },
       motivo: data.motivo,
       usuario_id: userId,
+      created_at: nowIso,
     });
 
-    return { cancelado: true, creditos_consumidos: consumidos };
+    // 5. Read-back obrigatório
+    const depois = await carregarContrato(sb, data.contrato_id);
+
+    return {
+      success: true,
+      cancelado: true,
+      contrato_id: data.contrato_id,
+      creditos_consumidos: consumidos,
+      pagamento_estornado: pagamentoEstornado?.id ?? null,
+      contrato_depois: depois.contrato,
+      saldos_finais: depois.saldos,
+    };
   });

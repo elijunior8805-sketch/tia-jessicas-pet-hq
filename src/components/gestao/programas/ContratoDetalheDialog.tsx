@@ -81,6 +81,14 @@ export function ContratoDetalheDialog({ contratoId, onOpenChange }: Props) {
     queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
     queryClient.invalidateQueries({ queryKey: ["contrato-detalhe", contratoId] });
     queryClient.invalidateQueries({ queryKey: ["cliente-ficha-programas"] });
+    queryClient.invalidateQueries({ queryKey: ["cliente-ficha-pagamentos-v2"] });
+    queryClient.invalidateQueries({ queryKey: ["cliente-ficha-detalhe"] });
+    queryClient.invalidateQueries({ queryKey: ["pet-programa-ativo"] });
+    queryClient.invalidateQueries({ queryKey: ["creditos-disponiveis-pet"] });
+    queryClient.invalidateQueries({ queryKey: ["financial-kpis"] });
+    queryClient.invalidateQueries({ queryKey: ["pagamentos-lista"] });
+    queryClient.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+    queryClient.invalidateQueries({ queryKey: ["auditoria-programas"] });
   };
 
   const salvar = useMutation({
