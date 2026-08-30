@@ -51,30 +51,76 @@ export const REGRAS_CATEGORIAS_PADRAO: Record<CategoriaCreditoTipo, RegraEquival
   },
 };
 
+function normalizarTexto(str: string): string {
+  return (str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 /**
  * Identifica a categoria de crédito a partir do serviço (por ID real e categoria oficial do catálogo)
  */
 export function identificarCategoriaCredito(servico: { id?: string; nome?: string; categoria?: string | null }): CategoriaCreditoTipo {
-  const catOficial = (servico.categoria || "").trim().toLowerCase();
-  const nomeServico = (servico.nome || "").trim().toLowerCase();
+  const cat = normalizarTexto(servico.categoria || "");
+  const nome = normalizarTexto(servico.nome || "");
 
-  if (catOficial === "banhos" || nomeServico.includes("banho")) {
+  // Banho (Banho Simples, Banho Premium, Banho Terapêutico, etc.)
+  if (
+    cat.includes("banho") ||
+    cat === "banhos" ||
+    nome.includes("banho") ||
+    nome.includes("bath") ||
+    nome.includes("lavagem") ||
+    nome.includes("ducha") ||
+    nome.includes("higienizacao")
+  ) {
     return "banho";
   }
 
-  if (catOficial === "hidratação" || catOficial === "hidratacao" || nomeServico.includes("hidrata")) {
+  // Hidratação
+  if (
+    cat.includes("hidrata") ||
+    nome.includes("hidrata") ||
+    nome.includes("nutricao") ||
+    nome.includes("cauterizacao") ||
+    nome.includes("mascara")
+  ) {
     return "hidratacao";
   }
 
-  if (catOficial === "tosas" || nomeServico.includes("tosa")) {
+  // Tosa
+  if (
+    cat.includes("tosa") ||
+    nome.includes("tosa") ||
+    nome.includes("trimming") ||
+    nome.includes("stripping")
+  ) {
     return "tosa";
   }
 
-  if (catOficial === "acabamentos" || nomeServico.includes("unha") || nomeServico.includes("pata") || nomeServico.includes("rosto")) {
+  // Acabamento
+  if (
+    cat.includes("acabamento") ||
+    nome.includes("unha") ||
+    nome.includes("pata") ||
+    nome.includes("rosto") ||
+    nome.includes("ouvido") ||
+    nome.includes("dente") ||
+    nome.includes("escovacao")
+  ) {
     return "acabamento";
   }
 
-  if (catOficial === "cuidados com a pelagem" || nomeServico.includes("desembolo") || nomeServico.includes("subpelo")) {
+  // Adicional / Pelagem
+  if (
+    cat.includes("pelagem") ||
+    cat.includes("adicional") ||
+    nome.includes("desembolo") ||
+    nome.includes("subpelo") ||
+    nome.includes("cardina")
+  ) {
     return "adicional";
   }
 

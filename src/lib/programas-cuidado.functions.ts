@@ -1047,3 +1047,268 @@ export const reconciliarCreditosPet = createServerFn({ method: "POST" })
     if (error) throw error;
     return result;
   });
+
+export const verificarElegibilidadeCredito = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    pet_id: z.string().uuid(),
+    cliente_id: z.string().uuid().optional(),
+    servicos: z.array(z.object({
+      id: z.string().optional(),
+      servico_id: z.string().optional(),
+      nome: z.string(),
+      valor: z.number().optional().default(0),
+      categoria: z.string().nullable().optional()
+    }))
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+
+    // 1. Busca contratos ativos do pet
+    let query = sb
+      .from("programas_contratados" as any)
+      .select(`
+        *,
+        pets:pet_id (id, nome),
+        movimentacoes:programas_creditos_movimentacoes (*)
+      `)
+      .eq("pet_id", data.pet_id)
+      .eq("status_do_programa", "ativo")
+      .order("criado_em", { ascending: true });
+
+    if (data.cliente_id) {
+      query = query.eq("cliente_id", data.cliente_id);
+    }
+
+    const { data: contratos, error: cErr } = await query;
+    if (cErr) throw cErr;
+
+    const contratosList = (contratos as any[]) || [];
+    if (contratosList.length === 0) {
+      return {
+        possui_programa: false,
+        possui_credito_elegivel: false,
+        servicos_cobertos: [],
+        servicos_extras: data.servicos,
+        total_coberto: 0,
+        total_extras: data.servicos.reduce((s, it) => s + (it.valor || 0), 0),
+        resumo: null
+      };
+    }
+
+    // Calcula saldos de cada contrato
+    const contratosResumo = contratosList.map(c => calcularSaldosDoContrato(c, c.movimentacoes || []));
+
+    // Clona mapa de saldos disponíveis por categoria para consumir virtualmente na avaliação
+    const saldosDisponiveisMap: Record<string, { disponivel: number; contrato: any; item: any }> = {};
+    for (const cRes of contratosResumo) {
+      for (const item of cRes.itens) {
+        if (!item.bloqueado && item.disponiveis > 0) {
+          const key = item.categoria;
+          if (!saldosDisponiveisMap[key]) {
+            saldosDisponiveisMap[key] = {
+              disponivel: item.disponiveis,
+              contrato: cRes,
+              item
+            };
+          } else {
+            saldosDisponiveisMap[key].disponivel += item.disponiveis;
+          }
+        }
+      }
+    }
+
+    const servicosCobertos: any[] = [];
+    const servicosExtras: any[] = [];
+    let totalCoberto = 0;
+    let totalExtras = 0;
+
+    for (const serv of data.servicos) {
+      const cat = identificarCategoriaCredito(serv);
+      const saldoCat = saldosDisponiveisMap[cat];
+
+      if (saldoCat && saldoCat.disponivel > 0) {
+        saldoCat.disponivel -= 1;
+        const valorServ = Number(serv.valor || 0);
+        totalCoberto += valorServ;
+        servicosCobertos.push({
+          ...serv,
+          categoria_credito: cat,
+          coberto: true,
+          contrato_id: saldoCat.contrato.contrato_id,
+          nome_programa: saldoCat.contrato.nome_programa,
+          data_validade: saldoCat.contrato.data_de_validade,
+        });
+      } else {
+        totalExtras += Number(serv.valor || 0);
+        servicosExtras.push({
+          ...serv,
+          coberto: false
+        });
+      }
+    }
+
+    const primeiroContrato = contratosResumo[0];
+    const itemBanho = primeiroContrato?.itens.find(i => i.categoria === "banho");
+
+    return {
+      possui_programa: true,
+      possui_credito_elegivel: servicosCobertos.length > 0,
+      servicos_cobertos: servicosCobertos,
+      servicos_extras: servicosExtras,
+      total_coberto: totalCoberto,
+      total_extras: totalExtras,
+      resumo: {
+        contrato_id: primeiroContrato?.contrato_id,
+        nome_programa: primeiroContrato?.nome_programa,
+        pet_nome: primeiroContrato?.pet_nome,
+        data_validade: primeiroContrato?.data_de_validade,
+        creditos_banho_disponiveis: itemBanho?.disponiveis || 0,
+        creditos_banho_reservados: itemBanho?.reservados || 0,
+        total_creditos_disponiveis: primeiroContrato?.total_creditos_disponiveis || 0
+      }
+    };
+  });
+
+export const consumirCreditoAtendimento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) => z.object({
+    atendimento_id: z.string().uuid(),
+    agendamento_id: z.string().uuid().optional().nullable(),
+    pet_id: z.string().uuid(),
+    cliente_id: z.string().uuid().optional().nullable(),
+    servicos_executados: z.array(z.object({
+      id: z.string().optional(),
+      servico_id: z.string().optional(),
+      nome: z.string(),
+      valor: z.number().optional(),
+      categoria: z.string().nullable().optional()
+    })).optional()
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const userId = context.userId;
+
+    // 1. Idempotência: Checa se já houve consumo registrado para este atendimento
+    const { data: consumosExistentes } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .select("id")
+      .eq("atendimento_id", data.atendimento_id)
+      .eq("tipo", "credito_consumido");
+
+    if (consumosExistentes && consumosExistentes.length > 0) {
+      return { success: true, count: consumosExistentes.length, idempotente: true };
+    }
+
+    // 2. Se houver agendamento_id com reservas existentes, consome as reservas!
+    if (data.agendamento_id) {
+      const { data: reservas } = await sb
+        .from("programas_creditos_movimentacoes" as any)
+        .select("*")
+        .eq("agendamento_id", data.agendamento_id)
+        .eq("tipo", "credito_reservado");
+
+      if (reservas && reservas.length > 0) {
+        const consumos = (reservas as any[]).map(res => ({
+          programa_contratado_id: res.programa_contratado_id,
+          servico_id: res.servico_id,
+          quantidade: res.quantidade,
+          tipo: 'credito_consumido',
+          agendamento_id: data.agendamento_id,
+          atendimento_id: data.atendimento_id,
+          usuario_id: userId,
+          motivo: 'Consumo definitivo da reserva no fechamento do atendimento',
+          idempotency_key: `consumo_res_${res.id}_${data.atendimento_id}`
+        }));
+
+        const { error: cErr } = await sb
+          .from("programas_creditos_movimentacoes" as any)
+          .insert(consumos);
+
+        if (cErr) throw cErr;
+
+        await registrarAuditoriaPrograma({
+          data: {
+            acao: 'consumo_credito',
+            pet_id: data.pet_id,
+            cliente_id: data.cliente_id || undefined,
+            metadata: {
+              agendamento_id: data.agendamento_id,
+              atendimento_id: data.atendimento_id,
+              origem: 'reserva_previa',
+              quantidade: consumos.length
+            },
+            motivo: 'Consumo definitivo de créditos reservados no atendimento'
+          }
+        });
+
+        return { success: true, count: consumos.length, tipo: 'reserva_consumida' };
+      }
+    }
+
+    // 3. Se NÃO havia reserva prévia (ex: agendamento sem reserva ou atendimento avulso), consome direto do contrato ativo
+    const servicos = data.servicos_executados || [{ nome: "Banho", valor: 0 }];
+    const servicosBanho = servicos.filter(s => identificarCategoriaCredito(s) === "banho");
+
+    if (servicosBanho.length === 0) {
+      return { success: true, count: 0, tipo: 'sem_servico_coberto' };
+    }
+
+    // Busca contratos ativos com saldo de banho
+    const { data: contratos } = await sb
+      .from("programas_contratados" as any)
+      .select(`
+        *,
+        movimentacoes:programas_creditos_movimentacoes (*)
+      `)
+      .eq("pet_id", data.pet_id)
+      .eq("status_do_programa", "ativo")
+      .order("data_de_validade", { ascending: true });
+
+    let contratoAlocado: any = null;
+    for (const c of (contratos as any[] || [])) {
+      const res = calcularSaldosDoContrato(c, c.movimentacoes || []);
+      const itemBanho = res.itens.find(i => i.categoria === "banho");
+      if (itemBanho && itemBanho.disponiveis > 0 && !itemBanho.bloqueado) {
+        contratoAlocado = c;
+        break;
+      }
+    }
+
+    if (!contratoAlocado) {
+      return { success: false, message: 'Nenhum contrato ativo com créditos disponíveis encontrado' };
+    }
+
+    const { error: insErr } = await sb
+      .from("programas_creditos_movimentacoes" as any)
+      .insert({
+        programa_contratado_id: contratoAlocado.id,
+        servico_id: servicosBanho[0].servico_id || servicosBanho[0].id || null,
+        quantidade: 1,
+        tipo: 'credito_consumido',
+        agendamento_id: data.agendamento_id || null,
+        atendimento_id: data.atendimento_id,
+        usuario_id: userId,
+        motivo: 'Consumo direto de crédito de banho no fechamento do atendimento',
+        idempotency_key: `consumo_direto_${data.atendimento_id}`
+      });
+
+    if (insErr) throw insErr;
+
+    await registrarAuditoriaPrograma({
+      data: {
+        acao: 'consumo_credito',
+        pet_id: data.pet_id,
+        cliente_id: data.cliente_id || undefined,
+        programa_contratado_id: contratoAlocado.id,
+        metadata: {
+          atendimento_id: data.atendimento_id,
+          agendamento_id: data.agendamento_id,
+          origem: 'consumo_direto_fechamento',
+        },
+        motivo: 'Consumo direto de crédito do programa no fechamento'
+      }
+    });
+
+    return { success: true, count: 1, tipo: 'consumo_direto' };
+  });

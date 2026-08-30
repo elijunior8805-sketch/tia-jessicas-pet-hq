@@ -234,49 +234,55 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   doc.text(`Check-out: ${fmtDateTime(atendimento?.data_fim)}`, M, y); y += 20;
 
   // ============ SERVIÇOS ============
+  const isQuitadoPrograma = atendimento?.pagamento_forma === "credito_programa" || executados.some((it: any) => it.usar_credito || it.valor_unit === 0);
+
   autoTable(doc, {
     startY: y,
-    head: [["Servico", "Qtd", "Valor unit.", "Subtotal"]],
+    head: [["Serviço", "Qtd", "Valor Unit.", "Situação / Subtotal"]],
     body: executados.length
-      ? executados.map((it) => [
-          it.nome,
-          String(it.quantidade ?? 1),
-          brl(Number(it.valor_unit ?? 0)),
-          brl(Number(it.valor_unit ?? 0) * Number(it.quantidade ?? 1)),
-        ])
-      : [["Nenhum servico executado", "", "", ""]],
+      ? executados.map((it: any) => {
+          const coberto = it.usar_credito || (isQuitadoPrograma && (it.nome?.toLowerCase().includes("banho") || it.valor_unit === 0));
+          return [
+            coberto ? `${it.nome} (Crédito do Programa)` : it.nome,
+            String(it.quantidade ?? 1),
+            brl(Number(it.valor_unit ?? 0)),
+            coberto ? "Quitado (1 crédito)" : brl(Number(it.valor_unit ?? 0) * Number(it.quantidade ?? 1)),
+          ];
+        })
+      : [["Nenhum serviço executado", "", "", ""]],
     theme: "grid",
-    styles: { font: "helvetica", fontSize: 10, cellPadding: 6, textColor: C.ink, lineColor: C.line },
+    styles: { font: "helvetica", fontSize: 9, cellPadding: 5, textColor: C.ink, lineColor: C.line },
     headStyles: { fillColor: C.forest, textColor: [255, 255, 255], fontStyle: "bold" },
     columnStyles: {
-      1: { halign: "center", cellWidth: 50 },
-      2: { halign: "right", cellWidth: 90 },
-      3: { halign: "right", cellWidth: 90 },
+      1: { halign: "center", cellWidth: 45 },
+      2: { halign: "right", cellWidth: 80 },
+      3: { halign: "right", cellWidth: 110 },
     },
     margin: { left: M, right: M },
   });
   y = (doc as any).lastAutoTable.finalY + 10;
 
   // ============ TOTAIS ============
+  const totalCobrado = Math.max(0, Number(atendimento?.valor_executado ?? total));
   const totRows: [string, string][] = [
-    ["Servicos executados", brl(valorExec)],
+    ["Serviços executados", brl(valorExec)],
     ["Taxa leva-e-traz", brl(taxa)],
-    ["TOTAL", brl(total)],
+    ["TOTAL A RECEBER", brl(totalCobrado)],
   ];
-  const totX = W - M - 240;
+  const totX = W - M - 250;
   totRows.forEach(([k, v], i) => {
     const isTotal = i === totRows.length - 1;
     if (isTotal) {
       doc.setFillColor(...C.forest);
-      doc.rect(totX, y - 2, 240, 22, "F");
+      doc.rect(totX, y - 2, 250, 22, "F");
       doc.setTextColor(255, 255, 255);
     } else {
       doc.setTextColor(...C.ink);
     }
     doc.setFont("helvetica", isTotal ? "bold" : "normal");
-    doc.setFontSize(isTotal ? 11 : 10);
+    doc.setFontSize(isTotal ? 11 : 9.5);
     doc.text(k, totX + 10, y + 13);
-    doc.text(v, totX + 230, y + 13, { align: "right" });
+    doc.text(v, totX + 240, y + 13, { align: "right" });
     y += isTotal ? 26 : 18;
   });
   y += 4;

@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import { getCreditosDisponiveis, reservarCredito, liberarReserva, consumirReserva, registrarAuditoriaPrograma } from "@/lib/programas-cuidado.functions";
+import { identificarCategoriaCredito } from "@/lib/programas-creditos-core";
 
 import { z } from "zod";
 import {
@@ -128,25 +129,59 @@ function openWhatsApp(row: any, signer?: { name: string; initials: string }) {
   });
 }
 
-function ProgramasCuidadoBadge({ petId }: { petId: string | null }) {
+function ProgramasCuidadoBadge({ petId, onReservarBanho }: { petId: string | null; onReservarBanho?: () => void }) {
   const { data: creditos, isLoading } = useQuery({
     queryKey: ["creditos-pet", petId],
     enabled: !!petId,
     queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
   });
 
-  if (!petId || isLoading || !creditos || Object.keys(creditos).length === 0) return null;
+  if (!petId || isLoading || !creditos) return null;
+
+  const contratos = (creditos as any).contratos || [];
+  const categorias = (creditos as any).saldos_por_categoria || {};
+  const listaCategorias = Object.values(categorias) as any[];
+
+  const categoriasComSaldo = listaCategorias.filter((c: any) => (c.disponivel > 0 || c.reservado > 0) && !c.bloqueado);
+
+  if (contratos.length === 0 && categoriasComSaldo.length === 0) return null;
+
+  const primeiroContrato = contratos[0];
+  const catBanho = categorias["banho"];
+  const qtdBanhoDisp = catBanho?.disponivel ?? 0;
+  const qtdBanhoRes = catBanho?.reservado ?? 0;
 
   return (
-    <div className="mt-2 p-3 bg-gold/10 border border-gold/30 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="flex items-center gap-2 mb-2">
-        <PackageCheck className="h-4 w-4 text-gold" />
-        <span className="text-xs font-bold text-gold uppercase tracking-wider">Programa Ativo</span>
+    <div className="mt-2.5 p-3.5 bg-[#F5F2EA] border border-[#C8A951]/40 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 font-bold text-xs text-[#123F2A]">
+          <PackageCheck className="h-4 w-4 text-[#C8A951]" />
+          <span>Crédito disponível no Programa de Cuidados</span>
+        </div>
+        {primeiroContrato?.data_de_validade && (
+          <Badge variant="outline" className="text-[10px] bg-white border-[#C8A951]/40 text-[#123F2A]">
+            Validade: {new Date(primeiroContrato.data_de_validade).toLocaleDateString("pt-BR")}
+          </Badge>
+        )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(creditos).map(([id, info]: [string, any]) => (
-          <Badge key={id} variant="outline" className="bg-white border-gold/20 text-[10px] h-6">
-            {info.nome}: {info.disponivel}x
+
+      <div className="text-xs text-foreground/90 leading-relaxed">
+        {primeiroContrato ? (
+          <p>
+            <strong>{primeiroContrato.pet_nome || "O pet"}</strong> possui{" "}
+            <strong className="text-emerald-800 font-bold">{qtdBanhoDisp} crédito(s) de banho</strong> disponíveis
+            {qtdBanhoRes > 0 ? ` (${qtdBanhoRes} já reservado(s))` : ""}{" "}
+            no programa <em>{primeiroContrato.nome_programa}</em>.
+          </p>
+        ) : (
+          <p>Créditos ativos disponíveis na carteira do pet.</p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 pt-0.5">
+        {categoriasComSaldo.map((cat: any) => (
+          <Badge key={cat.categoria} variant="outline" className="bg-white border-[#C8A951]/30 text-[11px] py-0.5 px-2 font-medium text-emerald-950">
+            {cat.nome_categoria}: <strong>{cat.disponivel} disp.</strong> {cat.reservado > 0 && <span className="text-muted-foreground ml-1">({cat.reservado} res.)</span>}
           </Badge>
         ))}
       </div>
@@ -1563,9 +1598,12 @@ function NovoAgendamentoDialog({
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
 
-    const saldosObj = (creditosPet as any)?.saldos || (creditosPet as any);
-    const infoCredito = saldosObj?.[s.id];
-    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0 && !infoCredito.bloqueado;
+    const cat = identificarCategoriaCredito(s);
+    const infoCat = (creditosPet as any)?.saldos_por_categoria?.[cat];
+    const infoServico = (creditosPet as any)?.saldos?.[s.id];
+    const disp = infoCat?.disponivel ?? infoServico?.disponivel ?? 0;
+    const bloqueado = infoCat?.bloqueado ?? infoServico?.bloqueado ?? false;
+    const temCredito = disp > 0 && !bloqueado;
 
     setItens((prev) => [...prev, {
       servico_id: s.id,
@@ -2128,9 +2166,12 @@ function EditarServicosDialog({
     const s = servicos?.find((x) => x.id === id);
     if (!s) return;
 
-    const saldosObj = (creditosPet as any)?.saldos || (creditosPet as any);
-    const infoCredito = saldosObj?.[s.id];
-    const temCredito = !!infoCredito?.disponivel && infoCredito.disponivel > 0 && !infoCredito.bloqueado;
+    const cat = identificarCategoriaCredito(s);
+    const infoCat = (creditosPet as any)?.saldos_por_categoria?.[cat];
+    const infoServico = (creditosPet as any)?.saldos?.[s.id];
+    const disp = infoCat?.disponivel ?? infoServico?.disponivel ?? 0;
+    const bloqueado = infoCat?.bloqueado ?? infoServico?.bloqueado ?? false;
+    const temCredito = disp > 0 && !bloqueado;
 
     setItens((prev) => [...prev, {
       servico_id: s.id,
