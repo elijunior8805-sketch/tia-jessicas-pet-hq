@@ -383,19 +383,27 @@ export function GeradorCobrancaDialog({
             <Label className="text-xs">Mensagem (edite à vontade)</Label>
             <Textarea rows={7} value={texto} onChange={(e) => setTexto(e.target.value)}
               placeholder="A mensagem gerada aparece aqui para sua revisão." />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {[
-                ["mais_gentil", "Mais gentil"], ["mais_direta", "Mais direta"],
-                ["mais_firme", "Mais firme"], ["acolhedor", "Mais acolhedor"], ["incisivo", "Incisivo"],
-                ["resumir", "Resumir"], ["corrigir", "Corrigir"],
+                ["mais_gentil", "Mais gentil"],
+                ["mais_cordial", "Mais cordial"],
+                ["mais_direta", "Mais direta"],
+                ["mais_firme", "Mais firme"],
+                ["mais_humano", "Mais humano"],
+                ["citar_pet", "Mencionar o pet"],
+                ["sem_valor", "Sem citar valor"],
+                ["incluir_vencimento", "Incluir vencimento"],
+                ["acolhedor", "Acolhedor"],
+                ["resumir", "Resumir"],
+                ["corrigir", "Corrigir"],
               ].map(([a, l]) => (
-                <Button key={a} size="sm" variant="outline" disabled={!texto || refinarM.isPending}
+                <Button key={a} size="sm" variant="outline" className="h-7 text-xs px-2.5 rounded-lg" disabled={!texto || refinarM.isPending}
                   onClick={() => refinarM.mutate(a as string)}>
                   {refinarM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : l}
                 </Button>
               ))}
-              <Button size="sm" variant="ghost" disabled={!texto}
-                onClick={() => { navigator.clipboard.writeText(texto); toast.success("Copiado."); }}>
+              <Button size="sm" variant="ghost" className="h-7 px-2 rounded-lg" disabled={!texto}
+                onClick={() => { navigator.clipboard.writeText(texto); toast.success("Copiado para a área de transferência."); }}>
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>

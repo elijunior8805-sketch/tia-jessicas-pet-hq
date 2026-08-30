@@ -113,14 +113,21 @@ export const refinarMensagem = createServerFn({ method: "POST" })
           "mais_gentil",
           "mais_direta",
           "mais_firme",
+          "mais_cordial",
+          "mais_humano",
+          "citar_pet",
+          "sem_valor",
+          "incluir_vencimento",
           "resumir",
           "corrigir",
           "outra_versao",
+          "acolhedor",
+          "incisivo",
         ]),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => await (await central()).refinarTexto(context.supabase, data.texto, data.acao));
+  .handler(async ({ data, context }) => await (await central()).refinarTexto(context.supabase, data.texto, data.acao as any));
 
 export const gerar3AbordagensIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

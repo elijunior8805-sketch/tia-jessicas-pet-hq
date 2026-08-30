@@ -27,6 +27,11 @@ export type AcaoRefino =
   | "mais_gentil"
   | "mais_direta"
   | "mais_firme"
+  | "mais_cordial"
+  | "mais_humano"
+  | "citar_pet"
+  | "sem_valor"
+  | "incluir_vencimento"
   | "resumir"
   | "corrigir"
   | "outra_versao"
@@ -37,6 +42,11 @@ const INSTRUCAO_REFINO: Record<AcaoRefino, string> = {
   mais_gentil: "Reescreva de forma mais gentil e acolhedora, reduzindo a firmeza.",
   mais_direta: "Reescreva de forma mais direta e objetiva, cortando rodeios.",
   mais_firme: "Reescreva com um tom de cobrança extremamente firme, indicando que a situação já passou por um longo tempo sem regularização e 'saiu dos limites'. O foco deve ser no impacto no negócio e na quebra de confiança, fazendo o cliente sentir a urgência máxima sem usar emojis.",
+  mais_cordial: "Reescreva com tom altamente cordial, elegante e respeitoso, mantendo a educação impecável.",
+  mais_humano: "Reescreva de forma calorosa, humana e pessoal, demonstrando carinho genuíno pelo tutor e pelo animal.",
+  citar_pet: "Destaque o nome e o bem-estar do pet na mensagem, reforçando a relação de carinho do Spa.",
+  sem_valor: "Reescreva sem mencionar valores numéricos ou cifras em R$, focando no acompanhamento do serviço e no agendamento.",
+  incluir_vencimento: "Destaque a data de vencimento da fatura com clareza e gentileza para orientação do tutor.",
   acolhedor: "Reescreva de forma mais acolhedora e empática, focando no bem-estar do pet e na parceria com o tutor.",
   incisivo: "Reescreva de forma incisiva e direta, enfatizando a necessidade imediata de uma posição ou ação, mantendo a seriedade.",
   resumir: "Resuma mantendo todas as informações essenciais em no máximo 3 linhas.",

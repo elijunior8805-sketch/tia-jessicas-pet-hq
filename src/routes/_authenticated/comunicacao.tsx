@@ -132,7 +132,8 @@ function ComunicacaoPage() {
             onIrParaInbox={(cid) => {
               if (cid) setInboxClienteId(cid);
               setAba("inbox");
-            }} 
+            }}
+            onIrParaPromessas={() => setAba("promessas")}
           />
         </TabsContent>
         <TabsContent value="inbox">
