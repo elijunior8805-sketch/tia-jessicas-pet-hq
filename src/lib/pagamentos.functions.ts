@@ -161,6 +161,7 @@ export const registrarContatoCobranca = createServerFn({ method: "POST" })
       .select("id, status, observacoes")
       .eq("id", data.pagamentoId)
       .maybeSingle();
+    const atual = atualRaw as any;
     if (readErr || !atual) throw new Error("Pagamento não encontrado");
     if (atual.status === "pago" || atual.status === "cancelado") {
       throw new Error("Não é possível registrar cobrança em pagamento finalizado");

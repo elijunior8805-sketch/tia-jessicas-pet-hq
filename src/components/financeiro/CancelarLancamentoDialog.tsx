@@ -181,7 +181,7 @@ export function CancelarLancamentoDialog({
             disabled={
               cancelarMutation.isPending ||
               motivo.trim().length < 3 ||
-              (exigeConfirmacaoExtra && confirmacaoValor !== pagamento.valor_total.toString())
+              Boolean(exigeConfirmacaoExtra && confirmacaoValor !== pagamento.valor_total.toString())
             }
           >
             {cancelarMutation.isPending ? "Processando..." : isPago ? "Confirmar Estorno" : "Confirmar Cancelamento"}
