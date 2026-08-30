@@ -38,13 +38,20 @@ export const contratarPrograma = createServerFn({ method: "POST" })
     data_de_inicio: z.string(),
     data_de_validade: z.string(),
     preco_vendido: z.number().optional(),
+    desconto: z.number().optional(),
+    tipo_desconto: z.enum(['percentual', 'fixo']).optional(),
+    valor_desconto: z.number().optional(),
+    motivo_desconto: z.string().optional(),
     forma_de_pagamento: z.string().optional(),
     observacoes: z.string().optional(),
     idempotency_key: z.string(),
     fracionado: z.boolean().optional(),
+    modo_venda: z.enum(['normal', 'fracionado']).optional(),
     itens_selecionados: z.array(z.object({
       servico_id: z.string().uuid(),
-      quantidade: z.number().int().min(0)
+      quantidade: z.number().int().min(0),
+      valor_unitario: z.number().optional(),
+      nome: z.string().optional()
     })).optional()
   }).parse(input))
   .handler(async ({ data, context }) => {
@@ -70,44 +77,50 @@ export const contratarPrograma = createServerFn({ method: "POST" })
     const permiteFracionar = !!(cfg as any)?.permitir_venda_fracionada;
 
     const itensOriginais = ((programa as any).itens ?? []) as any[];
-    let itensVenda = itensOriginais.map((i) => ({ ...i }));
-    let fracionado = false;
-
-    if (data.fracionado) {
-      if (!permiteFracionar) {
-        throw new Error("Venda fracionada está desativada nas configurações do módulo.");
-      }
-      const mapa = new Map((data.itens_selecionados ?? []).map((i) => [i.servico_id, i.quantidade]));
-      itensVenda = itensOriginais
-        .map((i) => ({ ...i, quantidade: Math.min(Number(mapa.get(i.servico_id) ?? 0), Number(i.quantidade)) }))
-        .filter((i) => i.quantidade > 0);
-      if (itensVenda.length === 0) {
-        throw new Error("Selecione ao menos um serviço para a venda fracionada.");
-      }
-      fracionado = itensVenda.some((i, idx) => i.quantidade !== Number(itensOriginais[idx]?.quantidade))
-        || itensVenda.length !== itensOriginais.length;
+    
+    // Identifica se é realmente venda fracionada (opção explícita) ou venda normal/personalizada
+    const ehRealmenteFracionado = data.modo_venda === 'fracionado' || (data.fracionado === true && data.modo_venda !== 'normal');
+    
+    if (ehRealmenteFracionado && !permiteFracionar) {
+      throw new Error("Venda fracionada está desativada nas configurações do módulo.");
     }
 
-    // Preço sempre calculado no backend
-    const precoCheio = Number((programa as any).preco_do_programa ?? 0);
-    const totalUnidadesOriginais = itensOriginais.reduce((s, i) => s + Number(i.quantidade || 0), 0) || 1;
-    let precoCalculado = precoCheio;
-
-    if (fracionado) {
-      const somaAlocada = itensOriginais.reduce(
-        (s, i) => s + Number(i.valor_alocado || 0), 0);
-      if (somaAlocada > 0) {
-        precoCalculado = itensVenda.reduce((s, i) => {
+    let itensVenda: any[] = [];
+    if (data.itens_selecionados && data.itens_selecionados.length > 0) {
+      itensVenda = data.itens_selecionados
+        .filter((i) => i.quantidade > 0)
+        .map((i) => {
           const orig = itensOriginais.find((o) => o.servico_id === i.servico_id);
-          const unit = Number(orig?.valor_alocado || 0) / Math.max(Number(orig?.quantidade || 1), 1);
-          return s + unit * i.quantidade;
-        }, 0);
-      } else {
-        const unidades = itensVenda.reduce((s, i) => s + i.quantidade, 0);
-        precoCalculado = (precoCheio / totalUnidadesOriginais) * unidades;
-      }
-      precoCalculado = Math.round(precoCalculado * 100) / 100;
+          const vUnit = i.valor_unitario ?? Number(orig?.valor_unitario_de_referencia ?? 0);
+          return {
+            servico_id: i.servico_id,
+            quantidade: i.quantidade,
+            valor_unitario_de_referencia: vUnit,
+            valor_alocado: vUnit * i.quantidade
+          };
+        });
+    } else {
+      itensVenda = itensOriginais.map((i) => ({ ...i }));
     }
+
+    if (itensVenda.length === 0) {
+      throw new Error("Selecione ao menos um serviço para compor o programa.");
+    }
+
+    const subtotalServicos = itensVenda.reduce((acc, i) => acc + (Number(i.valor_unitario_de_referencia || 0) * Number(i.quantidade || 0)), 0);
+    const precoBaseCatalogo = Number((programa as any).preco_do_programa ?? subtotalServicos);
+    
+    let precoFinal = data.preco_vendido !== undefined 
+      ? Number(data.preco_vendido) 
+      : (ehRealmenteFracionado ? subtotalServicos : precoBaseCatalogo);
+
+    if (data.desconto !== undefined && data.preco_vendido === undefined) {
+      precoFinal = Math.max(0, subtotalServicos - Number(data.desconto));
+    }
+
+    precoFinal = Math.round(precoFinal * 100) / 100;
+    const descontoCalculado = Math.max(0, (subtotalServicos || precoBaseCatalogo) - precoFinal);
+    const fracionado = ehRealmenteFracionado;
 
     // Idempotência: se esta chave já gerou um contrato, devolve o existente
     const { data: jaExiste } = await sb
@@ -156,9 +169,9 @@ export const contratarPrograma = createServerFn({ method: "POST" })
           nome_snapshot: fracionado ? `${(programa as any).nome} (fracionado)` : (programa as any).nome,
           composicao_snapshot: itensVenda,
           regras_snapshot: (programa as any).regras,
-          preco_original: precoCheio,
-          preco_vendido: precoCalculado,
-          desconto: precoCheio - precoCalculado,
+          preco_original: subtotalServicos || precoBaseCatalogo,
+          preco_vendido: precoFinal,
+          desconto: descontoCalculado,
           fracionado,
           data_de_inicio: data.data_de_inicio,
           data_de_validade: data.data_de_validade,
@@ -181,7 +194,7 @@ export const contratarPrograma = createServerFn({ method: "POST" })
         quantidade: item.quantidade,
         tipo: 'credito_criado',
         usuario_id: userId,
-        motivo: fracionado ? 'Contratação fracionada' : 'Contratação inicial',
+        motivo: fracionado ? 'Contratação fracionada' : 'Contratação de programa',
         idempotency_key: `${data.idempotency_key}_${item.servico_id}`
       }));
 
@@ -196,8 +209,8 @@ export const contratarPrograma = createServerFn({ method: "POST" })
         .from("pagamentos" as any)
         .insert({
           cliente_id: data.cliente_id,
-          valor_total: precoCalculado,
-          valor_pago: forma === 'pendente' ? 0 : precoCalculado,
+          valor_total: precoFinal,
+          valor_pago: forma === 'pendente' ? 0 : precoFinal,
           forma,
           status: forma === 'pendente' ? 'pendente' : 'pago',
           data_pagamento: forma === 'pendente' ? null : data.data_de_inicio,

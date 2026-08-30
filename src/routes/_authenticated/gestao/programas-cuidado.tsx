@@ -21,10 +21,12 @@ import {
   Bot,
   Info,
   CalendarPlus,
-  HelpCircle
+  HelpCircle,
+  Percent,
+  DollarSign
 } from "lucide-react";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   getProgramasCatalogo, 
   toggleProgramaStatus,
@@ -101,18 +103,23 @@ function ProgramasCuidadoPage() {
   const [searchCliente, setSearchCliente] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<any>(null);
   const [selectedPet, setSelectedPet] = useState<any>(null);
+  const [petPorteSelecionado, setPetPorteSelecionado] = useState<string>("");
   const [vendaDataInicio, setVendaDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [vendaPrecoCustomizado, setVendaPrecoCustomizado] = useState<number>(0);
   const [formaPagamento, setFormaPagamento] = useState<string>("pix");
   const [itensCustomizados, setItensCustomizados] = useState<Array<{ servico_id: string; nome: string; quantidade: number; valor_unitario: number }>>([]);
   const [servicoExtraAdicionar, setServicoExtraAdicionar] = useState<string>("");
+  
+  // Campo Livre de Desconto
+  const [tipoDescontoVenda, setTipoDescontoVenda] = useState<"percentual" | "fixo">("percentual");
+  const [descontoValorVenda, setDescontoValorVenda] = useState<string>("0");
+  const [motivoDescontoVenda, setMotivoDescontoVenda] = useState<string>("");
 
   const { data: programasConfig } = useQuery({
     queryKey: ["programas-config"],
     queryFn: () => getProgramasConfig(),
   });
 
-  // Busca todos os serviços para permitir inclusão de adicionais na venda
+  // Busca todos os serviços
   const { data: todosServicos = [] } = useQuery({
     queryKey: ["servicos-catalogo-venda"],
     queryFn: async () => {
@@ -121,6 +128,25 @@ function ProgramasCuidadoPage() {
         .select("id, nome, categoria, valor, duracao_min")
         .eq("ativo", true)
         .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Busca Portes e Preços por Porte
+  const { data: portes = [] } = useQuery({
+    queryKey: ["portes-lista"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("portes").select("id, nome").eq("ativo", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: servicosPrecos = [] } = useQuery({
+    queryKey: ["servicos-precos-lista"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("servicos_precos").select("servico_id, porte_id, valor");
       if (error) throw error;
       return data ?? [];
     },
@@ -157,6 +183,34 @@ function ProgramasCuidadoPage() {
     enabled: !!selectedCliente
   });
 
+  // Função para resolver o preço unitário do serviço considerando o porte do pet
+  const obterPrecoServico = (servicoId: string, porteNome?: string) => {
+    const serv = todosServicos.find((s: any) => s.id === servicoId);
+    if (!serv) return 0;
+    if (porteNome && portes.length > 0) {
+      const porteObj = portes.find((p: any) => p.nome.toLowerCase() === porteNome.toLowerCase());
+      if (porteObj) {
+        const precoPorte = servicosPrecos.find((sp: any) => sp.servico_id === servicoId && sp.porte_id === porteObj.id);
+        if (precoPorte && Number(precoPorte.valor) > 0) {
+          return Number(precoPorte.valor);
+        }
+      }
+    }
+    return Number(serv.valor || 0);
+  };
+
+  // Atualiza preços dos itens ao selecionar pet/porte
+  useEffect(() => {
+    if (!selectedPet) return;
+    const porte = petPorteSelecionado || selectedPet.porte;
+    setItensCustomizados((prev) =>
+      prev.map((item) => ({
+        ...item,
+        valor_unitario: obterPrecoServico(item.servico_id, porte)
+      }))
+    );
+  }, [selectedPet, petPorteSelecionado, todosServicos, servicosPrecos, portes]);
+
   const contratarMutation = useMutation({
     mutationFn: (vars: any) => contratarPrograma({ data: vars }),
     onSuccess: () => {
@@ -176,20 +230,21 @@ function ProgramasCuidadoPage() {
     setVendaStep(1);
     setSelectedCliente(null);
     setSelectedPet(null);
+    setPetPorteSelecionado("");
     setSearchCliente("");
     setSelectedPrograma(null);
     setItensCustomizados([]);
-    setVendaPrecoCustomizado(0);
+    setTipoDescontoVenda("percentual");
+    setDescontoValorVenda("0");
+    setMotivoDescontoVenda("");
     setFormaPagamento("pix");
     setServicoExtraAdicionar("");
   };
 
   const handleOpenVenda = (programa: any) => {
     setSelectedPrograma(programa);
-    const precoBase = Number(programa.preco_do_programa || 0);
-    setVendaPrecoCustomizado(precoBase);
     
-    // Inicializa a composição base do programa
+    // Inicializa a composição base do programa com os serviços do catálogo
     const itensBase = (programa.itens ?? []).map((i: any) => ({
       servico_id: i.servico_id,
       nome: i.servico?.nome || "Serviço",
@@ -197,25 +252,54 @@ function ProgramasCuidadoPage() {
       valor_unitario: Number(i.valor_unitario_de_referencia || i.servico?.valor || 0)
     }));
     setItensCustomizados(itensBase);
+
+    // Identifica desconto padrão do catálogo se houver
+    const sub = Number(programa.valor_normal_dos_servicos || 0);
+    const preco = Number(programa.preco_do_programa || 0);
+    const desc = Math.max(0, sub - preco);
+    if (sub > 0 && desc > 0) {
+      const perc = Math.round((desc / sub) * 1000) / 10;
+      setTipoDescontoVenda("percentual");
+      setDescontoValorVenda(String(perc));
+    } else {
+      setTipoDescontoVenda("percentual");
+      setDescontoValorVenda("0");
+    }
+    setMotivoDescontoVenda("");
     setOpenVenda(true);
   };
 
   const restaurarComposicaoOriginal = () => {
     if (!selectedPrograma) return;
+    const porte = petPorteSelecionado || selectedPet?.porte;
     const itensBase = (selectedPrograma.itens ?? []).map((i: any) => ({
       servico_id: i.servico_id,
       nome: i.servico?.nome || "Serviço",
       quantidade: Number(i.quantidade || 1),
-      valor_unitario: Number(i.valor_unitario_de_referencia || i.servico?.valor || 0)
+      valor_unitario: obterPrecoServico(i.servico_id, porte)
     }));
     setItensCustomizados(itensBase);
-    setVendaPrecoCustomizado(Number(selectedPrograma.preco_do_programa || 0));
+
+    const sub = Number(selectedPrograma.valor_normal_dos_servicos || 0);
+    const preco = Number(selectedPrograma.preco_do_programa || 0);
+    const desc = Math.max(0, sub - preco);
+    if (sub > 0 && desc > 0) {
+      const perc = Math.round((desc / sub) * 1000) / 10;
+      setTipoDescontoVenda("percentual");
+      setDescontoValorVenda(String(perc));
+    } else {
+      setTipoDescontoVenda("percentual");
+      setDescontoValorVenda("0");
+    }
   };
 
   const handleAdicionarExtraNaVenda = (servicoId: string) => {
     if (!servicoId) return;
     const serv = todosServicos.find((s: any) => s.id === servicoId);
     if (!serv) return;
+
+    const porte = petPorteSelecionado || selectedPet?.porte;
+    const precoUnit = obterPrecoServico(serv.id, porte);
 
     setItensCustomizados((prev) => {
       const jaExiste = prev.find((i) => i.servico_id === servicoId);
@@ -226,7 +310,7 @@ function ProgramasCuidadoPage() {
         servico_id: serv.id,
         nome: serv.nome,
         quantidade: 1,
-        valor_unitario: Number(serv.valor || 0)
+        valor_unitario: precoUnit
       }];
     });
     setServicoExtraAdicionar("");
@@ -284,7 +368,28 @@ function ProgramasCuidadoPage() {
     }
   };
 
-  const totalValorServicosCustomizados = itensCustomizados.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0);
+  // Cálculo financeiro em tempo real da venda
+  const subtotalVenda = useMemo(() => {
+    return itensCustomizados.reduce((acc, i) => acc + (i.quantidade * i.valor_unitario), 0);
+  }, [itensCustomizados]);
+
+  const { valorDescontoVenda, precoFinalVenda, percentualEfetivoVenda } = useMemo(() => {
+    const sub = subtotalVenda;
+    if (sub <= 0) return { valorDescontoVenda: 0, precoFinalVenda: 0, percentualEfetivoVenda: 0 };
+
+    const valorInput = Number(descontoValorVenda.replace(",", ".")) || 0;
+    if (tipoDescontoVenda === "percentual") {
+      const perc = Math.min(100, Math.max(0, valorInput));
+      const desc = Math.round((sub * (perc / 100)) * 100) / 100;
+      const final = Math.max(0, sub - desc);
+      return { valorDescontoVenda: desc, precoFinalVenda: final, percentualEfetivoVenda: perc };
+    } else {
+      const desc = Math.min(sub, Math.max(0, valorInput));
+      const final = Math.max(0, sub - desc);
+      const perc = sub > 0 ? Math.round((desc / sub) * 1000) / 10 : 0;
+      return { valorDescontoVenda: desc, precoFinalVenda: final, percentualEfetivoVenda: perc };
+    }
+  }, [subtotalVenda, tipoDescontoVenda, descontoValorVenda]);
 
   return (
     <div className="container mx-auto py-6 space-y-6 px-4 md:px-6">
@@ -739,14 +844,14 @@ function ProgramasCuidadoPage() {
         if (!val) resetVenda();
         setOpenVenda(val);
       }}>
-        <DialogContent className="sm:max-w-[560px] max-h-[92vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="sm:max-w-[620px] max-h-[92vh] overflow-y-auto p-0 gap-0">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="flex items-center gap-2 text-lg font-display">
               <PackageCheck className="h-5 w-5 text-gold" />
               Venda de Programa: {selectedPrograma?.nome}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Selecione o tutor, o pet e personalize os serviços antes de ativar o contrato.
+              Selecione o tutor, o pet e personalize os serviços com cálculo automático em tempo real.
             </DialogDescription>
           </DialogHeader>
 
@@ -761,7 +866,7 @@ function ProgramasCuidadoPage() {
                   }`}>
                     {vendaStep > s ? <CheckCircle2 className="h-5 w-5" /> : s}
                   </div>
-                  {s < 3 && <div className={`w-20 h-0.5 mx-2 ${vendaStep > s ? 'bg-green-500' : 'bg-muted'}`} />}
+                  {s < 3 && <div className={`w-24 h-0.5 mx-2 ${vendaStep > s ? 'bg-green-500' : 'bg-muted'}`} />}
                 </div>
               ))}
             </div>
@@ -829,10 +934,15 @@ function ProgramasCuidadoPage() {
                             className={`p-3 border rounded-lg cursor-pointer transition-all ${
                               selectedPet?.id === pet.id ? 'border-gold bg-gold/5 shadow-sm' : 'hover:bg-muted/50'
                             }`}
-                            onClick={() => setSelectedPet(pet)}
+                            onClick={() => {
+                              setSelectedPet(pet);
+                              setPetPorteSelecionado(pet.porte || "");
+                            }}
                           >
                             <p className="text-sm font-semibold truncate">{pet.nome}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{pet.raca || "Raça não inf."} · {pet.porte || "Porte padrão"}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {pet.raca || "Raça não inf."} · {pet.porte ? `Porte ${pet.porte}` : "Sem porte"}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -841,26 +951,51 @@ function ProgramasCuidadoPage() {
                     )}
                   </div>
                 )}
+
+                {/* Seletor de Porte se o pet não possuir porte cadastrado */}
+                {selectedPet && !selectedPet.porte && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-1.5 animate-in fade-in text-xs">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-800">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      Selecione o porte do pet para cálculo exato de preços:
+                    </div>
+                    <Select value={petPorteSelecionado} onValueChange={setPetPorteSelecionado}>
+                      <SelectTrigger className="text-xs h-8 bg-white">
+                        <SelectValue placeholder="Selecione o porte..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {portes.map((p: any) => (
+                          <SelectItem key={p.id} value={p.nome} className="text-xs">
+                            Porte {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ETAPA 2: PERSONALIZAR PARA ESTE CLIENTE */}
+            {/* ETAPA 2: PERSONALIZAR PARA ESTE CLIENTE & DESCONTO */}
             {vendaStep === 2 && (
-              <div className="space-y-4 animate-in fade-in">
+              <div className="space-y-4 animate-in fade-in text-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-semibold">Personalizar para {selectedPet?.nome || "este pet"}</h4>
-                    <p className="text-xs text-muted-foreground">Ajuste quantidades ou adicione serviços extras para este contrato.</p>
+                    <h4 className="text-sm font-semibold text-foreground">Personalizar para {selectedPet?.nome || "este pet"}</h4>
+                    <p className="text-muted-foreground">
+                      {petPorteSelecionado || selectedPet?.porte ? `Porte: ${petPorteSelecionado || selectedPet.porte} · ` : ""}
+                      Ajuste quantidades ou adicione serviços extras.
+                    </p>
                   </div>
                   <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground" onClick={restaurarComposicaoOriginal}>
                     Restaurar original
                   </Button>
                 </div>
 
-                {/* Lista de Serviços do Contrato */}
-                <div className="rounded-lg border divide-y bg-card max-h-52 overflow-y-auto">
+                {/* Lista de Serviços do Contrato com Preço por Porte Atualizado */}
+                <div className="rounded-lg border divide-y bg-card max-h-48 overflow-y-auto">
                   {itensCustomizados.map((it) => (
-                    <div key={it.servico_id} className="p-2.5 flex items-center justify-between gap-2 text-xs">
+                    <div key={it.servico_id} className="p-2.5 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <span className="font-semibold">{it.nome}</span>
                         <span className="text-muted-foreground ml-1.5">({brl(it.valor_unitario)}/un)</span>
@@ -907,19 +1042,96 @@ function ProgramasCuidadoPage() {
                 <div className="flex items-center gap-2">
                   <Select value={servicoExtraAdicionar} onValueChange={handleAdicionarExtraNaVenda}>
                     <SelectTrigger className="text-xs h-8">
-                      <SelectValue placeholder="+ Adicionar serviço adicional ao pacote..." />
+                      <SelectValue placeholder="+ Adicionar serviço extra ao contrato..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {todosServicos.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id} className="text-xs">
-                          {s.nome} ({brl(Number(s.valor || 0))})
-                        </SelectItem>
-                      ))}
+                      {todosServicos.map((s: any) => {
+                        const precoU = obterPrecoServico(s.id, petPorteSelecionado || selectedPet?.porte);
+                        return (
+                          <SelectItem key={s.id} value={s.id} className="text-xs">
+                            {s.nome} ({brl(precoU)})
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Preço e Validade */}
+                {/* SEÇÃO PREÇO E DESCONTO LIVRE DIGITÁVEL */}
+                <div className="p-3.5 rounded-xl border bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-gold" /> Preço e Desconto
+                    </h4>
+                    <span className="text-muted-foreground text-[11px]">Subtotal: <strong>{brl(subtotalVenda)}</strong></span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[11px]">Tipo de Desconto</Label>
+                      <Select value={tipoDescontoVenda} onValueChange={(v: "percentual" | "fixo") => setTipoDescontoVenda(v)}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentual">Percentual (%)</SelectItem>
+                          <SelectItem value="fixo">Valor em Reais (R$)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[11px]">
+                        {tipoDescontoVenda === "percentual" ? "Desconto (%)" : "Desconto (R$)"}
+                      </Label>
+                      <div className="relative">
+                        {tipoDescontoVenda === "percentual" ? (
+                          <Percent className="absolute right-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                        ) : (
+                          <span className="absolute left-2.5 top-1.5 text-xs text-muted-foreground font-bold">R$</span>
+                        )}
+                        <Input
+                          type="number"
+                          min={0}
+                          max={tipoDescontoVenda === "percentual" ? 100 : subtotalVenda}
+                          step="0.1"
+                          value={descontoValorVenda}
+                          onChange={(e) => setDescontoValorVenda(e.target.value)}
+                          placeholder={tipoDescontoVenda === "percentual" ? "Ex: 10 ou 12.5" : "Ex: 25.00"}
+                          className={`text-xs h-8 ${tipoDescontoVenda === "fixo" ? "pl-8" : "pr-8"}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {valorDescontoVenda > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-[11px]">Motivo do Desconto (Obrigatório para Auditoria)</Label>
+                      <Input
+                        value={motivoDescontoVenda}
+                        onChange={(e) => setMotivoDescontoVenda(e.target.value)}
+                        placeholder="Ex: Cortesia autorizada pelo proprietário, fidelidade, etc."
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  )}
+
+                  {/* Resumo Visual em Tempo Real */}
+                  <div className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-muted-foreground">Subtotal dos Serviços: </span>
+                      <strong>{brl(subtotalVenda)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Desconto ({percentualEfetivoVenda}%): </span>
+                      <strong className="text-emerald-700">-{brl(valorDescontoVenda)}</strong>
+                    </div>
+                    <div className="text-sm font-bold text-gold">
+                      Total do Contrato: {brl(precoFinalVenda)}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
                     <Label className="text-xs">Data de Início</Label>
@@ -931,31 +1143,32 @@ function ProgramasCuidadoPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Preço Final do Pacote (R$)</Label>
-                    <Input 
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={vendaPrecoCustomizado}
-                      onChange={(e) => setVendaPrecoCustomizado(Number(e.target.value))}
-                      className="text-xs h-8 font-bold text-gold"
-                    />
+                    <Label className="text-xs">Validade (Dias)</Label>
+                    <div className="h-8 flex items-center px-3 border rounded-md bg-muted/30 text-xs font-medium">
+                      {selectedPrograma?.validade_em_dias || 30} dias
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ETAPA 3: REVISÃO E PAGAMENTO */}
+            {/* ETAPA 3: REVISÃO COMPLETA E FORMA DE PAGAMENTO */}
             {vendaStep === 3 && (
-              <div className="space-y-4 animate-in fade-in">
-                <div className="bg-muted/30 border rounded-xl p-4 space-y-2.5 text-xs">
+              <div className="space-y-4 animate-in fade-in text-xs">
+                <div className="bg-muted/30 border rounded-xl p-4 space-y-3">
                   <div className="flex justify-between py-1 border-b">
                     <span className="text-muted-foreground">Tutor</span>
                     <span className="font-semibold">{selectedCliente?.nome}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b">
                     <span className="text-muted-foreground">Pet</span>
-                    <span className="font-semibold">{selectedPet?.nome}</span>
+                    <span className="font-semibold">
+                      {selectedPet?.nome} ({petPorteSelecionado || selectedPet?.porte || "Porte Padrão"})
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b">
+                    <span className="text-muted-foreground">Programa</span>
+                    <span className="font-semibold">{selectedPrograma?.nome}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b">
                     <span className="text-muted-foreground">Validade até</span>
@@ -963,25 +1176,47 @@ function ProgramasCuidadoPage() {
                       {format(addDays(new Date(vendaDataInicio), selectedPrograma?.validade_em_dias || 30), 'dd/MM/yyyy')}
                     </span>
                   </div>
-                  <div className="flex justify-between py-1.5 text-sm font-bold">
-                    <span>Total do Contrato</span>
-                    <span className="text-gold text-base">{brl(vendaPrecoCustomizado)}</span>
+
+                  {/* Lista detalhada dos serviços */}
+                  <div className="py-1 space-y-1 border-b">
+                    <span className="text-muted-foreground font-semibold">Composição dos Créditos:</span>
+                    {itensCustomizados.map((it) => (
+                      <div key={it.servico_id} className="flex justify-between text-[11px]">
+                        <span>{it.quantidade}x {it.nome}</span>
+                        <span className="text-muted-foreground">{brl(it.quantidade * it.valor_unitario)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between text-muted-foreground py-0.5">
+                    <span>Subtotal</span>
+                    <span>{brl(subtotalVenda)}</span>
+                  </div>
+                  {valorDescontoVenda > 0 && (
+                    <div className="flex justify-between text-emerald-700 py-0.5 font-medium">
+                      <span>Desconto ({percentualEfetivoVenda}%)</span>
+                      <span>-{brl(valorDescontoVenda)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1 text-sm font-bold border-t">
+                    <span>Total a Pagar</span>
+                    <span className="text-gold text-base">{brl(precoFinalVenda)}</span>
                   </div>
                 </div>
 
                 {/* Forma de Pagamento */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Forma de Pagamento</Label>
+                  <Label className="text-xs font-semibold">Condição / Forma de Pagamento</Label>
                   <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                    <SelectTrigger className="text-xs">
+                    <SelectTrigger className="text-xs h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pix">Pix (Imediato)</SelectItem>
-                      <SelectItem value="credito">Cartão de Crédito</SelectItem>
-                      <SelectItem value="debito">Cartão de Débito</SelectItem>
-                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                      <SelectItem value="pendente">Aguardando Pagamento (Créditos bloqueados até baixa)</SelectItem>
+                      <SelectItem value="pix">Pix (Imediato · Créditos Ativos)</SelectItem>
+                      <SelectItem value="credito">Cartão de Crédito (Créditos Ativos)</SelectItem>
+                      <SelectItem value="debito">Cartão de Débito (Créditos Ativos)</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro (Créditos Ativos)</SelectItem>
+                      <SelectItem value="pendente">Aguardando Pagamento (Créditos bloqueados até quitação)</SelectItem>
                       <SelectItem value="outras">Outras Formas</SelectItem>
                     </SelectContent>
                   </Select>
@@ -990,7 +1225,9 @@ function ProgramasCuidadoPage() {
                 <div className="flex items-start gap-2.5 p-3 rounded-lg bg-gold/5 border border-gold/20 text-[11px] leading-relaxed text-gold-foreground/90">
                   <AlertTriangle className="h-4 w-4 text-gold shrink-0 mt-0.5" />
                   <span>
-                    Ao confirmar, o contrato e os créditos do livro razão serão criados atômica e simultaneamente.
+                    {formaPagamento === 'pendente' 
+                      ? 'O contrato será criado com status "Aguardando Pagamento". Os créditos ficarão visíveis mas bloqueados até a baixa do pagamento.'
+                      : 'O contrato será ativado imediatamente e os créditos liberados na carteira do pet.'}
                   </span>
                 </div>
               </div>
@@ -1007,7 +1244,13 @@ function ProgramasCuidadoPage() {
               <Button 
                 size="sm"
                 className="bg-gold hover:bg-gold/90 text-white" 
-                onClick={() => setVendaStep(vendaStep + 1)}
+                onClick={() => {
+                  if (vendaStep === 2 && valorDescontoVenda > 0 && !motivoDescontoVenda.trim()) {
+                    toast.error("Informe o motivo do desconto concedido.");
+                    return;
+                  }
+                  setVendaStep(vendaStep + 1);
+                }}
                 disabled={!selectedPet || (vendaStep === 2 && itensCustomizados.length === 0)}
               >
                 Continuar
@@ -1022,10 +1265,20 @@ function ProgramasCuidadoPage() {
                   pet_id: selectedPet.id,
                   data_de_inicio: vendaDataInicio,
                   data_de_validade: format(addDays(new Date(vendaDataInicio), selectedPrograma?.validade_em_dias || 30), 'yyyy-MM-dd'),
-                  preco_vendido: vendaPrecoCustomizado,
+                  preco_vendido: precoFinalVenda,
+                  desconto: valorDescontoVenda,
+                  tipo_desconto: tipoDescontoVenda,
+                  valor_desconto: Number(descontoValorVenda) || 0,
+                  motivo_desconto: motivoDescontoVenda,
                   forma_de_pagamento: formaPagamento,
-                  fracionado: true,
-                  itens_selecionados: itensCustomizados.map((i) => ({ servico_id: i.servico_id, quantidade: i.quantidade })),
+                  modo_venda: "normal",
+                  fracionado: false,
+                  itens_selecionados: itensCustomizados.map((i) => ({
+                    servico_id: i.servico_id,
+                    quantidade: i.quantidade,
+                    valor_unitario: i.valor_unitario,
+                    nome: i.nome
+                  })),
                   idempotency_key: `venda_${selectedPet.id}_${Date.now()}`
                 })}
                 disabled={contratarMutation.isPending}

@@ -12,13 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { upsertPrograma } from "@/lib/programas-cuidado.functions";
 import { getProgramasConfig } from "@/lib/programas-config.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { PackageCheck, Save, Minus, Plus } from "lucide-react";
+import { PackageCheck, Save, Minus, Plus, Percent, DollarSign, Sparkles } from "lucide-react";
 
 interface ProgramaFormDialogProps {
   open: boolean;
@@ -37,7 +38,7 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
     queryFn: () => getProgramasConfig(),
   });
 
-  // Catálogo completo de serviços ativos (sem lista fixa no código)
+  // Catálogo completo de serviços ativos (fonte oficial)
   const { data: servicos } = useQuery({
     queryKey: ["servicos-ativos-programa"],
     queryFn: async () => {
@@ -54,27 +55,50 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
 
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [preco, setPreco] = useState("0");
   const [validade, setValidade] = useState("30");
   const [regras, setRegras] = useState("");
   const [busca, setBusca] = useState("");
   const [qtd, setQtd] = useState<Record<string, number>>({});
+  
+  // Seção Preço e Desconto
+  const [tipoDesconto, setTipoDesconto] = useState<"percentual" | "fixo">("percentual");
+  const [descontoValor, setDescontoValor] = useState<string>("0");
+  const [precoManual, setPrecoManual] = useState<string>("");
 
   // Carrega os dados ao abrir (novo ou edição)
   useEffect(() => {
     if (!open) return;
     setNome(initial?.nome ?? "");
     setDescricao(initial?.descricao ?? "");
-    setPreco(String(initial?.preco_do_programa ?? "0"));
     setRegras(initial?.regras ?? "");
     setBusca("");
+    
     const mapa: Record<string, number> = {};
     for (const item of (initial?.itens ?? []) as any[]) {
       if (item?.servico_id) mapa[item.servico_id] = Number(item.quantidade || 0);
     }
     setQtd(mapa);
+    
     const padrao = (config as any)?.validade_padrao_dias;
     setValidade(String(initial?.validade_em_dias ?? padrao ?? 30));
+
+    if (initial?.preco_do_programa && initial?.valor_normal_dos_servicos) {
+      const sub = Number(initial.valor_normal_dos_servicos);
+      const preco = Number(initial.preco_do_programa);
+      const desc = Math.max(0, sub - preco);
+      if (sub > 0 && desc > 0) {
+        const perc = Math.round((desc / sub) * 1000) / 10;
+        setTipoDesconto("percentual");
+        setDescontoValor(String(perc));
+      } else {
+        setTipoDesconto("fixo");
+        setDescontoValor(String(desc));
+      }
+    } else {
+      setTipoDesconto("percentual");
+      setDescontoValor("0");
+    }
+    setPrecoManual("");
   }, [open, initial, config]);
 
   const setQuantidade = (id: string, delta: number) =>
@@ -112,6 +136,7 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
           return {
             servico_id,
             nome: s?.nome ?? "Serviço",
+            categoria: s?.categoria ?? "Geral",
             quantidade,
             valor_unitario_de_referencia: valorUnit,
             valor_alocado: valorUnit * quantidade,
@@ -121,13 +146,40 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
     [qtd, servicos]
   );
 
-  const valorNormal = itensSelecionados.reduce((acc, i) => acc + i.valor_alocado, 0);
-  const economia = Math.max(0, valorNormal - Number(preco || 0));
+  const subtotalServicos = useMemo(() => {
+    return itensSelecionados.reduce((acc, i) => acc + i.valor_alocado, 0);
+  }, [itensSelecionados]);
+
+  // Cálculo automático do desconto e preço final em tempo real
+  const { valorDescontoCalculado, precoFinal, percentualEfetivo } = useMemo(() => {
+    const sub = subtotalServicos;
+    if (sub <= 0) return { valorDescontoCalculado: 0, precoFinal: 0, percentualEfetivo: 0 };
+
+    if (precoManual.trim() !== "") {
+      const manual = Math.max(0, Number(precoManual) || 0);
+      const desc = Math.max(0, sub - manual);
+      const perc = sub > 0 ? Math.round((desc / sub) * 1000) / 10 : 0;
+      return { valorDescontoCalculado: desc, precoFinal: manual, percentualEfetivo: perc };
+    }
+
+    const valorInput = Number(descontoValor.replace(",", ".")) || 0;
+    if (tipoDesconto === "percentual") {
+      const perc = Math.min(100, Math.max(0, valorInput));
+      const desc = Math.round((sub * (perc / 100)) * 100) / 100;
+      const final = Math.max(0, sub - desc);
+      return { valorDescontoCalculado: desc, precoFinal: final, percentualEfetivo: perc };
+    } else {
+      const desc = Math.min(sub, Math.max(0, valorInput));
+      const final = Math.max(0, sub - desc);
+      const perc = sub > 0 ? Math.round((desc / sub) * 1000) / 10 : 0;
+      return { valorDescontoCalculado: desc, precoFinal: final, percentualEfetivo: perc };
+    }
+  }, [subtotalServicos, tipoDesconto, descontoValor, precoManual]);
 
   const mutation = useMutation({
     mutationFn: (data: any) => upsertPrograma({ data }),
     onSuccess: () => {
-      toast.success("Programa salvo com sucesso");
+      toast.success("Programa salvo no catálogo com sucesso");
       queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
       onOpenChange(false);
     },
@@ -153,9 +205,9 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
       nome: nome.trim(),
       descricao,
       status: initial?.status ?? "ativo",
-      preco_do_programa: Number(preco || 0),
-      valor_normal_dos_servicos: valorNormal,
-      economia,
+      preco_do_programa: precoFinal,
+      valor_normal_dos_servicos: subtotalServicos,
+      economia: valorDescontoCalculado,
       validade_em_dias: Number(validade),
       permite_parcelamento: initial?.permite_parcelamento ?? true,
       inclui_transporte: initial?.inclui_transporte ?? false,
@@ -172,68 +224,71 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[720px] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[740px] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-display">
             <PackageCheck className="h-6 w-6 text-gold" />
-            {initial ? "Editar Programa" : "Novo Programa"}
+            {initial ? "Editar Programa do Catálogo" : "Novo Programa de Cuidado"}
           </DialogTitle>
-          <DialogDescription>Monte o pacote com os serviços reais do seu catálogo.</DialogDescription>
+          <DialogDescription className="text-xs">
+            Configure os serviços reais, cálculo automático e política de desconto para novas vendas.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label>Nome do Programa</Label>
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Rotina em Dia" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Descrição</Label>
-            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="O que o programa inclui?" />
+        <div className="grid gap-4 py-2 text-xs">
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-semibold">Nome do Programa</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Rotina em Dia" className="text-xs h-9" />
           </div>
 
-          <div className="grid gap-2">
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Descrição</Label>
+            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="O que o programa inclui?" className="text-xs" rows={2} />
+          </div>
+
+          {/* Seleção de Serviços com Pesquisa */}
+          <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
-              <Label>Serviços do programa</Label>
-              <span className="text-xs text-muted-foreground">
-                {itensSelecionados.length} selecionado(s)
-              </span>
+              <Label className="text-xs font-semibold">Serviços Incluídos ({itensSelecionados.length})</Label>
+              <span className="text-muted-foreground">Subtotal Base: <strong>{brl(subtotalServicos)}</strong></span>
             </div>
             <Input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar serviço (ex: banho, hidratação, tosa)"
+              placeholder="Buscar serviço do catálogo (ex: banho simples, hidratação, tosa)..."
+              className="text-xs h-8"
             />
-            <ScrollArea className="h-56 rounded-lg border border-sidebar-border/50">
+            <ScrollArea className="h-48 rounded-lg border border-sidebar-border/50 bg-card">
               <div className="divide-y">
                 {listaFiltrada.length === 0 && (
-                  <p className="p-4 text-sm text-muted-foreground italic">Nenhum serviço ativo encontrado.</p>
+                  <p className="p-4 text-center text-muted-foreground italic">Nenhum serviço ativo encontrado.</p>
                 )}
                 {listaFiltrada.map((s: any) => (
-                  <div key={s.id} className="flex items-center justify-between gap-3 p-3">
+                  <div key={s.id} className="flex items-center justify-between gap-3 p-2.5 hover:bg-muted/30 transition-colors">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{s.nome}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-semibold truncate text-foreground">{s.nome}</p>
+                      <p className="text-muted-foreground">
                         {s.categoria ? `${s.categoria} · ` : ""}
                         {brl(Number(s.valor ?? 0))}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7"
+                        className="h-6 w-6"
                         onClick={() => setQuantidade(s.id, -1)}
                         disabled={!qtd[s.id]}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <span className="w-6 text-center text-sm font-semibold">{qtd[s.id] ?? 0}</span>
+                      <span className="w-6 text-center font-bold text-primary">{qtd[s.id] ?? 0}</span>
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7"
+                        className="h-6 w-6"
                         onClick={() => setQuantidade(s.id, 1)}
                       >
                         <Plus className="h-3 w-3" />
@@ -245,43 +300,96 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
             </ScrollArea>
           </div>
 
-          {itensSelecionados.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {itensSelecionados.map((i) => (
-                <Badge key={i.servico_id} variant="secondary" className="text-xs">
-                  {i.quantidade}× {i.nome}
-                </Badge>
-              ))}
+          {/* SEÇÃO PREÇO E DESCONTO DIGITÁVEL */}
+          <div className="p-3.5 rounded-xl border bg-muted/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-gold" /> Preço e Desconto (Cálculo Automático)
+              </h4>
+              <span className="text-[11px] text-muted-foreground">Digite o desconto livremente</span>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Valor do programa (R$)</Label>
-              <Input type="number" min={0} value={preco} onChange={(e) => setPreco(e.target.value)} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[11px]">Tipo de Desconto</Label>
+                <Select value={tipoDesconto} onValueChange={(v: "percentual" | "fixo") => setTipoDesconto(v)}>
+                  <SelectTrigger className="text-xs h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentual">Percentual (%)</SelectItem>
+                    <SelectItem value="fixo">Valor em Reais (R$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px]">
+                  {tipoDesconto === "percentual" ? "Desconto (%)" : "Desconto (R$)"}
+                </Label>
+                <div className="relative">
+                  {tipoDesconto === "percentual" ? (
+                    <Percent className="absolute right-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  ) : (
+                    <span className="absolute left-2.5 top-1.5 text-xs text-muted-foreground font-bold">R$</span>
+                  )}
+                  <Input
+                    type="number"
+                    min={0}
+                    max={tipoDesconto === "percentual" ? 100 : subtotalServicos}
+                    step="0.1"
+                    value={descontoValor}
+                    onChange={(e) => {
+                      setDescontoValor(e.target.value);
+                      setPrecoManual("");
+                    }}
+                    placeholder={tipoDesconto === "percentual" ? "Ex: 12.5" : "Ex: 30.00"}
+                    className={`text-xs h-8 ${tipoDesconto === "fixo" ? "pl-8" : "pr-8"}`}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px]">Validade do Pacote</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={validade}
+                  onChange={(e) => setValidade(e.target.value)}
+                  className="text-xs h-8"
+                  placeholder="30 dias"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label>Validade (dias)</Label>
-              <Input type="number" min={1} value={validade} onChange={(e) => setValidade(e.target.value)} />
+
+            {/* Resumo Financeiro Completo */}
+            <div className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-muted-foreground">Subtotal dos Serviços: </span>
+                <strong>{brl(subtotalServicos)}</strong>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Desconto ({percentualEfetivo}%): </span>
+                <strong className="text-emerald-700">-{brl(valorDescontoCalculado)}</strong>
+              </div>
+              <div className="text-sm font-bold text-gold">
+                Total do Catálogo: {brl(precoFinal)}
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label>Regras (opcional)</Label>
-            <Textarea value={regras} onChange={(e) => setRegras(e.target.value)} placeholder="Ex: uso exclusivo do pet contratado." />
-          </div>
-
-          <div className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm flex flex-wrap gap-x-6 gap-y-1">
-            <span>Valor normal: <strong>{brl(valorNormal)}</strong></span>
-            <span>Preço do pacote: <strong>{brl(Number(preco || 0))}</strong></span>
-            <span className="text-green-600">Economia: <strong>{brl(economia)}</strong></span>
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Regras e Observações (Opcional)</Label>
+            <Textarea value={regras} onChange={(e) => setRegras(e.target.value)} placeholder="Ex: uso exclusivo do pet contratado." className="text-xs" rows={2} />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button className="bg-gold hover:bg-gold/90 text-white" onClick={handleSave} disabled={mutation.isPending}>
-            <Save className="mr-2 h-4 w-4" />
+        <DialogFooter className="gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
+            Cancelar
+          </Button>
+          <Button className="bg-gold hover:bg-gold/90 text-white text-xs" onClick={handleSave} disabled={mutation.isPending}>
+            <Save className="mr-1.5 h-4 w-4" />
             {mutation.isPending ? "Salvando..." : "Salvar Programa"}
           </Button>
         </DialogFooter>
