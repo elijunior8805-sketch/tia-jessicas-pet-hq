@@ -15,7 +15,13 @@ import {
   Trash2,
   Calendar,
   Wallet,
-  Pencil
+  Pencil,
+  Archive,
+  RotateCcw,
+  Bot,
+  Info,
+  CalendarPlus,
+  HelpCircle
 } from "lucide-react";
 
 import { useState, useMemo } from "react";
@@ -27,11 +33,12 @@ import {
   reconciliarCreditosPet
 } from "@/lib/programas-cuidado.functions";
 import { ProgramaFormDialog } from "@/components/gestao/programas/ProgramaFormDialog";
+import { ContratoDetalheDialog } from "@/components/gestao/programas/ContratoDetalheDialog";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
 import { Switch } from "@/components/ui/switch";
 import { ProgramasConfigTab } from "@/components/gestao/programas/ProgramasConfigTab";
 import { getProgramasConfig } from "@/lib/programas-config.functions";
-
+import { REGRAS_CATEGORIAS_PADRAO, identificarCategoriaCredito } from "@/lib/programas-creditos-core";
 
 import { Button } from "@/components/ui/button";
 import { 
@@ -51,14 +58,17 @@ import {
   DialogDescription, 
   DialogHeader, 
   DialogTitle,
-  DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const brl = (v: number) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const Route = createFileRoute("/_authenticated/gestao/programas-cuidado")({
   component: ProgramasCuidadoPage,
@@ -84,49 +94,37 @@ function ProgramasCuidadoPage() {
   const [vendaStep, setVendaStep] = useState(1);
   const [isProgramaModalOpen, setIsProgramaModalOpen] = useState(false);
   const [editingPrograma, setEditingPrograma] = useState<any>(null);
+  const [selectedContratoId, setSelectedContratoId] = useState<string | null>(null);
+  const [programaParaArquivar, setProgramaParaArquivar] = useState<any | null>(null);
 
-  
-  // Estados da Venda
+  // Estados da Venda Personalizada
   const [searchCliente, setSearchCliente] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<any>(null);
   const [selectedPet, setSelectedPet] = useState<any>(null);
   const [vendaDataInicio, setVendaDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [vendaPreco, setVendaPreco] = useState(0);
-  const [vendaFracionada, setVendaFracionada] = useState(false);
-  const [itensQtd, setItensQtd] = useState<Record<string, number>>({});
+  const [vendaPrecoCustomizado, setVendaPrecoCustomizado] = useState<number>(0);
+  const [formaPagamento, setFormaPagamento] = useState<string>("pix");
+  const [itensCustomizados, setItensCustomizados] = useState<Array<{ servico_id: string; nome: string; quantidade: number; valor_unitario: number }>>([]);
+  const [servicoExtraAdicionar, setServicoExtraAdicionar] = useState<string>("");
 
   const { data: programasConfig } = useQuery({
     queryKey: ["programas-config"],
     queryFn: () => getProgramasConfig(),
   });
-  const permiteFracionar = !!(programasConfig as any)?.permitir_venda_fracionada;
 
-  const itensPrograma: any[] = selectedPrograma?.itens ?? [];
-  const qtdDe = (item: any) =>
-    vendaFracionada ? Number(itensQtd[item.servico_id] ?? item.quantidade) : Number(item.quantidade);
-
-  // Mesmo cálculo aplicado no servidor (o servidor é a fonte da verdade)
-  const precoFracionado = (() => {
-    const precoCheio = Number(selectedPrograma?.preco_do_programa ?? 0);
-    if (!vendaFracionada || itensPrograma.length === 0) return precoCheio;
-    const somaAlocada = itensPrograma.reduce((s, i) => s + Number(i.valor_alocado || 0), 0);
-    let total = 0;
-    if (somaAlocada > 0) {
-      total = itensPrograma.reduce((s, i) => {
-        const unit = Number(i.valor_alocado || 0) / Math.max(Number(i.quantidade || 1), 1);
-        return s + unit * qtdDe(i);
-      }, 0);
-    } else {
-      const totalUnidades = itensPrograma.reduce((s, i) => s + Number(i.quantidade || 0), 0) || 1;
-      const unidades = itensPrograma.reduce((s, i) => s + qtdDe(i), 0);
-      total = (precoCheio / totalUnidades) * unidades;
-    }
-    return Math.round(total * 100) / 100;
-  })();
-
-  const precoFinalVenda = vendaFracionada ? precoFracionado : vendaPreco;
-  const unidadesSelecionadas = itensPrograma.reduce((s, i) => s + qtdDe(i), 0);
-
+  // Busca todos os serviços para permitir inclusão de adicionais na venda
+  const { data: todosServicos = [] } = useQuery({
+    queryKey: ["servicos-catalogo-venda"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("servicos")
+        .select("id, nome, categoria, valor, duracao_min")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   // Busca Clientes
   const { data: clientesBusca } = useQuery({
@@ -164,7 +162,8 @@ function ProgramasCuidadoPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
       queryClient.invalidateQueries({ queryKey: ["creditos-movimentacoes"] });
-      toast.success("Programa contratado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["cliente-ficha-programas"] });
+      toast.success("Programa contratado e créditos liberados com sucesso!");
       setOpenVenda(false);
       resetVenda();
     },
@@ -179,18 +178,59 @@ function ProgramasCuidadoPage() {
     setSelectedPet(null);
     setSearchCliente("");
     setSelectedPrograma(null);
-    setVendaFracionada(false);
-    setItensQtd({});
+    setItensCustomizados([]);
+    setVendaPrecoCustomizado(0);
+    setFormaPagamento("pix");
+    setServicoExtraAdicionar("");
   };
 
   const handleOpenVenda = (programa: any) => {
     setSelectedPrograma(programa);
-    setVendaPreco(Number(programa.preco_do_programa));
-    setVendaFracionada(false);
-    setItensQtd({});
+    const precoBase = Number(programa.preco_do_programa || 0);
+    setVendaPrecoCustomizado(precoBase);
+    
+    // Inicializa a composição base do programa
+    const itensBase = (programa.itens ?? []).map((i: any) => ({
+      servico_id: i.servico_id,
+      nome: i.servico?.nome || "Serviço",
+      quantidade: Number(i.quantidade || 1),
+      valor_unitario: Number(i.valor_unitario_de_referencia || i.servico?.valor || 0)
+    }));
+    setItensCustomizados(itensBase);
     setOpenVenda(true);
   };
 
+  const restaurarComposicaoOriginal = () => {
+    if (!selectedPrograma) return;
+    const itensBase = (selectedPrograma.itens ?? []).map((i: any) => ({
+      servico_id: i.servico_id,
+      nome: i.servico?.nome || "Serviço",
+      quantidade: Number(i.quantidade || 1),
+      valor_unitario: Number(i.valor_unitario_de_referencia || i.servico?.valor || 0)
+    }));
+    setItensCustomizados(itensBase);
+    setVendaPrecoCustomizado(Number(selectedPrograma.preco_do_programa || 0));
+  };
+
+  const handleAdicionarExtraNaVenda = (servicoId: string) => {
+    if (!servicoId) return;
+    const serv = todosServicos.find((s: any) => s.id === servicoId);
+    if (!serv) return;
+
+    setItensCustomizados((prev) => {
+      const jaExiste = prev.find((i) => i.servico_id === servicoId);
+      if (jaExiste) {
+        return prev.map((i) => i.servico_id === servicoId ? { ...i, quantidade: i.quantidade + 1 } : i);
+      }
+      return [...prev, {
+        servico_id: serv.id,
+        nome: serv.nome,
+        quantidade: 1,
+        valor_unitario: Number(serv.valor || 0)
+      }];
+    });
+    setServicoExtraAdicionar("");
+  };
 
   const toggleStatusMutation = useMutation({
     mutationFn: (vars: { id: string, status: "ativo" | "inativo" | "rascunho" }) => 
@@ -198,6 +238,7 @@ function ProgramasCuidadoPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
       toast.success("Status atualizado com sucesso");
+      setProgramaParaArquivar(null);
     }
   });
 
@@ -237,11 +278,13 @@ function ProgramasCuidadoPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ativo": return <Badge className="bg-green-500/10 text-green-600 border-green-200">Ativo</Badge>;
-      case "inativo": return <Badge variant="secondary" className="opacity-70">Inativo</Badge>;
+      case "inativo": return <Badge variant="secondary" className="opacity-70">Arquivado</Badge>;
       case "rascunho": return <Badge variant="outline" className="border-amber-200 text-amber-600 bg-amber-50/50">Rascunho</Badge>;
       default: return null;
     }
   };
+
+  const totalValorServicosCustomizados = itensCustomizados.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0);
 
   return (
     <div className="container mx-auto py-6 space-y-6 px-4 md:px-6">
@@ -254,7 +297,6 @@ function ProgramasCuidadoPage() {
           <p className="text-zinc-500 dark:text-zinc-400 font-medium">
             Gerencie planos pré-pagos e fidelidade com inteligência e elegância.
           </p>
-
         </div>
         
         <Button 
@@ -267,8 +309,6 @@ function ProgramasCuidadoPage() {
           <Plus className="mr-2 h-5 w-5" />
           Novo Programa
         </Button>
-
-
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -278,12 +318,16 @@ function ProgramasCuidadoPage() {
             Catálogo
           </TabsTrigger>
           <TabsTrigger value="ativos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
-            <Plus className="mr-2 h-4 w-4" />
-            Programas Ativos
+            <PackageCheck className="mr-2 h-4 w-4" />
+            Programas Ativos ({programasAtivos?.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="creditos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <CreditCard className="mr-2 h-4 w-4" />
             Movimentações
+          </TabsTrigger>
+          <TabsTrigger value="ia" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
+            <Bot className="mr-2 h-4 w-4" />
+            Inteligência dos Programas
           </TabsTrigger>
           <TabsTrigger value="auditoria" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <History className="mr-2 h-4 w-4" />
@@ -295,68 +339,94 @@ function ProgramasCuidadoPage() {
           </TabsTrigger>
         </TabsList>
 
-
+        {/* CATÁLOGO DE PROGRAMAS */}
         <TabsContent value="catalogo" className="space-y-6 outline-none">
           {programas && programas.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {programas.map((programa: any) => (
-                <Card key={programa.id} className="group overflow-hidden border-sidebar-border/60 hover:shadow-lg hover:shadow-gold/10 transition-all duration-300 bg-white dark:bg-zinc-950">
-                  <CardHeader className="pb-3 border-b border-sidebar-border/40 bg-zinc-50/50 dark:bg-zinc-900/50">
-                    <div className="flex justify-between items-start mb-2">
-                      {getStatusBadge(programa.status)}
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold" onClick={() => {
-                          setEditingPrograma(programa);
-                          setIsProgramaModalOpen(true);
-                        }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold" onClick={() => duplicarMutation.mutate(programa.id)}>
-                          <Plus className="h-4 w-4 rotate-45" />
-                        </Button>
+                <Card key={programa.id} className="group overflow-hidden border-sidebar-border/60 hover:shadow-lg hover:shadow-gold/10 transition-all duration-300 bg-white dark:bg-zinc-950 flex flex-col justify-between">
+                  <div>
+                    <CardHeader className="pb-3 border-b border-sidebar-border/40 bg-zinc-50/50 dark:bg-zinc-900/50">
+                      <div className="flex justify-between items-start mb-2">
+                        {getStatusBadge(programa.status)}
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-gold"
+                            title="Editar programa"
+                            onClick={() => {
+                              setEditingPrograma(programa);
+                              setIsProgramaModalOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-gold" 
+                            title="Duplicar programa"
+                            onClick={() => duplicarMutation.mutate(programa.id)}
+                          >
+                            <Plus className="h-4 w-4 rotate-45" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <CardTitle className="text-xl font-display text-zinc-900 dark:text-zinc-100 group-hover:text-gold transition-colors">
-                      {programa.nome}
-                    </CardTitle>
-                    <CardDescription className="line-clamp-2 min-h-[2.5rem] mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                      {programa.descricao || "Sem descrição definida."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-5 space-y-5 pb-5">
-                    <div className="space-y-3">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                        Serviços Incluídos
-                      </p>
-                      <ul className="space-y-2">
-                        {programa.itens?.map((item: any) => (
-                          <li key={item.id} className="flex items-center justify-between text-sm bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                            <span className="flex items-center gap-2">
-                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-gold">
-                                {item.quantidade}x
-                              </Badge>
-                              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                                {item.servico?.nome || "Serviço"}
-                              </span>
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-gold/5 border border-gold/10 p-3 rounded-xl">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gold/70">Validade</p>
-                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{programa.validade_em_dias} dias</p>
-                      </div>
-                      <div className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Transporte</p>
-                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                          {programa.inclui_transporte ? "Incluso" : "Não incluso"}
+                      <CardTitle className="text-xl font-display text-zinc-900 dark:text-zinc-100 group-hover:text-gold transition-colors">
+                        {programa.nome}
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2 min-h-[2.5rem] mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        {programa.descricao || "Sem descrição definida."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-5 space-y-5 pb-5">
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                          Serviços Incluídos
                         </p>
+                        <ul className="space-y-2">
+                          {programa.itens?.map((item: any) => {
+                            const cat = identificarCategoriaCredito({ nome: item.servico?.nome, categoria: item.servico?.categoria });
+                            const regra = REGRAS_CATEGORIAS_PADRAO[cat];
+                            return (
+                              <li key={item.id} className="text-sm bg-zinc-50 dark:bg-zinc-900 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-gold">
+                                      {item.quantidade}x
+                                    </Badge>
+                                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                                      {item.servico?.nome || "Serviço"}
+                                    </span>
+                                  </span>
+                                </div>
+                                {regra && (
+                                  <p className="text-[10px] text-primary/75 pl-7">
+                                    {regra.descricao_cobertura}
+                                  </p>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
-                    </div>
-                  </CardContent>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-gold/5 border border-gold/10 p-3 rounded-xl">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gold/70">Validade</p>
+                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{programa.validade_em_dias} dias</p>
+                        </div>
+                        <div className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Transporte</p>
+                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                            {programa.inclui_transporte ? "Incluso" : "Não incluso"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </div>
+
                   <CardFooter className="flex flex-col gap-4 pt-5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/30">
                     <div className="w-full flex justify-between items-end">
                       <div className="space-y-0.5">
@@ -382,21 +452,20 @@ function ProgramasCuidadoPage() {
                       >
                         Vender Agora
                       </Button>
+                      
+                      {/* Botão de Arquivar com Confirmação */}
                       <Button 
                         variant="secondary" 
                         size="icon"
                         className={`h-11 w-11 rounded-xl shadow-sm ${programa.status === 'ativo' ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
-                        onClick={() => toggleStatusMutation.mutate({ 
-                          id: programa.id, 
-                          status: programa.status === 'ativo' ? 'inativo' : 'ativo' 
-                        })}
+                        title={programa.status === 'ativo' ? 'Arquivar programa do catálogo' : 'Reativar programa'}
+                        onClick={() => setProgramaParaArquivar(programa)}
                       >
-                        <Plus className={`h-5 w-5 ${programa.status === 'ativo' ? 'rotate-45' : ''}`} />
+                        {programa.status === 'ativo' ? <Archive className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
                       </Button>
                     </div>
                   </CardFooter>
                 </Card>
-
               ))}
             </div>
           ) : (
@@ -417,19 +486,13 @@ function ProgramasCuidadoPage() {
           )}
         </TabsContent>
 
-
-        <TabsContent value="auditoria" className="space-y-6 outline-none">
-          <AuditoriaProgramasTab />
-        </TabsContent>
-
-
-
+        {/* PROGRAMAS ATIVOS / CONTRATADOS */}
         <TabsContent value="ativos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
                 <CardTitle className="text-lg">Programas em Vigor</CardTitle>
-                <CardDescription>Lista de todos os programas contratados.</CardDescription>
+                <CardDescription>Clique em qualquer contrato para visualizar detalhes, editar créditos ou cancelar com segurança.</CardDescription>
               </div>
               <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
                 <Button 
@@ -438,15 +501,7 @@ function ProgramasCuidadoPage() {
                   className="h-8 text-xs px-3"
                   onClick={() => setActiveSubTabAtivos("todos")}
                 >
-                  Todos
-                </Button>
-                <Button 
-                  variant={activeSubTabAtivos === "aguardando_pagamento" ? "secondary" : "ghost"} 
-                  size="sm" 
-                  className="h-8 text-xs px-3"
-                  onClick={() => setActiveSubTabAtivos("aguardando_pagamento")}
-                >
-                  Aguardando
+                  Todos ({programasAtivos?.length ?? 0})
                 </Button>
                 <Button 
                   variant={activeSubTabAtivos === "ativo" ? "secondary" : "ghost"} 
@@ -456,85 +511,69 @@ function ProgramasCuidadoPage() {
                 >
                   Ativos
                 </Button>
+                <Button 
+                  variant={activeSubTabAtivos === "aguardando_pagamento" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-8 text-xs px-3"
+                  onClick={() => setActiveSubTabAtivos("aguardando_pagamento")}
+                >
+                  Aguardando Pagamento
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               {programasAtivos && programasAtivos.length > 0 ? (
-                <div className="space-y-4">
+                <div className="divide-y border rounded-xl overflow-hidden">
                   {programasAtivos
                     .filter((p: any) => activeSubTabAtivos === "todos" || p.status_do_programa === activeSubTabAtivos)
                     .map((contrato: any) => (
-                    <div key={contrato.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border border-sidebar-border/40 hover:bg-muted/10 transition-colors gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
-                          <PackageCheck className="h-5 w-5 text-gold" />
-                        </div>
-                        <div className="space-y-0.5">
+                      <div 
+                        key={contrato.id} 
+                        className="p-4 hover:bg-muted/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
+                        onClick={() => setSelectedContratoId(contrato.id)}
+                      >
+                        <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{contrato.nome_snapshot}</span>
-                            {contrato.status_do_programa === 'ativo' ? (
-                              <Badge className="bg-green-500/10 text-green-600 border-green-200 h-5 px-1.5 text-[10px]">Ativo</Badge>
-                            ) : contrato.status_do_programa === 'aguardando_pagamento' ? (
-                              <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 h-5 px-1.5 text-[10px]">Aguardando</Badge>
-                            ) : (
-                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{contrato.status_do_programa}</Badge>
-                            )}
+                            <h4 className="font-semibold text-primary text-base">{contrato.nome_snapshot}</h4>
+                            <Badge className={contrato.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}>
+                              {contrato.status_do_programa === "ativo" ? "Ativo" : "Aguardando pagamento"}
+                            </Badge>
                           </div>
-                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 px-2 text-[10px] text-gold hover:text-gold/80 hover:bg-gold/5"
-                              onClick={async () => {
-                                const res = await reconciliarCreditosPet({ data: { pet_id: contrato.pet_id } });
-                                if ((res as any)[0]?.divergencia) {
-                                  toast.error("Divergência detectada nos créditos!");
-                                } else {
-                                  toast.success("Créditos reconciliados e consistentes.");
-                                }
-                              }}
-                            >
-                              Reconciliar
-                            </Button>
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                            <span>Tutor: <strong>{contrato.clientes?.nome || "Cliente"}</strong></span>
+                            <span>Pet: <strong>{contrato.pets?.nome || "Pet"}</strong></span>
+                            <span>Validade: <strong>{contrato.data_de_validade ? new Date(contrato.data_de_validade).toLocaleDateString("pt-BR") : "—"}</strong></span>
+                          </div>
+                        </div>
 
-                            <span className="flex items-center gap-1"><Search className="h-3 w-3" /> {contrato.clientes?.nome}</span>
-                            <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {contrato.pets?.nome}</span>
-                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Expira em {format(new Date(contrato.data_de_validade), 'dd/MM/yyyy')}</span>
+                        <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-2 md:pt-0">
+                          <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">Valor Contratado</span>
+                            <p className="text-sm font-bold text-gold">{brl(Number(contrato.preco_vendido || 0))}</p>
                           </div>
+                          <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                            Ver detalhes <ChevronRight className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
-                        <div className="text-right">
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Valor Contratado</p>
-                          <p className="text-sm font-bold text-gold">R$ {Number(contrato.preco_vendido).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-gold">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {programasAtivos.filter((p: any) => activeSubTabAtivos === "todos" || p.status_do_programa === activeSubTabAtivos).length === 0 && (
-                    <div className="py-10 text-center text-muted-foreground italic text-sm">
-                      Nenhum programa encontrado com este status.
-                    </div>
-                  )}
+                    ))}
                 </div>
               ) : (
                 <div className="py-10 text-center text-muted-foreground">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p>Nenhuma contratação ativa encontrada no momento.</p>
+                  <PackageCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>Nenhuma contratação encontrada no momento.</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* MOVIMENTAÇÕES DE CRÉDITOS */}
         <TabsContent value="creditos" className="space-y-6 outline-none">
           <Card className="border-sidebar-border/60">
             <CardHeader>
               <CardTitle className="text-lg">Livro Razão de Créditos</CardTitle>
-              <CardDescription>Histórico detalhado de todas as movimentações de saldo.</CardDescription>
+              <CardDescription>Histórico detalhado de todas as movimentações de saldo (Criação, Reserva, Consumo, Liberação, Estorno).</CardDescription>
             </CardHeader>
             <CardContent>
               {movimentacoes && movimentacoes.length > 0 ? (
@@ -555,24 +594,25 @@ function ProgramasCuidadoPage() {
                           <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                             {format(new Date(m.created_at), 'dd/MM/yy HH:mm')}
                           </td>
-                          <td className="px-4 py-3 font-medium">{m.pets?.nome}</td>
+                          <td className="px-4 py-3 font-medium">{m.pets?.nome || "Pet"}</td>
                           <td className="px-4 py-3">
                             <Badge 
                               variant="outline" 
-                              className={`text-[9px] px-1 h-4 ${
+                              className={`text-[9px] px-1.5 h-5 font-bold ${
                                 m.tipo === 'credito_criado' ? 'border-green-200 text-green-600 bg-green-50/50' :
                                 m.tipo === 'credito_reservado' ? 'border-amber-200 text-amber-600 bg-amber-50/50' :
-                                m.tipo === 'credito_consumido' ? 'border-red-200 text-red-600 bg-red-50/50' :
+                                m.tipo === 'credito_consumido' ? 'border-blue-200 text-blue-600 bg-blue-50/50' :
+                                m.tipo === 'reserva_liberada' ? 'border-purple-200 text-purple-600 bg-purple-50/50' :
                                 'border-gray-200 text-gray-600'
                               }`}
                             >
-                              {m.tipo.replace('credito_', '').toUpperCase()}
+                              {m.tipo.replace(/_/g, ' ').toUpperCase()}
                             </Badge>
                           </td>
-                          <td className={`px-4 py-3 text-right font-bold ${m.quantidade > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
+                          <td className={`px-4 py-3 text-right font-bold ${['credito_criado', 'reserva_liberada', 'estorno_consumo'].includes(m.tipo) ? 'text-green-600' : 'text-red-600'}`}>
+                            {['credito_criado', 'reserva_liberada', 'estorno_consumo'].includes(m.tipo) ? `+${m.quantidade}` : `-${m.quantidade}`}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
+                          <td className="px-4 py-3 text-muted-foreground max-w-[240px] truncate">
                             {m.motivo || '—'}
                           </td>
                         </tr>
@@ -590,32 +630,129 @@ function ProgramasCuidadoPage() {
           </Card>
         </TabsContent>
 
+        {/* INTELIGÊNCIA DOS PROGRAMAS (IA) */}
+        <TabsContent value="ia" className="space-y-6 outline-none">
+          <Card className="border-sidebar-border/60">
+            <CardHeader className="bg-primary/5 border-b pb-4">
+              <div className="flex items-center gap-2 text-primary font-display font-semibold text-lg">
+                <Bot className="h-5 w-5 text-gold" />
+                Inteligência dos Programas de Cuidado
+              </div>
+              <CardDescription>
+                Assistência estratégica com base nos dados reais de contratos, saldos de créditos e histórico de atendimentos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="p-4 border-l-4 border-l-gold bg-gold/5 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm text-foreground">
+                    <Sparkles className="h-4 w-4 text-gold" />
+                    Equivalência de Banhos
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Créditos da categoria <strong>Banho</strong> cobrem tanto <em>Banho Simples</em> quanto <em>Banho Premium</em> sem diferença financeira.
+                  </p>
+                </Card>
+
+                <Card className="p-4 border-l-4 border-l-blue-500 bg-blue-500/5 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm text-foreground">
+                    <Clock className="h-4 w-4 text-blue-500" />
+                    Vencimentos Próximos
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    A IA alerta tutores automaticamente sobre créditos com validade inferior a 5 dias para incentivar o uso.
+                  </p>
+                </Card>
+
+                <Card className="p-4 border-l-4 border-l-emerald-500 bg-emerald-500/5 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm text-foreground">
+                    <RotateCcw className="h-4 w-4 text-emerald-500" />
+                    Sugestão de Renovação
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Quando o pet consome o último crédito, o sistema sugere a renovação facilitada mantendo o histórico de preferências.
+                  </p>
+                </Card>
+              </div>
+
+              <div className="p-4 bg-muted/40 rounded-xl border border-sidebar-border/50 space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4 text-primary" /> Exemplos de Comandos para a Central Inteligente
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Quantos banhos o Thor ainda possui?”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Posso agendar Banho Premium usando o crédito?”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Quais programas vencem nos próximos 7 dias?”</div>
+                  <div className="p-2.5 bg-background rounded-lg border font-mono">“Prepare uma mensagem de renovação para o Eli Júnior”</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* AUDITORIA */}
+        <TabsContent value="auditoria" className="space-y-6 outline-none">
+          <AuditoriaProgramasTab />
+        </TabsContent>
+
+        {/* CONFIGURAÇÕES */}
         <TabsContent value="configuracoes" className="outline-none">
           <ProgramasConfigTab />
-
-
         </TabsContent>
       </Tabs>
 
-      {/* MODAL DE VENDA (CONTRATAÇÃO) */}
+      {/* DIÁLOGO DE CONFIRMAÇÃO DE ARQUIVAMENTO */}
+      <Dialog open={Boolean(programaParaArquivar)} onOpenChange={(v) => !v && setProgramaParaArquivar(null)}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-800">
+              <Archive className="h-5 w-5 text-rose-600" />
+              {programaParaArquivar?.status === 'ativo' ? 'Arquivar Programa do Catálogo?' : 'Reativar Programa no Catálogo?'}
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1 leading-relaxed">
+              {programaParaArquivar?.status === 'ativo'
+                ? `O programa "${programaParaArquivar?.nome}" deixará de aparecer para novas vendas. Todos os contratos já vendidos continuarão ativos, válidos e preservados com seus créditos até a expiração.`
+                : `O programa "${programaParaArquivar?.nome}" voltará a ficar disponível no catálogo para novas vendas.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-3">
+            <Button variant="outline" size="sm" onClick={() => setProgramaParaArquivar(null)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              className={programaParaArquivar?.status === 'ativo' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
+              onClick={() => toggleStatusMutation.mutate({
+                id: programaParaArquivar.id,
+                status: programaParaArquivar.status === 'ativo' ? 'inativo' : 'ativo'
+              })}
+              disabled={toggleStatusMutation.isPending}
+            >
+              {toggleStatusMutation.isPending ? "Processando..." : (programaParaArquivar?.status === 'ativo' ? "Sim, arquivar" : "Sim, reativar")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE VENDA PERSONALIZADA */}
       <Dialog open={openVenda} onOpenChange={(val) => {
         if (!val) resetVenda();
         setOpenVenda(val);
       }}>
-        <DialogContent className="sm:max-w-[500px] overflow-hidden p-0 gap-0">
+        <DialogContent className="sm:max-w-[560px] max-h-[92vh] overflow-y-auto p-0 gap-0">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-lg font-display">
               <PackageCheck className="h-5 w-5 text-gold" />
-              Contratar: {selectedPrograma?.nome}
+              Venda de Programa: {selectedPrograma?.nome}
             </DialogTitle>
-            <DialogDescription>
-              Siga os passos para ativar o programa para o pet.
+            <DialogDescription className="text-xs">
+              Selecione o tutor, o pet e personalize os serviços antes de ativar o contrato.
             </DialogDescription>
           </DialogHeader>
 
           <div className="p-6 pt-2">
             {/* Step Indicators */}
-            <div className="flex items-center justify-between mb-8 px-2">
+            <div className="flex items-center justify-between mb-6 px-2">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
@@ -624,273 +761,297 @@ function ProgramasCuidadoPage() {
                   }`}>
                     {vendaStep > s ? <CheckCircle2 className="h-5 w-5" /> : s}
                   </div>
-                  {s < 3 && <div className={`w-16 h-0.5 mx-2 ${vendaStep > s ? 'bg-green-500' : 'bg-muted'}`} />}
+                  {s < 3 && <div className={`w-20 h-0.5 mx-2 ${vendaStep > s ? 'bg-green-500' : 'bg-muted'}`} />}
                 </div>
               ))}
             </div>
 
+            {/* ETAPA 1: CLIENTE E PET */}
             {vendaStep === 1 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Buscar Cliente</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Nome do cliente (mín. 3 letras)" 
-                        className="pl-9"
-                        value={searchCliente}
-                        onChange={(e) => setSearchCliente(e.target.value)}
-                      />
-                    </div>
+              <div className="space-y-4 animate-in fade-in">
+                <div className="space-y-2">
+                  <Label className="text-xs">Buscar Tutor (Cliente)</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Nome do cliente (mín. 3 letras)" 
+                      className="pl-9 text-xs"
+                      value={searchCliente}
+                      onChange={(e) => setSearchCliente(e.target.value)}
+                    />
                   </div>
-
-                  {selectedCliente ? (
-                    <div className="flex items-center justify-between p-3 bg-gold/5 border border-gold/20 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold font-bold">
-                          {selectedCliente.nome.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{selectedCliente.nome}</p>
-                          <p className="text-xs text-muted-foreground">{selectedCliente.whatsapp || "Sem WhatsApp"}</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => { setSelectedCliente(null); setSelectedPet(null); }}>
-                        Alterar
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {clientesBusca?.map((cli) => (
-                        <div 
-                          key={cli.id} 
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          onClick={() => setSelectedCliente(cli)}
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{cli.nome}</p>
-                            <p className="text-xs text-muted-foreground">{cli.whatsapp}</p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      ))}
-                      {searchCliente.length >= 3 && clientesBusca?.length === 0 && (
-                        <p className="text-center text-xs text-muted-foreground py-2 italic">Nenhum cliente encontrado.</p>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedCliente && (
-                    <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <Label>Selecionar Pet</Label>
-                      {petsCliente && petsCliente.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          {petsCliente.map((pet) => (
-                            <div 
-                              key={pet.id}
-                              className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                                selectedPet?.id === pet.id ? 'border-gold bg-gold/5 shadow-sm' : 'hover:bg-muted/50'
-                              }`}
-                              onClick={() => setSelectedPet(pet)}
-                            >
-                              <p className="text-sm font-semibold truncate">{pet.nome}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">{pet.raca || "Raça não inf."}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground py-2 italic">Este cliente não possui pets cadastrados.</p>
-                      )}
-                    </div>
-                  )}
                 </div>
-              </div>
-            )}
 
-            {vendaStep === 2 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Data de Início</Label>
-                      <Input 
-                        type="date" 
-                        value={vendaDataInicio}
-                        onChange={(e) => setVendaDataInicio(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Validade (Dias)</Label>
-                      <div className="h-10 flex items-center px-3 border rounded-md bg-muted/30 text-sm font-medium">
-                        {selectedPrograma?.validade_em_dias} dias
+                {selectedCliente ? (
+                  <div className="flex items-center justify-between p-3 bg-gold/5 border border-gold/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gold/10 flex items-center justify-center text-gold font-bold text-xs">
+                        {selectedCliente.nome.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">{selectedCliente.nome}</p>
+                        <p className="text-xs text-muted-foreground">{selectedCliente.whatsapp || "Sem WhatsApp"}</p>
                       </div>
                     </div>
+                    <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => { setSelectedCliente(null); setSelectedPet(null); }}>
+                      Alterar
+                    </Button>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Preço de Venda (R$)</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-sm text-muted-foreground font-bold">R$</span>
-                      <Input 
-                        type="number"
-                        className="pl-10 font-bold text-gold"
-                        value={vendaFracionada ? precoFracionado : vendaPreco}
-                        readOnly={vendaFracionada}
-                        onChange={(e) => setVendaPreco(Number(e.target.value))}
-                      />
-                    </div>
-                    {vendaFracionada ? (
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        * Valor calculado automaticamente pelo servidor conforme os serviços selecionados.
-                      </p>
-                    ) : vendaPreco !== Number(selectedPrograma?.preco_do_programa) ? (
-                      <p className="text-[10px] text-amber-600 font-medium">
-                        * Valor original: R$ {Number(selectedPrograma?.preco_do_programa).toLocaleString('pt-BR')}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-muted/20 border border-sidebar-border/40 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Resumo dos Créditos</p>
-                      {permiteFracionar && (
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Fracionar</span>
-                          <Switch
-                            checked={vendaFracionada}
-                            onCheckedChange={(v: boolean) => {
-                              setVendaFracionada(v);
-                              if (v) {
-                                const base: Record<string, number> = {};
-                                itensPrograma.forEach((i: any) => { base[i.servico_id] = Number(i.quantidade); });
-                                setItensQtd(base);
-                              }
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {itensPrograma.map((item: any) => (
-                        <div key={item.id} className="flex justify-between items-center text-sm gap-3">
-                          <span className="text-muted-foreground truncate">{item.servico?.nome}</span>
-                          {vendaFracionada ? (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button
-                                type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg"
-                                onClick={() => setItensQtd((p) => ({ ...p, [item.servico_id]: Math.max(0, (p[item.servico_id] ?? Number(item.quantidade)) - 1) }))}
-                              >-</Button>
-                              <span className="w-8 text-center font-bold text-gold">{qtdDe(item)}</span>
-                              <Button
-                                type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg"
-                                onClick={() => setItensQtd((p) => ({ ...p, [item.servico_id]: Math.min(Number(item.quantidade), (p[item.servico_id] ?? Number(item.quantidade)) + 1) }))}
-                              >+</Button>
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="font-bold border-gold/30 text-gold">
-                              {item.quantidade}x
-                            </Badge>
-                          )}
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {clientesBusca?.map((cli) => (
+                      <div 
+                        key={cli.id} 
+                        className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors text-xs"
+                        onClick={() => setSelectedCliente(cli)}
+                      >
+                        <div>
+                          <p className="font-semibold">{cli.nome}</p>
+                          <p className="text-muted-foreground">{cli.whatsapp || "Sem telefone"}</p>
                         </div>
-                      ))}
-                    </div>
-                    {vendaFracionada && unidadesSelecionadas === 0 && (
-                      <p className="text-[10px] text-destructive font-medium">Selecione ao menos um serviço.</p>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    ))}
+                    {searchCliente.length >= 3 && clientesBusca?.length === 0 && (
+                      <p className="text-center text-xs text-muted-foreground py-2 italic">Nenhum cliente encontrado.</p>
                     )}
                   </div>
+                )}
 
+                {selectedCliente && (
+                  <div className="space-y-2 pt-2 animate-in fade-in">
+                    <Label className="text-xs">Selecionar Pet</Label>
+                    {petsCliente && petsCliente.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {petsCliente.map((pet) => (
+                          <div 
+                            key={pet.id}
+                            className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                              selectedPet?.id === pet.id ? 'border-gold bg-gold/5 shadow-sm' : 'hover:bg-muted/50'
+                            }`}
+                            onClick={() => setSelectedPet(pet)}
+                          >
+                            <p className="text-sm font-semibold truncate">{pet.nome}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{pet.raca || "Raça não inf."} · {pet.porte || "Porte padrão"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground py-2 italic">Este cliente não possui pets cadastrados.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ETAPA 2: PERSONALIZAR PARA ESTE CLIENTE */}
+            {vendaStep === 2 && (
+              <div className="space-y-4 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold">Personalizar para {selectedPet?.nome || "este pet"}</h4>
+                    <p className="text-xs text-muted-foreground">Ajuste quantidades ou adicione serviços extras para este contrato.</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground" onClick={restaurarComposicaoOriginal}>
+                    Restaurar original
+                  </Button>
+                </div>
+
+                {/* Lista de Serviços do Contrato */}
+                <div className="rounded-lg border divide-y bg-card max-h-52 overflow-y-auto">
+                  {itensCustomizados.map((it) => (
+                    <div key={it.servico_id} className="p-2.5 flex items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <span className="font-semibold">{it.nome}</span>
+                        <span className="text-muted-foreground ml-1.5">({brl(it.valor_unitario)}/un)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setItensCustomizados((prev) =>
+                              prev
+                                .map((item) => item.servico_id === it.servico_id ? { ...item, quantidade: item.quantidade - 1 } : item)
+                                .filter((item) => item.quantidade > 0)
+                            );
+                          }}
+                        >
+                          -
+                        </Button>
+                        <span className="w-6 text-center font-bold text-primary">{it.quantidade}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setItensCustomizados((prev) =>
+                              prev.map((item) => item.servico_id === it.servico_id ? { ...item, quantidade: item.quantidade + 1 } : item)
+                            );
+                          }}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {itensCustomizados.length === 0 && (
+                    <p className="p-4 text-center text-xs text-destructive">Selecione ao menos um serviço para o contrato.</p>
+                  )}
+                </div>
+
+                {/* Adicionar Extra */}
+                <div className="flex items-center gap-2">
+                  <Select value={servicoExtraAdicionar} onValueChange={handleAdicionarExtraNaVenda}>
+                    <SelectTrigger className="text-xs h-8">
+                      <SelectValue placeholder="+ Adicionar serviço adicional ao pacote..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {todosServicos.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id} className="text-xs">
+                          {s.nome} ({brl(Number(s.valor || 0))})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Preço e Validade */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data de Início</Label>
+                    <Input 
+                      type="date" 
+                      value={vendaDataInicio}
+                      onChange={(e) => setVendaDataInicio(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Preço Final do Pacote (R$)</Label>
+                    <Input 
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={vendaPrecoCustomizado}
+                      onChange={(e) => setVendaPrecoCustomizado(Number(e.target.value))}
+                      className="text-xs h-8 font-bold text-gold"
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
+            {/* ETAPA 3: REVISÃO E PAGAMENTO */}
             {vendaStep === 3 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="text-center space-y-2 mb-4">
-                  <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 className="h-8 w-8 text-gold" />
-                  </div>
-                  <h4 className="text-lg font-display font-bold">Tudo pronto!</h4>
-                  <p className="text-sm text-muted-foreground">Confirme os detalhes finais antes de ativar.</p>
-                </div>
-
-                <div className="bg-muted/30 border border-sidebar-border/50 rounded-2xl p-4 space-y-4">
-                  <div className="flex justify-between text-sm py-1 border-b border-dashed border-sidebar-border">
-                    <span className="text-muted-foreground">Cliente</span>
+              <div className="space-y-4 animate-in fade-in">
+                <div className="bg-muted/30 border rounded-xl p-4 space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1 border-b">
+                    <span className="text-muted-foreground">Tutor</span>
                     <span className="font-semibold">{selectedCliente?.nome}</span>
                   </div>
-                  <div className="flex justify-between text-sm py-1 border-b border-dashed border-sidebar-border">
+                  <div className="flex justify-between py-1 border-b">
                     <span className="text-muted-foreground">Pet</span>
                     <span className="font-semibold">{selectedPet?.nome}</span>
                   </div>
-                  <div className="flex justify-between text-sm py-1 border-b border-dashed border-sidebar-border">
+                  <div className="flex justify-between py-1 border-b">
                     <span className="text-muted-foreground">Validade até</span>
                     <span className="font-semibold">
-                      {format(addDays(new Date(vendaDataInicio), selectedPrograma?.validade_em_dias), 'dd/MM/yyyy')}
+                      {format(addDays(new Date(vendaDataInicio), selectedPrograma?.validade_em_dias || 30), 'dd/MM/yyyy')}
                     </span>
                   </div>
-                  <div className="flex justify-between text-lg py-2">
-                    <span className="font-bold">Total a Pagar</span>
-                    <span className="font-bold text-gold">R$ {precoFinalVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <div className="flex justify-between py-1.5 text-sm font-bold">
+                    <span>Total do Contrato</span>
+                    <span className="text-gold text-base">{brl(vendaPrecoCustomizado)}</span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                {/* Forma de Pagamento */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Forma de Pagamento</Label>
+                  <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                    <SelectTrigger className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">Pix (Imediato)</SelectItem>
+                      <SelectItem value="credito">Cartão de Crédito</SelectItem>
+                      <SelectItem value="debito">Cartão de Débito</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="pendente">Aguardando Pagamento (Créditos bloqueados até baixa)</SelectItem>
+                      <SelectItem value="outras">Outras Formas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-gold/5 border border-gold/20 text-[11px] leading-relaxed text-gold-foreground/90">
                   <AlertTriangle className="h-4 w-4 text-gold shrink-0 mt-0.5" />
-                  <p className="text-[10px] leading-relaxed text-gold-foreground/80">
-                    Ao confirmar, os créditos serão liberados imediatamente no livro razão. 
-                    Esta ação gerará registros de auditoria e não poderá ser desfeita automaticamente.
-                  </p>
+                  <span>
+                    Ao confirmar, o contrato e os créditos do livro razão serão criados atômica e simultaneamente.
+                  </span>
                 </div>
               </div>
             )}
           </div>
 
-          <DialogFooter className="p-6 bg-muted/20 border-t border-sidebar-border/40 gap-3">
+          <DialogFooter className="p-4 bg-muted/20 border-t gap-2">
             {vendaStep > 1 && (
-              <Button variant="outline" className="flex-1" onClick={() => setVendaStep(vendaStep - 1)} disabled={contratarMutation.isPending}>
+              <Button variant="outline" size="sm" onClick={() => setVendaStep(vendaStep - 1)} disabled={contratarMutation.isPending}>
                 Voltar
               </Button>
             )}
             {vendaStep < 3 ? (
               <Button 
-                className="flex-1 bg-gold hover:bg-gold/90 text-white" 
+                size="sm"
+                className="bg-gold hover:bg-gold/90 text-white" 
                 onClick={() => setVendaStep(vendaStep + 1)}
-                disabled={!selectedPet || precoFinalVenda <= 0 || (vendaFracionada && unidadesSelecionadas === 0)}
+                disabled={!selectedPet || (vendaStep === 2 && itensCustomizados.length === 0)}
               >
                 Continuar
               </Button>
             ) : (
               <Button 
-                className="flex-1 bg-gold hover:bg-gold/90 text-white" 
+                size="sm"
+                className="bg-gold hover:bg-gold/90 text-white" 
                 onClick={() => contratarMutation.mutate({
                   programa_id: selectedPrograma.id,
                   cliente_id: selectedCliente.id,
                   pet_id: selectedPet.id,
                   data_de_inicio: vendaDataInicio,
-                  data_de_validade: format(addDays(new Date(vendaDataInicio), selectedPrograma.validade_em_dias), 'yyyy-MM-dd'),
-                  preco_vendido: precoFinalVenda,
-                  fracionado: vendaFracionada,
-                  itens_selecionados: vendaFracionada
-                    ? itensPrograma.map((i: any) => ({ servico_id: i.servico_id, quantidade: qtdDe(i) }))
-                    : undefined,
+                  data_de_validade: format(addDays(new Date(vendaDataInicio), selectedPrograma?.validade_em_dias || 30), 'yyyy-MM-dd'),
+                  preco_vendido: vendaPrecoCustomizado,
+                  forma_de_pagamento: formaPagamento,
+                  fracionado: true,
+                  itens_selecionados: itensCustomizados.map((i) => ({ servico_id: i.servico_id, quantidade: i.quantidade })),
                   idempotency_key: `venda_${selectedPet.id}_${Date.now()}`
                 })}
                 disabled={contratarMutation.isPending}
               >
-                {contratarMutation.isPending ? "Processando..." : "Confirmar e Ativar"}
+                {contratarMutation.isPending ? "Processando..." : "Confirmar e Ativar Venda"}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* MODAL DE EDIÇÃO DO CATÁLOGO */}
       <ProgramaFormDialog 
         open={isProgramaModalOpen} 
         onOpenChange={setIsProgramaModalOpen}
         initial={editingPrograma}
       />
-    </div>
 
+      {/* DIÁLOGO DE DETALHES E EDIÇÃO DO CONTRATO VENDIDO */}
+      <ContratoDetalheDialog 
+        contratoId={selectedContratoId}
+        onOpenChange={(open) => {
+          if (!open) setSelectedContratoId(null);
+        }}
+      />
+    </div>
   );
 }
 
@@ -959,5 +1120,3 @@ function AuditoriaProgramasTab() {
     </Card>
   );
 }
-
-
