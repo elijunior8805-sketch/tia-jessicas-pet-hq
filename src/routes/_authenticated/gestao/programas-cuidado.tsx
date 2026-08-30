@@ -282,6 +282,26 @@ function ProgramasCuidadoPage() {
     );
   }, [selectedPet, petPorteSelecionado, todosServicos, servicosPrecos, portes]);
 
+  // Cálculo do subtotal, desconto e preço final da venda
+  const subtotalVenda = useMemo(
+    () => itensCustomizados.reduce((acc, i) => acc + Number(i.valor_unitario || 0) * Number(i.quantidade || 0), 0),
+    [itensCustomizados]
+  );
+
+  const { valorDescontoVenda, precoFinalVenda, percentualEfetivoVenda } = useMemo(() => {
+    const sub = subtotalVenda;
+    if (sub <= 0) return { valorDescontoVenda: 0, precoFinalVenda: 0, percentualEfetivoVenda: 0 };
+    const valorInput = Number(String(descontoValorVenda).replace(",", ".")) || 0;
+    if (tipoDescontoVenda === "percentual") {
+      const perc = Math.min(100, Math.max(0, valorInput));
+      const desc = Math.round(sub * (perc / 100) * 100) / 100;
+      return { valorDescontoVenda: desc, precoFinalVenda: Math.max(0, sub - desc), percentualEfetivoVenda: perc };
+    }
+    const desc = Math.min(sub, Math.max(0, valorInput));
+    const perc = Math.round((desc / sub) * 1000) / 10;
+    return { valorDescontoVenda: desc, precoFinalVenda: Math.max(0, sub - desc), percentualEfetivoVenda: perc };
+  }, [subtotalVenda, tipoDescontoVenda, descontoValorVenda]);
+
   const invalidarTodosCaches = () => {
     queryClient.invalidateQueries({ queryKey: ["programas-catalogo"] });
     queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });

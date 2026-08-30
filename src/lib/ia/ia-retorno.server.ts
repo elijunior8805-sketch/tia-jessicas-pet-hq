@@ -54,7 +54,7 @@ export async function logIAAuditoria(
     } as any).select('id').single();
 
     if (logError) console.error('[IA-AUDITORIA-LOG-ERROR]', logError);
-    return logData?.id;
+    return (logData as any)?.id;
 
   } catch (e) {
     console.error('[IA-AUDITORIA-FATAL-ERROR]', e);

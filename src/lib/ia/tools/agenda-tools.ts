@@ -17,8 +17,7 @@ export async function consultarAgendaJessi(
   const res = await buscarDadosAgenda(sb, {
     data: dataRef,
     status: params.status,
-    cliente_id: params.cliente_id,
-  });
+  } as any);
 
   return {
     success: res.success,
@@ -68,13 +67,13 @@ export async function criarAgendamentoJessi(
   const res = await criarAgendamentoIA(sb, {
     cliente_id: params.cliente_id,
     pet_id: params.pet_id,
-    servico_id: params.servico_id,
+    servicos: [{ id: params.servico_id, nome: "", valor: 0 }],
     data: params.data,
     hora: params.hora,
     transporte: params.transporte,
     observacoes: params.observacoes,
     idempotency_key: idempotencyKey,
-  });
+  } as any);
 
   const validacao = res.affected_record_id
     ? await validarGravacaoReal(sb, "agendamentos", res.affected_record_id)
@@ -96,12 +95,12 @@ export async function reagendarJessi(
   sb: SupabaseClient<Database>,
   params: { agendamento_id: string; nova_data: string; nova_hora: string; motivo?: string }
 ): Promise<JessiMutationResult> {
-  const res = await remarcarAgendamentoIA(sb, {
-    agendamento_id: params.agendamento_id,
-    nova_data: params.nova_data,
-    nova_hora: params.nova_hora,
-    motivo: params.motivo,
-  });
+  const res = await remarcarAgendamentoIA(
+    sb,
+    params.agendamento_id,
+    params.nova_data,
+    params.nova_hora
+  );
 
   return {
     success: res.success,
@@ -118,10 +117,7 @@ export async function cancelarAgendamentoJessi(
   sb: SupabaseClient<Database>,
   params: { agendamento_id: string; motivo: string }
 ): Promise<JessiMutationResult> {
-  const res = await cancelarAgendamentoIA(sb, {
-    agendamento_id: params.agendamento_id,
-    motivo: params.motivo,
-  });
+  const res = await cancelarAgendamentoIA(sb, params.agendamento_id, params.motivo);
 
   return {
     success: res.success,

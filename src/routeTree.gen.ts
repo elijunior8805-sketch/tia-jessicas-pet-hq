@@ -24,6 +24,7 @@ import { Route as AuthenticatedJessiRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
 import { Route as AuthenticatedLevaTrazRouteImport } from './routes/_authenticated/leva-traz'
 import { Route as AuthenticatedLembretesRouteImport } from './routes/_authenticated/lembretes'
+import { Route as AuthenticatedJessiRouteImport } from './routes/_authenticated/jessi'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -130,6 +131,11 @@ const AuthenticatedLevaTrazRoute = AuthenticatedLevaTrazRouteImport.update({
 const AuthenticatedLembretesRoute = AuthenticatedLembretesRouteImport.update({
   id: '/lembretes',
   path: '/lembretes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedJessiRoute = AuthenticatedJessiRouteImport.update({
+  id: '/jessi',
+  path: '/jessi',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/jessi': typeof AuthenticatedJessiRoute
   '/lembretes': typeof AuthenticatedLembretesRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
@@ -358,6 +365,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/jessi': typeof AuthenticatedJessiRoute
   '/lembretes': typeof AuthenticatedLembretesRoute
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
@@ -404,6 +412,7 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/jessi': typeof AuthenticatedJessiRoute
   '/_authenticated/lembretes': typeof AuthenticatedLembretesRoute
   '/_authenticated/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/fornecedores'
     | '/inbox'
+    | '/jessi'
     | '/lembretes'
     | '/leva-traz'
     | '/pagamentos-abertos'
@@ -496,6 +506,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/fornecedores'
     | '/inbox'
+    | '/jessi'
     | '/lembretes'
     | '/leva-traz'
     | '/pagamentos-abertos'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/fornecedores'
     | '/_authenticated/inbox'
+    | '/_authenticated/jessi'
     | '/_authenticated/lembretes'
     | '/_authenticated/leva-traz'
     | '/_authenticated/pagamentos-abertos'
@@ -679,6 +691,13 @@ declare module '@tanstack/react-router' {
       path: '/lembretes'
       fullPath: '/lembretes'
       preLoaderRoute: typeof AuthenticatedLembretesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/jessi': {
+      id: '/_authenticated/jessi'
+      path: '/jessi'
+      fullPath: '/jessi'
+      preLoaderRoute: typeof AuthenticatedJessiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/inbox': {
@@ -917,6 +936,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedJessiRoute: typeof AuthenticatedJessiRoute
   AuthenticatedLembretesRoute: typeof AuthenticatedLembretesRoute
   AuthenticatedLevaTrazRoute: typeof AuthenticatedLevaTrazRoute
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
@@ -954,6 +974,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedJessiRoute: AuthenticatedJessiRoute,
   AuthenticatedLembretesRoute: AuthenticatedLembretesRoute,
   AuthenticatedLevaTrazRoute: AuthenticatedLevaTrazRoute,
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,

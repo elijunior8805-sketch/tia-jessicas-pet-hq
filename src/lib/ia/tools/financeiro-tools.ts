@@ -14,7 +14,12 @@ export async function consultarKPIsFinanceirosJessi(
   params: { mes?: string }
 ): Promise<JessiQueryResult> {
   const mesRef = params.mes || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(new Date());
-  const res = await consultarKPIsFinanceirosIA(sb, mesRef);
+  const res = await consultarKPIsFinanceirosIA(sb, {
+    from: `${mesRef}-01`,
+    to: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(
+      new Date(Number(mesRef.slice(0, 4)), Number(mesRef.slice(5, 7)), 0)
+    ),
+  });
 
   return {
     success: res.success,
@@ -29,7 +34,7 @@ export async function consultarKPIsFinanceirosJessi(
 export async function consultarInadimplenciaJessi(
   sb: SupabaseClient<Database>
 ): Promise<JessiQueryResult> {
-  const res = await consultarInadimplenciaIA(sb);
+  const res = await consultarInadimplenciaIA(sb, {});
 
   return {
     success: res.success,
@@ -45,7 +50,13 @@ export async function compararPeriodosFinanceirosJessi(
   sb: SupabaseClient<Database>,
   params: { mes1: string; mes2: string }
 ): Promise<JessiQueryResult> {
-  const res = await compararPeriodosIA(sb, params.mes1, params.mes2);
+  const periodo = (mes: string) => ({
+    from: `${mes}-01`,
+    to: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(
+      new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0)
+    ),
+  });
+  const res = await compararPeriodosIA(sb, { p1: periodo(params.mes1), p2: periodo(params.mes2) });
 
   return {
     success: res.success,
@@ -69,7 +80,7 @@ export async function registrarBaixaPagamentoJessi(
   const res = await registrarPagamentoIA(sb, {
     pagamento_id: params.pagamento_id,
     valor_pago: params.valor_pago,
-    forma_pagamento: params.forma_pagamento,
+    forma: params.forma_pagamento as any,
     observacoes: params.observacoes,
   });
 
@@ -90,10 +101,7 @@ export async function estornarPagamentoJessi(
   sb: SupabaseClient<Database>,
   params: { pagamento_id: string; motivo: string }
 ): Promise<JessiMutationResult> {
-  const res = await estornarPagamentoIA(sb, {
-    pagamento_id: params.pagamento_id,
-    motivo: params.motivo,
-  });
+  const res = await estornarPagamentoIA(sb, params.pagamento_id, params.motivo);
 
   return {
     success: res.success,
