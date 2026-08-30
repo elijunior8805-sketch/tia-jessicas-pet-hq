@@ -21,6 +21,7 @@ import { recalcularAgregados } from "@/lib/agregados.functions";
 import { toast } from "sonner";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
 import { RelatorioFinanceiroExport } from "@/components/RelatorioFinanceiroExport";
+import { JessiDashboardCard } from "@/components/jessi/JessiDashboardCard";
 
 
 
@@ -352,6 +353,9 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ============ INTELIGÊNCIA OPERACIONAL DA JESSI ============ */}
+      <JessiDashboardCard />
 
       <Card className="mb-6 border-border/60 bg-card p-4 shadow-sm sm:p-5">
         <div className="mb-4 flex items-center gap-3">

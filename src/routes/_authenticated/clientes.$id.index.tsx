@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft, MessageCircle, MapPin, Phone, Mail, Star, PawPrint, Plus, FileText,
-  Pencil, Archive, CalendarPlus, ExternalLink, ClipboardList, DollarSign, AlertTriangle, CheckCircle2
+  Pencil, Archive, CalendarPlus, ExternalLink, ClipboardList, DollarSign, AlertTriangle, CheckCircle2, Sparkles
 } from "lucide-react";
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { useRealtimeFinanceiro } from "@/lib/use-realtime-financeiro";
@@ -190,6 +190,12 @@ function ClienteDetalhe() {
               className="gap-2 bg-white text-primary hover:bg-white/90"
             >
               <CalendarPlus className="h-4 w-4"/> Novo agendamento
+            </Button>
+            <Button
+              onClick={() => navigate({ to: "/jessi" })}
+              className="gap-2 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold border border-[#C8A951]/40"
+            >
+              <Sparkles className="h-4 w-4 text-[#C8A951]"/> Perguntar à Jessi
             </Button>
             <Button
               variant="outline"
