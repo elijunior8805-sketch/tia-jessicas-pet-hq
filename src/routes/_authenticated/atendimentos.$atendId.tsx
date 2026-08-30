@@ -528,7 +528,7 @@ function AtendimentoDetalhe() {
         pet_id: (atendimento as any).pet_id,
         cliente_id: (atendimento as any).cliente_id,
         servicos: [...rawSolicitados, ...rawExtras].map((s) => ({
-          id: s.id,
+          id: (s as any).id,
           servico_id: s.servico_id,
           nome: s.nome,
           valor: Number(s.valor_total || s.valor_unit || 0),
@@ -577,7 +577,7 @@ function AtendimentoDetalhe() {
             pet_id: (atendimento as any).pet_id,
             cliente_id: (atendimento as any).cliente_id || null,
             servicos_executados: executados.map((s) => ({
-              id: s.id,
+              id: (s as any).id,
               servico_id: s.servico_id,
               nome: s.nome,
               valor: Number(s.valor_total || s.valor_unit || 0),
@@ -644,27 +644,8 @@ function AtendimentoDetalhe() {
     onError: (e: any) => toast.error(e.message ?? "Erro ao excluir atendimento"),
   });
 
-
-  if (isLoading) {
-    return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
-  }
-  if (!atendimento) {
-    return <PageShell><div className="text-sm text-muted-foreground">Atendimento não encontrado.</div></PageShell>;
-  }
-
-  const pet = (atendimento as any).pets;
-  const cliente = (atendimento as any).clientes;
-  const encerrado = !!(atendimento as any).encerrado_em;
-  const readOnly = encerrado && !isAdmin;
-
-  const solicitados: ServicoItem[] = ((atendimento as any).servicos_solicitados ?? (atendimento as any).servicos_planejados ?? []) as ServicoItem[];
-  const extras: ServicoItem[] = ((atendimento as any).servicos_extras ?? []) as ServicoItem[];
-  const fotosAntes: FotoItem[] = ((atendimento as any).fotos_antes ?? []) as FotoItem[];
-  const fotosDepois: FotoItem[] = ((atendimento as any).fotos_depois ?? []) as FotoItem[];
-
-  const valorSolicitados = sumItens(solicitados);
-  const valorExtras = sumItens(extras);
-  const subtotalBruto = valorSolicitados + valorExtras;
+  const solicitados: ServicoItem[] = ((atendimento as any)?.servicos_solicitados ?? (atendimento as any)?.servicos_planejados ?? []) as ServicoItem[];
+  const extras: ServicoItem[] = ((atendimento as any)?.servicos_extras ?? []) as ServicoItem[];
 
   const servicosComCobertura = useMemo(() => {
     if (!usarCreditoPrograma || !elegibilidadeCredito?.possui_credito_elegivel) {
@@ -681,7 +662,27 @@ function AtendimentoDetalhe() {
       valorCoberto: elegibilidadeCredito.total_coberto || 0,
       valorExtrasReal: elegibilidadeCredito.total_extras || 0,
     };
-  }, [usarCreditoPrograma, elegibilidadeCredito, solicitados, extras]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usarCreditoPrograma, elegibilidadeCredito, atendimento]);
+
+  if (isLoading) {
+    return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
+  }
+  if (!atendimento) {
+    return <PageShell><div className="text-sm text-muted-foreground">Atendimento não encontrado.</div></PageShell>;
+  }
+
+  const pet = (atendimento as any).pets;
+  const cliente = (atendimento as any).clientes;
+  const encerrado = !!(atendimento as any).encerrado_em;
+  const readOnly = encerrado && !isAdmin;
+
+  const fotosAntes: FotoItem[] = ((atendimento as any).fotos_antes ?? []) as FotoItem[];
+  const fotosDepois: FotoItem[] = ((atendimento as any).fotos_depois ?? []) as FotoItem[];
+
+  const valorSolicitados = sumItens(solicitados);
+  const valorExtras = sumItens(extras);
+  const subtotalBruto = valorSolicitados + valorExtras;
 
   // Total efetivo a receber do cliente (extras + taxa - desc, com banho coberto a R$ 0)
   const total = Math.max(0, servicosComCobertura.valorExtrasReal + Number(taxa || 0) - Number(desc || 0));
@@ -845,7 +846,7 @@ function AtendimentoDetalhe() {
             pet_id: (atendimento as any).pet_id,
             cliente_id: (atendimento as any).cliente_id || null,
             servicos_executados: [...solicitados, ...extras].map((s) => ({
-              id: s.id,
+              id: (s as any).id,
               servico_id: s.servico_id,
               nome: s.nome,
               valor: Number(s.valor_total || s.valor_unit || 0),
