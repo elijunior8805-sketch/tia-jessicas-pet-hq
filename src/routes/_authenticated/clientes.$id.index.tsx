@@ -315,13 +315,13 @@ function ClienteDetalhe() {
                 ) as any;
                 const valorPago = Number(pagProg?.valor_pago ?? 0);
                 const saldo = Math.max(0, Number(prog.preco_vendido) - valorPago);
-                const statusBadge: Record<string, { label: string; cls: string }> = {
+                const statusBadge: { label: string; cls: string } = ({
                   'ativo': { label: 'Ativo', cls: 'bg-green-100 text-green-800' },
                   'aguardando_pagamento': { label: 'Aguardando pagamento', cls: 'bg-amber-100 text-amber-800' },
                   'suspenso': { label: 'Suspenso', cls: 'bg-orange-100 text-orange-800' },
                   'vencido': { label: 'Vencido', cls: 'bg-red-100 text-red-800' },
                   'concluído': { label: 'Concluído', cls: 'bg-blue-100 text-blue-800' },
-                }[prog.status_do_programa] ?? { label: prog.status_do_programa, cls: 'bg-gray-100 text-gray-800' };
+                } as Record<string, { label: string; cls: string }>)[prog.status_do_programa] ?? { label: String(prog.status_do_programa), cls: 'bg-gray-100 text-gray-800' };
                 
                 return (
                   <div key={prog.id} className="rounded-lg border p-4 space-y-2">
