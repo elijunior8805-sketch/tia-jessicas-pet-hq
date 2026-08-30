@@ -26,10 +26,10 @@ const QUICK_COMMANDS: {
   phrase: string;
 }[] = [
   { label: "Agenda de hoje", icon: Calendar, intent: "consultar_agenda", phrase: "Mostre a agenda de hoje" },
-  { label: "Quantos atendimentos?", icon: ClipboardList, intent: "contar_atendimentos", phrase: "Quantos atendimentos eu tenho hoje?" },
-  { label: "Novo Agendamento", icon: Calendar, intent: "criar_agendamento", phrase: "Quero criar um agendamento" },
+  { label: "Programas & Créditos", icon: LayoutDashboard, intent: "consultar_catalogo_programas", phrase: "Consultar saldos de programas e créditos" },
   { label: "Faturamento do mês", icon: TrendingUp, intent: "consultar_faturamento", phrase: "Qual foi o faturamento do mês?" },
   { label: "Valores a receber", icon: DollarSign, intent: "consultar_valores_a_receber", phrase: "Quanto tenho para receber?" },
+  { label: "Novo Agendamento", icon: Calendar, intent: "criar_agendamento", phrase: "Quero criar um agendamento" },
   { label: "Resumo do dia", icon: LayoutDashboard, intent: "consultar_resumo_operacional", phrase: "Mostre o resumo operacional de hoje" },
 ];
 

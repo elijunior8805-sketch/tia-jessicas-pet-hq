@@ -92,7 +92,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
       setMessages([
         {
           role: "assistant",
-          content: `Olá! Sou a Assistente Operacional e Estratégica do Spa de Pet Tia Jéssica. Como posso ajudar você na gestão do Pet Shop agora?`,
+          content: `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você na gestão e na rotina do Spa hoje?`,
           timestamp: new Date().toISOString(),
         },
       ]);

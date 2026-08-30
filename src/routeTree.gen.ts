@@ -20,6 +20,7 @@ import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedReativacaoRouteImport } from './routes/_authenticated/reativacao'
 import { Route as AuthenticatedQualidadeIaRouteImport } from './routes/_authenticated/qualidade-ia'
+import { Route as AuthenticatedJessiRouteImport } from './routes/_authenticated/jessi'
 import { Route as AuthenticatedPagamentosAbertosRouteImport } from './routes/_authenticated/pagamentos-abertos'
 import { Route as AuthenticatedLevaTrazRouteImport } from './routes/_authenticated/leva-traz'
 import { Route as AuthenticatedLembretesRouteImport } from './routes/_authenticated/lembretes'
@@ -107,6 +108,12 @@ const AuthenticatedQualidadeIaRoute =
   AuthenticatedQualidadeIaRouteImport.update({
     id: '/qualidade-ia',
     path: '/qualidade-ia',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedJessiRoute =
+  AuthenticatedJessiRouteImport.update({
+    id: '/jessi',
+    path: '/jessi',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPagamentosAbertosRoute =
@@ -310,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/qualidade-ia': typeof AuthenticatedQualidadeIaRoute
+  '/jessi': typeof AuthenticatedJessiRoute
   '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
@@ -354,6 +362,7 @@ export interface FileRoutesByTo {
   '/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/qualidade-ia': typeof AuthenticatedQualidadeIaRoute
+  '/jessi': typeof AuthenticatedJessiRoute
   '/reativacao': typeof AuthenticatedReativacaoRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/servicos': typeof AuthenticatedServicosRoute
@@ -399,6 +408,7 @@ export interface FileRoutesById {
   '/_authenticated/leva-traz': typeof AuthenticatedLevaTrazRoute
   '/_authenticated/pagamentos-abertos': typeof AuthenticatedPagamentosAbertosRoute
   '/_authenticated/qualidade-ia': typeof AuthenticatedQualidadeIaRoute
+  '/_authenticated/jessi': typeof AuthenticatedJessiRoute
   '/_authenticated/reativacao': typeof AuthenticatedReativacaoRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
@@ -445,6 +455,7 @@ export interface FileRouteTypes {
     | '/leva-traz'
     | '/pagamentos-abertos'
     | '/qualidade-ia'
+    | '/jessi'
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/leva-traz'
     | '/pagamentos-abertos'
     | '/qualidade-ia'
+    | '/jessi'
     | '/reativacao'
     | '/relatorios'
     | '/servicos'
@@ -533,6 +545,7 @@ export interface FileRouteTypes {
     | '/_authenticated/leva-traz'
     | '/_authenticated/pagamentos-abertos'
     | '/_authenticated/qualidade-ia'
+    | '/_authenticated/jessi'
     | '/_authenticated/reativacao'
     | '/_authenticated/relatorios'
     | '/_authenticated/servicos'
@@ -908,6 +921,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLevaTrazRoute: typeof AuthenticatedLevaTrazRoute
   AuthenticatedPagamentosAbertosRoute: typeof AuthenticatedPagamentosAbertosRoute
   AuthenticatedQualidadeIaRoute: typeof AuthenticatedQualidadeIaRoute
+  AuthenticatedJessiRoute: typeof AuthenticatedJessiRoute
   AuthenticatedReativacaoRoute: typeof AuthenticatedReativacaoRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
@@ -944,6 +958,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLevaTrazRoute: AuthenticatedLevaTrazRoute,
   AuthenticatedPagamentosAbertosRoute: AuthenticatedPagamentosAbertosRoute,
   AuthenticatedQualidadeIaRoute: AuthenticatedQualidadeIaRoute,
+  AuthenticatedJessiRoute: AuthenticatedJessiRoute,
   AuthenticatedReativacaoRoute: AuthenticatedReativacaoRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,

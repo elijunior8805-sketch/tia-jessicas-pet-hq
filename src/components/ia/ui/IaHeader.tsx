@@ -28,21 +28,26 @@ const statusMessages: Record<IAStatus, string> = {
 };
 
 export const IaHeader: React.FC<IaHeaderProps> = ({ iaStatus, onClose }) => (
-  <div className="px-6 py-5 border-b border-[#C99845]/10 flex items-center justify-between bg-[#123F2A] text-white">
+  <div className="px-5 py-4 border-b border-[#C8A951]/20 flex items-center justify-between bg-[#1B5E20] text-white">
     <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-[#C99845]/20 flex items-center justify-center border border-[#C99845]/30 shadow-inner">
-        <Sparkles className="w-5 h-5 text-[#C99845] animate-pulse" />
+      <div className="w-10 h-10 rounded-xl bg-[#C8A951]/20 flex items-center justify-center border border-[#C8A951]/40 shadow-inner">
+        <Sparkles className="w-5 h-5 text-[#C8A951] animate-pulse" />
       </div>
       <div>
-        <h2 className="font-display font-semibold text-lg tracking-tight leading-none">
-          Assistente IA
-        </h2>
-        <div className="flex items-center gap-2 mt-1.5">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display font-semibold text-lg tracking-tight leading-none">
+            Jessi
+          </h2>
+          <span className="text-[10px] bg-[#C8A951]/20 border border-[#C8A951]/40 text-[#F5E6BE] px-1.5 py-0.2 rounded font-semibold">
+            Operacional
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
           <span
-            className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === "error" ? "bg-red-500" : "bg-[#C99845]"}`}
+            className={`flex h-1.5 w-1.5 rounded-full animate-pulse ${iaStatus === "error" ? "bg-red-400" : "bg-[#C8A951]"}`}
           />
-          <p className="text-[9px] uppercase tracking-widest font-bold text-white/60">
-            {statusMessages[iaStatus]}
+          <p className="text-[10px] uppercase tracking-wider font-medium text-white/80">
+            {statusMessages[iaStatus] || "Spa de Pet Tia Jéssica"}
           </p>
         </div>
       </div>

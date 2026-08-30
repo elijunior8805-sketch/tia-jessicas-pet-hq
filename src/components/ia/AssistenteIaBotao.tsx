@@ -17,10 +17,11 @@ export function AssistenteIaBotao() {
     <>
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-2xl bg-gold hover:bg-gold/90 text-white border-4 border-white dark:border-zinc-950 transition-all hover:scale-110 active:scale-95 group"
+        className="fixed bottom-6 right-6 z-40 h-14 px-4 rounded-full shadow-2xl bg-emerald-800 hover:bg-emerald-900 text-white border-2 border-[#C8A951] transition-all hover:scale-105 active:scale-95 group flex items-center gap-2"
+        title="Jessi — Assistente Operacional do Spa"
       >
-        <Sparkles className="w-6 h-6 animate-pulse group-hover:animate-none" />
-        <span className="sr-only">Assistente IA</span>
+        <Sparkles className="w-5 h-5 text-[#C8A951] animate-pulse group-hover:animate-none" />
+        <span className="font-semibold text-sm tracking-wide">Jessi</span>
       </Button>
 
       <AssistenteIaSidebar 
