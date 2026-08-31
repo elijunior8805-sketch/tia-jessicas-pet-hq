@@ -368,8 +368,21 @@ function fallbackClassificador(texto: string): IAIntent {
     };
   }
 
-  // 6. Valores a receber / Inadimplência
-  if (lowercaseText.includes("receber") || lowercaseText.includes("inadimplencia") || lowercaseText.includes("inadimplência") || lowercaseText.includes("pendentes") || lowercaseText.includes("em aberto")) {
+  // 6. Valores a receber / Inadimplência / Cobranças
+  if (
+    lowercaseText.includes("receber") ||
+    lowercaseText.includes("inadimplencia") ||
+    lowercaseText.includes("inadimplência") ||
+    lowercaseText.includes("pendentes") ||
+    lowercaseText.includes("em aberto") ||
+    lowercaseText.includes("débito") ||
+    lowercaseText.includes("debito") ||
+    lowercaseText.includes("devedores") ||
+    lowercaseText.includes("quem deve") ||
+    lowercaseText.includes("cobrança") ||
+    lowercaseText.includes("cobranca") ||
+    lowercaseText.includes("vencidos")
+  ) {
     return {
       intencao: "consultar_valores_a_receber",
       especialista: "financeiro",
@@ -392,16 +405,24 @@ function fallbackClassificador(texto: string): IAIntent {
     };
   }
 
-  // 8. Programas de Cuidado e Créditos
-  if (lowercaseText.includes("programa") || lowercaseText.includes("plano") || lowercaseText.includes("crédito") || lowercaseText.includes("credito") || lowercaseText.includes("pacote")) {
-    if (lowercaseText.includes("créditos") || lowercaseText.includes("creditos") || lowercaseText.includes("quantos banhos")) {
+  // 8. Clubinho / Programas de Cuidado e Créditos
+  if (
+    lowercaseText.includes("clubinho") ||
+    lowercaseText.includes("programa") ||
+    lowercaseText.includes("plano") ||
+    lowercaseText.includes("crédito") ||
+    lowercaseText.includes("credito") ||
+    lowercaseText.includes("pacote") ||
+    lowercaseText.includes("quantos banhos")
+  ) {
+    if (lowercaseText.includes("crédito") || lowercaseText.includes("credito") || lowercaseText.includes("saldo") || lowercaseText.includes("quantos banhos") || lowercaseText.includes("tem clubinho")) {
       return {
         intencao: "consultar_creditos_pet",
         especialista: "programas_cuidado",
         tipo_operacao: "consulta",
         exige_confirmacao: false,
-        parametros: { comando_original: texto, pet_nome: "Thor" },
-        nivel_confianca: 0.9,
+        parametros: { comando_original: texto },
+        nivel_confianca: 0.95,
       };
     }
 
@@ -415,7 +436,43 @@ function fallbackClassificador(texto: string): IAIntent {
     };
   }
 
-  // 9. Resumo geral
+  // 9. Aniversariantes
+  if (lowercaseText.includes("aniversariante") || lowercaseText.includes("aniversário") || lowercaseText.includes("aniversario") || lowercaseText.includes("parabéns")) {
+    return {
+      intencao: "consultar_aniversariantes",
+      especialista: "comunicacao",
+      tipo_operacao: "consulta",
+      exige_confirmacao: false,
+      parametros: { comando_original: texto },
+      nivel_confianca: 0.95,
+    };
+  }
+
+  // 10. Clientes Inativos / Reativação
+  if (lowercaseText.includes("reativação") || lowercaseText.includes("reativacao") || lowercaseText.includes("sumidos") || lowercaseText.includes("inativos") || lowercaseText.includes("risco")) {
+    return {
+      intencao: "consultar_reativacao",
+      especialista: "comunicacao",
+      tipo_operacao: "consulta",
+      exige_confirmacao: false,
+      parametros: { comando_original: texto },
+      nivel_confianca: 0.95,
+    };
+  }
+
+  // 11. Central de Mensagens / Respostas / Espera
+  if (lowercaseText.includes("mensagem") || lowercaseText.includes("aguardando") || lowercaseText.includes("sem resposta") || lowercaseText.includes("espera há mais tempo") || lowercaseText.includes("não lidas")) {
+    return {
+      intencao: "sugerir_resposta",
+      especialista: "comunicacao",
+      tipo_operacao: "consulta",
+      exige_confirmacao: false,
+      parametros: { comando_original: texto },
+      nivel_confianca: 0.9,
+    };
+  }
+
+  // 12. Resumo operacional geral
   return {
     intencao: "resumo_negocio",
     especialista: "gestao_estrategica",
@@ -423,6 +480,5 @@ function fallbackClassificador(texto: string): IAIntent {
     exige_confirmacao: false,
     parametros: { comando_original: texto },
     nivel_confianca: 0.7,
-    resposta_ia: "Estou consultando as informações operacionais do Spa para responder...",
   };
 }

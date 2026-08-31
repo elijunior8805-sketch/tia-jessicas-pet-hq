@@ -35,14 +35,37 @@ export async function consultarInadimplenciaJessi(
   sb: SupabaseClient<Database>
 ): Promise<JessiQueryResult> {
   const res = await consultarInadimplenciaIA(sb, {});
+  const registros: any[] = res.data?.registros || [];
+  const totalRegistros = registros.length;
+
+  let totalValorAtraso = 0;
+  registros.forEach((r) => {
+    totalValorAtraso += Number(r.valor_total || 0) - Number(r.valor_pago || 0);
+  });
+
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  let resumoTexto = "";
+  if (totalRegistros === 0) {
+    resumoTexto = "Parabéns! Não encontrei nenhum valor em atraso ou pendência financeira no momento.";
+  } else {
+    const topDevedores = registros.slice(0, 5).map((r) => {
+      const nome = r.clientes?.nome || "Cliente";
+      const saldo = Number(r.valor_total || 0) - Number(r.valor_pago || 0);
+      const desc = r.descricao ? ` (${r.descricao})` : "";
+      return `• ${nome}: ${brl(saldo)}${desc}`;
+    }).join("\n");
+
+    resumoTexto = `Temos ${totalRegistros} lançamento(s) pendente(s), totalizando ${brl(totalValorAtraso)}.\n\nPrincipais pendências:\n${topDevedores}`;
+  }
 
   return {
     success: res.success,
     source: "inadimplencia",
     data: res.data,
-    total_count: Array.isArray(res.data) ? res.data.length : 0,
+    total_count: totalRegistros,
     executed_at: new Date().toISOString(),
-    summary: `Valores pendentes e inadimplência identificados.`,
+    summary: resumoTexto,
   };
 }
 

@@ -293,11 +293,16 @@ export async function chamarIA(p: ChamadaParams): Promise<ChamadaResultado> {
 
 
 async function chamarIaInterno(p: ChamadaParams): Promise<ChamadaResultado> {
+  const apiKey =
+    process.env["LOVABLE_API_KEY"] ||
+    process.env["OPENAI_API_KEY"] ||
+    process.env["GEMINI_API_KEY"] ||
+    process.env["GOOGLE_API_KEY"] ||
+    process.env["GROQ_API_KEY"];
 
-  const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey)
     throw new IaIndisponivelError(
-      "A integração de IA não está configurada neste projeto.",
+      "Nenhuma chave de API de IA configurada no ambiente.",
       "sem_chave",
     );
   if (!p.config.ia_ativa)

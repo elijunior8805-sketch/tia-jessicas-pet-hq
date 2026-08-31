@@ -19,14 +19,32 @@ export async function consultarAgendaJessi(
     status: params.status,
   } as any);
 
+  const lista: any[] = Array.isArray(res.data) ? res.data : [];
+  const total = lista.length;
+
+  let resumoTexto = "";
+  if (total === 0) {
+    resumoTexto = `Não há agendamentos marcados para ${dataRef}. A agenda está livre!`;
+  } else {
+    const itens = lista.slice(0, 8).map((a) => {
+      const hora = a.hora ? String(a.hora).slice(0, 5) : "--:--";
+      const pet = a.pets?.nome || "Pet";
+      const tutor = a.clientes?.nome ? ` (${a.clientes.nome})` : "";
+      const servico = a.servicos?.nome || "Atendimento";
+      const st = a.status ? ` - ${a.status}` : "";
+      return `• ${hora}: ${pet}${tutor} - ${servico}${st}`;
+    }).join("\n");
+    resumoTexto = `Temos ${total} agendamento(s) para ${dataRef}:\n\n${itens}${total > 8 ? `\n...e mais ${total - 8} agendamento(s).` : ""}`;
+  }
+
   return {
     success: res.success,
     source: "agenda",
     data: res.data,
-    total_count: Array.isArray(res.data) ? res.data.length : 0,
+    total_count: total,
     filters_applied: { data: dataRef, status: params.status },
     executed_at: new Date().toISOString(),
-    summary: `Agenda consultada para ${dataRef}. Encontrados ${Array.isArray(res.data) ? res.data.length : 0} agendamentos.`,
+    summary: resumoTexto,
   };
 }
 

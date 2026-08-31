@@ -135,10 +135,11 @@ export async function processarMensagemJessiCore(
 
         novoContexto.acaoPendente = pendingAction;
       } else {
-        // Ferramenta de consulta: executa diretamente
+        // Ferramenta de consulta: executa diretamente no banco de dados
         const resQuery = await toolDef.executar(sb, params, { user, contexto: input.contexto });
 
-        respostaTexto = intencao.resposta_ia || resQuery.summary || "Consulta realizada com sucesso.";
+        // Prioridade MÁXIMA para o resultado detalhado gerado pela ferramenta executada
+        respostaTexto = resQuery.summary || resQuery.texto || intencao.resposta_ia || "Consulta realizada com sucesso.";
 
         // Identifica card especializado e atualiza contexto
         if (toolDef.especialista === "agenda") {

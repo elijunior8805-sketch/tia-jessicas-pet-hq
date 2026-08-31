@@ -10,36 +10,48 @@ import { getContratoDetalhe } from "@/lib/programas-contratos.functions";
 
 export async function consultarCreditosPetJessi(
   sb: SupabaseClient<Database>,
-  params: { pet_id: string }
+  params: { pet_id?: string; pet_nome?: string; cliente_id?: string }
 ): Promise<JessiQueryResult> {
-  const { data: pet } = await sb
-    .from("pets")
-    .select("id, nome, cliente_id, clientes(nome)")
-    .eq("id", params.pet_id)
-    .maybeSingle();
-
-  // Busca movimentações e contratos do pet
-  const { data: contratos } = await sb
+  let query = sb
     .from("programas_contratados")
     .select(`
-      id, programa_id, preco_vendido, status_do_programa, data_de_inicio, data_de_validade,
-      programas_de_cuidado(nome),
+      id, programa_id, preco_vendido, status_do_programa, data_de_inicio, data_de_validade, nome_snapshot,
+      pets:pet_id(id, nome, cliente_id, clientes(id, nome)),
       programas_creditos_movimentacoes(*)
     `)
-    .eq("pet_id", params.pet_id)
-    .in("status_do_programa", ["ativo", "aguardando_pagamento"]);
+    .in("status_do_programa", ["ativo", "aguardando_pagamento"])
+    .order("criado_em", { ascending: false });
+
+  if (params?.pet_id) {
+    query = query.eq("pet_id", params.pet_id);
+  }
+
+  const { data: contratos } = await query.limit(10);
+  const total = (contratos || []).length;
+
+  let resumoTexto = "";
+  if (total === 0) {
+    resumoTexto = "Não encontrei nenhum contrato do Clubinho ativo ou aguardando pagamento no momento.";
+  } else {
+    const lista = (contratos as any[]).map((c) => {
+      const petNome = c.pets?.nome || "Pet";
+      const tutorNome = c.pets?.clientes?.nome ? ` (${c.pets.clientes.nome})` : "";
+      const nomePlano = c.nome_snapshot || "Clubinho";
+      const movs = c.programas_creditos_movimentacoes || [];
+      const consumidos = movs.filter((m: any) => m.tipo === "consumo" || m.tipo === "uso").length;
+      return `• ${petNome}${tutorNome}: ${nomePlano} (${c.status_do_programa}) - ${consumidos} uso(s) registrado(s)`;
+    }).join("\n");
+    resumoTexto = `Encontrei ${total} contrato(s) ativo(s) do Clubinho:\n${lista}`;
+  }
 
   return {
     success: true,
     source: "programas_creditos",
-    data: {
-      pet: pet || null,
-      contratos: contratos || [],
-    },
-    total_count: (contratos || []).length,
-    filters_applied: { pet_id: params.pet_id },
+    data: contratos || [],
+    total_count: total,
+    filters_applied: params,
     executed_at: new Date().toISOString(),
-    summary: `Créditos e programas do pet ${(pet as any)?.nome || params.pet_id} consultados com sucesso.`,
+    summary: resumoTexto,
   };
 }
 
