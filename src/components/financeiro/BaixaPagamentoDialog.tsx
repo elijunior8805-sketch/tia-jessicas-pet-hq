@@ -72,10 +72,17 @@ export function BaixaPagamentoDialog({
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["pagamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["pagamentos-abertos"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente-pagamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["financeiro-lancamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["fin-resumo"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente-programas"] });
       
-      const novoStatus = result?.novo_status || "atualizado";
+      const novoStatus = result?.novo_status === "pago" ? "Pago Integralmente" : result?.novo_status === "parcial" ? "Pagamento Parcial" : "Atualizado";
       toast.success(
-        `Pagamento registrado com sucesso! (Status: ${novoStatus})`
+        `Pagamento registrado com sucesso! (${novoStatus})`
       );
       
       onSuccess?.();
@@ -114,11 +121,14 @@ export function BaixaPagamentoDialog({
     setError(null);
 
     mutation.mutate({
+      pagamentoId: pagamento.id,
       id: pagamento.id,
       valor: numValor,
+      dataPagamento: dataPagamento,
       data_pagamento: dataPagamento,
+      forma: formaPagamento,
       forma_pagamento: formaPagamento,
-      observacao,
+      observacao: observacao || undefined,
     });
   };
 

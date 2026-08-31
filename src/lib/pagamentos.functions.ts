@@ -318,15 +318,31 @@ export const registrarContatoCobrancaLote = createServerFn({ method: "POST" })
 
 export const confirmarRecebimento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) =>
-    z.object({
-      pagamentoId: z.string().uuid(),
-      forma: z.enum(["pix", "dinheiro", "debito", "credito", "outras"]),
-      valor: z.number().min(0.01),
-      dataPagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      observacao: z.string().optional(),
-    }).parse(data)
-  )
+  .inputValidator((data: unknown) => {
+    const obj = (data ?? {}) as Record<string, any>;
+    const targetId = obj.pagamentoId || obj.id;
+    if (!targetId || typeof targetId !== "string") {
+      throw new Error("ID do pagamento não informado");
+    }
+    const val = Number(obj.valor || obj.valorPago || 0);
+    if (isNaN(val) || val <= 0) {
+      throw new Error("Valor do recebimento deve ser maior que zero");
+    }
+    const formaBruta = String(obj.forma || obj.forma_pagamento || "pix").toLowerCase().trim();
+    const forma = ["pix", "dinheiro", "debito", "credito", "outras"].includes(formaBruta)
+      ? formaBruta
+      : "pix";
+    const dataPag = String(obj.dataPagamento || obj.data_pagamento || new Date().toISOString().slice(0, 10)).trim();
+    const observacao = obj.observacao ? String(obj.observacao) : undefined;
+
+    return {
+      pagamentoId: targetId,
+      forma,
+      valor: val,
+      dataPagamento: dataPag,
+      observacao,
+    };
+  })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
@@ -365,7 +381,7 @@ export const confirmarRecebimento = createServerFn({ method: "POST" })
 
     if (updErr) {
       console.error("[pagamentos] confirmarRecebimento erro:", updErr.message);
-      throw new Error("Falha ao registrar recebimento");
+      throw new Error(`Falha ao registrar recebimento: ${updErr.message}`);
     }
 
     if (novoStatus === "pago" && atual.categoria_receita === "programa_cuidado" && atual.idempotency_key?.startsWith("programa_")) {
