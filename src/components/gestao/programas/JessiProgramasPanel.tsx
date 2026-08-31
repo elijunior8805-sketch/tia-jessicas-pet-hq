@@ -206,7 +206,7 @@ export const JessiProgramasPanel: React.FC<JessiProgramasPanelProps> = ({
             />
             <button
               type="button"
-              onClick={isListening ? stopListening : startListening}
+              onClick={() => (isListening ? stopListening() : startListening())}
               className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors ${
                 isListening
                   ? "bg-red-500 text-white animate-pulse"
