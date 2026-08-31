@@ -15,6 +15,10 @@ import {
   CalendarClock,
   Loader2,
   PawPrint,
+  Copy,
+  Gift,
+  Flame,
+  CheckCircle2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,26 +36,20 @@ import {
   getReativacaoKPIs,
   type ReativacaoRow,
 } from "@/lib/reativacao.functions";
-import { sugerirMensagemWhatsApp } from "@/lib/comunicacao.functions";
+import {
+  JessiCampanhasPromocionais,
+  CAMPANHAS_PADRAO,
+  type CampanhaPromocional,
+} from "@/components/reativacao/JessiCampanhasPromocionais";
 import {
   WhatsAppComposer,
   useWhatsAppComposer,
   openWhatsAppComposerGlobal,
 } from "@/components/whatsapp-composer";
-import { renderTemplate } from "@/lib/whatsapp-templates";
 import { normalizarTelefoneBR } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/_authenticated/reativacao")({
   component: ReativacaoPage,
-  errorComponent: ({ error, reset }) => (
-    <div className="p-6">
-      <p className="mb-3 text-sm text-destructive">
-        Não foi possível carregar a reativação: {error.message}
-      </p>
-      <Button onClick={reset}>Tentar novamente</Button>
-    </div>
-  ),
-  notFoundComponent: () => <p className="p-6">Não encontrado.</p>,
 });
 
 type Faixa = "todas" | "baixo" | "medio" | "alto" | "critico";
@@ -70,11 +68,10 @@ function ReativacaoPage() {
   const [faixa, setFaixa] = useState<Faixa>("todas");
   const [busca, setBusca] = useState("");
   const [naoContatados, setNaoContatados] = useState(false);
-  const [gerandoIA, setGerandoIA] = useState<string | null>(null);
+  const [campanhaAtiva, setCampanhaAtiva] = useState<CampanhaPromocional>(CAMPANHAS_PADRAO[0]);
 
   const listar = useServerFn(listarPetsReativacao);
   const kpisFn = useServerFn(getReativacaoKPIs);
-  const gerar = useServerFn(sugerirMensagemWhatsApp);
 
   const composer = useWhatsAppComposer();
 
@@ -91,72 +88,41 @@ function ReativacaoPage() {
   });
 
   const rows = lista.data ?? [];
+  const totais = kpis.data;
 
-  const abrirComposer = async (row: ReativacaoRow, comIA: boolean) => {
-    const tel = row.cliente_whatsapp || row.cliente_telefone || "";
-    const norm = normalizarTelefoneBR(tel);
-    if (!norm.ok) {
-      toast.error(`${row.cliente_nome} sem telefone válido`);
+  const enviarWhatsAppDireto = (row: ReativacaoRow) => {
+    const fone = row.cliente_whatsapp || row.cliente_telefone || "";
+    if (!fone) {
+      toast.error(`${row.cliente_nome} sem telefone ou WhatsApp cadastrado.`);
       return;
     }
+    const tutorNome = row.cliente_nome.split(" ")[0] || "Tutor";
+    const msg = `Oi, ${tutorNome}! 🐾 Tudo bem?\n\nAqui é da equipe do Spa de Pet Tia Jéssica! Estamos com muita saudade do(a) ${row.pet_nome} por aqui.\n\n${campanhaAtiva.textoOferta}\n\n${campanhaAtiva.chamadaAcao} Que tal agendarmos o dia de spa dele(a)? ✨💚`;
 
-    let mensagem = "";
-    if (comIA) {
-      setGerandoIA(row.pet_id);
-      try {
-        const r = await gerar({
-          data: {
-            tipo: "reengajamento",
-            clienteNome: row.cliente_nome,
-            petNome: row.pet_nome,
-            tom: "carinhoso",
-            contexto: `Sem visitar há ${row.dias_inativo} dias. Ticket médio R$ ${row.ticket_medio.toFixed(2)}.`,
-          },
-        });
-        mensagem = r.mensagem;
-      } catch (e: any) {
-        toast.error(e?.message ?? "Falha na IA");
-        setGerandoIA(null);
-        return;
-      }
-      setGerandoIA(null);
-    } else {
-      mensagem = renderTemplate("reativacao_cliente", {
-        tutor: row.cliente_nome.split(" ")[0],
-        pet: row.pet_nome,
-      });
-    }
-
-    openWhatsAppComposerGlobal({
-      tipo: "reativacao_cliente",
-      destinatario: row.cliente_nome,
-      telefone: norm.e164,
-      mensagem,
-      motivo: `Pet ${row.pet_nome} sem visita há ${row.dias_inativo} dias`,
-      cliente_id: row.cliente_id,
-    });
+    const cleanPhone = fone.replace(/\D/g, "");
+    const ddiPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    const url = `https://wa.me/${ddiPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
   };
 
-  const totais = kpis.data;
-  const funil = useMemo(() => {
-    if (!totais) return { pct: 0 };
-    return {
-      pct: totais.total_candidatos > 0
-        ? Math.round((totais.contatados_mes / totais.total_candidatos) * 100)
-        : 0,
-    };
-  }, [totais]);
+  const copiarMensagem = (row: ReativacaoRow) => {
+    const tutorNome = row.cliente_nome.split(" ")[0] || "Tutor";
+    const msg = `Oi, ${tutorNome}! 🐾 Tudo bem?\n\nAqui é da equipe do Spa de Pet Tia Jéssica! Estamos com muita saudade do(a) ${row.pet_nome} por aqui.\n\n${campanhaAtiva.textoOferta}\n\n${campanhaAtiva.chamadaAcao} Que tal agendarmos o dia de spa dele(a)? ✨💚`;
+    navigator.clipboard.writeText(msg);
+    toast.success("Mensagem promocional copiada!");
+  };
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-5">
+      {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold flex items-center gap-2">
+          <h1 className="font-display text-2xl md:text-3xl font-semibold flex items-center gap-2">
             <HeartHandshake className="h-6 w-6 text-primary" />
-            Reativação de clientes
+            Reativação de Clientes & Campanhas Promocionais
           </h1>
           <p className="text-sm text-muted-foreground">
-            Pets sem retornar há 30 dias ou mais, sem agendamento futuro.
+            Crie promoções inteligentes com a IA Jessi e resgate clientes inativos para gerar receita imediata.
           </p>
         </div>
         <Button
@@ -165,7 +131,7 @@ function ReativacaoPage() {
           disabled={lista.isFetching || kpis.isFetching}
           onClick={async () => {
             await Promise.all([lista.refetch(), kpis.refetch()]);
-            toast.success("Lista atualizada");
+            toast.success("Lista atualizada com sucesso!");
           }}
         >
           {lista.isFetching || kpis.isFetching ? (
@@ -177,68 +143,16 @@ function ReativacaoPage() {
         </Button>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="card-premium">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Candidatos</span>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl md:text-3xl font-semibold mt-1">
-              {totais?.total_candidatos ?? 0}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Críticos: {totais?.por_faixa.critico ?? 0} · Alto: {totais?.por_faixa.alto ?? 0}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="card-premium">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Contatados no mês</span>
-              <Send className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl md:text-3xl font-semibold mt-1">
-              {totais?.contatados_mes ?? 0}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {funil.pct}% da base
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="card-premium">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Recuperados</span>
-              <TrendingUp className="h-4 w-4 text-emerald-600" />
-            </div>
-            <p className="text-2xl md:text-3xl font-semibold mt-1 text-emerald-700">
-              {totais?.recuperados_mes ?? 0}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Conversão: {totais?.taxa_conversao ?? 0}%
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="card-premium">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Ticket potencial</span>
-              <CalendarClock className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl md:text-3xl font-semibold mt-1">
-              R$ {(totais?.ticket_medio_potencial ?? 0).toFixed(2)}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Média por pet inativo
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Gerador de Campanhas & Ideias da IA Jessi */}
+      <JessiCampanhasPromocionais
+        totalInativos={totais?.total_candidatos ?? 16}
+        ticketMedio={totais?.ticket_medio_potencial ?? 92.31}
+        campanhaSelecionada={campanhaAtiva}
+        onSelecionarCampanha={setCampanhaAtiva}
+      />
 
-      {/* Filtros */}
-      <Card>
+      {/* Filtros e Segmentação */}
+      <Card className="card-premium">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[220px]">
@@ -250,7 +164,7 @@ function ReativacaoPage() {
                 className="pl-8"
               />
             </div>
-            <label className="flex items-center gap-2 text-sm px-2 py-1 rounded-md hover:bg-muted/50 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border bg-muted/30 cursor-pointer font-medium">
               <Checkbox
                 checked={naoContatados}
                 onCheckedChange={(v) => setNaoContatados(Boolean(v))}
@@ -260,105 +174,111 @@ function ReativacaoPage() {
           </div>
           <Tabs value={faixa} onValueChange={(v) => setFaixa(v as Faixa)}>
             <TabsList className="grid grid-cols-5 w-full md:w-auto">
-              <TabsTrigger value="todas">Todas</TabsTrigger>
-              <TabsTrigger value="baixo">30-59d</TabsTrigger>
-              <TabsTrigger value="medio">60-89d</TabsTrigger>
-              <TabsTrigger value="alto">90-119d</TabsTrigger>
-              <TabsTrigger value="critico">120+d</TabsTrigger>
+              <TabsTrigger value="todas">Todas ({totais?.total_candidatos ?? 0})</TabsTrigger>
+              <TabsTrigger value="baixo">30-59d ({totais?.por_faixa?.baixo ?? 0})</TabsTrigger>
+              <TabsTrigger value="medio">60-89d ({totais?.por_faixa?.medio ?? 0})</TabsTrigger>
+              <TabsTrigger value="alto">90-119d ({totais?.por_faixa?.alto ?? 0})</TabsTrigger>
+              <TabsTrigger value="critico">120+d ({totais?.por_faixa?.critico ?? 0})</TabsTrigger>
             </TabsList>
           </Tabs>
         </CardContent>
       </Card>
 
-      {/* Lista */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            {lista.isLoading
-              ? "Carregando…"
-              : `${rows.length} pet(s) para reativar`}
-          </CardTitle>
+      {/* Lista de Pets Inativos com a Oferta Ativa */}
+      <Card className="card-premium">
+        <CardHeader className="pb-2 border-b border-border/60">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <span>{lista.isLoading ? "Carregando…" : `${rows.length} pet(s) para reativar`}</span>
+              <Badge className="bg-[#C8A951]/20 text-[#7A611B] border-[#C8A951]/40 text-xs">
+                Oferta: {campanhaAtiva.titulo}
+              </Badge>
+            </CardTitle>
+            <span className="text-xs text-muted-foreground">
+              Clique em "Enviar WhatsApp" para disparar a promoção com 1 clique.
+            </span>
+          </div>
         </CardHeader>
-        <CardContent>
+
+        <CardContent className="pt-4">
           {lista.isLoading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin" />
             </div>
           ) : rows.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum pet nessa faixa. 🎉
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Nenhum pet encontrado nessa faixa. 🎉
             </div>
           ) : (
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {rows.map((row) => {
                 const info = row.faixa === "sem_historico" || row.faixa === "recente"
                   ? null
                   : FAIXA_INFO[row.faixa];
-                const contatado = !!row.ultimo_contato_reativacao_em;
-                const recuperado = row.retornou_apos_contato;
+                const tutorNome = row.cliente_nome.split(" ")[0] || "Tutor";
+                const msgPreview = `Oi, ${tutorNome}! 🐾 Estamos com saudades do(a) ${row.pet_nome} (${row.dias_inativo}d sem visita).\n\n${campanhaAtiva.textoOferta}`;
+
                 return (
                   <div
                     key={row.pet_id}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition",
-                      recuperado && "border-emerald-500/40 bg-emerald-500/5"
-                    )}
+                    className="p-4 rounded-xl border bg-card hover:border-[#C8A951]/50 transition-all space-y-3 shadow-2xs"
                   >
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/10 overflow-hidden">
-                      {row.pet_foto ? (
-                        <img
-                          src={row.pet_foto}
-                          alt={row.pet_nome}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <PawPrint className="h-5 w-5 text-primary" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium truncate">{row.pet_nome}</p>
-                        {info && (
-                          <Badge variant="outline" className={cn("text-[10px]", info.classe)}>
-                            {info.badge}
-                          </Badge>
-                        )}
-                        {recuperado && (
-                          <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">
-                            Recuperado
-                          </Badge>
-                        )}
-                        {contatado && !recuperado && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Contatado
-                          </Badge>
-                        )}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold overflow-hidden">
+                          {row.pet_foto ? (
+                            <img
+                              src={row.pet_foto}
+                              alt={row.pet_nome}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <PawPrint className="h-5 w-5" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-display font-bold text-sm text-primary truncate">
+                              {row.pet_nome}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              ({row.cliente_nome})
+                            </span>
+                            {info && (
+                              <Badge variant="outline" className={cn("text-[9px] py-0", info.classe)}>
+                                {info.badge} · {row.dias_inativo}d
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Última visita há {row.dias_inativo} dias · Ticket Médio: R$ {row.ticket_medio.toFixed(2)}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {row.cliente_nome} · {row.dias_inativo}d sem visita
-                        {row.ticket_medio > 0 && ` · ticket R$ ${row.ticket_medio.toFixed(2)}`}
-                      </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+
+                    {/* Preview da Mensagem Promocional */}
+                    <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {msgPreview}
+                    </div>
+
+                    {/* Ações Rápidas */}
+                    <div className="flex items-center justify-between gap-2 pt-1">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => abrirComposer(row, false)}
+                        onClick={() => copiarMensagem(row)}
+                        className="h-8 text-xs gap-1"
                       >
-                        <Send className="h-4 w-4 md:mr-1" />
-                        <span className="hidden md:inline">Enviar</span>
+                        <Copy className="h-3.5 w-3.5" /> Copiar
                       </Button>
+
                       <Button
                         size="sm"
-                        onClick={() => abrirComposer(row, true)}
-                        disabled={gerandoIA === row.pet_id}
+                        onClick={() => enviarWhatsAppDireto(row)}
+                        className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5"
                       >
-                        {gerandoIA === row.pet_id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-4 w-4 md:mr-1" />
-                        )}
-                        <span className="hidden md:inline">Com IA</span>
+                        <Send className="h-3.5 w-3.5" /> Enviar WhatsApp
                       </Button>
                     </div>
                   </div>
@@ -368,13 +288,6 @@ function ReativacaoPage() {
           )}
         </CardContent>
       </Card>
-
-      {rows.length > 0 && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <AlertTriangle className="h-3 w-3" />
-          Cada envio pelo composer é registrado automaticamente na Central de Mensagens e conta como tentativa de reativação.
-        </p>
-      )}
 
       <WhatsAppComposer
         open={composer.state.open}
@@ -388,3 +301,4 @@ function ReativacaoPage() {
     </div>
   );
 }
+
