@@ -1604,7 +1604,7 @@ function AtendimentoDetalhe() {
                     {extras.map((se, i) => (
                       <div key={i} className="flex justify-between text-xs py-0.5">
                         <span>{se.nome}</span>
-                        <span className="font-medium tabular-nums">{brl(Number(se.valor_total || se.valor_unit || se.valor || 0))}</span>
+                        <span className="font-medium tabular-nums">{brl(Number(se.valor_total || se.valor_unit || (se as any).valor || 0))}</span>
                       </div>
                     ))}
                     <div className="flex justify-between text-xs text-muted-foreground pt-1 font-medium">
