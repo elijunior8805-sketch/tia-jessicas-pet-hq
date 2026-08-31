@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { RelatoriosAgendamentos } from "@/components/relatorios-agendamentos";
+import { JessiRelatoriosCopilot } from "@/components/relatorios/JessiRelatoriosCopilot";
 import { PageShell, PageHeader, KpiCard, SectionCard } from "@/components/page-shell";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
@@ -231,6 +232,18 @@ function RelatoriosPage() {
           )}
         </div>
       </SectionCard>
+
+      {/* Copiloto de Inteligência em Relatórios da Jessi */}
+      <JessiRelatoriosCopilot
+        faturamento={ind?.faturamento ?? 0}
+        ticketMedio={ind?.ticket_medio ?? 0}
+        atendimentosFinalizados={ind?.atendimentos_finalizados ?? 0}
+        clientesAtendidos={ind?.clientes_atendidos ?? 0}
+        novosClientes={ind?.novos_clientes ?? 0}
+        aReceber={ind?.a_receber ?? 0}
+        periodoStr={`${de} até ${ate}`}
+        onExportCsv={exportarCsv}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

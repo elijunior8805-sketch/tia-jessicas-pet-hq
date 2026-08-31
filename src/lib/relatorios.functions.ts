@@ -53,9 +53,28 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => PeriodoSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    // Amplia a janela em ±1 dia para captar registros que ficam do "outro lado"
-    // do meio-dia UTC mas pertencem a um dia local em America/Sao_Paulo.
+    // 1. Busca indicadores consolidados da view unificada (mesma base do Dashboard e Financeiro)
+    const { data: indicators } = await supabase
+      .from("vw_financeiro_indicadores")
+      .select("*")
+      .gte("data_referencia", data.de)
+      .lte("data_referencia", data.ate);
+
+    let faturamentoCompetencia = 0;
+    let recebidoPeriodo = 0;
+    let atendimentosCount = 0;
+
+    indicators?.forEach((row: any) => {
+      const val = Number(row.valor || 0);
+      if (row.tipo === "receita_servico") {
+        faturamentoCompetencia += val;
+        atendimentosCount += Number(row.quantidade_atendimentos || 0);
+      } else if (row.tipo === "receita_recebida") {
+        recebidoPeriodo += val;
+      }
+    });
+
+    // 2. Atendimentos do período para rankings e detalhamento
     const deWide = new Date(`${data.de}T00:00:00.000Z`);
     deWide.setUTCDate(deWide.getUTCDate() - 1);
     const ateWide = new Date(`${data.ate}T23:59:59.999Z`);
@@ -63,7 +82,6 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
     const deIsoWide = deWide.toISOString();
     const ateIsoWide = ateWide.toISOString();
 
-    // Atendimentos em janela ampliada — filtramos depois por dia local.
     const { data: atendRowsRaw, error: atErr } = await supabase
       .from("atendimentos")
       .select(
@@ -77,9 +95,6 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .returns<any[]>();
     if (atErr) throw new Error("Falha ao carregar atendimentos");
 
-    // Determina o dia de referência de cada linha (local SP):
-    // - finalizados: encerrado_em (data real do faturamento)
-    // - demais: data_inicio (data do agendamento)
     const rowsAll = (atendRowsRaw ?? []).map((r) => {
       const isFinalized = r.finalizado === true && !!r.encerrado_em;
       const dia = toLocalDay(isFinalized ? r.encerrado_em : (r.data_inicio ?? r.data_fim));
@@ -87,15 +102,17 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
     });
     const rows = rowsAll.filter((r) => r.__dia >= data.de && r.__dia <= data.ate);
 
-    // Pagamentos em aberto — snapshot atual (independe do período)
+    // Pagamentos em aberto — snapshot atual (mesmo critério de Dashboard e Financeiro)
     const { data: pagRows, error: pgErr } = await supabase
       .from("pagamentos")
       .select(sel("valor_total, valor_pago, vencimento, status"))
-      .in("status", ["pendente", "parcial", "atrasado"])
+      .neq("status", "pago")
+      .neq("status", "cancelado")
+      .is("arquivado_em", null)
       .returns<any[]>();
     if (pgErr) throw new Error("Falha ao carregar pagamentos");
 
-    // Clientes novos no período (count exato)
+    // Clientes novos no período
     const deIsoDay = `${data.de}T00:00:00.000Z`;
     const ateIsoDay = `${data.ate}T23:59:59.999Z`;
     const { count: novosCliCount, error: cliErr } = await supabase
@@ -114,9 +131,6 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
       .in("status", ["cancelado", "nao_compareceu"])
       .returns<any[]>();
 
-    // Faturamento/ticket/contagem: SOMENTE finalizados com valor_executado > 0.
-    // Regra única (igual Dashboard/Financeiro/Histórico):
-    //   total = max(0, valor_executado + taxa_leva_traz - desconto)
     const isExecutado = (r: any) =>
       Number(r.valor_executado ?? 0) > 0 && r.__final === true;
     const rowsExecutados = rows.filter(isExecutado);
@@ -127,7 +141,12 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
           Number(r.taxa_leva_traz ?? 0) -
           Number(r.desconto ?? 0),
       );
-    const faturamento = rowsExecutados.reduce((s, r) => s + totalRow(r), 0);
+    
+    // Se a view unificada retornou faturamento, usa a base consolidada
+    const faturamento = faturamentoCompetencia > 0 
+      ? faturamentoCompetencia 
+      : rowsExecutados.reduce((s, r) => s + totalRow(r), 0);
+
     const faturamentoPlan = rows.reduce(
       (s, r) => s + Number(r.valor_planejado ?? 0),
       0,
