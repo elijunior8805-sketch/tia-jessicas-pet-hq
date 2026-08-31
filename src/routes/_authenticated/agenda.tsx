@@ -452,13 +452,21 @@ function AgendaPage() {
   const navigate = useNavigate();
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Status }) => {
-      // Se estiver finalizando, consome a reserva
+      // Se estiver finalizando, consome a reserva (se houver)
       if (status === "finalizado") {
-        await consumirReserva({ data: { agendamento_id: id } });
+        try {
+          await consumirReserva({ data: { agendamento_id: id } });
+        } catch (errRes) {
+          console.warn("Agendamento sem reserva de Clubinho a consumir:", errRes);
+        }
       }
-      // Se estiver cancelando, libera a reserva
+      // Se estiver cancelando, libera a reserva (se houver)
       if (status === "cancelado") {
-        await liberarReserva({ data: { agendamento_id: id } });
+        try {
+          await liberarReserva({ data: { agendamento_id: id } });
+        } catch (errRes) {
+          console.warn("Agendamento sem reserva de Clubinho a liberar:", errRes);
+        }
       }
 
       const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);

@@ -126,15 +126,20 @@ function TarefaCard({ tarefa }: { tarefa: Tarefa }) {
       const { error } = await (supabase as any).from("leva_traz_tarefas")
         .update({ status: novo }).eq("id", tarefa.id);
       if (error) throw error;
-      const { data: u } = await supabase.auth.getUser();
-      await (supabase as any).from("leva_traz_eventos").insert({
-        tarefa_id: tarefa.id,
-        agendamento_id: tarefa.agendamento_id,
-        tipo: "status_atualizado",
-        payload: { de: tarefa.status, para: novo },
-        user_id: u.user?.id ?? null,
-        user_email: u.user?.email ?? null,
-      });
+      
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        await (supabase as any).from("leva_traz_eventos").insert({
+          tarefa_id: tarefa.id,
+          agendamento_id: tarefa.agendamento_id,
+          tipo: "status_atualizado",
+          payload: { de: tarefa.status, para: novo },
+          user_id: u.user?.id ?? null,
+          user_email: u.user?.email ?? null,
+        });
+      } catch (errEv) {
+        console.warn("Log de evento não crítico omitido:", errEv);
+      }
     },
     onSuccess: () => {
       toast.success("Status atualizado");
