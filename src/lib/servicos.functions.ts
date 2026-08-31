@@ -182,3 +182,32 @@ export const duplicarServico = createServerFn({ method: "POST" })
 
     return novo;
   });
+
+/** Expurgar serviços indesejados permanentemente do catálogo */
+export const expurgarServicoPorNome = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) =>
+    z
+      .object({
+        termo: z.string().default("BANHO SPA"),
+      })
+      .parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: itens, error } = await sb
+      .from("servicos")
+      .select("id, nome")
+      .ilike("nome", `%${data.termo}%`);
+
+    if (error || !itens || itens.length === 0) return { removidos: 0 };
+
+    for (const item of itens) {
+      await sb.from("servicos_precos" as any).delete().eq("servico_id", item.id);
+      await sb.from("servicos_combo_itens" as any).delete().eq("servico_id", item.id);
+      await sb.from("servicos").delete().eq("id", item.id);
+      await sb.from("servicos").update({ ativo: false } as any).eq("id", item.id);
+    }
+
+    return { removidos: itens.length };
+  });

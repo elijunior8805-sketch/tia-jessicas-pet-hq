@@ -60,6 +60,7 @@ const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 
 function ServicosPage() {
   const qc = useQueryClient();
+  const expurgarFn = useServerFn(expurgarServicoPorNome);
   const [busca, setBusca] = useState("");
   const [tab, setTab] = useState<"servicos" | "combos">("servicos");
   const [editing, setEditing] = useState<Servico | null>(null);
@@ -84,7 +85,17 @@ function ServicosPage() {
         .select("id, nome, categoria, descricao, valor, duracao_min, ativo, is_combo, preco_a_partir")
         .order("nome");
       if (error) throw error;
-      return data as Servico[];
+      
+      const limpos = (data as Servico[]).filter(
+        (s) => !s.nome.toUpperCase().includes("BANHO SPA")
+      );
+
+      // Se encontrou algum Banho Spa no banco, expurga em background
+      if ((data as Servico[]).some((s) => s.nome.toUpperCase().includes("BANHO SPA"))) {
+        expurgarFn({ data: { termo: "BANHO SPA" } }).catch(() => {});
+      }
+
+      return limpos;
     },
   });
 

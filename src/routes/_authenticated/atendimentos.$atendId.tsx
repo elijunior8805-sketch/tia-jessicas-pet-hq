@@ -455,7 +455,7 @@ function AtendimentoDetalhe() {
     queryFn: async () => {
       const { data } = await supabase.from("servicos")
         .select("id, nome, valor, categoria").eq("ativo", true).order("nome");
-      return data ?? [];
+      return (data ?? []).filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"));
     },
   });
 

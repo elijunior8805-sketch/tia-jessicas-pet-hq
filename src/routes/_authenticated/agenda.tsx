@@ -1583,7 +1583,7 @@ function NovoAgendamentoDialog({
         .select("id, nome, valor, duracao_min, categoria")
         .eq("ativo", true)
         .order("nome");
-      return data ?? [];
+      return (data ?? []).filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"));
     },
   });
 
@@ -2157,7 +2157,7 @@ function EditarServicosDialog({
         .select("id, nome, valor, duracao_min, categoria")
         .eq("ativo", true)
         .order("nome");
-      return data ?? [];
+      return (data ?? []).filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"));
     },
   });
 
