@@ -269,7 +269,7 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-display">
             <PackageCheck className="h-6 w-6 text-gold" />
-            {initial ? "Editar Programa do Catálogo" : "Novo Programa de Cuidado"}
+            {initial ? "Editar Plano do Clubinho" : "Novo Plano do Clubinho"}
           </DialogTitle>
           <DialogDescription className="text-xs">
             Configure os serviços reais, cálculo automático e política de desconto para novas vendas.

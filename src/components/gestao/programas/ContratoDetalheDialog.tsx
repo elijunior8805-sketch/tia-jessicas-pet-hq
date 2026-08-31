@@ -205,7 +205,7 @@ export function ContratoDetalheDialog({ contratoId, onOpenChange }: Props) {
       pet_nome: contrato.pets?.nome || "Pet",
       pet_raca: contrato.pets?.raca || null,
       pet_porte: contrato.pets?.porte || null,
-      programa_nome: contrato.nome_snapshot || "Programa de Cuidados",
+      programa_nome: contrato.nome_snapshot || "Clubinho",
       data_contratacao: contrato.criado_em || contrato.data_de_inicio || new Date().toISOString(),
       data_inicio: contrato.data_de_inicio || new Date().toISOString(),
       data_validade: validade || contrato.data_de_validade || new Date().toISOString(),

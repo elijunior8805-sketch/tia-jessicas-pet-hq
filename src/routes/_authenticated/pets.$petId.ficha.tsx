@@ -156,7 +156,7 @@ function FichaOperacional() {
         </Card>
       )}
 
-      {/* Programa de Cuidado do Pet */}
+      {/* Clubinho do Pet */}
       {programaContratado && (() => {
         const resumo = calcularSaldosDoContrato(programaContratado as any, (programaContratado as any).movimentacoes || []);
         return (
@@ -164,7 +164,7 @@ function FichaOperacional() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase font-bold tracking-wider text-muted-foreground">Programa de Cuidado Ativo</span>
+                  <span className="text-xs uppercase font-bold tracking-wider text-muted-foreground">Clubinho Ativo</span>
                   <Badge className={cn(
                     "text-xs",
                     resumo.status_do_programa === "ativo" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"

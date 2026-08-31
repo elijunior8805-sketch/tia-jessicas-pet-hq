@@ -122,10 +122,10 @@ export function TermoPosVendaDialog({
           </div>
           <DialogTitle className="text-lg font-bold font-display text-white flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-[#C8A951]" />
-            Termo de Contratação do Programa
+            Termo de Adesão — Clubinho
           </DialogTitle>
           <DialogDescription className="text-xs text-white/80">
-            O contrato foi registrado no banco de dados. O PDF oficial já está pronto para visualização, download e encaminhamento manual.
+            A adesão ao Clubinho foi registrada no banco de dados. O PDF oficial já está pronto para visualização, download e compartilhamento.
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +141,7 @@ export function TermoPosVendaDialog({
               <span className="font-bold text-emerald-900">🐾 {termoData.pet_nome}</span>
             </div>
             <div className="flex justify-between items-center border-b border-border/60 pb-2">
-              <span className="text-muted-foreground font-medium">Programa:</span>
+              <span className="text-muted-foreground font-medium">Plano do Clubinho:</span>
               <span className="font-bold text-foreground">{termoData.programa_nome}</span>
             </div>
             <div className="flex justify-between items-center border-b border-border/60 pb-2">

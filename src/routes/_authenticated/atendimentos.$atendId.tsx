@@ -934,7 +934,7 @@ function AtendimentoDetalhe() {
           status: "pago",
           vencimento: hojeISO,
           data_pagamento: hojeISO,
-          descricao: `Atendimento de ${pet?.nome || 'Pet'} quitado com 1 crédito do Programa de Cuidados`,
+          descricao: `Atendimento de ${pet?.nome || 'Pet'} quitado com 1 crédito do Clubinho`,
         };
         const { data: existing } = await supabase.from("pagamentos")
           .select("id").eq("atendimento_id", atendId).maybeSingle();
@@ -967,13 +967,13 @@ function AtendimentoDetalhe() {
       const pagPayload: any = {
         atendimento_id: atendId,
         cliente_id: (atendimento as any).cliente_id,
-        valor_total: totalExtrasFinanceiro, // Registra apenas os extras, sem somar o banho já quitado no programa!
+        valor_total: totalExtrasFinanceiro, // Registra apenas os extras, sem somar o banho já quitado no Clubinho!
         valor_pago: valorPago,
         forma: formaPagExtras,
         status: status,
         vencimento: hojeISO,
         data_pagamento: pago ? hojeISO : null,
-        descricao: `Serviços extras de ${pet?.nome || 'Pet'} (Banho quitado com 1 crédito do Programa)`,
+        descricao: `Serviços extras de ${pet?.nome || 'Pet'} (Banho quitado com 1 crédito do Clubinho)`,
       };
       const { data: existing } = await supabase.from("pagamentos")
         .select("id").eq("atendimento_id", atendId).maybeSingle();
@@ -1614,10 +1614,10 @@ function AtendimentoDetalhe() {
                   </div>
                 )}
 
-                {/* 3. TOTAL COBERTO PELO PROGRAMA */}
+                {/* 3. TOTAL COBERTO PELO CLUBINHO */}
                 {isBanhoQuitadoComCredito && (
                   <div className="p-2 rounded-lg bg-emerald-50/80 border border-emerald-200 text-xs flex justify-between items-center text-emerald-950">
-                    <span className="font-medium">✨ Total coberto pelo Programa:</span>
+                    <span className="font-medium">✨ Total coberto pelo Clubinho:</span>
                     <strong className="text-emerald-800">{brl(valorSolicitados)} (1 crédito de banho)</strong>
                   </div>
                 )}
@@ -1644,7 +1644,7 @@ function AtendimentoDetalhe() {
                 <div>
                   <span className="font-display text-lg">Total a Receber Agora</span>
                   {isBanhoQuitadoComCredito && (
-                    <p className="text-[11px] text-emerald-800 font-medium">Banho quitado via Programa de Cuidados</p>
+                    <p className="text-[11px] text-emerald-800 font-medium">Banho quitado via Clubinho</p>
                   )}
                 </div>
                 <span className={`font-display text-3xl tabular-nums ${total === 0 ? "text-emerald-800 font-bold" : "text-primary"}`}>
@@ -1680,7 +1680,7 @@ function AtendimentoDetalhe() {
                       >
                         {elegibilidadeCredito?.resumo?.creditos_banho_reservados && elegibilidadeCredito.resumo.creditos_banho_reservados > 0
                           ? "🐾 Crédito de banho reservado para este atendimento"
-                          : `🐾 Crédito de banho — Programa de Cuidados (${elegibilidadeCredito?.resumo?.creditos_banho_disponiveis !== undefined ? `${elegibilidadeCredito.resumo.creditos_banho_disponiveis} disponíveis` : "Disponível"})`
+                          : `🐾 Crédito de banho — Clubinho (${elegibilidadeCredito?.resumo?.creditos_banho_disponiveis !== undefined ? `${elegibilidadeCredito.resumo.creditos_banho_disponiveis} disponíveis` : "Disponível"})`
                         }
                       </SelectItem>
                       {FORMAS_PAGAMENTO.map((f) => (
@@ -1696,7 +1696,7 @@ function AtendimentoDetalhe() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 font-bold text-[#123F2A] text-xs">
                           <PackageCheck className="h-4 w-4 text-[#C8A951]" />
-                          <span>Programa de Cuidados</span>
+                          <span>Clubinho</span>
                         </div>
                         {elegibilidadeCredito.resumo?.nome_programa && (
                           <span className="text-[10px] text-muted-foreground italic truncate max-w-[140px]">
@@ -1785,7 +1785,7 @@ function AtendimentoDetalhe() {
                 {isBanhoQuitadoComCredito && totalExtrasFinanceiro === 0 && (
                   <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-200/80 text-xs text-emerald-950 flex items-center gap-2.5 shadow-sm">
                     <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
-                    <span className="leading-tight font-medium">Atendimento 100% quitado com crédito do Programa. Nenhuma cobrança financeira pendente.</span>
+                    <span className="leading-tight font-medium">Atendimento 100% quitado com crédito do Clubinho. Nenhuma cobrança financeira pendente.</span>
                   </div>
                 )}
 

@@ -761,7 +761,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               ["visao", "Visão geral"],
               ["pets", `Pets${data.pets?.length ? ` (${data.pets.length})` : ""}`],
               ["agenda", "Agendamentos"],
-              ["programas", `Programas${programasContratados?.length ? ` (${programasContratados.length})` : ""}`],
+              ["programas", `Clubinho${programasContratados?.length ? ` (${programasContratados.length})` : ""}`],
               ["financeiro", "Financeiro"],
               ["comunicacao", "Comunicação"],
               ["historico", "Histórico"],
@@ -796,7 +796,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
               )}
             </div>
 
-            {/* Cartão de Programa de Cuidado na Visão Geral */}
+            {/* Cartão de Clubinho na Visão Geral */}
             <Card className="p-5 border-l-4 border-l-primary bg-primary/[0.03]">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
@@ -804,13 +804,13 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
                     <PackageCheck className="h-6 w-6" />
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Programa de Cuidado</div>
+                    <div className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Clubinho</div>
                     {programasContratados && programasContratados.length > 0 ? (
                       <div className="font-display font-semibold text-base text-primary">
                         {programasContratados[0].nome_snapshot} — {programasContratados[0].pets?.nome ?? "Pet"}
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground">Nenhum programa de cuidado ativo.</div>
+                      <div className="text-sm text-muted-foreground">Nenhum plano do Clubinho ativo.</div>
                     )}
                   </div>
                 </div>
@@ -828,7 +828,7 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
                       </Badge>
                     </div>
                     <Button size="sm" variant="outline" className="gap-1.5 shadow-sm" onClick={() => setAbaAtiva("programas")}>
-                      Ver programa <ChevronRight className="h-4 w-4" />
+                      Ver Clubinho <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
@@ -888,11 +888,11 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
             )}
           </TabsContent>
 
-          {/* PROGRAMAS DE CUIDADO */}
+          {/* CLUBINHO */}
           <TabsContent value="programas" className="mt-0 space-y-4">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs text-muted-foreground">
-                {fetchingProgramas ? "Atualizando..." : `${(programasContratados ?? []).length} programa(s) encontrado(s)`}
+                {fetchingProgramas ? "Atualizando..." : `${(programasContratados ?? []).length} assinatura(s) do Clubinho`}
               </div>
               <Button
                 size="sm"
@@ -901,16 +901,16 @@ function FichaCliente({ id, onVoltar }: { id: string; onVoltar: () => void }) {
                 disabled={fetchingProgramas}
               >
                 <RefreshCw className={cn("h-4 w-4 mr-1.5", fetchingProgramas && "animate-spin")} />
-                Atualizar programas
+                Atualizar Clubinho
               </Button>
             </div>
 
             {(!programasContratados || programasContratados.length === 0) ? (
               <div className="card-premium p-8 text-center space-y-3">
                 <PackageCheck className="h-10 w-10 text-muted-foreground mx-auto" />
-                <div className="text-sm font-medium">Nenhum programa de cuidado ativo para este cliente.</div>
+                <div className="text-sm font-medium">Nenhum plano do Clubinho ativo para este cliente.</div>
                 <Button size="sm" onClick={() => navigate({ to: "/gestao/programas-cuidado" } as any)}>
-                  Vender Programa de Cuidado
+                  Adesão ao Clubinho
                 </Button>
               </div>
             ) : (

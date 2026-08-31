@@ -17,24 +17,24 @@ export const ProgramaCard: React.FC<ProgramaCardProps> = ({ data, onActionClick 
       <div className="font-semibold text-emerald-950 flex items-center justify-between border-b border-border/60 pb-2.5">
         <span className="flex items-center gap-1.5">
           <Sparkles className="h-4 w-4 text-[#C8A951]" />
-          <span>Programas de Cuidado & Saldos de Créditos</span>
+          <span>Clubinho & Saldos de Créditos</span>
         </span>
         {pet?.nome && <Badge variant="outline" className="text-[10px] text-emerald-800 bg-emerald-50">Pet: {pet.nome}</Badge>}
       </div>
 
       <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/70 text-[11px] text-amber-900">
         <span className="font-semibold block mb-0.5">⭐ Regra de Equivalência de Banho:</span>
-        1 crédito de banho do programa pode ser utilizado tanto para <strong>Banho Simples</strong> quanto para <strong>Banho Premium</strong> sem cobrança extra.
+        1 crédito de banho do Clubinho pode ser utilizado tanto para <strong>Banho Simples</strong> quanto para <strong>Banho Premium</strong> sem cobrança extra.
       </div>
 
       {!contratos.length ? (
         <div className="text-muted-foreground py-3 text-center text-xs">
-          Nenhum programa ou pacote de créditos ativo para este pet.
+          Nenhum plano do Clubinho ou pacote de créditos ativo para este pet.
         </div>
       ) : (
         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
           {contratos.map((c: any, idx: number) => {
-            const nomeProg = c.programas_de_cuidado?.nome || c.nome_snapshot || "Programa de Cuidado";
+            const nomeProg = c.programas_de_cuidado?.nome || c.nome_snapshot || "Clubinho";
             const validade = c.data_de_validade ? new Date(c.data_de_validade).toLocaleDateString("pt-BR") : "Sem validade";
             const status = c.status_do_programa || "ativo";
             const petNome = c.pets?.nome || pet?.nome || "Pet";

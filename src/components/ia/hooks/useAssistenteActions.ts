@@ -463,16 +463,16 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
           .eq("ativo", true);
         
         if (progs && progs.length > 0) {
-          respostaFinal = `### 🎁 Programas de Cuidado do Spa\n\n` +
-            `Equivalência de Banho: **1 crédito de banho cobre Banho Simples ou Banho Premium**.\n\n` +
+          respostaFinal = `### 🎁 Planos do Clubinho\n\n` +
+            `Equivalência de Banho: **1 crédito de banho do Clubinho cobre Banho Simples ou Banho Premium**.\n\n` +
             progs.map((p: any) => `- **${p.nome}**: R$ ${Number(p.preco || 0).toFixed(2)}`).join("\n");
         } else {
-          respostaFinal = "Não encontrei programas de cuidado ativos no catálogo.";
+          respostaFinal = "Não encontrei planos do Clubinho ativos no catálogo.";
         }
       }
 
       if (intent.intencao === "saudacao") {
-        respostaFinal = intent.resposta_ia || "Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Estou à disposição para ajudar com agenda, clientes, pets, programas de cuidado e finanças!";
+        respostaFinal = intent.resposta_ia || "Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Estou à disposição para ajudar com agenda, clientes, pets, Clubinho e finanças!";
       }
 
 

@@ -114,7 +114,7 @@ export async function generateTermoProgramaPDF(d: TermoProgramaData): Promise<js
   doc.setFontSize(9);
   doc.setTextColor(...C.mute);
   doc.text("Centro de Estética, Bem-Estar e Cuidados Caninos Integrados", headerLeft, y + 27);
-  doc.text("Termo de Contratação e Uso do Programa de Cuidados", headerLeft, y + 38);
+  doc.text("Termo de Adesão e Uso — Clubinho Tia Jéssica", headerLeft, y + 38);
 
   // Badge do Número do Contrato no canto superior direito
   doc.setFillColor(...C.cream);
@@ -294,7 +294,7 @@ export async function generateTermoProgramaPDF(d: TermoProgramaData): Promise<js
     },
     {
       tit: "5. Pré-Pagamento e Liberação:",
-      txt: "O programa de cuidados opera sob regime de pré-pagamento. A liberação e uso dos créditos estão condicionados à liquidação integral do valor contratado.",
+      txt: "O Clubinho opera sob regime de pré-pagamento. A liberação e uso dos créditos estão condicionados à liquidação integral do valor contratado.",
     },
   ];
 
@@ -334,7 +334,7 @@ export async function generateTermoProgramaPDF(d: TermoProgramaData): Promise<js
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...C.ink);
-  const aceiteTxt = `Declaro ter lido e concordado integralmente com as regras, vigência de 30 dias e condições do ${d.programa_nome} contratado para o pet ${d.pet_nome}.`;
+  const aceiteTxt = `Declaro ter lido e concordado integralmente com as regras, vigência de 30 dias e condições do ${d.programa_nome} do Clubinho para o pet ${d.pet_nome}.`;
   doc.text(doc.splitTextToSize(aceiteTxt, contentW - 20), M + 10, y + 25);
 
   // Rodapé em todas as páginas
@@ -351,7 +351,7 @@ export async function generateTermoProgramaPDF(d: TermoProgramaData): Promise<js
     doc.setFontSize(7);
     doc.setTextColor(...C.mute);
     doc.text(
-      `Spa de Pet Tia Jéssica  ·  Contrato ${numContrato}  ·  Emitido em: ${agora}  ·  ${versao}`,
+      `Spa de Pet Tia Jéssica  ·  Clubinho ${numContrato}  ·  Emitido em: ${agora}  ·  ${versao}`,
       M,
       H - 16
     );
@@ -363,24 +363,24 @@ export async function generateTermoProgramaPDF(d: TermoProgramaData): Promise<js
 
 export async function baixarTermoProgramaPDF(data: TermoProgramaData) {
   const doc = await generateTermoProgramaPDF(data);
-  const fileName = `programa-de-cuidados-${data.numero_contrato || data.contrato_id.slice(0, 8)}.pdf`;
+  const fileName = `clubinho-${data.numero_contrato || data.contrato_id.slice(0, 8)}.pdf`;
   doc.save(fileName);
   toast.success("PDF baixado com sucesso!");
 }
 
 export async function visualizarTermoProgramaPDF(data: TermoProgramaData) {
   const doc = await generateTermoProgramaPDF(data);
-  const fileName = `programa-de-cuidados-${data.numero_contrato || data.contrato_id.slice(0, 8)}.pdf`;
+  const fileName = `clubinho-${data.numero_contrato || data.contrato_id.slice(0, 8)}.pdf`;
   deliverPdf(doc, fileName);
 }
 
 export function gerarTextoMensagemTermo(d: TermoProgramaData): string {
-  const numContrato = d.numero_contrato || `PC-${d.contrato_id.slice(0, 8).toUpperCase()}`;
-  return `Olá, ${d.tutor_nome}! A contratação do Programa de Cuidados *${d.programa_nome}* para o pet *${d.pet_nome}* foi finalizada com sucesso. 🐾
+  const numContrato = d.numero_contrato || `CLB-${d.contrato_id.slice(0, 8).toUpperCase()}`;
+  return `Olá, ${d.tutor_nome}! A adesão ao Clubinho (*${d.programa_nome}*) para o pet *${d.pet_nome}* foi finalizada com sucesso. 🐾
 
-O programa possui validade de *${fmtDate(d.data_inicio)}* até *${fmtDate(d.data_validade)}* (30 dias corridos).
+O plano possui validade de *${fmtDate(d.data_inicio)}* até *${fmtDate(d.data_validade)}* (30 dias corridos).
 
-Segue o Termo de Contratação e Uso com os serviços incluídos, créditos, direitos, deveres e regras de agendamento do programa.
+Segue o Termo de Adesão e Uso com os serviços incluídos, créditos, direitos, deveres e regras de agendamento do Clubinho.
 
 Contrato: *${numContrato}*
 
@@ -389,7 +389,7 @@ Spa de Pet Tia Jéssica.`;
 
 export async function compartilharTermoWhatsApp(d: TermoProgramaData) {
   const doc = await generateTermoProgramaPDF(d);
-  const fileName = `programa-de-cuidados-${d.numero_contrato || d.contrato_id.slice(0, 8)}.pdf`;
+  const fileName = `clubinho-${d.numero_contrato || d.contrato_id.slice(0, 8)}.pdf`;
   const textoMensagem = gerarTextoMensagemTermo(d);
   const fone = (d.tutor_telefone || "").replace(/\D/g, "");
 
@@ -401,7 +401,7 @@ export async function compartilharTermoWhatsApp(d: TermoProgramaData) {
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `Termo do Programa de Cuidados — ${d.pet_nome}`,
+          title: `Termo do Clubinho — ${d.pet_nome}`,
           text: textoMensagem,
         });
         toast.success("Compartilhamento aberto com sucesso!");

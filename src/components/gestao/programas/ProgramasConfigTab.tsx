@@ -132,7 +132,7 @@ export function ProgramasConfigTab() {
             Configurações do Módulo
           </CardTitle>
           <CardDescription className="text-zinc-500 dark:text-zinc-400">
-            Defina as regras operacionais e financeiras que regem todos os programas de cuidado.
+            Defina as regras operacionais e financeiras que regem todos os planos do Clubinho.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8 pt-8">
@@ -142,7 +142,7 @@ export function ProgramasConfigTab() {
               <div className="space-y-0.5">
                 <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Permitir venda fracionada</p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Habilita a venda de parte dos serviços de um programa, com valor calculado automaticamente.
+                  Habilita a venda de parte dos serviços de um plano do Clubinho, com valor calculado automaticamente.
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">

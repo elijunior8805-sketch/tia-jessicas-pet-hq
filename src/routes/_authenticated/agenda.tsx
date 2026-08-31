@@ -156,7 +156,7 @@ function ProgramasCuidadoBadge({ petId, onReservarBanho }: { petId: string | nul
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 font-bold text-xs text-[#123F2A]">
           <PackageCheck className="h-4 w-4 text-[#C8A951]" />
-          <span>Crédito disponível no Programa de Cuidados</span>
+          <span>Crédito disponível no Clubinho</span>
         </div>
         {primeiroContrato?.data_de_validade && (
           <Badge variant="outline" className="text-[10px] bg-white border-[#C8A951]/40 text-[#123F2A]">
@@ -171,7 +171,7 @@ function ProgramasCuidadoBadge({ petId, onReservarBanho }: { petId: string | nul
             <strong>{primeiroContrato.pet_nome || "O pet"}</strong> possui{" "}
             <strong className="text-emerald-800 font-bold">{qtdBanhoDisp} crédito(s) de banho</strong> disponíveis
             {qtdBanhoRes > 0 ? ` (${qtdBanhoRes} já reservado(s))` : ""}{" "}
-            no programa <em>{primeiroContrato.nome_programa}</em>.
+            no plano <em>{primeiroContrato.nome_programa}</em> do Clubinho.
           </p>
         ) : (
           <p>Créditos ativos disponíveis na carteira do pet.</p>
@@ -1877,7 +1877,7 @@ function NovoAgendamentoDialog({
                         <span>{it.nome}</span>
                         {it.usar_credito && (
                           <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 font-normal">
-                            ✨ Crédito do Programa
+                            ✨ Crédito do Clubinho
                           </Badge>
                         )}
                       </div>
@@ -2306,7 +2306,7 @@ function EditarServicosDialog({
                       <span>{it.nome}</span>
                       {it.usar_credito && (
                         <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 font-normal">
-                          ✨ Crédito do Programa
+                          ✨ Crédito do Clubinho
                         </Badge>
                       )}
                     </div>

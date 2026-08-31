@@ -703,10 +703,10 @@ function ProgramasCuidadoPage() {
         <div className="space-y-1">
           <h1 className="text-3xl font-display font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
             <PackageCheck className="h-8 w-8 text-gold" />
-            Programas de Cuidado
+            Clubinho
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 font-medium">
-            Gerencie planos pré-pagos e fidelidade com inteligência, controle de créditos e auditoria.
+            Gerencie os planos pré-pagos e fidelidade do Clubinho com inteligência, controle de créditos e auditoria.
           </p>
         </div>
         
@@ -718,7 +718,7 @@ function ProgramasCuidadoPage() {
           }}
         >
           <Plus className="mr-2 h-5 w-5" />
-          Novo Programa
+          Novo Plano
         </Button>
       </div>
 
@@ -730,7 +730,7 @@ function ProgramasCuidadoPage() {
           </TabsTrigger>
           <TabsTrigger value="ativos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <PackageCheck className="mr-2 h-4 w-4" />
-            Programas Ativos ({contratosOperacionais.length})
+            Clubinho Ativo ({contratosOperacionais.length})
           </TabsTrigger>
           <TabsTrigger value="creditos" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <CreditCard className="mr-2 h-4 w-4" />
@@ -738,7 +738,7 @@ function ProgramasCuidadoPage() {
           </TabsTrigger>
           <TabsTrigger value="ia" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <Bot className="mr-2 h-4 w-4" />
-            Inteligência dos Programas
+            Inteligência do Clubinho
           </TabsTrigger>
           <TabsTrigger value="auditoria" className="rounded-xl data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm data-[state=active]:text-gold font-bold transition-all px-5 py-2.5">
             <History className="mr-2 h-4 w-4" />

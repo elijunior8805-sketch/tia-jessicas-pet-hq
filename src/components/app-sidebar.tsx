@@ -57,7 +57,7 @@ const groups = [
     label: "Gestão",
     items: [
       { title: "Serviços", url: "/servicos", icon: Scissors },
-      { title: "Programas de Cuidado", url: "/gestao/programas-cuidado", icon: PackageCheck },
+      { title: "Clubinho", url: "/gestao/programas-cuidado", icon: PackageCheck },
       { title: "Leva e Traz", url: "/leva-traz", icon: Truck },
       { title: "Financeiro", url: "/financeiro", icon: Wallet },
       { title: "Pagamentos em aberto", url: "/pagamentos-abertos", icon: Receipt },

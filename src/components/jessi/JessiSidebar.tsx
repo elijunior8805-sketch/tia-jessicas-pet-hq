@@ -30,7 +30,7 @@ export const JessiSidebar: React.FC<JessiSidebarProps> = ({
     { id: "agenda", label: "Agenda & Horários", icon: Calendar },
     { id: "clientes", label: "Clientes & Pets", icon: Users },
     { id: "financeiro", label: "Financeiro & KPIs", icon: DollarSign },
-    { id: "programas", label: "Programas de Cuidado", icon: Gift },
+    { id: "programas", label: "Clubinho", icon: Gift },
     { id: "comprovantes", label: "Comprovantes Pix", icon: FileText },
     { id: "alertas", label: "Alertas & Cobrança", icon: Bell },
     { id: "historico", label: "Auditoria & Qualidade", icon: History },

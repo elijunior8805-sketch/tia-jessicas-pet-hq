@@ -305,13 +305,13 @@ function ClienteDetalhe() {
           </Card>
         </div>
 
-        {/* Programas de Cuidado */}
+        {/* Clubinho */}
         <Card className="p-5 lg:col-span-3">
           <h2 className="font-display font-semibold text-primary mb-3 flex items-center gap-2">
-            <ClipboardList className="h-4 w-4"/> Programas de Cuidado
+            <ClipboardList className="h-4 w-4"/> Clubinho
           </h2>
           {!programasAtivos || programasAtivos.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center">Nenhum programa de cuidado ativo.</div>
+            <div className="text-sm text-muted-foreground py-6 text-center">Nenhum plano do Clubinho ativo.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {(programasAtivos as any[]).map((prog: any) => {
