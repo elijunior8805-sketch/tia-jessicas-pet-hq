@@ -65,6 +65,8 @@ import {
   montarWaUrl,
   abrirWhatsApp,
 } from "@/lib/whatsapp";
+import { JessiInboxPanel } from "@/components/inbox/JessiInboxPanel";
+import { JessiThreadSuggester } from "@/components/inbox/JessiThreadSuggester";
 
 type FiltroConversa =
   | "todas"
@@ -181,6 +183,17 @@ function InboxPage() {
             Atualizar
           </Button>
         </header>
+
+        {/* Painel Interativo da Jessi */}
+        <JessiInboxPanel
+          kpis={kpis.data}
+          onFiltrarAguardando={() => setFiltro("aguardando")}
+          onFiltrarNaoLidas={() => setFiltro("nao_lidas")}
+          onRefresh={async () => {
+            await Promise.all([threads.refetch(), kpis.refetch()]);
+          }}
+          isRefreshing={threads.isFetching || kpis.isFetching}
+        />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard
@@ -789,6 +802,20 @@ function ThreadView({
           ))}
         </div>
       </ScrollArea>
+
+      {/* Sugestor Inteligente da Jessi */}
+      <div className="px-3 pt-2 bg-background border-t">
+        <JessiThreadSuggester
+          cliente={cli}
+          pets={pets}
+          proximoAgendamento={prox}
+          mensagensRecentes={mensagens}
+          onUsarMensagem={(msg) => {
+            setTexto(msg);
+            setModo("envio");
+          }}
+        />
+      </div>
 
       <div className="border-t bg-muted/30 p-3 space-y-2">
         <Tabs value={modo} onValueChange={(v) => setModo(v as any)}>
