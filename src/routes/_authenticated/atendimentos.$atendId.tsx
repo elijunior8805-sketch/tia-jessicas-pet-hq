@@ -720,11 +720,12 @@ function AtendimentoDetalhe() {
         valorExtrasReal: sumItens(solicitados) + sumItens(extras),
       };
     }
+    const eleg = elegibilidadeCredito as any;
     return {
-      cobertos: elegibilidadeCredito.servicos_cobertos || [],
-      extrasList: elegibilidadeCredito.servicos_extras || [],
-      valorCoberto: elegibilidadeCredito.total_coberto || 0,
-      valorExtrasReal: elegibilidadeCredito.total_extras || 0,
+      cobertos: eleg.servicos_cobertos || [],
+      extrasList: eleg.servicos_extras || [],
+      valorCoberto: eleg.total_coberto || 0,
+      valorExtrasReal: eleg.total_extras || 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usarCreditoPrograma, elegibilidadeCredito, atendimento]);
