@@ -1317,16 +1317,27 @@ function AtendimentoDetalhe() {
             servicosJaAdicionados={[...solicitados, ...extras].map((s) => s.nome)}
             onAdicionarServico={
               !readOnly
-                ? (nome, valor) => {
-                    setExtras((prev) => [
-                      ...prev,
-                      {
-                        nome,
-                        quantidade: 1,
-                        valor_unit: valor,
-                        valor_total: valor,
-                      },
-                    ]);
+                ? (nome: string, valor: number) => {
+                    const match = servicos.find((s: any) => s.nome?.toLowerCase() === nome.toLowerCase());
+                    if (match) {
+                      addExtra(match.id);
+                      return;
+                    }
+                    const novo: ServicoItem = {
+                      servico_id: null,
+                      nome,
+                      quantidade: 1,
+                      valor_unit: valor,
+                      valor_total: valor,
+                      categoria: null,
+                      adicionado_por: myProfile?.id ?? null,
+                      adicionado_por_nome: myProfile?.nome ?? null,
+                      adicionado_em: new Date().toISOString(),
+                    };
+                    const nextExtras = [...extras, novo];
+                    const patch: any = { servicos_extras: nextExtras as any };
+                    if (encerrado) Object.assign(patch, recomputeExecutado(solicitados, nextExtras));
+                    patchMut.mutate(patch);
                   }
                 : undefined
             }
