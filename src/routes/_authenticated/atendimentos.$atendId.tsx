@@ -1654,22 +1654,28 @@ function AtendimentoDetalhe() {
               {/* SELETORES SEPARADOS DE QUITAÇÃO */}
               <div className="mt-4 space-y-4">
                 {/* CAMPO 1: FORMA DE QUITAÇÃO DO BANHO PRINCIPAL */}
-                <div className="p-3 bg-muted/20 border border-border/70 rounded-xl space-y-2">
-                  <Label className="text-xs font-bold text-foreground uppercase tracking-wider block">
-                    Forma de Quitação do Banho ({brl(valorSolicitados)})
-                  </Label>
+                <div className="p-3.5 bg-[#FAF8F3] border border-[#C8A951]/30 rounded-xl space-y-2.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-[#123F2A] uppercase tracking-wider">
+                      Quitação do Banho
+                    </Label>
+                    <Badge variant="outline" className="bg-white/80 text-[11px] font-semibold border-[#C8A951]/40 text-[#123F2A]">
+                      {brl(valorSolicitados)}
+                    </Badge>
+                  </div>
+
                   <Select
                     value={formaQuitacaoBanho}
                     disabled={readOnly}
                     onValueChange={(v) => setFormaQuitacaoBanho(v)}
                   >
-                    <SelectTrigger className="w-full bg-white">
-                      <SelectValue placeholder="Selecione a forma de quitação do banho" />
+                    <SelectTrigger className="w-full bg-white border-[#C8A951]/40 h-10 shadow-sm focus:ring-[#C8A951]/20">
+                      <SelectValue placeholder="Selecione a forma de quitação" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem
                         value="credito_programa"
-                        className="font-semibold text-emerald-900 bg-emerald-50 focus:bg-emerald-100"
+                        className="font-medium text-emerald-950 bg-emerald-50/80 focus:bg-emerald-100 my-0.5 rounded-md"
                       >
                         {elegibilidadeCredito?.resumo?.creditos_banho_reservados && elegibilidadeCredito.resumo.creditos_banho_reservados > 0
                           ? "🐾 Crédito de banho reservado para este atendimento"
@@ -1685,24 +1691,31 @@ function AtendimentoDetalhe() {
 
                   {/* BOX DE CONFIRMAÇÃO DO CONSUMO DO CRÉDITO */}
                   {isBanhoQuitadoComCredito && elegibilidadeCredito && (
-                    <div className="mt-2 p-2.5 bg-[#F5F2EA] border border-[#C8A951]/40 rounded-lg text-xs space-y-1.5 animate-in fade-in">
-                      <div className="flex items-center gap-1.5 font-bold text-[#123F2A]">
-                        <PackageCheck className="h-4 w-4 text-[#C8A951]" />
-                        <span>Confirmação de Uso do Crédito</span>
+                    <div className="p-3 bg-white/90 border border-[#C8A951]/30 rounded-lg text-xs space-y-2 animate-in fade-in shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-[#123F2A] text-xs">
+                          <PackageCheck className="h-4 w-4 text-[#C8A951]" />
+                          <span>Programa de Cuidados</span>
+                        </div>
+                        {elegibilidadeCredito.resumo?.nome_programa && (
+                          <span className="text-[10px] text-muted-foreground italic truncate max-w-[140px]">
+                            {elegibilidadeCredito.resumo.nome_programa}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-foreground/80 leading-relaxed">
-                        <strong>{pet?.nome || "O pet"}</strong> possui{" "}
-                        <strong>{elegibilidadeCredito.resumo?.creditos_banho_disponiveis} créditos de banho</strong> disponíveis
-                        no Programa <em>{elegibilidadeCredito.resumo?.nome_programa}</em>.
+                        Será debitado <strong>1 crédito de banho</strong> de <strong>{pet?.nome || "pet"}</strong>.
                       </p>
-                      <div className="grid grid-cols-2 gap-1 pt-1 border-t border-[#C8A951]/30 text-[11px]">
-                        <div><span className="text-muted-foreground">Tutor:</span> {cliente?.nome ?? "—"}</div>
-                        <div><span className="text-muted-foreground">Pet:</span> {pet?.nome ?? "—"}</div>
-                        <div><span className="text-muted-foreground">A consumir:</span> <strong className="text-emerald-800">1 crédito</strong></div>
-                        <div><span className="text-muted-foreground">Saldo após uso:</span> <strong>{Math.max(0, (elegibilidadeCredito.resumo?.creditos_banho_disponiveis ?? 1) - 1)} crédito(s)</strong></div>
-                        <div className="col-span-2 text-[10px] text-muted-foreground">
-                          Validade do contrato: {elegibilidadeCredito.resumo?.data_validade ? new Date(elegibilidadeCredito.resumo.data_validade).toLocaleDateString("pt-BR") : "—"}
-                        </div>
+                      <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-[#C8A951]/20 text-[11px]">
+                        <div><span className="text-muted-foreground">Tutor:</span> <span className="font-medium">{cliente?.nome ?? "—"}</span></div>
+                        <div><span className="text-muted-foreground">Pet:</span> <span className="font-medium">{pet?.nome ?? "—"}</span></div>
+                        <div><span className="text-muted-foreground">Consumo:</span> <strong className="text-emerald-800">1 crédito</strong></div>
+                        <div><span className="text-muted-foreground">Saldo após:</span> <strong>{Math.max(0, (elegibilidadeCredito.resumo?.creditos_banho_disponiveis ?? 1) - 1)} crédito(s)</strong></div>
+                        {elegibilidadeCredito.resumo?.data_validade && (
+                          <div className="col-span-2 text-[10px] text-muted-foreground pt-0.5">
+                            Validade: {new Date(elegibilidadeCredito.resumo.data_validade).toLocaleDateString("pt-BR")}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1715,7 +1728,7 @@ function AtendimentoDetalhe() {
                         value={valorPagoInput}
                         disabled={readOnly}
                         onChange={(e) => setValorPagoInput(Number(e.target.value || 0))}
-                        className="mt-1 h-9"
+                        className="mt-1 h-9 bg-white"
                       />
                     </div>
                   )}
@@ -1723,16 +1736,22 @@ function AtendimentoDetalhe() {
 
                 {/* CAMPO 2: FORMA DE PAGAMENTO DOS SERVIÇOS EXTRAS */}
                 {isBanhoQuitadoComCredito && totalExtrasFinanceiro > 0 && (
-                  <div className="p-3 bg-muted/20 border border-border/70 rounded-xl space-y-2 animate-in fade-in">
-                    <Label className="text-xs font-bold text-foreground uppercase tracking-wider block">
-                      Forma de Pagamento dos Serviços Extras ({brl(totalExtrasFinanceiro)})
-                    </Label>
+                  <div className="p-3.5 bg-amber-50/40 border border-amber-200/80 rounded-xl space-y-2 animate-in fade-in shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                        Pagamento dos Serviços Extras
+                      </Label>
+                      <Badge variant="outline" className="bg-white text-xs font-semibold border-amber-300 text-amber-950">
+                        {brl(totalExtrasFinanceiro)}
+                      </Badge>
+                    </div>
+
                     <Select
                       value={formaPagExtras}
                       disabled={readOnly}
                       onValueChange={(v) => setFormaPagExtras(v)}
                     >
-                      <SelectTrigger className="w-full bg-white">
+                      <SelectTrigger className="w-full bg-white h-10 shadow-sm">
                         <SelectValue placeholder="Selecione a forma de pagamento dos extras" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1751,7 +1770,7 @@ function AtendimentoDetalhe() {
                           value={valorPagoExtrasInput}
                           disabled={readOnly}
                           onChange={(e) => setValorPagoExtrasInput(Number(e.target.value || 0))}
-                          className="mt-1 h-9"
+                          className="mt-1 h-9 bg-white"
                         />
                         <p className="text-[11px] text-muted-foreground mt-1">
                           Restante dos extras em aberto: {brl(Math.max(0, totalExtrasFinanceiro - Number(valorPagoExtrasInput || 0)))}
@@ -1763,31 +1782,36 @@ function AtendimentoDetalhe() {
 
                 {/* AVISO DE ATENDIMENTO 100% QUITADO */}
                 {isBanhoQuitadoComCredito && totalExtrasFinanceiro === 0 && (
-                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-200/80 text-xs text-emerald-950 flex items-center gap-2.5 shadow-sm">
                     <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
-                    <span>Atendimento 100% quitado com crédito do Programa. Nenhuma cobrança financeira necessária.</span>
+                    <span className="leading-tight font-medium">Atendimento 100% quitado com crédito do Programa. Nenhuma cobrança financeira pendente.</span>
                   </div>
                 )}
 
                 {pagStatus && (
-                  <p className="text-xs text-muted-foreground">
-                    Status do pagamento: <span className="font-medium capitalize">{pagStatus}</span>
-                  </p>
+                  <div className="text-[11px] text-muted-foreground px-1 flex items-center justify-between">
+                    <span>Status do pagamento:</span>
+                    <Badge variant="secondary" className="capitalize text-[11px] font-medium">
+                      {pagStatus}
+                    </Badge>
+                  </div>
                 )}
 
-                {/* BOTÃO PRINCIPAL DE CONCLUSÃO / CONFIRMAÇÃO */}
+                {/* BOTÃO PRINCIPAL DE CONCLUSÃO / CONFIRMAÇÃO COM DESIGN RESPONSIVO */}
                 <Button
-                  className="w-full h-11 uppercase bg-emerald-800 hover:bg-emerald-900 text-white font-bold tracking-wider"
+                  className="w-full min-h-[48px] py-2.5 px-4 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 whitespace-normal text-center leading-snug"
                   disabled={readOnly || (!isBanhoQuitadoComCredito && !formaQuitacaoBanho) || (isBanhoQuitadoComCredito && totalExtrasFinanceiro > 0 && !formaPagExtras)}
                   onClick={confirmarPagamento}
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {isBanhoQuitadoComCredito
-                    ? totalExtrasFinanceiro === 0
-                      ? "Concluir atendimento e consumir 1 crédito"
-                      : `Confirmar recebimento dos extras (${brl(totalExtrasFinanceiro)}) e usar 1 crédito`
-                    : `Confirmar pagamento (${brl(total)})`
-                  }
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-200" />
+                  <span>
+                    {isBanhoQuitadoComCredito
+                      ? totalExtrasFinanceiro === 0
+                        ? "Concluir atendimento e consumir 1 crédito"
+                        : `Confirmar extras (${brl(totalExtrasFinanceiro)}) e usar 1 crédito`
+                      : `Confirmar pagamento (${brl(total)})`
+                    }
+                  </span>
                 </Button>
               </div>
               <ConfirmadaFooter st={st(7)} />
