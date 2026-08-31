@@ -350,12 +350,39 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
 
     // DESTAQUE VERDE: EXIBIDO SOMENTE SE OS BANHOS DO CLUBINHO ACABARAM (banhos_restantes === 0)
     if (clubinho.banhos_restantes === 0 && clubinho.banhos_contratados > 0) {
+      const avisoTitulo = "TODOS OS BANHOS DO CLUBINHO FORAM UTILIZADOS COM SUCESSO!";
+      const avisoSub = "Que tal renovar o plano do seu pet para continuar garantindo os melhores cuidados e condições exclusivas?";
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      const subLines = doc.splitTextToSize(avisoSub, clbBoxW - 30);
+      const avisoBoxH = 12 + 10 + (subLines.length * 9.5) + 4;
+
       doc.setFillColor(...C.emeraldLight);
       doc.setDrawColor(...C.gold);
-      doc.roundedRect(M, y, clbBoxW, 16, 3, 3, "FD");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.emeraldDark);
-      doc.text("🐾 Todos os banhos do seu Clubinho foram utilizados! Que tal renovar o plano para continuar garantindo o melhor cuidado?", M + 10, y + 11);
-      y += 20;
+      doc.roundedRect(M, y, clbBoxW, avisoBoxH, 4, 4, "FD");
+
+      // Badge indicador
+      doc.setFillColor(...C.forest);
+      doc.roundedRect(M + 8, y + 5, 88, 11, 2, 2, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text("AVISO DE RENOVAÇÃO", M + 52, y + 13, { align: "center" });
+
+      // Título do aviso
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.emeraldDark);
+      doc.text(avisoTitulo, M + 102, y + 13.5);
+
+      // Subtítulo descritivo
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.forest);
+      doc.text(subLines, M + 10, y + 25);
+
+      y += avisoBoxH + 6;
     }
   }
 
@@ -463,7 +490,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
 
   if (isQuitadoComCredito && totalReceberReal === 0) {
     doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(...C.emeraldDark);
-    doc.text("✨ Atendimento 100% quitado com crédito do Clubinho.", M, y - 6);
+    doc.text("• Atendimento 100% quitado com crédito do Clubinho.", M, y - 6);
   }
 
   y += 4;
