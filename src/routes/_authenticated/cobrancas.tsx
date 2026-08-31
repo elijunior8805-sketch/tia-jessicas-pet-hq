@@ -1276,93 +1276,209 @@ function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
     refetchInterval: 60_000,
   });
 
-  const items = q.data ?? [];
-  const grupos = items.reduce<Record<string, FilaItemDTO[]>>((acc, it) => {
-    const label = it.prioridade.charAt(0).toUpperCase() + it.prioridade.slice(1);
-    (acc[label] ??= []).push(it);
-    return acc;
-  }, {});
+  const [buscaFila, setBuscaFila] = useState("");
 
+  const items = useMemo(() => {
+    const raw = q.data ?? [];
+    if (!buscaFila.trim()) return raw;
+    const s = buscaFila.toLowerCase().trim();
+    return raw.filter(
+      (it) =>
+        it.cliente_nome?.toLowerCase().includes(s) ||
+        it.pet_nome?.toLowerCase().includes(s) ||
+        it.prioridade_justificativa?.toLowerCase().includes(s)
+    );
+  }, [q.data, buscaFila]);
+
+  const prioridadesOrdem = ["Crítica", "Alta", "Média", "Baixa"];
+
+  const grupos = useMemo(() => {
+    const map: Record<string, FilaItemDTO[]> = {
+      Crítica: [],
+      Alta: [],
+      Média: [],
+      Baixa: [],
+    };
+
+    items.forEach((it) => {
+      let label = "Média";
+      if (it.prioridade === "critica") label = "Crítica";
+      else if (it.prioridade === "alta") label = "Alta";
+      else if (it.prioridade === "baixa") label = "Baixa";
+      map[label].push(it);
+    });
+
+    return map;
+  }, [items]);
+
+  const totalGeral = items.reduce((acc, curr) => acc + Number(curr.saldo || 0), 0);
 
   if (q.isLoading) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground">
-          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary mb-2" />
+          <p className="text-sm">Organizando a fila de cobrança inteligente...</p>
         </CardContent>
       </Card>
     );
   }
-  if (items.length === 0) {
+
+  if (items.length === 0 && !buscaFila) {
     return (
-      <Card>
+      <Card className="border-emerald-800/20 bg-emerald-500/5">
         <CardContent className="py-12 text-center text-muted-foreground">
-          <Inbox className="mx-auto h-6 w-6 mb-2" />
-          Nada para cobrar hoje. Bom trabalho!
+          <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600 mb-2" />
+          <p className="font-display font-semibold text-foreground text-base">Tudo em dia!</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Nenhuma cobrança pendente para a fila de hoje. Bom trabalho!
+          </p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Object.entries(grupos).map(([label, rows]) => (
-          <Card key={label} className="border-gold/20 shadow-sm">
-            <CardHeader className="py-3 bg-muted/30">
-              <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                <span>{label}</span>
-                <Badge variant="secondary" className="bg-gold/20 text-gold-900">
-                  {rows.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="max-h-[400px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y">
-                    {rows.map((c) => (
-                      <tr
-                        key={c.id}
-                        className="border-t hover:bg-muted/40 cursor-pointer"
-                        onClick={() => onSelect(c as any)}
-                      >
-                        <td className="py-2 px-3">
-                          <Badge 
-                            className={
-                              c.prioridade === 'critica' ? "bg-rose-100 text-rose-900 border-rose-200" :
-                              c.prioridade === 'alta' ? "bg-amber-100 text-amber-900 border-amber-200" :
-                              "bg-gold/20 text-foreground border-gold/40"
-                            }
+    <div className="space-y-4">
+      {/* Barra de Resumo e Busca */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/40 p-3 rounded-xl border">
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-muted-foreground">
+            Total na Fila: <strong className="text-foreground">{items.length} cobranças</strong>
+          </div>
+          <span className="text-muted-foreground/40">•</span>
+          <div className="text-xs text-muted-foreground">
+            Volume a Recuperar:{" "}
+            <strong className="text-rose-600 font-bold">
+              {totalGeral.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </strong>
+          </div>
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Input
+            placeholder="Filtrar por cliente ou pet..."
+            value={buscaFila}
+            onChange={(e) => setBuscaFila(e.target.value)}
+            className="h-8 text-xs bg-background"
+          />
+        </div>
+      </div>
+
+      {/* Grid de Colunas Kanban Responsivas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+        {prioridadesOrdem.map((label) => {
+          const rows = grupos[label] || [];
+          if (rows.length === 0 && buscaFila) return null;
+
+          const totalColuna = rows.reduce((acc, curr) => acc + Number(curr.saldo || 0), 0);
+
+          const colStyles = {
+            Crítica: {
+              headerBg: "bg-rose-500/10 border-rose-200 text-rose-900",
+              badge: "bg-rose-100 text-rose-900 border-rose-300",
+              dot: "bg-rose-500",
+            },
+            Alta: {
+              headerBg: "bg-amber-500/10 border-amber-200 text-amber-900",
+              badge: "bg-amber-100 text-amber-900 border-amber-300",
+              dot: "bg-amber-500",
+            },
+            Média: {
+              headerBg: "bg-emerald-500/10 border-emerald-200 text-emerald-900",
+              badge: "bg-emerald-100 text-emerald-900 border-emerald-300",
+              dot: "bg-emerald-600",
+            },
+            Baixa: {
+              headerBg: "bg-zinc-500/10 border-zinc-200 text-zinc-800",
+              badge: "bg-zinc-100 text-zinc-800 border-zinc-300",
+              dot: "bg-zinc-400",
+            },
+          }[label]!;
+
+          return (
+            <div
+              key={label}
+              className="rounded-2xl border bg-card/60 backdrop-blur-xs shadow-xs flex flex-col overflow-hidden"
+            >
+              {/* Cabeçalho da Coluna */}
+              <div className={`p-3.5 border-b flex items-center justify-between ${colStyles.headerBg}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${colStyles.dot}`} />
+                  <span className="font-display font-bold text-sm">{label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={`text-xs font-bold ${colStyles.badge}`}>
+                    {rows.length}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Sub-header com valor acumulado */}
+              <div className="px-3.5 py-1.5 bg-muted/20 border-b text-[11px] text-muted-foreground flex justify-between">
+                <span>Subtotal:</span>
+                <span className="font-semibold text-foreground">
+                  {totalColuna.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </div>
+
+              {/* Lista de Cards da Coluna */}
+              <div className="p-2.5 space-y-2.5 max-h-[580px] overflow-y-auto">
+                {rows.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground italic">
+                    Nenhuma cobrança nesta categoria
+                  </div>
+                ) : (
+                  rows.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => onSelect(c as any)}
+                      className="p-3 rounded-xl border border-border/80 bg-background hover:border-[#C8A951] hover:shadow-md transition-all cursor-pointer space-y-2 group"
+                    >
+                      {/* Linha 1: Score + Nome + Valor */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`h-6 min-w-[24px] px-1.5 rounded-md text-[11px] font-bold flex items-center justify-center border shadow-2xs ${colStyles.badge}`}
+                            title={`Score de cobrança: ${c.score}`}
                           >
                             {c.score}
-                          </Badge>
-                        </td>
-                        <td className="py-2 px-3">
-                          <div className="font-medium">{c.cliente_nome}</div>
-                          <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">
-                            {c.pet_nome ?? "—"} • {c.prioridade_justificativa}
+                          </span>
+                          <div className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                            {c.cliente_nome}
                           </div>
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <div className="font-semibold text-rose-600">
-                            {Number(c.saldo).toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {c.dias_atraso}d atraso
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+
+                        <span className="font-bold text-xs text-rose-600 whitespace-nowrap">
+                          {Number(c.saldo).toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Linha 2: Pet + Dias de Atraso + Motivo */}
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                        <span className="truncate flex items-center gap-1 font-medium text-foreground/80">
+                          🐾 {c.pet_nome || "Pet"}
+                        </span>
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 whitespace-nowrap">
+                          {c.dias_atraso}d atraso
+                        </span>
+                      </div>
+
+                      {c.prioridade_justificativa && (
+                        <p className="text-[10px] text-muted-foreground/90 truncate leading-tight">
+                          {c.prioridade_justificativa}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
