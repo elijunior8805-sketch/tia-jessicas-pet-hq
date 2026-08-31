@@ -140,11 +140,11 @@ function DashboardPage() {
       const [novosClientesRes, proxAgRes] = await Promise.all([
         supabase.from("clientes").select("id,created_at").gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
         supabase.from("agendamentos")
-          .select("id,data,hora_inicio,status,pets(nome),servicos(nome),clientes(nome)")
+          .select("id,data,hora,status,pets(nome),servicos(nome),clientes(nome)")
           .gte("data", format(new Date(), "yyyy-MM-dd"))
           .in("status", ["agendado", "confirmado", "aguardando"])
           .order("data", { ascending: true })
-          .order("hora_inicio", { ascending: true })
+          .order("hora", { ascending: true })
           .limit(6),
       ]);
 
@@ -574,7 +574,7 @@ function DashboardPage() {
                       <div className="flex flex-col items-center justify-center w-[52px] sm:w-14 shrink-0 rounded-lg py-1.5 bg-[oklch(0.96_0.02_155)] border border-[oklch(0.90_0.02_155)]">
                         <div className="flex items-center gap-1 font-display text-sm sm:text-[15px] font-semibold text-primary leading-none tabular-nums">
                           <Clock className="h-3 w-3 text-[oklch(0.55_0.10_82)]" strokeWidth={2.2} />
-                          {a.hora_inicio?.slice(0, 5)}
+                          {a.hora?.slice(0, 5)}
                         </div>
                         <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-1">
                           {isToday(dt) ? "Hoje" : format(dt, "dd MMM", { locale: ptBR })}
