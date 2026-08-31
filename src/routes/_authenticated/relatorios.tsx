@@ -7,6 +7,7 @@ import {
   listarLinhasExport,
   type LinhaExport,
 } from "@/lib/relatorios.functions";
+import { getFinancialKPIs } from "@/lib/financial-kpis.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,6 +121,18 @@ function RelatoriosPage() {
   const ranking = query.data?.rankingClientes ?? [];
   const servicos = query.data?.servicos ?? [];
 
+  const fetchKPIs = useServerFn(getFinancialKPIs);
+  const { data: unifiedKPIs } = useQuery({
+    queryKey: ["relatorios-unified-kpis", de, ate],
+    queryFn: () => fetchKPIs({ data: { from: de, to: ate } }),
+    staleTime: 30000,
+  });
+
+  const faturamentoReal = unifiedKPIs?.faturamento ?? (ind?.faturamento ?? 0);
+  const ticketMedioReal = unifiedKPIs?.ticketMedio ?? (ind?.ticket_medio ?? 0);
+  const aReceberReal = unifiedKPIs?.aReceber ?? (ind?.a_receber ?? 0);
+  const vencidoReal = unifiedKPIs?.vencido ?? (ind?.em_atraso ?? 0);
+
   const presetDias = (dias: number) => {
     const a = new Date();
     const d = new Date();
@@ -162,7 +175,7 @@ function RelatoriosPage() {
   );
 
   const conversao = ind && ind.faturamento_planejado > 0
-    ? `${((ind.faturamento / ind.faturamento_planejado) * 100).toFixed(1)}%`
+    ? `${((faturamentoReal / ind.faturamento_planejado) * 100).toFixed(1)}%`
     : "—";
 
   return (
@@ -176,7 +189,9 @@ function RelatoriosPage() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => query.refetch()}
+              onClick={() => {
+                query.refetch();
+              }}
               disabled={query.isFetching}
               className="bg-white/10 border-white/25 text-white hover:bg-white/20 hover:text-white"
             >
@@ -235,12 +250,12 @@ function RelatoriosPage() {
 
       {/* Copiloto de Inteligência em Relatórios da Jessi */}
       <JessiRelatoriosCopilot
-        faturamento={ind?.faturamento ?? 0}
-        ticketMedio={ind?.ticket_medio ?? 0}
+        faturamento={faturamentoReal}
+        ticketMedio={ticketMedioReal}
         atendimentosFinalizados={ind?.atendimentos_finalizados ?? 0}
         clientesAtendidos={ind?.clientes_atendidos ?? 0}
         novosClientes={ind?.novos_clientes ?? 0}
-        aReceber={ind?.a_receber ?? 0}
+        aReceber={aReceberReal}
         periodoStr={`${de} até ${ate}`}
         onExportCsv={exportarCsv}
       />
@@ -250,14 +265,14 @@ function RelatoriosPage() {
         <KpiCard
           icon={CircleDollarSign}
           label="Faturamento"
-          value={brl(ind?.faturamento ?? 0)}
+          value={brl(faturamentoReal)}
           hint={`Planejado ${brl(ind?.faturamento_planejado ?? 0)}`}
           accent="forest"
         />
         <KpiCard
           icon={TrendingUp}
           label="Ticket médio"
-          value={brl(ind?.ticket_medio ?? 0)}
+          value={brl(ticketMedioReal)}
           hint={`${ind?.atendimentos_finalizados ?? 0} finalizados`}
           accent="gold"
         />
@@ -271,9 +286,9 @@ function RelatoriosPage() {
         <KpiCard
           icon={Wallet}
           label="A receber"
-          value={brl(ind?.a_receber ?? 0)}
-          hint={`${brl(ind?.em_atraso ?? 0)} em atraso · snapshot atual`}
-          accent={(ind?.em_atraso ?? 0) > 0 ? "terracotta" : "sage"}
+          value={brl(aReceberReal)}
+          hint={`${brl(vencidoReal)} em atraso · snapshot atual`}
+          accent={vencidoReal > 0 ? "terracotta" : "sage"}
         />
         <KpiCard
           icon={Sparkles}
