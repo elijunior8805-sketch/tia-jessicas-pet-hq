@@ -34,6 +34,7 @@ import {
   type FilaItemDTO
 } from "@/lib/cobrancas.functions";
 import { CobrancaPainelLateral } from "@/components/cobrancas/CobrancaPainelLateral";
+import { JessiCobrancasPanel } from "@/components/cobrancas/JessiCobrancasPanel";
 
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -167,6 +168,18 @@ function CobrancasPage() {
           Régua e templates
         </Button>
       </header>
+
+      {/* Painel Inteligente da Jessi */}
+      <JessiCobrancasPanel
+        kpis={qKpis.data}
+        onFiltrarAtraso7d={() => setFiltro((f) => ({ ...f, atrasoFaixa: "8_15" }))}
+        onFiltrarVenceHoje={() => setFiltro((f) => ({ ...f, status: ["a_vencer"] }))}
+        onRefresh={async () => {
+          await Promise.all([qKpis.refetch(), qLista.refetch()]);
+          toast.success("Dados de cobrança atualizados");
+        }}
+        isRefreshing={qKpis.isFetching || qLista.isFetching}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard

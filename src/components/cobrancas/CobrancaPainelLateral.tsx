@@ -248,52 +248,74 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
                     </section>
                   </TabsContent>
 
-                  <TabsContent value="compor" className="m-0 space-y-6">
-                    <div className="space-y-3">
-                      <Label className="text-sm font-semibold">Tom da Cobrança (IA)</Label>
+                  <TabsContent value="compor" className="m-0 space-y-5">
+                    {/* Bloco Jessi Gerador de Abordagens */}
+                    <div className="p-3.5 rounded-xl bg-[#FAF8F3] border border-[#C8A951]/40 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-[#C8A951]" />
+                          <span className="font-bold text-xs text-[#123F2A]">Gerador de Abordagens da Jessi</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={carregandoIA}
+                          onClick={() => handleSugerirIA("lembrete")}
+                          className="h-7 text-xs bg-white text-[#123F2A] border-[#C8A951]/40 font-semibold gap-1"
+                        >
+                          {carregandoIA ? <Loader2 className="h-3 w-3 animate-spin text-[#C8A951]" /> : <Sparkles className="h-3 w-3 text-[#C8A951]" />}
+                          Sugerir com IA
+                        </Button>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2">
                         <Button 
                           variant="outline" 
                           size="sm" 
                           disabled={carregandoIA}
                           onClick={() => handleSugerirIA("lembrete")}
+                          className="h-8 text-xs justify-start"
                         >
-                          <Clock className="h-3 w-3 mr-2 text-sky-500" /> Cordial
+                          <Clock className="h-3 w-3 mr-1.5 text-sky-500" /> Lembrete Cordial
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           disabled={carregandoIA}
                           onClick={() => handleSugerirIA("cobranca")}
+                          className="h-8 text-xs justify-start"
                         >
-                          <Sparkles className="h-3 w-3 mr-2 text-gold" /> Objetivo
+                          <Sparkles className="h-3 w-3 mr-1.5 text-[#C8A951]" /> Direta + Pix
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           disabled={carregandoIA}
                           onClick={() => handleSugerirIA("negociacao")}
+                          className="h-8 text-xs justify-start"
                         >
-                          <AlertTriangle className="h-3 w-3 mr-2 text-amber-500" /> Firme
+                          <AlertTriangle className="h-3 w-3 mr-1.5 text-amber-500" /> Negociação
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           disabled={carregandoIA}
                           onClick={() => handleSugerirIA("incisiva")}
+                          className="h-8 text-xs justify-start"
                         >
-                          <ShieldAlert className="h-3 w-3 mr-2 text-rose-500" /> Incisivo
+                          <ShieldAlert className="h-3 w-3 mr-1.5 text-rose-500" /> Incisiva
                         </Button>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Mensagem para WhatsApp</Label>
+                      <Label className="text-xs font-semibold text-muted-foreground">Mensagem pronta para envio</Label>
                       <Textarea 
-                        rows={10} 
+                        rows={8} 
                         value={mensagem} 
                         onChange={e => setMensagem(e.target.value)}
-                        placeholder="Clique em um dos tons acima para gerar com IA ou digite aqui..."
+                        placeholder="Clique em um dos botões da Jessi acima para gerar ou digite o texto..."
+                        className="text-xs leading-relaxed"
                       />
                     </div>
                   </TabsContent>
