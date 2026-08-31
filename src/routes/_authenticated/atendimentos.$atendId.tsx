@@ -1070,7 +1070,15 @@ function AtendimentoDetalhe() {
       if (contratoValido) {
         const movs = (contratoValido.programas_creditos_movimentacoes as any[]) ?? [];
         const saldos = calcularSaldosDoContrato(contratoValido, movs);
-        const banhoCat = saldos.categorias["banho"] || { contratado: 0, consumido: 0, reservado: 0, disponivel: 0 };
+        const itemBanho = saldos?.itens?.find((i: any) => i.categoria === "banho") || saldos?.itens?.[0];
+        const banhoCat = itemBanho
+          ? {
+              contratado: Number(itemBanho.contratados || 0),
+              consumido: Number(itemBanho.utilizados || 0),
+              reservado: Number(itemBanho.reservados || 0),
+              disponivel: Number(itemBanho.disponiveis || 0),
+            }
+          : { contratado: 0, consumido: 0, reservado: 0, disponivel: 0 };
 
         // Histórico real de utilizações do contrato
         const usos = movs
