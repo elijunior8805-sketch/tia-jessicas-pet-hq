@@ -18,6 +18,11 @@ import {
   CheckCircle2,
   X,
   ChevronRight,
+  PawPrint,
+  Flame,
+  Crown,
+  Repeat,
+  Scissors,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +62,11 @@ import {
   type CampanhaRow,
   type DestinatarioRow,
 } from "@/lib/campanhas.functions";
+import {
+  JessiCampanhasProativasCopilot,
+  MOTORES_ESTRATEGICOS,
+  type MotorCampanha,
+} from "@/components/campanhas/JessiCampanhasProativasCopilot";
 import { normalizarTelefoneBR } from "@/lib/whatsapp";
 import {
   WhatsAppComposer,
@@ -66,15 +76,6 @@ import {
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
   component: CampanhasPage,
-  errorComponent: ({ error, reset }) => (
-    <div className="p-6">
-      <p className="text-sm text-destructive mb-3">
-        Não foi possível carregar campanhas: {error.message}
-      </p>
-      <Button onClick={reset}>Tentar novamente</Button>
-    </div>
-  ),
-  notFoundComponent: () => <p className="p-6">Não encontrado.</p>,
 });
 
 const STATUS_BADGE: Record<CampanhaRow["status"], { label: string; cls: string }> = {
@@ -90,6 +91,7 @@ function CampanhasPage() {
   const [criarOpen, setCriarOpen] = useState(false);
   const [detalheId, setDetalheId] = useState<string | null>(null);
   const [pendingDestId, setPendingDestId] = useState<string | null>(null);
+  const [motorAtivo, setMotorAtivo] = useState<MotorCampanha>(MOTORES_ESTRATEGICOS[0]);
 
   const listar = useServerFn(listarCampanhas);
   const kpisFn = useServerFn(kpisCampanhas);
@@ -108,6 +110,22 @@ function CampanhasPage() {
     queryKey: ["campanhas-kpis"],
     queryFn: () => kpisFn(),
     staleTime: 15_000,
+  });
+
+  // Clientes e Pets Ativos da Base para o Motor da Jessi
+  const { data: clientesBase = [], isLoading: loadingClientes } = useQuery({
+    queryKey: ["campanhas-clientes-base"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("pets")
+        .select(`
+          id, nome, raca, porte, foto_url,
+          clientes:cliente_id(id, nome, whatsapp, telefone)
+        `)
+        .order("nome", { ascending: true })
+        .limit(50);
+      return data ?? [];
+    },
   });
 
   const excluir = useMutation({
@@ -138,126 +156,273 @@ function CampanhasPage() {
 
   const totais = kpis.data;
 
+  const enviarWhatsAppDireto = (pet: any) => {
+    const fone = pet.clientes?.whatsapp || pet.clientes?.telefone || "";
+    if (!fone) {
+      toast.error(`${pet.clientes?.nome || "Cliente"} sem telefone ou WhatsApp cadastrado.`);
+      return;
+    }
+    const tutorNome = pet.clientes?.nome?.split(" ")[0] || "Tutor";
+    const petNome = pet.nome;
+
+    const textoFormatado = motorAtivo.textoOferta
+      .replace("{{pet}}", petNome)
+      .replace("{{tutor}}", tutorNome);
+
+    const chamadaFormatada = motorAtivo.chamadaAcao
+      .replace("{{pet}}", petNome)
+      .replace("{{tutor}}", tutorNome);
+
+    const msgCompleta = `Oi, ${tutorNome}! 🐾 Tudo bem?\n\nAqui é da equipe do Spa de Pet Tia Jéssica!\n\n${textoFormatado}\n\n${chamadaFormatada} Te esperamos com muito carinho! ✨💚`;
+
+    const cleanPhone = fone.replace(/\D/g, "");
+    const ddiPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    const url = `https://wa.me/${ddiPhone}?text=${encodeURIComponent(msgCompleta)}`;
+    window.open(url, "_blank");
+  };
+
+  const copiarMensagem = (pet: any) => {
+    const tutorNome = pet.clientes?.nome?.split(" ")[0] || "Tutor";
+    const petNome = pet.nome;
+
+    const textoFormatado = motorAtivo.textoOferta
+      .replace("{{pet}}", petNome)
+      .replace("{{tutor}}", tutorNome);
+
+    const chamadaFormatada = motorAtivo.chamadaAcao
+      .replace("{{pet}}", petNome)
+      .replace("{{tutor}}", tutorNome);
+
+    const msgCompleta = `Oi, ${tutorNome}! 🐾 Tudo bem?\n\nAqui é da equipe do Spa de Pet Tia Jéssica!\n\n${textoFormatado}\n\n${chamadaFormatada} Te esperamos com muito carinho! ✨💚`;
+
+    navigator.clipboard.writeText(msgCompleta);
+    toast.success("Mensagem promocional copiada!");
+  };
+
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-5">
+      {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold flex items-center gap-2">
+          <h1 className="font-display text-2xl md:text-3xl font-semibold flex items-center gap-2">
             <Megaphone className="h-6 w-6 text-primary" />
-            Campanhas segmentadas
+            Campanhas & Vendas Segmentadas
           </h1>
           <p className="text-sm text-muted-foreground">
-            Envios em lote pelo WhatsApp Web com filtros por porte, cidade, aniversariante e inatividade.
+            Motores estratégicos de ofertas por perfil de cliente, com disparos de 1 clique no WhatsApp pela IA Jessi.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => { lista.refetch(); kpis.refetch(); }}>
             <RefreshCcw className="h-4 w-4 mr-2" /> Atualizar
           </Button>
-          <Button size="sm" onClick={() => setCriarOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Nova campanha
+          <Button size="sm" onClick={() => setCriarOpen(true)} className="bg-primary text-primary-foreground font-bold">
+            <Plus className="h-4 w-4 mr-2" /> Nova Campanha
           </Button>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Campanhas" value={totais?.total_campanhas ?? 0} icon={<Megaphone className="h-4 w-4" />} />
-        <KpiCard label="Em envio" value={totais?.em_envio ?? 0} icon={<Send className="h-4 w-4" />} />
-        <KpiCard label="Concluídas" value={totais?.concluidas ?? 0} icon={<CheckCircle2 className="h-4 w-4" />} />
-        <KpiCard
-          label="Mensagens enviadas"
-          value={totais?.total_enviadas ?? 0}
-          hint={`de ${totais?.total_mensagens ?? 0} planejadas`}
-          icon={<Users className="h-4 w-4" />}
-        />
-      </div>
+      {/* Copiloto de Campanhas Proativas da IA Jessi */}
+      <JessiCampanhasProativasCopilot
+        totalClientes={clientesBase.length || 18}
+        motorAtivo={motorAtivo}
+        onSelecionarMotor={setMotorAtivo}
+      />
 
-      <Card>
-        <CardContent className="p-3">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar campanha…"
-              className="pl-8"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="motores" className="space-y-4">
+        <TabsList className="bg-muted/60 p-1 rounded-xl">
+          <TabsTrigger value="motores" className="rounded-lg gap-2 text-xs font-semibold">
+            <Flame className="h-3.5 w-3.5 text-[#C8A951]" />
+            Disparos do Motor Ativo ({motorAtivo.titulo})
+          </TabsTrigger>
+          <TabsTrigger value="historico" className="rounded-lg gap-2 text-xs font-semibold">
+            <Users className="h-3.5 w-3.5" />
+            Campanhas Salvas ({rows.length})
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            {lista.isLoading ? "Carregando…" : `${rows.length} campanha(s)`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {lista.isLoading ? (
-            <div className="py-10 text-center">
-              <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              Nenhuma campanha criada ainda. Comece com <strong>Nova campanha</strong>.
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {rows.map((c) => {
-                const badge = STATUS_BADGE[c.status];
-                const pct = c.total_destinatarios > 0
-                  ? Math.round((c.total_enviados / c.total_destinatarios) * 100)
-                  : 0;
-                return (
-                  <div
-                    key={c.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium truncate">{c.nome}</p>
-                        <Badge variant="outline" className={cn("text-[10px]", badge.cls)}>
-                          {badge.label}
-                        </Badge>
+        {/* ABA 1: DISPAROS DO MOTOR ATIVO */}
+        <TabsContent value="motores" className="space-y-4">
+          <Card className="card-premium">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span>{motorAtivo.titulo}</span>
+                    <Badge className={`text-xs border ${motorAtivo.corTag}`}>
+                      {motorAtivo.tag}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Público-Alvo: <strong className="text-foreground">{motorAtivo.publicoAlvo}</strong> · Impacto: <strong className="text-emerald-700">{motorAtivo.impactoNegocio}</strong>
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Clique em "Enviar WhatsApp" para disparar a oferta diretamente ao tutor.
+                </span>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4">
+              {loadingClientes ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                </div>
+              ) : clientesBase.length === 0 ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  Nenhum cliente cadastrado na base ainda.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {clientesBase.map((pet: any) => {
+                    const tutorNome = pet.clientes?.nome?.split(" ")[0] || "Tutor";
+                    const petNome = pet.nome;
+                    const textoFormatado = motorAtivo.textoOferta
+                      .replace("{{pet}}", petNome)
+                      .replace("{{tutor}}", tutorNome);
+
+                    return (
+                      <div
+                        key={pet.id}
+                        className="p-4 rounded-xl border bg-card hover:border-[#C8A951]/50 transition-all space-y-3 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold overflow-hidden">
+                              {pet.foto_url ? (
+                                <img
+                                  src={pet.foto_url}
+                                  alt={pet.nome}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <PawPrint className="h-5 w-5" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-display font-bold text-sm text-primary truncate">
+                                  {pet.nome}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate">
+                                  ({pet.clientes?.nome})
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Raça: {pet.raca || "Não informada"} {pet.porte ? `· Porte: ${pet.porte}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Mensagem da Oferta */}
+                        <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                          {`Oi, ${tutorNome}! 🐾\n\n${textoFormatado}`}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copiarMensagem(pet)}
+                            className="h-8 text-xs gap-1"
+                          >
+                            <Copy className="h-3.5 w-3.5" /> Copiar
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            onClick={() => enviarWhatsAppDireto(pet)}
+                            className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5"
+                          >
+                            <Send className="h-3.5 w-3.5" /> Enviar WhatsApp
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {c.total_enviados}/{c.total_destinatarios} enviados · {pct}%
-                        {c.total_falhas > 0 && ` · ${c.total_falhas} falha(s)`}
-                        {c.descricao && ` · ${c.descricao}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => duplicar.mutate(c.id)}
-                        title="Duplicar"
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA 2: CAMPANHAS SALVAS */}
+        <TabsContent value="historico" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                {lista.isLoading ? "Carregando…" : `${rows.length} campanha(s) personalizada(s)`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {lista.isLoading ? (
+                <div className="py-10 text-center">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : rows.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  Nenhuma campanha personalizada criada ainda. Use os motores da Jessi acima ou clique em <strong>Nova Campanha</strong>.
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {rows.map((c) => {
+                    const badge = STATUS_BADGE[c.status];
+                    const pct = c.total_destinatarios > 0
+                      ? Math.round((c.total_enviados / c.total_destinatarios) * 100)
+                      : 0;
+                    return (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition"
                       >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => {
-                          if (confirm(`Excluir campanha "${c.nome}"?`)) excluir.mutate(c.id);
-                        }}
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" onClick={() => setDetalheId(c.id)}>
-                        Abrir <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium truncate">{c.nome}</p>
+                            <Badge variant="outline" className={cn("text-[10px]", badge.cls)}>
+                              {badge.label}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {c.total_enviados}/{c.total_destinatarios} enviados · {pct}%
+                            {c.total_falhas > 0 && ` · ${c.total_falhas} falha(s)`}
+                            {c.descricao && ` · ${c.descricao}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => duplicar.mutate(c.id)}
+                            title="Duplicar"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => {
+                              if (confirm(`Excluir campanha "${c.nome}"?`)) excluir.mutate(c.id);
+                            }}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" onClick={() => setDetalheId(c.id)}>
+                            Abrir <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <CriarCampanhaDialog
         open={criarOpen}
@@ -311,6 +476,7 @@ function CampanhasPage() {
     </div>
   );
 }
+
 
 function KpiCard({
   label,
