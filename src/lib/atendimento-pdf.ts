@@ -5,6 +5,29 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, sumItens, type ServicoItem } from "./atendimento-utils";
 import { getLogoDataUrl, drawLogoBadge } from "./logo-pdf";
 
+export type ClubinhoHistoricoUso = {
+  data: string;
+  servico_nome: string;
+  quantidade: number;
+  saldo_apos: number;
+  protocolo?: string;
+};
+
+export type ClubinhoRelatorioData = {
+  nome_programa: string;
+  status_do_programa: string;
+  data_contratacao: string;
+  data_inicio: string;
+  data_validade: string;
+  dias_restantes: number;
+  banhos_contratados: number;
+  banhos_utilizados: number;
+  banhos_reservados: number;
+  banhos_restantes: number;
+  historico_utilizacoes: ClubinhoHistoricoUso[];
+  isQuitadoComCredito?: boolean;
+};
+
 type AtendPDFData = {
   atendimento: any;
   ocorrencias?: any[];
@@ -16,6 +39,8 @@ type AtendPDFData = {
   fotosDepoisPaths?: string[];
   /** Se true, gera o PDF mesmo sem fotos ou com falha no download. */
   permitirSemFotos?: boolean;
+  /** Dados consolidados do Clubinho / Programa de Cuidados do pet */
+  clubinho?: ClubinhoRelatorioData | null;
 };
 
 export type PDFResult = {
@@ -32,6 +57,8 @@ const C = {
   mute: [110, 116, 112] as [number, number, number],
   line: [220, 216, 208] as [number, number, number],
   cream: [250, 247, 240] as [number, number, number],
+  emeraldLight: [236, 253, 245] as [number, number, number],
+  emeraldDark: [6, 78, 59] as [number, number, number],
 };
 
 function fmtDateTime(iso?: string | null) {
@@ -224,7 +251,125 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   ]);
   y = boxTop + boxH + 20;
 
+  const clubinho = opts.clubinho;
+  const isQuitadoComCredito = clubinho?.isQuitadoComCredito ?? (atendimento?.pagamento_forma === "credito_programa" || executados.some((it: any) => it.usar_credito));
+
+  // ============ CLUBINHO - PROGRAMA DE CUIDADOS (SE EXISTIR) ============
+  if (clubinho && (clubinho.banhos_contratados > 0 || clubinho.nome_programa)) {
+    if (y + 160 > H - 60) { doc.addPage(); y = 60; }
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...C.forest);
+    doc.text("CLUBINHO - PROGRAMA DE CUIDADOS", M, y);
+    doc.setDrawColor(...C.gold); doc.line(M, y + 4, M + 180, y + 4);
+
+    // Selo de Situação no canto direito
+    const stLabel = clubinho.status_do_programa === "ativo" 
+      ? "Clubinho Ativo" 
+      : clubinho.status_do_programa === "concluido" || clubinho.status_do_programa === "concluído"
+      ? "Utilização Concluída"
+      : clubinho.status_do_programa === "vencido"
+      ? "Vencido"
+      : clubinho.status_do_programa === "aguardando_pagamento"
+      ? "Aguardando Pagamento"
+      : "Clubinho";
+    
+    doc.setFillColor(...(clubinho.status_do_programa === "ativo" ? C.emeraldLight : C.cream));
+    doc.setDrawColor(...C.gold);
+    doc.roundedRect(W - M - 120, y - 10, 120, 18, 4, 4, "FD");
+    doc.setFontSize(8.5); doc.setFont("helvetica", "bold");
+    doc.setTextColor(...(clubinho.status_do_programa === "ativo" ? C.emeraldDark : C.forest));
+    doc.text(stLabel, W - M - 60, y + 2, { align: "center" });
+
+    y += 18;
+
+    // Cartão de Resumo do Clubinho
+    const clbBoxW = W - M * 2;
+    const clbBoxH = 82;
+    doc.setDrawColor(...C.line);
+    doc.setFillColor(...C.cream);
+    doc.roundedRect(M, y, clbBoxW, clbBoxH, 6, 6, "FD");
+
+    // Linha 1: Nome do Programa e Período
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...C.forest);
+    doc.text(`Programa: ${clubinho.nome_programa || "Clubinho Tia Jéssica"}`, M + 12, y + 18);
+    
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.mute);
+    const validadeStr = `Validade: ${fmtDate(clubinho.data_inicio)} a ${fmtDate(clubinho.data_validade)}${clubinho.dias_restantes > 0 ? ` (${clubinho.dias_restantes} dias restantes)` : ""}`;
+    doc.text(validadeStr, M + 12, y + 32);
+
+    // Linha 2: 4 Indicadores em mini-cards
+    const indW = (clbBoxW - 24 - 18) / 4;
+    const indY = y + 40;
+    const indH = 34;
+
+    const indicadores = [
+      { label: "Banhos contratados", val: `${clubinho.banhos_contratados} ${clubinho.banhos_contratados === 1 ? "banho" : "banhos"}`, tone: C.ink },
+      { label: "Banhos utilizados", val: `${clubinho.banhos_utilizados} ${clubinho.banhos_utilizados === 1 ? "banho" : "banhos"}`, tone: C.forest },
+      { label: "Banhos reservados", val: `${clubinho.banhos_reservados} ${clubinho.banhos_reservados === 1 ? "banho" : "banhos"}`, tone: C.mute },
+      { label: "Banhos restantes", val: `${clubinho.banhos_restantes} ${clubinho.banhos_restantes === 1 ? "banho" : "banhos"}`, tone: C.emeraldDark },
+    ];
+
+    indicadores.forEach((ind, i) => {
+      const ix = M + 12 + i * (indW + 6);
+      doc.setDrawColor(...C.line);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(ix, indY, indW, indH, 4, 4, "FD");
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.mute);
+      doc.text(ind.label, ix + indW / 2, indY + 12, { align: "center" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(...ind.tone);
+      doc.text(ind.val, ix + indW / 2, indY + 26, { align: "center" });
+    });
+
+    y += clbBoxH + 12;
+
+    // Tabela de Histórico de Utilizações
+    if (clubinho.historico_utilizacoes && clubinho.historico_utilizacoes.length > 0) {
+      if (y + 90 > H - 60) { doc.addPage(); y = 60; }
+
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.forest);
+      doc.text("HISTÓRICO DE BANHOS UTILIZADOS", M, y);
+      y += 6;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Data do Uso", "Serviço", "Utilização", "Saldo após o uso", "Atendimento"]],
+        body: clubinho.historico_utilizacoes.map((u) => [
+          fmtDate(u.data),
+          u.servico_nome || "Banho",
+          `${u.quantidade} crédito`,
+          `${u.saldo_apos} ${u.saldo_apos === 1 ? "banho" : "banhos"}`,
+          u.protocolo ? `Protocolo ${u.protocolo}` : "Atendimento",
+        ]),
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 4.5, textColor: C.ink, lineColor: C.line },
+        headStyles: { fillColor: C.forest, textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          2: { halign: "center", cellWidth: 70 },
+          3: { halign: "center", cellWidth: 90 },
+          4: { halign: "right", cellWidth: 100 },
+        },
+        margin: { left: M, right: M },
+      });
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Mensagem de Destaque do Saldo do Clubinho
+    if (y + 35 > H - 60) { doc.addPage(); y = 60; }
+    const destMsg = clubinho.banhos_restantes > 0
+      ? `🐾 Seu pet ainda possui ${clubinho.banhos_restantes} ${clubinho.banhos_restantes === 1 ? "banho disponível" : "banhos disponíveis"} para utilizar até ${fmtDate(clubinho.data_validade)}.`
+      : `🐾 Todos os ${clubinho.banhos_contratados} banhos do Clubinho foram utilizados com sucesso.`;
+
+    doc.setFillColor(...C.emeraldLight);
+    doc.setDrawColor(...C.gold);
+    doc.roundedRect(M, y, W - M * 2, 22, 5, 5, "FD");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.emeraldDark);
+    doc.text(destMsg, M + 12, y + 14);
+    y += 30;
+  }
+
   // ============ TIMELINE ============
+  if (y + 60 > H - 60) { doc.addPage(); y = 60; }
   doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...C.forest);
   doc.text("LINHA DO TEMPO", M, y);
   doc.setDrawColor(...C.gold); doc.line(M, y + 4, M + 90, y + 4);
@@ -234,19 +379,35 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   doc.text(`Check-out: ${fmtDateTime(atendimento?.data_fim)}`, M, y); y += 20;
 
   // ============ SERVIÇOS ============
-  const isQuitadoPrograma = atendimento?.pagamento_forma === "credito_programa" || executados.some((it: any) => it.usar_credito || it.valor_unit === 0);
+  let valorReferenciaBanhoCoberto = 0;
+  let valorExtrasReal = 0;
+
+  executados.forEach((it: any) => {
+    const isBanhoItem = it.usar_credito || (isQuitadoComCredito && (it.nome?.toLowerCase().includes("banho") || it.valor_unit === 0));
+    if (isBanhoItem) {
+      valorReferenciaBanhoCoberto += Number(it.valor_unit || it.valor_total || 60);
+    } else {
+      valorExtrasReal += Number(it.valor_total || it.valor_unit || 0) * Number(it.quantidade ?? 1);
+    }
+  });
+
+  const descontoReal = Number(atendimento?.desconto ?? 0);
+  const totalReceberReal = isQuitadoComCredito 
+    ? Math.max(0, valorExtrasReal + taxa - descontoReal)
+    : Math.max(0, valorExec + taxa - descontoReal);
 
   autoTable(doc, {
     startY: y,
-    head: [["Serviço", "Qtd", "Valor Unit.", "Situação / Subtotal"]],
+    head: [["Serviço Executado", "Qtd", "Valor Ref.", "Situação / Valor Cobrado"]],
     body: executados.length
       ? executados.map((it: any) => {
-          const coberto = it.usar_credito || (isQuitadoPrograma && (it.nome?.toLowerCase().includes("banho") || it.valor_unit === 0));
+          const coberto = it.usar_credito || (isQuitadoComCredito && (it.nome?.toLowerCase().includes("banho") || it.valor_unit === 0));
+          const valRef = Number(it.valor_unit || 60);
           return [
-            coberto ? `${it.nome} (Crédito do Programa)` : it.nome,
+            coberto ? `${it.nome} (Coberto pelo Clubinho)` : it.nome,
             String(it.quantidade ?? 1),
-            brl(Number(it.valor_unit ?? 0)),
-            coberto ? "Quitado (1 crédito)" : brl(Number(it.valor_unit ?? 0) * Number(it.quantidade ?? 1)),
+            brl(valRef),
+            coberto ? "Quitado (1 crédito - R$ 0,00)" : brl(valRef * Number(it.quantidade ?? 1)),
           ];
         })
       : [["Nenhum serviço executado", "", "", ""]],
@@ -256,37 +417,61 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     columnStyles: {
       1: { halign: "center", cellWidth: 45 },
       2: { halign: "right", cellWidth: 80 },
-      3: { halign: "right", cellWidth: 110 },
+      3: { halign: "right", cellWidth: 140 },
     },
     margin: { left: M, right: M },
   });
   y = (doc as any).lastAutoTable.finalY + 10;
 
-  // ============ TOTAIS ============
-  const totalCobrado = Math.max(0, Number(atendimento?.valor_executado ?? total));
-  const totRows: [string, string][] = [
-    ["Serviços executados", brl(valorExec)],
-    ["Taxa leva-e-traz", brl(taxa)],
-    ["TOTAL A RECEBER", brl(totalCobrado)],
+  // ============ TOTAIS FINANCEIROS (CORRIGIDO) ============
+  if (y + 100 > H - 60) { doc.addPage(); y = 60; }
+
+  const totRows: [string, string, boolean][] = [
+    ["Valor de referência dos serviços", brl(valorExec || valorReferenciaBanhoCoberto), false],
   ];
-  const totX = W - M - 250;
-  totRows.forEach(([k, v], i) => {
-    const isTotal = i === totRows.length - 1;
+
+  if (isQuitadoComCredito && valorReferenciaBanhoCoberto > 0) {
+    totRows.push(["Coberto pelo Clubinho", `- ${brl(valorReferenciaBanhoCoberto)} (1 crédito)`, false]);
+  }
+
+  if (valorExtrasReal > 0) {
+    totRows.push(["Serviços adicionais (extras)", brl(valorExtrasReal), false]);
+  }
+
+  if (taxa > 0) {
+    totRows.push(["Taxa leva-e-traz", brl(taxa), false]);
+  }
+
+  if (descontoReal > 0) {
+    totRows.push(["Desconto aplicado", `- ${brl(descontoReal)}`, false]);
+  }
+
+  totRows.push(["TOTAL A RECEBER AGORA", brl(totalReceberReal), true]);
+
+  const totX = W - M - 260;
+  totRows.forEach(([k, v, isTotal]) => {
     if (isTotal) {
-      doc.setFillColor(...C.forest);
-      doc.rect(totX, y - 2, 250, 22, "F");
+      doc.setFillColor(...(totalReceberReal === 0 ? C.forest : C.gold));
+      doc.rect(totX, y - 2, 260, 22, "F");
       doc.setTextColor(255, 255, 255);
     } else {
       doc.setTextColor(...C.ink);
     }
     doc.setFont("helvetica", isTotal ? "bold" : "normal");
-    doc.setFontSize(isTotal ? 11 : 9.5);
+    doc.setFontSize(isTotal ? 10.5 : 9);
     doc.text(k, totX + 10, y + 13);
-    doc.text(v, totX + 240, y + 13, { align: "right" });
-    y += isTotal ? 26 : 18;
+    doc.text(v, totX + 250, y + 13, { align: "right" });
+    y += isTotal ? 26 : 17;
   });
   y += 4;
   doc.setTextColor(...C.ink);
+
+  if (isQuitadoComCredito && totalReceberReal === 0) {
+    doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(...C.emeraldDark);
+    doc.text("✨ Atendimento 100% quitado com crédito do Clubinho. Nenhuma cobrança financeira pendente.", M, y + 10);
+    y += 18;
+    doc.setTextColor(...C.ink);
+  }
 
   if (planejados.length) {
     const planTotal = sumItens(planejados);

@@ -39,7 +39,11 @@ import {
   FORMAS_PAGAMENTO, getEtapaStatus, isEtapaConfirmada,
   type ServicoItem, type FotoItem, type EtapaStatus,
 } from "@/lib/atendimento-utils";
-import { generateAtendimentoPDF } from "@/lib/atendimento-pdf";
+import { 
+  generateAtendimentoPDF, 
+  type ClubinhoRelatorioData, 
+  type ClubinhoHistoricoUso 
+} from "@/lib/atendimento-pdf";
 import { useMyProfile } from "@/hooks/use-my-profile";
 import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
 
@@ -1043,6 +1047,95 @@ function AtendimentoDetalhe() {
       const { data: prof } = await supabase.from("profiles").select("nome").eq("id", profId).maybeSingle();
       profissionalNome = prof?.nome ?? null;
     }
+
+    // Consulta real e estruturada do Clubinho do pet
+    let clubinhoData: ClubinhoRelatorioData | null = null;
+    const currentPetId = (atendimento as any)?.pet_id;
+
+    if (currentPetId) {
+      const { data: contratos } = await supabase
+        .from("programas_contratados" as any)
+        .select(`
+          id, nome_snapshot, status_do_programa, criado_em, data_de_inicio, data_de_validade, composicao_snapshot,
+          programas_creditos_movimentacoes (*)
+        `)
+        .eq("pet_id", currentPetId)
+        .order("criado_em", { ascending: false })
+        .limit(3);
+
+      const contratoValido = (contratos as any[])?.find(
+        (c) => c.status_do_programa === "ativo" || c.status_do_programa === "aguardando_pagamento"
+      ) || (contratos as any[])?.[0];
+
+      if (contratoValido) {
+        const movs = (contratoValido.programas_creditos_movimentacoes as any[]) ?? [];
+        const saldos = calcularSaldosDoContrato(contratoValido, movs);
+        const banhoCat = saldos.categorias["banho"] || { contratado: 0, consumido: 0, reservado: 0, disponivel: 0 };
+
+        // Histórico real de utilizações do contrato
+        const usos = movs
+          .filter((m: any) => m.tipo === "consumo" || m.tipo === "uso")
+          .sort((a: any, b: any) => new Date(a.created_at || "").getTime() - new Date(b.created_at || "").getTime());
+
+        const jaConstaUsoAtendimento = usos.some((u: any) => u.atendimento_id === atendId);
+        const utilizacoesHistorico: ClubinhoHistoricoUso[] = [];
+
+        let saldoAcumulado = banhoCat.contratado;
+        for (const u of usos) {
+          const qtdUso = Math.abs(Number(u.quantidade || 1));
+          saldoAcumulado = Math.max(0, saldoAcumulado - qtdUso);
+          utilizacoesHistorico.push({
+            data: u.created_at || new Date().toISOString(),
+            servico_nome: u.servico_nome || "Banho",
+            quantidade: qtdUso,
+            saldo_apos: saldoAcumulado,
+            protocolo: u.atendimento_id ? String(u.atendimento_id).slice(0, 8).toUpperCase() : undefined,
+          });
+        }
+
+        // Se o banho deste atendimento foi quitado com crédito e ainda não foi persistido em movs, adiciona ao histórico
+        if (isBanhoQuitadoComCredito && !jaConstaUsoAtendimento && utilizacoesHistorico.length < banhoCat.contratado) {
+          saldoAcumulado = Math.max(0, saldoAcumulado - 1);
+          utilizacoesHistorico.push({
+            data: (atendimento as any)?.data_fim || (atendimento as any)?.data_inicio || new Date().toISOString(),
+            servico_nome: "Banho",
+            quantidade: 1,
+            saldo_apos: Math.max(0, banhoCat.disponivel - 1),
+            protocolo: String(atendId).slice(0, 8).toUpperCase(),
+          });
+        }
+
+        const hoje = new Date();
+        const validadeDate = new Date(contratoValido.data_de_validade || "");
+        const diasRestantes = Math.max(0, Math.ceil((validadeDate.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
+
+        const totalUtilizadosCalculado = Math.min(
+          banhoCat.contratado,
+          banhoCat.consumido + (isBanhoQuitadoComCredito && !jaConstaUsoAtendimento ? 1 : 0)
+        );
+
+        const totalRestantesCalculado = Math.max(
+          0,
+          banhoCat.disponivel - (isBanhoQuitadoComCredito && !jaConstaUsoAtendimento ? 1 : 0)
+        );
+
+        clubinhoData = {
+          nome_programa: contratoValido.nome_snapshot || "Clubinho Tia Jéssica",
+          status_do_programa: contratoValido.status_do_programa || "ativo",
+          data_contratacao: contratoValido.criado_em || contratoValido.data_de_inicio || new Date().toISOString(),
+          data_inicio: contratoValido.data_de_inicio || new Date().toISOString(),
+          data_validade: contratoValido.data_de_validade || new Date().toISOString(),
+          dias_restantes: diasRestantes,
+          banhos_contratados: banhoCat.contratado,
+          banhos_utilizados: totalUtilizadosCalculado,
+          banhos_reservados: banhoCat.reservado,
+          banhos_restantes: totalRestantesCalculado,
+          historico_utilizacoes: utilizacoesHistorico,
+          isQuitadoComCredito: isBanhoQuitadoComCredito,
+        };
+      }
+    }
+
     return generateAtendimentoPDF({
       atendimento: enriched,
       ocorrencias,
@@ -1052,6 +1145,7 @@ function AtendimentoDetalhe() {
       fotosAntesPaths: fotosAntes.map((f) => f.path).filter(Boolean) as string[],
       fotosDepoisPaths: fotosDepois.map((f) => f.path).filter(Boolean) as string[],
       permitirSemFotos,
+      clubinho: clubinhoData,
     });
   };
 
