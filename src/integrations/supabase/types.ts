@@ -3574,6 +3574,7 @@ export type Database = {
       programas_creditos_movimentacoes: {
         Row: {
           agendamento_id: string | null
+          atendimento_id: string | null
           data_hora: string | null
           estabelecimento_id: string | null
           id: string
@@ -3587,6 +3588,7 @@ export type Database = {
         }
         Insert: {
           agendamento_id?: string | null
+          atendimento_id?: string | null
           data_hora?: string | null
           estabelecimento_id?: string | null
           id?: string
@@ -3600,6 +3602,7 @@ export type Database = {
         }
         Update: {
           agendamento_id?: string | null
+          atendimento_id?: string | null
           data_hora?: string | null
           estabelecimento_id?: string | null
           id?: string
@@ -3625,6 +3628,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mensagens_threads_v2"
             referencedColumns: ["proximo_agendamento_id"]
+          },
+          {
+            foreignKeyName: "programas_creditos_movimentacoes_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "programas_creditos_movimentacoes_programa_contratado_id_fkey"

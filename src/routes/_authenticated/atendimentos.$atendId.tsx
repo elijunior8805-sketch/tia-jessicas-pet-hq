@@ -720,11 +720,12 @@ function AtendimentoDetalhe() {
         valorExtrasReal: sumItens(solicitados) + sumItens(extras),
       };
     }
+    const eleg = elegibilidadeCredito as any;
     return {
-      cobertos: elegibilidadeCredito.servicos_cobertos || [],
-      extrasList: elegibilidadeCredito.servicos_extras || [],
-      valorCoberto: elegibilidadeCredito.total_coberto || 0,
-      valorExtrasReal: elegibilidadeCredito.total_extras || 0,
+      cobertos: eleg.servicos_cobertos || [],
+      extrasList: eleg.servicos_extras || [],
+      valorCoberto: eleg.total_coberto || 0,
+      valorExtrasReal: eleg.total_extras || 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usarCreditoPrograma, elegibilidadeCredito, atendimento]);
@@ -1603,7 +1604,7 @@ function AtendimentoDetalhe() {
                     {extras.map((se, i) => (
                       <div key={i} className="flex justify-between text-xs py-0.5">
                         <span>{se.nome}</span>
-                        <span className="font-medium tabular-nums">{brl(Number(se.valor_total || se.valor_unit || se.valor || 0))}</span>
+                        <span className="font-medium tabular-nums">{brl(Number(se.valor_total || se.valor_unit || (se as any).valor || 0))}</span>
                       </div>
                     ))}
                     <div className="flex justify-between text-xs text-muted-foreground pt-1 font-medium">
