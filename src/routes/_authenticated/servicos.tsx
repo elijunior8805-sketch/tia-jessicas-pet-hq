@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Package, Scissors, Search, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { excluirServicoSeguro, duplicarServico } from "@/lib/servicos.functions";
+import { excluirServicoSeguro, duplicarServico, expurgarServicoPorNome } from "@/lib/servicos.functions";
 
 export const Route = createFileRoute("/_authenticated/servicos")({
   component: ServicosPage,
