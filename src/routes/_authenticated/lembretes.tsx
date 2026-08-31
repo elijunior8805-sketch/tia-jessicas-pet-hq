@@ -16,6 +16,13 @@ import {
   Loader2,
   Save,
   Search,
+  Heart,
+  Clock,
+  CheckCircle2,
+  Gift,
+  Phone,
+  MessageCircle,
+  Copy,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,416 +56,373 @@ import {
   WhatsAppComposer,
   useWhatsAppComposer,
 } from "@/components/whatsapp-composer";
-import { normalizarTelefoneBR } from "@/lib/whatsapp";
+import { JessiLembretesCopilot } from "@/components/lembretes/JessiLembretesCopilot";
+import { normalizarTelefoneBR, abrirWhatsApp } from "@/lib/whatsapp";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/lembretes")({
   component: LembretesPage,
-  errorComponent: ({ error, reset }) => (
-    <div className="p-6">
-      <p className="mb-3 text-sm text-destructive">Erro: {error.message}</p>
-      <Button onClick={reset}>Tentar novamente</Button>
-    </div>
-  ),
-  notFoundComponent: () => <p className="p-6">Não encontrado.</p>,
 });
-
-const TIPO_INFO: Record<
-  LembreteTipo,
-  { label: string; icon: React.ComponentType<{ className?: string }>; badge: string }
-> = {
-  lembrete_24h: {
-    label: "Lembrete 24h",
-    icon: CalendarDays,
-    badge: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
-  },
-  pos_atendimento: {
-    label: "Pós-atendimento",
-    icon: Sparkles,
-    badge: "bg-blue-500/15 text-blue-700 border-blue-500/30",
-  },
-  aniversario_pet: {
-    label: "Aniversário do pet",
-    icon: Cake,
-    badge: "bg-amber-500/15 text-amber-700 border-amber-500/30",
-  },
-  aniversario_tutor: {
-    label: "Aniversário do tutor",
-    icon: Cake,
-    badge: "bg-pink-500/15 text-pink-700 border-pink-500/30",
-  },
-  petversario: {
-    label: "Petversário",
-    icon: Cake,
-    badge: "bg-fuchsia-500/15 text-fuchsia-700 border-fuchsia-500/30",
-  },
-  data_especial: {
-    label: "Data especial",
-    icon: Sparkles,
-    badge: "bg-rose-500/15 text-rose-700 border-rose-500/30",
-  },
-};
-
-const STATUS_INFO: Record<string, { label: string; classe: string }> = {
-  pendente: { label: "Pendente", classe: "bg-amber-500/15 text-amber-700 border-amber-500/30" },
-  enviado: { label: "Enviado", classe: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30" },
-  falhou: { label: "Falhou", classe: "bg-red-500/15 text-red-700 border-red-500/30" },
-  cancelado: { label: "Cancelado", classe: "bg-muted text-muted-foreground border-border" },
-};
-
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  tint,
-}: {
-  label: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  tint: string;
-}) {
-  return (
-    <Card className="card-premium">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className={cn("grid h-10 w-10 place-items-center rounded-lg", tint)}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="font-display text-2xl font-semibold">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function LembretesPage() {
   const qc = useQueryClient();
   const composer = useWhatsAppComposer();
 
-  const [status, setStatus] = useState<
-    "pendente" | "enviado" | "falhou" | "cancelado" | "todos"
-  >("pendente");
-  const [tipo, setTipo] = useState<LembreteTipo | "todos">("todos");
-  const [busca, setBusca] = useState("");
+  const hojeDate = new Date();
+  const hojeStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(hojeDate);
+
+  const amanhaDate = new Date(hojeDate);
+  amanhaDate.setDate(amanhaDate.getDate() + 1);
+  const amanhaStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(amanhaDate);
 
   const cfgFn = useServerFn(getLembretesConfig);
   const salvarCfgFn = useServerFn(salvarLembretesConfig);
-  const listarFn = useServerFn(listarLembretes);
-  const kpisFn = useServerFn(getLembretesKPIs);
-  const marcarFn = useServerFn(marcarLembreteEnviado);
-  const cancelarFn = useServerFn(cancelarLembrete);
-  const reenfileirarFn = useServerFn(reenfileirarLembrete);
-  const gerarFn = useServerFn(gerarLembretesAgora);
 
   const cfg = useQuery({ queryKey: ["lembretes-config"], queryFn: () => cfgFn() });
-  const kpis = useQuery({
-    queryKey: ["lembretes-kpis"],
-    queryFn: () => kpisFn(),
-    staleTime: 30_000,
+
+  // 1. Agendamentos de Amanhã (Tempo Real)
+  const { data: agendamentosAmanha = [], isLoading: loadingAmanha } = useQuery({
+    queryKey: ["lembretes-agendamentos-amanha", amanhaStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("agendamentos")
+        .select(`
+          id, data, hora, status, leva_traz_modalidade,
+          clientes:cliente_id(id, nome, whatsapp, telefone),
+          pets:pet_id(id, nome, raca),
+          servicos:servico_id(nome)
+        `)
+        .eq("data", amanhaStr)
+        .neq("status", "cancelado")
+        .order("hora", { ascending: true });
+      return data ?? [];
+    },
   });
-  const lista = useQuery({
-    queryKey: ["lembretes-fila", status, tipo, busca],
-    queryFn: () => listarFn({ data: { status, tipo, busca } }),
-    staleTime: 15_000,
+
+  // 2. Pós-Atendimentos de Hoje (Tempo Real)
+  const { data: atendimentosHoje = [], isLoading: loadingHoje } = useQuery({
+    queryKey: ["lembretes-pos-hoje", hojeStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("atendimentos")
+        .select(`
+          id, data_inicio, finalizado,
+          clientes:cliente_id(id, nome, whatsapp, telefone),
+          pets:pet_id(id, nome, raca)
+        `)
+        .gte("data_inicio", `${hojeStr}T00:00:00`)
+        .lte("data_inicio", `${hojeStr}T23:59:59`)
+        .eq("finalizado", true);
+      return data ?? [];
+    },
+  });
+
+  // 3. Aniversariantes do Mês
+  const { data: aniversariantes = [] } = useQuery({
+    queryKey: ["lembretes-aniversarios-mes"],
+    queryFn: async () => {
+      const mesAtual = new Date().getMonth() + 1;
+      const { data: pets } = await supabase
+        .from("pets")
+        .select("id, nome, raca, data_nascimento, cliente_id, clientes:cliente_id(id, nome, whatsapp, telefone)")
+        .not("data_nascimento", "is", null)
+        .limit(100);
+
+      return (pets ?? []).filter((p: any) => {
+        if (!p.data_nascimento) return false;
+        const [_, m] = String(p.data_nascimento).split("-");
+        return Number(m) === mesAtual;
+      });
+    },
   });
 
   const [form, setForm] = useState<LembreteConfig | null>(null);
-  // Hidrata form quando cfg carrega
   if (cfg.data && !form) setForm(cfg.data);
 
   const salvar = useMutation({
     mutationFn: async (v: LembreteConfig) => salvarCfgFn({ data: v }),
     onSuccess: () => {
-      toast.success("Configurações salvas");
+      toast.success("Configurações salvas com sucesso!");
       qc.invalidateQueries({ queryKey: ["lembretes-config"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const gerar = useMutation({
-    mutationFn: async () => gerarFn(),
-    onSuccess: (r) => {
-      const total =
-        Number(r?.lembrete_24h ?? 0) +
-        Number(r?.pos_atendimento ?? 0) +
-        Number(r?.aniversario_pet ?? 0) +
-        Number(r?.aniversario_tutor ?? 0) +
-        Number(r?.petversario ?? 0) +
-        Number(r?.data_especial ?? 0);
-      toast.success(
-        total > 0
-          ? `${total} lembrete(s) adicionados à fila`
-          : "Nenhum lembrete novo — tudo em dia"
-      );
-      qc.invalidateQueries({ queryKey: ["lembretes-fila"] });
-      qc.invalidateQueries({ queryKey: ["lembretes-kpis"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const marcarEnviado = useMutation({
-    mutationFn: async (id: string) => marcarFn({ data: { id } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lembretes-fila"] });
-      qc.invalidateQueries({ queryKey: ["lembretes-kpis"] });
-    },
-  });
-
-  const cancelar = useMutation({
-    mutationFn: async (id: string) => cancelarFn({ data: { id } }),
-    onSuccess: () => {
-      toast.success("Lembrete cancelado");
-      qc.invalidateQueries({ queryKey: ["lembretes-fila"] });
-      qc.invalidateQueries({ queryKey: ["lembretes-kpis"] });
-    },
-  });
-
-  const reenfileirar = useMutation({
-    mutationFn: async (id: string) => reenfileirarFn({ data: { id } }),
-    onSuccess: () => {
-      toast.success("Lembrete reenfileirado");
-      qc.invalidateQueries({ queryKey: ["lembretes-fila"] });
-    },
-  });
-
-  const abrirComposer = (row: LembreteRow) => {
-    const tel = row.telefone ?? "";
-    const norm = normalizarTelefoneBR(tel);
-    if (!norm.ok) {
-      toast.error(`${row.cliente_nome ?? "Cliente"} sem telefone válido`);
+  const enviarWhatsAppDireto = (fone: string, texto: string) => {
+    if (!fone) {
+      toast.error("Tutor sem telefone ou WhatsApp cadastrado.");
       return;
     }
-    const tipoWa =
-      row.tipo === "aniversario_pet"
-        ? "aniversario_pet"
-        : row.tipo === "aniversario_tutor"
-        ? "parabens_cliente"
-        : row.tipo === "petversario"
-        ? "aniversario_pet"
-        : row.tipo === "data_especial"
-        ? "personalizada"
-        : row.tipo === "pos_atendimento"
-        ? "solicitacao_avaliacao"
-        : "lembrete_atendimento";
-    composer.open({
-      tipo: tipoWa,
-      destinatario: row.cliente_nome ?? "Cliente",
-      telefone: norm.formatado,
-      mensagem: row.mensagem,
-      motivo: TIPO_INFO[row.tipo].label,
-      cliente_id: row.cliente_id,
-    });
+    const cleanPhone = fone.replace(/\D/g, "");
+    const ddiPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    const url = `https://wa.me/${ddiPhone}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank");
   };
-
-  const rows = lista.data ?? [];
 
   return (
     <div className="space-y-6 p-4 md:p-6">
+      {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold md:text-3xl">
-            Automação de Lembretes
+            Automação de Lembretes & Comunicação
           </h1>
           <p className="text-sm text-muted-foreground">
-            Lembretes 24h, pós-atendimento e aniversários do pet — gerados automaticamente todos os dias.
+            Lembretes de 24h, pós-atendimento e aniversários com disparos de 1 clique no WhatsApp.
           </p>
         </div>
-        <Button
-          onClick={() => gerar.mutate()}
-          disabled={gerar.isPending}
-          className="gap-2"
-        >
-          {gerar.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-          Gerar lembretes de hoje
-        </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard
-          label="Pendentes"
-          value={kpis.data?.pendentes ?? 0}
-          icon={BellRing}
-          tint="bg-amber-500/15 text-amber-700"
-        />
-        <KpiCard
-          label="Próximas 24h"
-          value={kpis.data?.proximas24h ?? 0}
-          icon={CalendarDays}
-          tint="bg-emerald-500/15 text-emerald-700"
-        />
-        <KpiCard
-          label="Enviados"
-          value={kpis.data?.enviados ?? 0}
-          icon={Send}
-          tint="bg-blue-500/15 text-blue-700"
-        />
-        <KpiCard
-          label="Falhas"
-          value={kpis.data?.falhas ?? 0}
-          icon={X}
-          tint="bg-red-500/15 text-red-700"
-        />
-      </div>
+      {/* Copiloto da IA Jessi */}
+      <JessiLembretesCopilot
+        totalAmanha={agendamentosAmanha.length}
+        totalPosHoje={atendimentosHoje.length}
+        totalAniversariantes={aniversariantes.length}
+      />
 
-      <Tabs defaultValue="fila" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="fila">Fila</TabsTrigger>
-          <TabsTrigger value="config">Configuração</TabsTrigger>
+      <Tabs defaultValue="amanha" className="space-y-4">
+        <TabsList className="bg-muted/60 p-1 rounded-xl">
+          <TabsTrigger value="amanha" className="rounded-lg gap-2 text-xs font-semibold">
+            <Clock className="h-3.5 w-3.5" />
+            Lembretes de Amanhã ({agendamentosAmanha.length})
+          </TabsTrigger>
+          <TabsTrigger value="pos" className="rounded-lg gap-2 text-xs font-semibold">
+            <Heart className="h-3.5 w-3.5" />
+            Pós-Atendimento de Hoje ({atendimentosHoje.length})
+          </TabsTrigger>
+          <TabsTrigger value="aniversarios" className="rounded-lg gap-2 text-xs font-semibold">
+            <Gift className="h-3.5 w-3.5" />
+            Aniversariantes do Mês ({aniversariantes.length})
+          </TabsTrigger>
+          <TabsTrigger value="config" className="rounded-lg gap-2 text-xs font-semibold">
+            Configurações & Modelos
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="fila" className="space-y-4">
-          <Card className="card-premium">
-            <CardContent className="flex flex-wrap items-center gap-3 p-4">
-              <div className="relative min-w-[220px] flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Cliente ou pet"
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={tipo} onValueChange={(v: string) => setTipo(v as LembreteTipo | "todos")}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os tipos</SelectItem>
-                  <SelectItem value="lembrete_24h">Lembrete 24h</SelectItem>
-                  <SelectItem value="pos_atendimento">Pós-atendimento</SelectItem>
-                  <SelectItem value="aniversario_pet">Aniversário do pet</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={status} onValueChange={(v: string) => setStatus(v as typeof status)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendente">Pendentes</SelectItem>
-                  <SelectItem value="enviado">Enviados</SelectItem>
-                  <SelectItem value="falhou">Falhas</SelectItem>
-                  <SelectItem value="cancelado">Cancelados</SelectItem>
-                  <SelectItem value="todos">Todos</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="icon" onClick={() => lista.refetch()}>
-                <RefreshCcw className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
+        {/* ABA 1: LEMBRETES DE AMANHÃ (24h) */}
+        <TabsContent value="amanha" className="space-y-3">
+          {loadingAmanha ? (
+            <div className="grid place-items-center py-12 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : agendamentosAmanha.length === 0 ? (
+            <Card className="card-premium">
+              <CardContent className="grid place-items-center gap-2 py-12 text-center text-muted-foreground">
+                <CalendarDays className="h-8 w-8 opacity-40" />
+                <p className="font-semibold text-foreground">Nenhum agendamento para amanhã ({amanhaStr}).</p>
+                <p className="text-xs">Assim que houver novos horários agendados, eles aparecerão aqui com lembretes prontos.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {agendamentosAmanha.map((ag: any) => {
+                const tutorNome = ag.clientes?.nome?.split(" ")[0] || "Tutor";
+                const petNome = ag.pets?.nome || "seu pet";
+                const servicoNome = ag.servicos?.nome || "Banho & Tosa";
+                const fone = ag.clientes?.whatsapp || ag.clientes?.telefone || "";
 
-          <div className="space-y-3">
-            {lista.isLoading ? (
-              <div className="grid place-items-center py-10 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : rows.length === 0 ? (
-              <Card className="card-premium">
-                <CardContent className="grid place-items-center gap-2 py-12 text-center text-muted-foreground">
-                  <Bell className="h-8 w-8 opacity-50" />
-                  <p>Nenhum lembrete nesta seleção.</p>
-                  <p className="text-xs">
-                    Use "Gerar lembretes de hoje" para forçar o processamento.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              rows.map((r) => {
-                const info = TIPO_INFO[r.tipo];
-                const Icon = info.icon;
-                const st = STATUS_INFO[r.status];
+                const msgLembrete = `Oi, ${tutorNome}! 🐾 Tudo bem?\n\nPassando para confirmar o agendamento do ${petNome} no Spa de Pet Tia Jéssica amanhã (${amanhaStr}) às ${ag.hora?.slice(0, 5)} (${servicoNome}).\n\nTudo certo por aí? Te esperamos com muito carinho! ✨💚`;
+
                 return (
-                  <Card key={r.id} className="card-premium">
-                    <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-start md:justify-between">
-                      <div className="flex min-w-0 gap-3">
-                        <div
-                          className={cn(
-                            "grid h-10 w-10 shrink-0 place-items-center rounded-lg border",
-                            info.badge
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
+                  <Card key={ag.id} className="card-premium p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
+                      <div>
+                        <div className="font-display font-bold text-sm text-primary flex items-center gap-1.5">
+                          <span>🐾 {ag.pets?.nome}</span>
+                          <span className="text-xs text-muted-foreground font-normal">({ag.clientes?.nome})</span>
                         </div>
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">
-                              {r.cliente_nome ?? "—"}
-                            </span>
-                            {r.pet_nome && (
-                              <span className="text-sm text-muted-foreground">
-                                • {r.pet_nome}
-                              </span>
-                            )}
-                            <Badge variant="outline" className={info.badge}>
-                              {info.label}
-                            </Badge>
-                            <Badge variant="outline" className={st.classe}>
-                              {st.label}
-                            </Badge>
-                            {r.tentativas > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                {r.tentativas} tentativa(s)
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="line-clamp-2 whitespace-pre-wrap text-sm text-muted-foreground">
-                            {r.mensagem}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Envio agendado: {new Date(r.proximo_envio).toLocaleString("pt-BR")}
-                            {r.telefone ? ` • ${r.telefone}` : " • sem telefone"}
-                          </p>
-                          {r.erro && (
-                            <p className="text-xs text-red-600">Erro: {r.erro}</p>
-                          )}
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Horário: <span className="font-semibold text-foreground">{ag.hora?.slice(0, 5)}</span> · {servicoNome}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 md:justify-end">
-                        {r.status === "pendente" && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                abrirComposer(r);
-                                marcarEnviado.mutate(r.id);
-                              }}
-                              className="gap-1"
-                            >
-                              <Send className="h-4 w-4" /> Enviar agora
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => cancelar.mutate(r.id)}
-                            >
-                              Cancelar
-                            </Button>
-                          </>
-                        )}
-                        {(r.status === "falhou" || r.status === "cancelado") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => reenfileirar.mutate(r.id)}
-                            className="gap-1"
-                          >
-                            <RefreshCcw className="h-4 w-4" /> Reenfileirar
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
+                      <Badge className="bg-emerald-600/15 text-emerald-800 border-emerald-300 text-[10px]">
+                        {ag.status}
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg whitespace-pre-wrap leading-relaxed">
+                      {msgLembrete}
+                    </p>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(msgLembrete);
+                          toast.success("Mensagem copiada!");
+                        }}
+                        className="h-8 text-xs gap-1"
+                      >
+                        <Copy className="h-3.5 w-3.5" /> Copiar
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        onClick={() => enviarWhatsAppDireto(fone, msgLembrete)}
+                        className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5"
+                      >
+                        <Send className="h-3.5 w-3.5" /> Enviar WhatsApp
+                      </Button>
+                    </div>
                   </Card>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          )}
         </TabsContent>
 
+        {/* ABA 2: PÓS-ATENDIMENTO (HOJE) */}
+        <TabsContent value="pos" className="space-y-3">
+          {loadingHoje ? (
+            <div className="grid place-items-center py-12 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : atendimentosHoje.length === 0 ? (
+            <Card className="card-premium">
+              <CardContent className="grid place-items-center gap-2 py-12 text-center text-muted-foreground">
+                <Heart className="h-8 w-8 opacity-40" />
+                <p className="font-semibold text-foreground">Nenhum atendimento finalizado hoje ({hojeStr}) ainda.</p>
+                <p className="text-xs">Assim que um atendimento for concluído, o lembrete de carinho pós-banho será gerado aqui.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {atendimentosHoje.map((at: any) => {
+                const tutorNome = at.clientes?.nome?.split(" ")[0] || "Tutor";
+                const petNome = at.pets?.nome || "seu pet";
+                const fone = at.clientes?.whatsapp || at.clientes?.telefone || "";
+
+                const msgPos = `Oi, ${tutorNome}! 🐾 Aqui é da equipe do Spa de Pet Tia Jéssica!\n\nEsperamos que o ${petNome} tenha amado o dia de spa e esteja super cheiroso(a) e relaxado(a) em casa! Se precisar de qualquer orientação sobre a pelagem ou cuidados, estamos sempre à disposição. Obrigado pelo carinho e confiança! ✨💚`;
+
+                return (
+                  <Card key={at.id} className="card-premium p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
+                      <div>
+                        <div className="font-display font-bold text-sm text-primary flex items-center gap-1.5">
+                          <span>🐾 {at.pets?.nome}</span>
+                          <span className="text-xs text-muted-foreground font-normal">({at.clientes?.nome})</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Status: <span className="font-semibold text-emerald-700">Atendimento Concluído</span>
+                        </div>
+                      </div>
+                      <Badge className="bg-blue-600/15 text-blue-800 border-blue-300 text-[10px]">
+                        Pós-Atendimento
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg whitespace-pre-wrap leading-relaxed">
+                      {msgPos}
+                    </p>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(msgPos);
+                          toast.success("Mensagem copiada!");
+                        }}
+                        className="h-8 text-xs gap-1"
+                      >
+                        <Copy className="h-3.5 w-3.5" /> Copiar
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        onClick={() => enviarWhatsAppDireto(fone, msgPos)}
+                        className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5"
+                      >
+                        <Send className="h-3.5 w-3.5" /> Enviar Carinho
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ABA 3: ANIVERSARIANTES DO MÊS */}
+        <TabsContent value="aniversarios" className="space-y-3">
+          {aniversariantes.length === 0 ? (
+            <Card className="card-premium">
+              <CardContent className="grid place-items-center gap-2 py-12 text-center text-muted-foreground">
+                <Gift className="h-8 w-8 opacity-40" />
+                <p className="font-semibold text-foreground">Nenhum pet aniversariante registrado neste mês.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {aniversariantes.map((pet: any) => {
+                const tutorNome = pet.clientes?.nome?.split(" ")[0] || "Tutor";
+                const petNome = pet.nome;
+                const fone = pet.clientes?.whatsapp || pet.clientes?.telefone || "";
+
+                const msgParabens = `Parabéns, ${tutorNome}! 🎉🐾 Hoje é dia de celebrar a vida do ${petNome}!\n\nToda a equipe do Spa de Pet Tia Jéssica deseja muita saúde, petiscos e momentos felizes para esse aumigo tão especial! Que tal trazer ele(a) para um banho comemorativo com direito a muito mimo? 🎂✨💚`;
+
+                return (
+                  <Card key={pet.id} className="card-premium p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
+                      <div>
+                        <div className="font-display font-bold text-sm text-primary flex items-center gap-1.5">
+                          <span>🎂 {pet.nome}</span>
+                          <span className="text-xs text-muted-foreground font-normal">({pet.clientes?.nome})</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Data de Nascimento: <span className="font-semibold text-foreground">{pet.data_nascimento}</span>
+                        </div>
+                      </div>
+                      <Badge className="bg-pink-600/15 text-pink-800 border-pink-300 text-[10px]">
+                        Aniversariante
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg whitespace-pre-wrap leading-relaxed">
+                      {msgParabens}
+                    </p>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(msgParabens);
+                          toast.success("Mensagem copiada!");
+                        }}
+                        className="h-8 text-xs gap-1"
+                      >
+                        <Copy className="h-3.5 w-3.5" /> Copiar
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        onClick={() => enviarWhatsAppDireto(fone, msgParabens)}
+                        className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5"
+                      >
+                        <Send className="h-3.5 w-3.5" /> Enviar Parabéns
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ABA 4: CONFIGURAÇÕES E MODELOS */}
         <TabsContent value="config" className="space-y-4">
           {!form ? (
             <div className="grid place-items-center py-10 text-muted-foreground">
@@ -485,7 +449,7 @@ function LembretesPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Mensagem</Label>
+                    <Label className="text-xs">Mensagem Padrão</Label>
                     <Textarea
                       rows={5}
                       value={form.lembrete_24h_template}
@@ -493,9 +457,6 @@ function LembretesPage() {
                         setForm({ ...form, lembrete_24h_template: e.target.value })
                       }
                     />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Variáveis: {"{{tutor}}"}, {"{{pet}}"}, {"{{data}}"}, {"{{hora}}"}
-                    </p>
                   </div>
                 </div>
               </ConfigCard>
@@ -524,7 +485,7 @@ function LembretesPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Mensagem</Label>
+                    <Label className="text-xs">Mensagem Padrão</Label>
                     <Textarea
                       rows={5}
                       value={form.pos_atendimento_template}
@@ -532,9 +493,6 @@ function LembretesPage() {
                         setForm({ ...form, pos_atendimento_template: e.target.value })
                       }
                     />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Variáveis: {"{{tutor}}"}, {"{{pet}}"}
-                    </p>
                   </div>
                 </div>
               </ConfigCard>
@@ -558,7 +516,7 @@ function LembretesPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Mensagem</Label>
+                    <Label className="text-xs">Mensagem Padrão</Label>
                     <Textarea
                       rows={5}
                       value={form.aniversario_template}
@@ -566,9 +524,6 @@ function LembretesPage() {
                         setForm({ ...form, aniversario_template: e.target.value })
                       }
                     />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Variáveis: {"{{tutor}}"}, {"{{pet}}"}
-                    </p>
                   </div>
                 </div>
               </ConfigCard>
@@ -577,7 +532,7 @@ function LembretesPage() {
                 <Button
                   onClick={() => form && salvar.mutate(form)}
                   disabled={salvar.isPending}
-                  className="gap-2"
+                  className="gap-2 bg-primary text-primary-foreground font-bold"
                 >
                   {salvar.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -638,3 +593,4 @@ function ConfigCard({
     </Card>
   );
 }
+
