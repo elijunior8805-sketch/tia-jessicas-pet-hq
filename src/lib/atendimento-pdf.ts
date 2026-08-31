@@ -58,6 +58,8 @@ const C = {
   cream: [250, 247, 240] as [number, number, number],
   emeraldLight: [236, 253, 245] as [number, number, number],
   emeraldDark: [6, 78, 59] as [number, number, number],
+  amberLight: [254, 243, 199] as [number, number, number],
+  amberDark: [146, 64, 14] as [number, number, number],
 };
 
 function fmtDateTime(iso?: string | null) {
@@ -127,7 +129,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const M = 36; // Margem padrão lateral otimizada
+  const M = 38; // Margem padrão balanceada
 
   const cliente = atendimento?.clientes ?? {};
   const pet = atendimento?.pets ?? {};
@@ -170,65 +172,65 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     }
   }
 
-  // ==========================================
+  // ====================================================
   // PÁGINA 1: RELATÓRIO COMPLETO DO ATENDIMENTO
-  // ==========================================
+  // ====================================================
 
-  // A. CABEÇALHO COMPACTO E ELEGANTE
+  // A. CABEÇALHO ELEGANTE
   const logoDataUrl = await getLogoDataUrl();
   doc.setFillColor(...C.forest);
-  doc.rect(0, 0, W, 76, "F");
+  doc.rect(0, 0, W, 74, "F");
   doc.setFillColor(...C.gold);
-  doc.rect(0, 76, W, 2.5, "F");
+  doc.rect(0, 74, W, 2.5, "F");
 
-  drawLogoBadge(doc, logoDataUrl, M + 24, 38, 48);
-  const textX = logoDataUrl ? M + 62 : M;
+  drawLogoBadge(doc, logoDataUrl, M + 22, 37, 46);
+  const textX = logoDataUrl ? M + 58 : M;
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text(empresa?.nome ?? "Spa de Pet Tia Jéssica", textX, 34);
+  doc.setFontSize(15);
+  doc.text(empresa?.nome ?? "Spa de Pet Tia Jéssica", textX, 33);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   const infoLine = [empresa?.cnpj, empresa?.telefone, empresa?.endereco].filter(Boolean).join("  ·  ");
-  if (infoLine) doc.text(infoLine, textX, 48);
-  doc.setFontSize(9);
+  if (infoLine) doc.text(infoLine, textX, 46);
+  doc.setFontSize(8.5);
   doc.setTextColor(...C.goldLight);
-  doc.text("Relatório de Atendimento", textX, 63);
+  doc.text("Relatório Oficial de Atendimento", textX, 60);
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   const proto = String(atendimento?.id ?? "").slice(0, 8).toUpperCase();
-  doc.text(`Protocolo ${proto}`, W - M, 34, { align: "right" });
+  doc.text(`Protocolo: ${proto}`, W - M, 33, { align: "right" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(230, 230, 230);
-  doc.text(fmtDateTime(atendimento?.data_fim ?? atendimento?.data_inicio), W - M, 48, { align: "right" });
+  doc.text(fmtDateTime(atendimento?.data_fim ?? atendimento?.data_inicio), W - M, 46, { align: "right" });
 
-  let y = 88;
+  let y = 86;
   doc.setTextColor(...C.ink);
 
   // B. DADOS DO TUTOR E DO PET (LADO A LADO)
   const boxW = (W - M * 2 - 10) / 2;
   const boxTop = y;
-  const boxH = 66;
+  const boxH = 62;
 
   const drawBox = (x: number, title: string, lines: [string, string][]) => {
     doc.setDrawColor(...C.line);
     doc.setFillColor(...C.cream);
     doc.roundedRect(x, boxTop, boxW, boxH, 4, 4, "FD");
     doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.gold);
-    doc.text(title.toUpperCase(), x + 10, boxTop + 14);
+    doc.text(title.toUpperCase(), x + 10, boxTop + 13);
     doc.setTextColor(...C.ink);
-    let ly = boxTop + 27;
+    let ly = boxTop + 26;
     lines.forEach(([k, v]) => {
       doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.mute);
       doc.text(k, x + 10, ly);
       doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.ink);
       const valText = doc.splitTextToSize(v || "—", boxW - 85);
       doc.text(valText, x + 76, ly);
-      ly += 12;
+      ly += 11.5;
     });
   };
 
@@ -247,9 +249,9 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     ["Última visita", ultimaVisitaStr],
   ]);
 
-  y = boxTop + boxH + 10;
+  y = boxTop + boxH + 8;
 
-  // C. CLUBINHO (SE EXISTIR PARA O PET)
+  // C. SEÇÃO CLUBINHO (SE HOUVER)
   const clubinho = opts.clubinho;
   const isQuitadoComCredito = clubinho?.isQuitadoComCredito ?? (atendimento?.pagamento_forma === "credito_programa" || executados.some((it: any) => it.usar_credito));
 
@@ -257,10 +259,10 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     const clbBoxW = W - M * 2;
     const clbTop = y;
 
-    // Cabeçalho da seção Clubinho com Selo de Situação
-    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.forest);
-    doc.text("CLUBINHO - PROGRAMA DE CUIDADOS", M, clbTop + 9);
-    doc.setDrawColor(...C.gold); doc.line(M, clbTop + 13, M + 185, clbTop + 13);
+    // Cabeçalho Clubinho
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.forest);
+    doc.text("CLUBINHO - PROGRAMA DE CUIDADOS", M, clbTop + 8);
+    doc.setDrawColor(...C.gold); doc.line(M, clbTop + 11, M + 175, clbTop + 11);
 
     const stLabel = clubinho.status_do_programa === "ativo"
       ? "Clubinho Ativo"
@@ -272,31 +274,31 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
 
     doc.setFillColor(...(clubinho.status_do_programa === "ativo" ? C.emeraldLight : C.cream));
     doc.setDrawColor(...C.gold);
-    doc.roundedRect(W - M - 95, clbTop, 95, 14, 3, 3, "FD");
-    doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+    doc.roundedRect(W - M - 90, clbTop - 1, 90, 13, 3, 3, "FD");
+    doc.setFontSize(7); doc.setFont("helvetica", "bold");
     doc.setTextColor(...(clubinho.status_do_programa === "ativo" ? C.emeraldDark : C.forest));
-    doc.text(stLabel, W - M - 47.5, clbTop + 10, { align: "center" });
+    doc.text(stLabel, W - M - 45, clbTop + 8, { align: "center" });
 
-    y += 18;
+    y += 16;
 
-    // Cartão Principal com Dados do Plano e 3 Indicadores (SEM Banhos Reservados)
-    const cardH = 50;
+    // Cartão Principal: Nome do Plano e 3 Indicadores (SEM Banhos Reservados)
+    const cardH = 46;
     doc.setDrawColor(...C.line);
     doc.setFillColor(...C.cream);
-    doc.roundedRect(M, y, clbBoxW, cardH, 5, 5, "FD");
+    doc.roundedRect(M, y, clbBoxW, cardH, 4, 4, "FD");
 
-    // Linha de Identificação do Plano e Validade
-    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.forest);
-    doc.text(`Plano: ${clubinho.nome_programa || "Clubinho Tia Jéssica"}`, M + 10, y + 13);
+    // Linha 1: Nome do Plano e Validade
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.forest);
+    doc.text(`Plano: ${clubinho.nome_programa || "Clubinho Tia Jéssica"}`, M + 10, y + 11);
 
     doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.mute);
     const validadeStr = `Validade: ${fmtDate(clubinho.data_inicio)} a ${fmtDate(clubinho.data_validade)}${clubinho.dias_restantes > 0 ? ` (${clubinho.dias_restantes} dias restantes)` : ""}`;
-    doc.text(validadeStr, W - M - 10, y + 13, { align: "right" });
+    doc.text(validadeStr, W - M - 10, y + 11, { align: "right" });
 
-    // 3 INDICADORES DISTRIBUÍDOS UNIFORMEMENTE OCUPANDO 100% DA LARGURA
+    // 3 Indicadores Distribuídos Uniformemente
     const indW = (clbBoxW - 20 - 12) / 3;
-    const indY = y + 20;
-    const indH = 24;
+    const indY = y + 17;
+    const indH = 23;
 
     const indicadores = [
       { label: "Banhos contratados", val: `${clubinho.banhos_contratados} ${clubinho.banhos_contratados === 1 ? "banho" : "banhos"}`, tone: C.ink },
@@ -309,19 +311,19 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
       doc.setDrawColor(...C.line);
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(ix, indY, indW, indH, 3, 3, "FD");
-      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...C.mute);
-      doc.text(ind.label, ix + indW / 2, indY + 9, { align: "center" });
-      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...ind.tone);
-      doc.text(ind.val, ix + indW / 2, indY + 19, { align: "center" });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(...C.mute);
+      doc.text(ind.label, ix + indW / 2, indY + 8, { align: "center" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...ind.tone);
+      doc.text(ind.val, ix + indW / 2, indY + 18, { align: "center" });
     });
 
-    y += cardH + 6;
+    y += cardH + 5;
 
-    // Tabela Compacta do Histórico de Utilizações
+    // Tabela do Histórico de Utilizações
     if (clubinho.historico_utilizacoes && clubinho.historico_utilizacoes.length > 0) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.forest);
       doc.text("HISTÓRICO DE CRÉDITOS UTILIZADOS", M, y + 6);
-      y += 9;
+      y += 8;
 
       autoTable(doc, {
         startY: y,
@@ -333,8 +335,8 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
           `${u.saldo_apos} ${u.saldo_apos === 1 ? "banho restante" : "banhos restantes"}`,
         ]),
         theme: "grid",
-        styles: { font: "helvetica", fontSize: 7.5, cellPadding: 2.5, textColor: C.ink, lineColor: C.line },
-        headStyles: { fillColor: C.forest, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5, cellPadding: 2.5 },
+        styles: { font: "helvetica", fontSize: 7.5, cellPadding: 2, textColor: C.ink, lineColor: C.line },
+        headStyles: { fillColor: C.forest, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5, cellPadding: 2 },
         columnStyles: {
           0: { cellWidth: 90 },
           1: { cellWidth: 150 },
@@ -343,21 +345,31 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
         },
         margin: { left: M, right: M },
       });
-      y = (doc as any).lastAutoTable.finalY + 6;
+      y = (doc as any).lastAutoTable.finalY + 4;
+    }
+
+    // DESTAQUE VERDE: EXIBIDO SOMENTE SE OS BANHOS DO CLUBINHO ACABARAM (banhos_restantes === 0)
+    if (clubinho.banhos_restantes === 0 && clubinho.banhos_contratados > 0) {
+      doc.setFillColor(...C.emeraldLight);
+      doc.setDrawColor(...C.gold);
+      doc.roundedRect(M, y, clbBoxW, 16, 3, 3, "FD");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.emeraldDark);
+      doc.text("🐾 Todos os banhos do seu Clubinho foram utilizados! Que tal renovar o plano para continuar garantindo o melhor cuidado?", M + 10, y + 11);
+      y += 20;
     }
   }
 
-  // D. LINHA DO TEMPO & SERVIÇOS EXECUTADOS
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.forest);
-  doc.text("SERVIÇOS E LINHA DO TEMPO", M, y + 8);
-  doc.setDrawColor(...C.gold); doc.line(M, y + 12, M + 140, y + 12);
+  // D. SERVIÇOS EXECUTADOS & LINHA DO TEMPO
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.forest);
+  doc.text("SERVIÇOS EXECUTADOS E LINHA DO TEMPO", M, y + 8);
+  doc.setDrawColor(...C.gold); doc.line(M, y + 11, M + 195, y + 11);
 
   // Check-in / Check-out alinhados no canto direito
   doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.mute);
   const timeStr = `Check-in: ${fmtDateTime(atendimento?.data_inicio)}   |   Check-out: ${fmtDateTime(atendimento?.data_fim)}`;
   doc.text(timeStr, W - M, y + 8, { align: "right" });
 
-  y += 16;
+  y += 15;
 
   // Cálculo financeiro
   let valorReferenciaBanhoCoberto = 0;
@@ -394,8 +406,8 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
         })
       : [["Nenhum serviço executado", "", "", ""]],
     theme: "grid",
-    styles: { font: "helvetica", fontSize: 8, cellPadding: 3.5, textColor: C.ink, lineColor: C.line },
-    headStyles: { fillColor: C.forest, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8, cellPadding: 3.5 },
+    styles: { font: "helvetica", fontSize: 7.5, cellPadding: 3, textColor: C.ink, lineColor: C.line },
+    headStyles: { fillColor: C.forest, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5, cellPadding: 3 },
     columnStyles: {
       0: { cellWidth: 230 },
       1: { halign: "center", cellWidth: 35 },
@@ -404,7 +416,7 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
     },
     margin: { left: M, right: M },
   });
-  y = (doc as any).lastAutoTable.finalY + 6;
+  y = (doc as any).lastAutoTable.finalY + 5;
 
   // Resumo Financeiro Compacto à Direita
   const totRows: [string, string, boolean][] = [
@@ -430,22 +442,22 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
   totRows.forEach(([k, v, isTotal]) => {
     if (isTotal) {
       doc.setFillColor(...(totalReceberReal === 0 ? C.forest : C.gold));
-      doc.roundedRect(totX, y, totW, 16, 3, 3, "F");
+      doc.roundedRect(totX, y, totW, 15, 3, 3, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8.5);
-      doc.text(k, totX + 8, y + 11);
-      doc.text(v, totX + totW - 8, y + 11, { align: "right" });
-      y += 18;
+      doc.setFontSize(8);
+      doc.text(k, totX + 8, y + 10.5);
+      doc.text(v, totX + totW - 8, y + 10.5, { align: "right" });
+      y += 17;
     } else {
       doc.setTextColor(...C.mute);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
-      doc.text(k, totX + 8, y + 9);
+      doc.text(k, totX + 8, y + 8.5);
       doc.setTextColor(...C.ink);
       doc.setFont("helvetica", "bold");
-      doc.text(v, totX + totW - 8, y + 9, { align: "right" });
-      y += 12;
+      doc.text(v, totX + totW - 8, y + 8.5, { align: "right" });
+      y += 11;
     }
   });
 
@@ -456,11 +468,11 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
 
   y += 4;
 
-  // E. INFORMAÇÕES DO ATENDIMENTO, RECOMENDAÇÕES E PRÓXIMA VISITA (TUDO NA PÁGINA 1)
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.forest);
+  // E. INFORMAÇÕES DO ATENDIMENTO & OBSERVAÇÕES
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.forest);
   doc.text("INFORMAÇÕES E OBSERVAÇÕES DO ATENDIMENTO", M, y + 6);
-  doc.setDrawColor(...C.gold); doc.line(M, y + 10, M + 230, y + 10);
-  y += 16;
+  doc.setDrawColor(...C.gold); doc.line(M, y + 9, M + 220, y + 9);
+  y += 14;
 
   // Alertas do check-in
   const flags: { label: string; on: boolean }[] = [
@@ -475,56 +487,53 @@ export async function generateAtendimentoPDF(opts: AtendPDFData): Promise<PDFRes
       const tw = doc.getTextWidth(f.label) + 14;
       doc.setFillColor(255, 244, 214);
       doc.setDrawColor(...C.gold);
-      doc.roundedRect(bx, y - 8, tw, 13, 3, 3, "FD");
-      doc.setFontSize(7.5); doc.setTextColor(...C.forest); doc.setFont("helvetica", "bold");
+      doc.roundedRect(bx, y - 7, tw, 12, 3, 3, "FD");
+      doc.setFontSize(7); doc.setTextColor(...C.forest); doc.setFont("helvetica", "bold");
       doc.text(f.label, bx + 7, y + 1);
       bx += tw + 5;
     });
-    y += 12;
+    y += 10;
   }
 
   const obsCheckin = (atendimento?.observacoes_checkin?.trim?.() || atendimento?.observacoes?.trim?.() || (atendimento as any)?.check_in_obs?.trim?.() || "Atendimento realizado com carinho e tranquilidade.");
   const recomendacoes = (atendimento?.recomendacoes?.trim?.() || "Manter a rotina de escovação e cuidados em casa.");
 
-  // Card unificado de Observações e Recomendações
+  // Card unificado de Observações, Recomendações e Próxima Visita
   const infoBoxW = W - M * 2;
   const infoBoxTop = y;
 
-  doc.setDrawColor(...C.line);
-  doc.setFillColor(...C.cream);
-  
-  // Calcula linhas de texto
   doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
   const obsLines = doc.splitTextToSize(obsCheckin, infoBoxW - 120);
   const recLines = doc.splitTextToSize(recomendacoes, infoBoxW - 120);
-  const boxHeightCalc = 12 + (obsLines.length * 10) + (recLines.length * 10) + (atendimento?.proxima_visita ? 22 : 8);
+  const hasProxVisita = !!atendimento?.proxima_visita;
+  const boxHeightCalc = 12 + (obsLines.length * 9.5) + (recLines.length * 9.5) + (hasProxVisita ? 15 : 4);
 
+  doc.setDrawColor(...C.line);
+  doc.setFillColor(...C.cream);
   doc.roundedRect(M, infoBoxTop, infoBoxW, boxHeightCalc, 4, 4, "FD");
 
-  let curY = infoBoxTop + 10;
+  let curY = infoBoxTop + 9;
 
   // Observações
   doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.forest);
   doc.text("Observações:", M + 8, curY);
   doc.setFont("helvetica", "normal"); doc.setTextColor(...C.ink);
   doc.text(obsLines, M + 95, curY);
-  curY += obsLines.length * 10 + 2;
+  curY += obsLines.length * 9.5 + 2;
 
   // Recomendações
   doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.forest);
   doc.text("Recomendações:", M + 8, curY);
   doc.setFont("helvetica", "normal"); doc.setTextColor(...C.ink);
   doc.text(recLines, M + 95, curY);
-  curY += recLines.length * 10 + 4;
+  curY += recLines.length * 9.5 + 3;
 
-  // PRÓXIMA VISITA SUGERIDA NA PRIMEIRA PÁGINA (LOGO APÓS AS RECOMENDAÇÕES)
-  if (atendimento?.proxima_visita) {
-    doc.setFillColor(...C.emeraldLight);
-    doc.setDrawColor(...C.gold);
-    doc.roundedRect(M + 8, curY - 2, infoBoxW - 16, 16, 3, 3, "FD");
-
-    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.emeraldDark);
-    doc.text(`📅 PRÓXIMA VISITA SUGERIDA: ${fmtDate(atendimento.proxima_visita)}`, M + 16, curY + 9);
+  // PRÓXIMA VISITA SUGERIDA (FORMATO LIMPO E ELEGANTE DENTRO DO CARD)
+  if (hasProxVisita) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.forest);
+    doc.text("Próxima visita sugerida:", M + 8, curY);
+    doc.setFont("helvetica", "bold"); doc.setTextColor(...C.gold);
+    doc.text(fmtDate(atendimento.proxima_visita), M + 95, curY);
   }
 
   // ====================================================
