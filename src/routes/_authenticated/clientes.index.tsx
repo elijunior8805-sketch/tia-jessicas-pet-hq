@@ -527,12 +527,6 @@ function ClienteRow({
             )}
           </div>
         )}
-        {vencido > 0 && (
-          <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-terracotta)]">
-            <AlertTriangle className="h-3 w-3" />
-            {vencido.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} vencido
-          </div>
-        )}
       </div>
       <ChevronRight className={cn(
         "h-4 w-4 shrink-0 mt-1 transition-colors",
