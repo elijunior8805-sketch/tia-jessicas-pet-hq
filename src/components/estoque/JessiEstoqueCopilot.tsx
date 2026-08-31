@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Sparkles,
-  PackageAlert,
+  PackageX,
   ShoppingCart,
   Copy,
   CheckCircle2,
@@ -102,7 +102,7 @@ export const JessiEstoqueCopilot: React.FC<JessiEstoqueCopilotProps> = ({
         <div className="p-2.5 rounded-xl bg-black/20 border border-white/10 backdrop-blur-xs">
           <span className="text-[10px] text-white/60 block mb-0.5">Estoque Crítico (Abaixo do Mínimo)</span>
           <span className={`font-bold text-sm flex items-center gap-1.5 ${produtosCriticos.length > 0 ? "text-amber-300" : "text-emerald-300"}`}>
-            <PackageAlert className="h-4 w-4" />
+            <PackageX className="h-4 w-4" />
             {produtosCriticos.length} produto(s)
           </span>
         </div>
