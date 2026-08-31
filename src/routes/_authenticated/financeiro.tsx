@@ -61,6 +61,7 @@ import { generateFinanceiroPDF } from "@/lib/financeiro-pdf";
 import { generateFinanceiroCSV } from "@/lib/financeiro-csv";
 import { BaixaPagamentoDialog } from "@/components/financeiro/BaixaPagamentoDialog";
 import { CancelarLancamentoDialog } from "@/components/financeiro/CancelarLancamentoDialog";
+import { JessiFinanceiroCopilot } from "@/components/financeiro/JessiFinanceiroCopilot";
 import { toast } from "sonner";
 
 import {
@@ -1317,6 +1318,19 @@ function FinanceiroPage() {
           </div>
         </section>
 
+        {/* ============ Copiloto Financeiro da Jessi ============ */}
+        <JessiFinanceiroCopilot
+          receitaBruta={kpis.receitaBruta}
+          totalRecebido={kpis.totalRecebido}
+          totalAReceber={kpis.totalAReceber}
+          despesas={kpis.despesas}
+          vencidos={kpis.vencidos}
+          lucroEstimado={kpis.lucroEstimado}
+          ticketMedio={kpis.ticketMedio}
+          qtdPendentes={kpis.qtdPendentes}
+          periodoLabel={periodoLabel}
+        />
+
         {/* ============ KPIs — Linha 1 (destaque) ============ */}
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <HeroKpi
@@ -1353,47 +1367,47 @@ function FinanceiroPage() {
           />
         </section>
 
-        {/* ============ KPIs — Linha 2 ============ */}
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {/* ============ KPIs — Linha 2 (Métricas Secundárias) ============ */}
+        <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <MiniKpi
-            label="Saldo do período"
+            label="Saldo Líquido"
             value={brl(kpis.saldoPeriodo)}
-            icon={<Scale className="h-3.5 w-3.5" />}
+            icon={<Scale className="h-3.5 w-3.5 text-emerald-700" />}
             tone={kpis.saldoPeriodo >= 0 ? "positive" : "negative"}
             tooltip="Recebido − Despesas do período."
           />
           <MiniKpi
-            label="A receber"
+            label="A Receber"
             value={brl(kpis.totalAReceber)}
-            icon={<Clock className="h-3.5 w-3.5" />}
+            icon={<Clock className="h-3.5 w-3.5 text-blue-600" />}
             tone="neutral"
             tooltip="Saldo em aberto (pendentes + parciais)."
           />
           <MiniKpi
             label="Vencidos"
             value={brl(kpis.vencidos)}
-            icon={<AlertTriangle className="h-3.5 w-3.5" />}
+            icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-600" />}
             tone="negative"
             tooltip="Parcelas em aberto com vencimento anterior a hoje."
           />
           <MiniKpi
-            label="Ticket médio"
+            label="Ticket Médio"
             value={brl(kpis.ticketMedio)}
-            icon={<Receipt className="h-3.5 w-3.5" />}
+            icon={<Receipt className="h-3.5 w-3.5 text-[#C8A951]" />}
             tone="neutral"
             tooltip="Média dos recebimentos de serviços no período."
           />
           <MiniKpi
-            label="Pendentes"
-            value={String(kpis.qtdPendentes)}
-            icon={<Clock className="h-3.5 w-3.5" />}
+            label="Pendências"
+            value={`${kpis.qtdPendentes} fatura(s)`}
+            icon={<Clock className="h-3.5 w-3.5 text-muted-foreground" />}
             tone="neutral"
             tooltip="Quantidade de pagamentos em aberto."
           />
           <MiniKpi
-            label="Aportes/ajustes"
+            label="Aportes"
             value={brl(kpis.aportesAjustes)}
-            icon={<Wallet className="h-3.5 w-3.5" />}
+            icon={<Wallet className="h-3.5 w-3.5 text-emerald-800" />}
             tone="neutral"
             tooltip="Não somam ao faturamento de serviços."
           />
@@ -1954,28 +1968,30 @@ function MiniKpi({
 }) {
   const toneCls =
     tone === "positive"
-      ? "text-[color:var(--color-emerald)]"
+      ? "text-emerald-700 font-bold"
       : tone === "negative"
-        ? "text-[color:var(--color-terracotta)]"
-        : "text-foreground";
-  return (
-    <div className="card-premium p-3">
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        ? "text-rose-600 font-bold"
+        : "text-foreground font-bold";
+
+  const cardContent = (
+    <div className="card-premium p-3 sm:p-3.5 hover:border-[#C8A951]/50 hover:shadow-xs transition-all cursor-default">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
         {icon}
-        <span className="truncate">{label}</span>
-        {tooltip && (
-          <UITooltip>
-            <TooltipTrigger asChild>
-              <button type="button" className="ml-auto text-muted-foreground/50 hover:text-muted-foreground">
-                <Info className="h-3 w-3" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-[220px] text-xs">{tooltip}</TooltipContent>
-          </UITooltip>
-        )}
+        <span>{label}</span>
       </div>
-      <div className={cn("mt-1 font-mono text-base font-semibold md:text-lg", toneCls)}>{value}</div>
+      <div className={cn("mt-1.5 font-display text-base md:text-lg tracking-tight", toneCls)}>{value}</div>
     </div>
+  );
+
+  if (!tooltip) return cardContent;
+
+  return (
+    <UITooltip>
+      <TooltipTrigger asChild>
+        <div>{cardContent}</div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[240px] text-xs leading-relaxed">{tooltip}</TooltipContent>
+    </UITooltip>
   );
 }
 
