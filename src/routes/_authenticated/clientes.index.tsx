@@ -16,12 +16,13 @@ import {
   PawPrint, X, ArrowLeft, ChevronRight, CalendarPlus, Pencil,
   ExternalLink, AlertTriangle, DollarSign, ClipboardList, FileText,
   Cake, History, MessageSquare, UserPlus, RefreshCw, PackageCheck,
-  CheckCircle2, Sparkles, Calendar, Wrench
+  CheckCircle2, Sparkles, Calendar, Wrench, Clock, ShieldAlert, Award
 } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { abrirWhatsApp } from "@/lib/whatsapp";
 import { BaixaPagamentoDialog } from "@/components/financeiro/BaixaPagamentoDialog";
+import { JessiClientesOverview } from "@/components/clientes/JessiClientesOverview";
 import { repararDadosClienteCompleto } from "@/lib/cliente-financeiro.functions";
 import { calcularSaldosDoContrato } from "@/lib/programas-creditos-core";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ const searchSchema = z.object({
   q: z.string().optional(),
   sel: z.string().optional(),
   vip: z.enum(["1"]).optional(),
+  tab: z.enum(["todos", "clubinho", "pendentes", "ausentes", "vip"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/clientes/")({
@@ -41,8 +43,11 @@ const PAGE_SIZE = 10;
 
 function ClientesPage() {
   const navigate = useNavigate();
-  const { q: qParam, sel, vip: vipParam } = Route.useSearch();
-  const onlyVip = vipParam === "1";
+  const { q: qParam, sel, vip: vipParam, tab: tabParam } = Route.useSearch();
+  const onlyVip = vipParam === "1" || tabParam === "vip";
+  const [currentTab, setCurrentTab] = useState<"todos" | "clubinho" | "pendentes" | "ausentes" | "vip">(
+    tabParam || (onlyVip ? "vip" : "todos")
+  );
   const [rawQ, setRawQ] = useState(qParam ?? "");
   const [q, setQ] = useState(qParam ?? "");
   const [page, setPage] = useState(0);
@@ -75,6 +80,32 @@ function ClientesPage() {
       const { count } = await supabase
         .from("clientes")
         .select("*", { count: "exact", head: true });
+      return count ?? 0;
+    },
+  });
+
+  // Total de Pets
+  const { data: totalPets } = useQuery({
+    queryKey: ["clientes-total-pets"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("pets")
+        .select("*", { count: "exact", head: true })
+        .eq("ativo", true);
+      return count ?? 0;
+    },
+  });
+
+  // Total de Clubinhos Ativos
+  const { data: totalClubinhos } = useQuery({
+    queryKey: ["clientes-total-clubinho"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("programas_contratados")
+        .select("*", { count: "exact", head: true })
+        .eq("status_do_programa", "ativo");
       return count ?? 0;
     },
   });
@@ -226,18 +257,19 @@ function ClientesPage() {
     <PageShell>
       <PageHeader
         title="Clientes e Pets"
-        description="Central de consulta: busque um cliente e abra a ficha completa."
+        description="Central inteligente de gestão: consulte fichas, histórico, oportunidades de clubinho e reativação."
         icon={Users}
         actions={
           <Link to="/clientes/novo">
             <Button className="gap-2"><Plus className="h-4 w-4" /> Novo cliente</Button>
           </Link>
         }
-        stats={
-          totalClientes != null
-            ? [{ label: "Total cadastrado", value: totalClientes.toLocaleString("pt-BR") }]
-            : undefined
-        }
+        stats={[
+          { label: "Clientes", value: (totalClientes ?? 0).toLocaleString("pt-BR") },
+          { label: "Pets ativos", value: (totalPets ?? 0).toLocaleString("pt-BR") },
+          { label: "Clubinhos", value: (totalClubinhos ?? 0).toLocaleString("pt-BR") },
+          { label: "VIPs", value: (totalVip ?? 0).toLocaleString("pt-BR") },
+        ]}
       />
 
       <div className={cn(
@@ -270,32 +302,58 @@ function ClientesPage() {
                 </button>
               )}
             </div>
-            <div className="flex gap-1.5">
+
+            {/* Chips de Segmentação Inteligente */}
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
               <button
                 type="button"
-                onClick={() => navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: undefined }), replace: true })}
+                onClick={() => {
+                  setCurrentTab("todos");
+                  navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: undefined, tab: undefined }), replace: true });
+                }}
                 className={cn(
-                  "flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
-                  !onlyVip ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border text-foreground",
+                  "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors",
+                  currentTab === "todos" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border text-foreground",
                 )}
               >
                 Todos {totalClientes != null && <span className="opacity-70">({totalClientes})</span>}
               </button>
+
               <button
                 type="button"
-                onClick={() => navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: "1" }), replace: true })}
+                onClick={() => {
+                  setCurrentTab("vip");
+                  navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, vip: "1", tab: "vip" }), replace: true });
+                }}
                 className={cn(
-                  "flex-1 px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors inline-flex items-center justify-center gap-1",
-                  onlyVip
+                  "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors inline-flex items-center gap-1",
+                  currentTab === "vip"
                     ? "bg-[var(--color-gold)] text-primary border-[var(--color-gold)]"
                     : "bg-background hover:bg-[var(--color-gold)]/10 border-[var(--color-gold)]/40 text-foreground",
                 )}
-                title="Mostrar somente clientes marcados como VIP"
               >
-                <Star className={cn("h-3.5 w-3.5", onlyVip && "fill-current")} />
+                <Star className={cn("h-3 w-3", currentTab === "vip" && "fill-current")} />
                 VIP {totalVip != null && <span className="opacity-80">({totalVip})</span>}
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentTab("clubinho");
+                  navigate({ to: "/clientes", search: (prev: any) => ({ ...prev, tab: "clubinho" }), replace: true });
+                }}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors inline-flex items-center gap-1",
+                  currentTab === "clubinho"
+                    ? "bg-emerald-700 text-white border-emerald-700 font-bold"
+                    : "bg-background hover:bg-emerald-50 border-emerald-300 text-emerald-800",
+                )}
+              >
+                <Award className="h-3 w-3" />
+                Clubinho {totalClubinhos != null && <span className="opacity-80">({totalClubinhos})</span>}
+              </button>
             </div>
+
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center justify-between">
               <span>
                 {searching
@@ -306,16 +364,6 @@ function ClientesPage() {
               </span>
               {buscando && searching && <span className="text-primary">Buscando…</span>}
             </div>
-            {onlyVip && (
-              <Link
-                to="/atendimentos"
-                search={{ vip: "1" } as any}
-                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
-              >
-                <Star className="h-3 w-3 fill-[var(--color-gold)] text-[var(--color-gold)]" />
-                Ver atendimentos de clientes VIP →
-              </Link>
-            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -393,7 +441,7 @@ function ClientesPage() {
           </div>
         </aside>
 
-        {/* -------- Coluna direita: ficha do cliente -------- */}
+        {/* -------- Coluna direita: ficha do cliente ou Painel de Inteligência da Jessi -------- */}
         <section className={cn(
           "min-w-0",
           !sel && "hidden lg:block",
@@ -401,11 +449,7 @@ function ClientesPage() {
           {sel ? (
             <FichaCliente id={sel} onVoltar={() => selecionar(null)} />
           ) : (
-            <EmptyState
-              icon={Users}
-              title="Selecione um cliente"
-              description="Busque um cliente para consultar seus dados, pets e histórico de atendimentos."
-            />
+            <JessiClientesOverview onSelectCliente={selecionar} />
           )}
         </section>
       </div>

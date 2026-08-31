@@ -1,0 +1,326 @@
+import React, { useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Sparkles,
+  Heart,
+  Calendar,
+  Gift,
+  Clock,
+  AlertTriangle,
+  Send,
+  Copy,
+  ChevronRight,
+  UserPlus,
+  PawPrint,
+  TrendingUp,
+  MessageCircle,
+  Zap,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
+interface JessiClientesOverviewProps {
+  onSelectCliente: (clienteId: string) => void;
+}
+
+export const JessiClientesOverview: React.FC<JessiClientesOverviewProps> = ({
+  onSelectCliente,
+}) => {
+  const [mensagemPronta, setMensagemPronta] = useState<{ id: string; texto: string; fone: string } | null>(null);
+
+  // 1. Clientes ausentes há mais de 25 dias (Radar de Reativação)
+  const { data: ausentes = [], isLoading: loadingAusentes } = useQuery({
+    queryKey: ["jessi-clientes-ausentes"],
+    queryFn: async () => {
+      const dataLimite = new Date();
+      dataLimite.setDate(dataLimite.getDate() - 25);
+      const limiteIso = dataLimite.toISOString();
+
+      const { data: atendimentos } = await supabase
+        .from("atendimentos")
+        .select("cliente_id, pet_id, data_inicio, clientes(id, nome, whatsapp, telefone), pets(id, nome, raca)")
+        .not("encerrado_em", "is", null)
+        .order("data_inicio", { ascending: false })
+        .limit(150);
+
+      const ultimosPorPet = new Map<string, any>();
+      (atendimentos ?? []).forEach((at: any) => {
+        if (!at.pet_id || !at.clientes) return;
+        if (!ultimosPorPet.has(at.pet_id)) {
+          ultimosPorPet.set(at.pet_id, at);
+        }
+      });
+
+      const emRisco: any[] = [];
+      ultimosPorPet.forEach((at) => {
+        if (at.data_inicio < limiteIso) {
+          const dias = Math.floor((new Date().getTime() - new Date(at.data_inicio).getTime()) / (1000 * 60 * 60 * 24));
+          emRisco.push({ ...at, diasSemVisita: dias });
+        }
+      });
+
+      return emRisco.sort((a, b) => b.diasSemVisita - a.diasSemVisita).slice(0, 4);
+    },
+  });
+
+  // 2. Aniversariantes do Mês (Pets)
+  const { data: aniversariantes = [] } = useQuery({
+    queryKey: ["jessi-pets-aniversario"],
+    queryFn: async () => {
+      const mesAtual = new Date().getMonth() + 1;
+      const { data: pets } = await supabase
+        .from("pets")
+        .select("id, nome, raca, data_nascimento, cliente_id, clientes(id, nome, whatsapp, telefone)")
+        .not("data_nascimento", "is", null)
+        .limit(100);
+
+      const doMes = (pets ?? []).filter((p: any) => {
+        if (!p.data_nascimento) return false;
+        const [_, m] = String(p.data_nascimento).split("-");
+        return Number(m) === mesAtual;
+      });
+
+      return doMes.slice(0, 3);
+    },
+  });
+
+  // 3. Clientes com Pendências Financeiras
+  const { data: pendentes = [] } = useQuery({
+    queryKey: ["jessi-clientes-inadimplentes"],
+    queryFn: async () => {
+      const { data: rows } = await supabase
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, vencimento, cliente_id, clientes(id, nome, whatsapp, telefone), atendimentos(pets(nome))")
+        .in("status", ["pendente", "atrasado", "parcial"])
+        .is("arquivado_em", null)
+        .order("vencimento", { ascending: true })
+        .limit(4);
+
+      return (rows ?? []).map((r: any) => ({
+        ...r,
+        saldo: Math.max(0, Number(r.valor_total || 0) - Number(r.valor_pago || 0)),
+      }));
+    },
+  });
+
+  const handleGerarMensagemSaudade = (item: any) => {
+    const nomeTutor = item.clientes?.nome?.split(" ")[0] || "Tutor";
+    const nomePet = item.pets?.nome || "seu pet";
+    const fone = item.clientes?.whatsapp || item.clientes?.telefone || "";
+
+    const texto = `Oi, ${nomeTutor}! 🐾 Tudo bem por aí?\n\nAqui é do Spa de Pet Tia Jéssica. Estamos com muitas saudades do ${nomePet}! Já faz ${item.diasSemVisita} dias desde a última visita.\n\nQue tal aproveitarmos esta semana para agendar um banho relaxante e deixar ele(a) super cheiroso(a)? ✨💚`;
+
+    setMensagemPronta({ id: item.pet_id, texto, fone });
+  };
+
+  const handleGerarMensagemParabens = (pet: any) => {
+    const nomeTutor = pet.clientes?.nome?.split(" ")[0] || "Tutor";
+    const nomePet = pet.nome;
+    const fone = pet.clientes?.whatsapp || pet.clientes?.telefone || "";
+
+    const texto = `Parabéns, ${nomeTutor}! 🎉🐾 Hoje é dia de festa para o ${nomePet}!\n\nToda a equipe do Spa de Pet Tia Jéssica deseja muita saúde, petiscos e alegria para esse aumigo tão especial! Que tal trazer ele(a) para um banho comemorativo com direito a muito mimo? 🎂✨💚`;
+
+    setMensagemPronta({ id: pet.id, texto, fone });
+  };
+
+  const handleAbrirWhatsApp = (fone: string, texto: string) => {
+    if (!fone) {
+      toast.error("Cliente sem telefone ou WhatsApp cadastrado.");
+      return;
+    }
+    const cleanPhone = fone.replace(/\D/g, "");
+    const ddiPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    const url = `https://wa.me/${ddiPhone}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank");
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in">
+      {/* Banner Principal com a IA Jessi */}
+      <div className="rounded-2xl bg-gradient-to-br from-[#123F2A] via-[#1A5C3D] to-[#0E3322] text-white p-4 shadow-sm border border-[#C8A951]/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-[#C8A951]/20 border border-[#C8A951]/40 flex items-center justify-center text-[#F5E6BE] shadow-xs">
+              <Sparkles className="h-5 w-5 text-[#C8A951] animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-base text-white">
+                  Radar de Relacionamento · Jessi
+                </span>
+                <Badge className="bg-[#C8A951]/30 text-[#F5E6BE] border-[#C8A951]/50 text-[10px] py-0 px-2">
+                  CRM Inteligente
+                </Badge>
+              </div>
+              <p className="text-xs text-white/70">
+                Selecione um cliente ao lado para ver a ficha completa ou utilize as ações sugeridas abaixo
+              </p>
+            </div>
+          </div>
+
+          <Link to="/clientes/novo">
+            <Button
+              size="sm"
+              className="h-8 text-xs bg-[#C8A951] hover:bg-[#B59640] text-[#123F2A] font-bold rounded-lg gap-1.5 shadow-2xs self-start sm:self-auto"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Novo Cliente
+            </Button>
+          </Link>
+        </div>
+
+        {/* Mensagem em Destaque para Disparo */}
+        {mensagemPronta && (
+          <div className="p-3 rounded-xl bg-white text-zinc-900 border border-[#C8A951]/40 space-y-2 mb-3 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-1">
+              <span className="font-bold text-[#123F2A] text-xs flex items-center gap-1.5">
+                <MessageCircle className="h-3.5 w-3.5 text-[#C8A951]" />
+                Mensagem Gerada para WhatsApp:
+              </span>
+              <div className="flex gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(mensagemPronta.texto);
+                    toast.success("Mensagem copiada!");
+                  }}
+                  className="h-6 px-2 text-[10px] gap-1"
+                >
+                  <Copy className="h-3 w-3" /> Copiar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleAbrirWhatsApp(mensagemPronta.fone, mensagemPronta.texto)}
+                  className="h-6 px-2.5 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1"
+                >
+                  <Send className="h-3 w-3" /> Enviar WhatsApp
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setMensagemPronta(null)}
+                  className="h-6 px-1.5 text-[10px] text-zinc-500"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+            <pre className="whitespace-pre-wrap text-zinc-800 text-[11px] leading-relaxed font-sans bg-zinc-50 p-2 rounded-lg border">
+              {mensagemPronta.texto}
+            </pre>
+          </div>
+        )}
+
+        {/* Cards de Oportunidades do Radar */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {/* Coluna 1: Radar de Reativação */}
+          <div className="p-3 rounded-xl bg-black/25 border border-white/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-amber-200 flex items-center gap-1.5 text-xs">
+                <Clock className="h-3.5 w-3.5 text-amber-300" />
+                Radar de Reativação (+25 dias ausentes):
+              </span>
+              <Badge className="bg-amber-500/20 text-amber-200 border-amber-400/30 text-[10px] py-0">
+                {ausentes.length} pets
+              </Badge>
+            </div>
+
+            {ausentes.length === 0 ? (
+              <p className="text-white/60 text-[11px] py-2">Nenhum cliente com retorno atrasado no momento.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {ausentes.map((item: any) => (
+                  <div
+                    key={item.pet_id}
+                    className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between gap-2 hover:bg-white/10 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white truncate text-xs">
+                        🐾 {item.pets?.nome} ({item.clientes?.nome})
+                      </div>
+                      <span className="text-[10px] text-amber-300 block">Ausente há {item.diasSemVisita} dias</span>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      onClick={() => handleGerarMensagemSaudade(item)}
+                      className="h-6 px-2 text-[10px] bg-[#C8A951] hover:bg-[#B59640] text-[#123F2A] font-bold rounded-md gap-1 shrink-0"
+                    >
+                      <MessageCircle className="h-3 w-3" /> Reengajar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Coluna 2: Aniversariantes do Mês ou Pendências */}
+          <div className="p-3 rounded-xl bg-black/25 border border-white/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-emerald-200 flex items-center gap-1.5 text-xs">
+                <Gift className="h-3.5 w-3.5 text-emerald-300" />
+                Aniversariantes do Mês (Pets):
+              </span>
+              <Badge className="bg-emerald-500/20 text-emerald-200 border-emerald-400/30 text-[10px] py-0">
+                {aniversariantes.length} pets
+              </Badge>
+            </div>
+
+            {aniversariantes.length === 0 ? (
+              <div className="text-white/70 text-[11px] space-y-2">
+                <p>Nenhum pet aniversariante com data registrada este mês.</p>
+                {pendentes.length > 0 && (
+                  <div className="pt-2 border-t border-white/10">
+                    <span className="font-semibold text-amber-200 block text-[11px] mb-1">
+                      ⚠️ Clientes com cobrança em aberto:
+                    </span>
+                    {pendentes.slice(0, 2).map((p: any) => (
+                      <div
+                        key={p.id}
+                        onClick={() => onSelectCliente(p.cliente_id)}
+                        className="flex items-center justify-between p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer text-[10px]"
+                      >
+                        <span className="text-white font-medium truncate">{p.clientes?.nome}</span>
+                        <span className="text-rose-300 font-bold">
+                          {p.saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {aniversariantes.map((pet: any) => (
+                  <div
+                    key={pet.id}
+                    className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between gap-2 hover:bg-white/10 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white truncate text-xs">
+                        🎂 {pet.nome} ({pet.clientes?.nome})
+                      </div>
+                      <span className="text-[10px] text-white/60 block">{pet.raca || "Pet"}</span>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      onClick={() => handleGerarMensagemParabens(pet)}
+                      className="h-6 px-2 text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-md gap-1 shrink-0"
+                    >
+                      <Gift className="h-3 w-3" /> Parabenizar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
