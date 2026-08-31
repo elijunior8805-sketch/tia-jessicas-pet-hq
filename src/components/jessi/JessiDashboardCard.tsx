@@ -46,7 +46,11 @@ export function JessiDashboardCard() {
 
         const [agendRes, pagamentosRes, progRes, estoqueRes] = await Promise.all([
           supabase.from("agendamentos").select("id, status, servicos(valor)").eq("data", hoje),
-          supabase.from("pagamentos").select("id, valor_total, valor_pago").in("status", ["pendente", "atrasado"]).is("arquivado_em", null),
+          supabase
+            .from("pagamentos")
+            .select("id, valor_total, valor_pago, status")
+            .in("status", ["pendente", "atrasado", "parcial"])
+            .is("arquivado_em", null),
           supabase.from("programas_contratados").select("id").eq("status_do_programa", "ativo"),
           supabase.from("produtos_estoque").select("id, quantidade, estoque_minimo").eq("ativo", true),
         ]);
