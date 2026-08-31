@@ -57,6 +57,7 @@ import { ContratoDetalheDialog } from "@/components/gestao/programas/ContratoDet
 import { TermoPosVendaDialog } from "@/components/gestao/programas/TermoPosVendaDialog";
 import { TermoProgramaData } from "@/lib/programa-termo-pdf";
 import { QuickServiceForm } from "@/components/gestao/programas/QuickServiceForm";
+import { JessiProgramasPanel } from "@/components/gestao/programas/JessiProgramasPanel";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
@@ -721,6 +722,28 @@ function ProgramasCuidadoPage() {
           Novo Plano
         </Button>
       </div>
+
+      {/* Painel Inteligente da Jessi no Clubinho */}
+      <JessiProgramasPanel
+        totalAtivos={contratosAtivos.length}
+        totalCreditosDisponiveis={contratosAtivos.length * 4}
+        vencendo7Dias={
+          contratosAtivos.filter((c: any) => {
+            const d = new Date(c.data_de_validade || "");
+            const hoje = new Date();
+            const diff = Math.ceil((d.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+            return diff >= 0 && diff <= 7;
+          }).length
+        }
+        onFiltrarVencendo={() => {
+          setActiveTab("ativos");
+          setActiveSubTabAtivos("ativo");
+        }}
+        onRefresh={() => {
+          invalidarTodosCaches();
+          toast.success("Dados do Clubinho atualizados");
+        }}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-zinc-100/80 dark:bg-zinc-900/80 p-1.5 mb-8 flex-wrap h-auto overflow-x-auto justify-start rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-sm gap-1">

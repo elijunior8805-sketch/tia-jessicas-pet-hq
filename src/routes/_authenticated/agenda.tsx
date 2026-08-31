@@ -36,6 +36,7 @@ import {
 
 import { useMyProfile, displayName, initials } from "@/hooks/use-my-profile";
 import { WhatsAppComposer, useWhatsAppComposer, openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
+import { JessiAgendaPanel } from "@/components/agenda/JessiAgendaPanel";
 
 
 // ---------- WhatsApp helpers ----------
@@ -620,6 +621,21 @@ function AgendaPage() {
         description={fmtDateLong(date)}
       />
 
+      {/* Painel Operacional da Jessi na Agenda */}
+      <JessiAgendaPanel
+        dataSelecionada={date}
+        totalAgendamentos={(agendamentos ?? []).length}
+        confirmados={(agendamentos ?? []).filter((a: any) => a.status === "confirmado").length}
+        aguardando={(agendamentos ?? []).filter((a: any) => a.status === "agendado" || a.status === "aguardando").length}
+        levaETrazCount={(agendamentos ?? []).filter((a: any) => !!a.leva_e_traz || Number(a.taxa_leva_traz || 0) > 0).length}
+        onFiltrarAguardando={() => setStatusFilter("aguardando")}
+        onFiltrarLevaETraz={() => setBusca("leva")}
+        onRefresh={async () => {
+          await qc.invalidateQueries({ queryKey: ["agendamentos"] });
+          toast.success("Agenda atualizada");
+        }}
+        isRefreshing={isLoading}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
         {/* Coluna principal */}
