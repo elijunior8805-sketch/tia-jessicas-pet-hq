@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { JessiEstoqueCopilot } from "@/components/estoque/JessiEstoqueCopilot";
 
 export const Route = createFileRoute("/_authenticated/estoque")({
   component: EstoquePage,
@@ -108,6 +109,12 @@ function EstoquePage() {
             <Plus className="h-4 w-4" /> Novo produto
           </Button>
         }
+      />
+
+      {/* Copiloto de Inteligência e Reposição de Estoque da Jessi */}
+      <JessiEstoqueCopilot
+        produtos={produtos}
+        onFiltrarCriticos={() => setApenasBaixos(true)}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

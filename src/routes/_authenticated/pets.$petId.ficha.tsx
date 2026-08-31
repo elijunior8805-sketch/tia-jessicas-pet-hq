@@ -12,6 +12,7 @@ import {
 import { useSignedUrl } from "@/lib/use-signed-url";
 import { calcularSaldosDoContrato } from "@/lib/programas-creditos-core";
 import { cn } from "@/lib/utils";
+import { JessiPetDossieCard } from "@/components/pets/JessiPetDossieCard";
 
 export const Route = createFileRoute("/_authenticated/pets/$petId/ficha")({
   component: FichaOperacional,
@@ -155,6 +156,22 @@ function FichaOperacional() {
           </div>
         </Card>
       )}
+
+      {/* Dossiê Estratégico da Jessi */}
+      <JessiPetDossieCard
+        petNome={pet.nome}
+        tutorNome={pet.clientes?.nome}
+        tutorWhatsapp={pet.clientes?.whatsapp || pet.clientes?.telefone}
+        totalAtendimentos={resumo?.total ?? 0}
+        ultimaVisita={resumo?.ultima}
+        possuiClubinho={!!programaContratado}
+        creditosRestantes={
+          programaContratado
+            ? calcularSaldosDoContrato(programaContratado as any, (programaContratado as any).movimentacoes || []).total_creditos_disponiveis
+            : 0
+        }
+        temperamento={pet.temperamento}
+      />
 
       {/* Clubinho do Pet */}
       {programaContratado && (() => {

@@ -39,6 +39,7 @@ import {
   FORMAS_PAGAMENTO, getEtapaStatus, isEtapaConfirmada,
   type ServicoItem, type FotoItem, type EtapaStatus,
 } from "@/lib/atendimento-utils";
+import { JessiAtendimentoCopilot } from "@/components/atendimentos/JessiAtendimentoCopilot";
 import { 
   generateAtendimentoPDF, 
   type ClubinhoRelatorioData, 
@@ -1302,6 +1303,34 @@ function AtendimentoDetalhe() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* ---- Left column ---- */}
         <div className="lg:col-span-2 space-y-6">
+
+          {/* Copiloto de Inteligência e Protocolos da Jessi */}
+          <JessiAtendimentoCopilot
+            petNome={pet?.nome ?? "Pet"}
+            raca={pet?.raca}
+            porte={pet?.porte}
+            alergias={pet?.alergias}
+            temperamento={pet?.temperamento}
+            observacoesAnteriores={(atendimento as any)?.pets?.observacoes}
+            possuiClubinho={!!elegibilidadeCredito?.possui_programa}
+            creditosDisponiveis={elegibilidadeCredito?.resumo?.creditos_banho_disponiveis ?? 0}
+            servicosJaAdicionados={[...solicitados, ...extras].map((s) => s.nome)}
+            onAdicionarServico={
+              !readOnly
+                ? (nome, valor) => {
+                    setExtras((prev) => [
+                      ...prev,
+                      {
+                        nome,
+                        quantidade: 1,
+                        valor_unit: valor,
+                        valor_total: valor,
+                      },
+                    ]);
+                  }
+                : undefined
+            }
+          />
 
           {/* 1. Serviço Solicitado */}
           <Card className="p-6 border-l-4 border-l-gold">

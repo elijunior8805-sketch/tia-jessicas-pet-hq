@@ -18,6 +18,7 @@ import { format, addDays, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMyProfile } from "@/hooks/use-my-profile";
 import { abrirWhatsApp } from "@/lib/whatsapp";
+import { JessiLevaTrazCopilot } from "@/components/leva-traz/JessiLevaTrazCopilot";
 
 type LTStatus =
   | "aguardando_responsavel" | "agendado" | "a_caminho_busca" | "pet_coletado"
@@ -322,6 +323,12 @@ function LevaTrazPage() {
           <p className="text-sm text-muted-foreground">Painel operacional integrado ao agendamento</p>
         </div>
       </header>
+
+      {/* Copiloto de Logística e Otimização de Rotas da Jessi */}
+      <JessiLevaTrazCopilot
+        tarefas={tarefas}
+        dataSelecionada={range.start || new Date().toISOString().slice(0, 10)}
+      />
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 items-center">
