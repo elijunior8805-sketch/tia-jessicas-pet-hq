@@ -53,6 +53,7 @@ export const carregarIndicadores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => PeriodoSchema.parse(d))
   .handler(async ({ data, context }) => {
+    const { supabase } = context;
     // 1. Busca indicadores consolidados da view unificada (mesma base do Dashboard e Financeiro)
     const { data: indicators } = await supabase
       .from("vw_financeiro_indicadores")
