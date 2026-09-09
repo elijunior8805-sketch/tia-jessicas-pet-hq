@@ -288,7 +288,7 @@ export async function processarMensagemJessiV2Core(
         expires_at: proposta.validade,
       };
 
-      respostaTexto = `Preparei o pedido solicitado no cartão de revisão abaixo. Contudo, nesta etapa consultiva, a gravação e execução direta de agendamentos, remarcações e cancelamentos ainda não está liberada.`;
+      respostaTexto = `Preparei a operação solicitada no cartão de revisão abaixo. Revise os dados e confirme para que eu execute a gravação no sistema.`;
       
       cards.push({
         type: "confirmacao",
