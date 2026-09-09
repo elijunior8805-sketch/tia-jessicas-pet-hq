@@ -437,7 +437,7 @@ export class ClientesPetsAdapter {
       const summary =
         `**Ficha Cadastral de ${cliente.nome}**\n` +
         `• Telefone/WhatsApp: ${cliente.whatsapp || cliente.telefone || "Não informado"}\n` +
-        `• Endereço: ${cliente.endereco || "Não cadastrado"}${cliente.bairro ? ` - ${cliente.bairro}` : ""}${cliente.cidade ? `, ${cliente.cidade}` : ""}\n` +
+        `• Endereço: ${[cliente.rua, cliente.numero].filter(Boolean).join(", ") || "Não cadastrado"}${cliente.bairro ? ` - ${cliente.bairro}` : ""}${cliente.cidade ? `, ${cliente.cidade}` : ""}\n` +
         `• Pets Vinculados (${cliente.pets?.length || 0}): ${petsList || "Nenhum"}\n` +
         `• Programas Ativos: ${programas?.length ? programas.map((pr: any) => pr.nome_snapshot).join(", ") : "Nenhum plano ativo"}\n` +
         `• Situação Financeira: ${sitFin}`;
