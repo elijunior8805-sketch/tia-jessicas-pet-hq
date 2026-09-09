@@ -564,6 +564,8 @@ export class AgendaAdapter {
         correlation_id: correlationId,
       };
     }
+  }
+
   /**
    * Consulta o último atendimento realizado ou registrado de um pet específico
    */
