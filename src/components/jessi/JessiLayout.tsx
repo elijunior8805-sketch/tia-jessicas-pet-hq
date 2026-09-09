@@ -75,6 +75,8 @@ export const JessiLayout: React.FC = () => {
     }
   }, [isListening]);
 
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
   const handleToggleVoice = () => {
     if (isListening) {
       stopListening();
@@ -83,7 +85,22 @@ export const JessiLayout: React.FC = () => {
     }
   };
 
+  const handleCancelProcessing = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setStatus("disponivel");
+    setStatusDetalhe(undefined);
+    toast.info("Processamento cancelado pelo usuário.");
+  };
+
   const handleNovaConversa = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setMessages([]);
     setContexto({
       dataReferencia: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
@@ -93,10 +110,15 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
+    // 1. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
+    if (isLoading) {
+      return;
+    }
+
     const textToSend = customText || inputText;
     if (!textToSend.trim() && !selectedFile) return;
 
-    const userMessageId = `user_${Date.now()}`;
+    const userMessageId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const userMsg: JessiMessage = {
       id: userMessageId,
       role: "user",
@@ -104,10 +126,15 @@ export const JessiLayout: React.FC = () => {
       timestamp: new Date().toISOString(),
     };
 
+    // 2. Preserva mensagem enviada no histórico
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
     setStatus("processando");
+    setStatusDetalhe("Consultando sistema e regras operacionais...");
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       let fileBase64: string | undefined;
@@ -124,11 +151,17 @@ export const JessiLayout: React.FC = () => {
           mensagem: textToSend,
           contexto: contexto as any,
           historico: messages.slice(-20) as any,
+          correlationId: `req_${Date.now()}`,
         },
       });
 
+      // Se foi cancelado antes do retorno, descarta a resposta
+      if (controller.signal.aborted) {
+        return;
+      }
+
       const assistantMsg: JessiMessage = {
-        id: `ast_${Date.now()}`,
+        id: `ast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         role: "assistant",
         content: res.respostaTexto,
         timestamp: new Date().toISOString(),
@@ -145,34 +178,45 @@ export const JessiLayout: React.FC = () => {
 
       if (res.pendingAction) {
         setStatus("aguardando_confirmacao");
+        setStatusDetalhe("Aguardando sua confirmação");
       } else {
         setStatus("disponivel");
+        setStatusDetalhe(undefined);
       }
     } catch (err: any) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
       console.error("Erro na comunicação com a Jessi:", err);
       const assistantErrMsg: JessiMessage = {
         id: `ast_err_${Date.now()}`,
         role: "assistant",
-        content: "Tive uma dificuldade temporária na comunicação com o servidor. Por favor, tente enviar novamente.",
+        content: "Houve uma instabilidade temporária na comunicação com o servidor. Sua mensagem foi preservada e você pode reenviá-la.",
         timestamp: new Date().toISOString(),
         cards: [
           {
             type: "alerta",
             data: {
               tipo: "erro",
-              titulo: "Instabilidade temporária",
-              mensagem: "A requisição não pôde ser completada. Se persistir, recarregue a página.",
+              titulo: "Dificuldade de Conexão",
+              mensagem: "A consulta falhou temporariamente. Clique abaixo para tentar novamente.",
+              acaoTexto: "Tentar novamente",
+              comandoAcao: textToSend,
             },
           },
         ],
       };
       setMessages((prev) => [...prev, assistantErrMsg]);
-      toast.error("Não foi possível processar a mensagem.");
+      toast.error("Instabilidade na conexão. Tente novamente.");
       setStatus("erro");
+      setStatusDetalhe("Falha temporária de conexão");
     } finally {
+      // 3. Retira o indicador de processamento ao concluir ou falhar
       setIsLoading(false);
       setSelectedFile(null);
       setFilePreview(null);
+      abortControllerRef.current = null;
     }
   };
 
@@ -328,6 +372,7 @@ export const JessiLayout: React.FC = () => {
               onConfirmAction={handleConfirmAction}
               onCancelAction={handleCancelAction}
               onSendMessage={handleSendMessage}
+              onCancelProcessing={handleCancelProcessing}
               isLoading={isLoading}
             />
           )}

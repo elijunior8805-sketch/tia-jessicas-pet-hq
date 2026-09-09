@@ -14,6 +14,7 @@ interface JessiChatProps {
   onConfirmAction?: (pendingAction: any) => void;
   onCancelAction?: () => void;
   onSendMessage?: (text: string) => void;
+  onCancelProcessing?: () => void;
   isLoading?: boolean;
 }
 
@@ -22,6 +23,7 @@ export const JessiChat: React.FC<JessiChatProps> = ({
   onConfirmAction,
   onCancelAction,
   onSendMessage,
+  onCancelProcessing,
   isLoading,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -82,7 +84,20 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                           />
                         );
                       case "alerta":
-                        return <AlertaCard key={cIdx} data={card.data} />;
+                        return (
+                          <div key={cIdx} className="space-y-1.5">
+                            <AlertaCard data={card.data} />
+                            {card.data?.comandoAcao && onSendMessage && (
+                              <button
+                                type="button"
+                                onClick={() => onSendMessage(card.data.comandoAcao)}
+                                className="text-xs text-emerald-800 font-semibold hover:underline"
+                              >
+                                {card.data.acaoTexto || "Tentar novamente"} →
+                              </button>
+                            )}
+                          </div>
+                        );
                       default:
                         return null;
                     }
@@ -137,9 +152,20 @@ export const JessiChat: React.FC<JessiChatProps> = ({
           <div className="h-8 w-8 rounded-full bg-emerald-800 text-[#C8A951] flex items-center justify-center shrink-0 animate-pulse">
             <Sparkles className="h-4 w-4" />
           </div>
-          <div className="rounded-2xl bg-card border border-border/80 p-3.5 text-xs text-muted-foreground shadow-xs flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-emerald-600 animate-ping" />
-            <span>Consultando dados e verificando regras operacionais...</span>
+          <div className="rounded-2xl bg-card border border-border/80 p-3.5 text-xs text-muted-foreground shadow-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-600 animate-ping" />
+              <span>Consultando dados e verificando regras operacionais...</span>
+            </div>
+            {onCancelProcessing && (
+              <button
+                type="button"
+                onClick={onCancelProcessing}
+                className="text-[11px] text-muted-foreground hover:text-red-700 underline font-medium"
+              >
+                Cancelar
+              </button>
+            )}
           </div>
         </div>
       )}
