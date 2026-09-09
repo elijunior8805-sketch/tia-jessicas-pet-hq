@@ -152,7 +152,7 @@ export const cancelarContrato = createServerFn({ method: "POST" })
       return { ja_cancelado: true, contrato_id: data.contrato_id };
     }
 
-    const consumidos = Object.values(antes.saldos).reduce((acc, s: any) => acc + s.consumido, 0);
+    const consumidos: number = Object.values(antes.saldos).reduce((acc: number, s: any) => acc + Number(s.consumido || 0), 0);
     const cancelamentosCreditos: any[] = [];
 
     // 1. Zera créditos disponíveis e libera reservas (histórico preservado no livro razão)
@@ -292,7 +292,7 @@ export const excluirLancamentosLote = createServerFn({ method: "POST" })
           continue;
         }
 
-        const consumidos = Object.values(antes.saldos).reduce((acc, s: any) => acc + s.consumido, 0);
+        const consumidos: number = Object.values(antes.saldos).reduce((acc: number, s: any) => acc + Number(s.consumido || 0), 0);
 
         // 1. Cancelar créditos restantes e liberar reservas
         for (const s of Object.values(antes.saldos) as any[]) {
