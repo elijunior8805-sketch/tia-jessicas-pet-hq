@@ -84,9 +84,15 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
       onError: (erro) => {
         console.warn("[Jessi Voice Error]:", erro);
         if (erro === "not-allowed" || erro === "permission-denied") {
-          toast.error("Permissão de microfone negada no navegador. Permita o acesso nas configurações do site.");
+          toast.error("Permissão de microfone negada. Clique no ícone de cadeado/permissões no navegador e permita o microfone.");
         } else if (erro === "no-speech") {
-          // Apenas silêncio, não é erro crítico
+          // Apenas silêncio momentâneo, não exibir erro ao usuário
+        } else if (erro === "network") {
+          toast.error("Serviço de voz indisponível na prévia integrada. Abra o sistema em uma aba do Google Chrome ou Edge para usar o microfone.");
+        } else if (erro === "audio-capture") {
+          toast.error("Nenhum microfone detectado no dispositivo ou ele está em uso.");
+        } else if (erro === "service-not-allowed") {
+          toast.error("Reconhecimento de voz bloqueado nesta janela. Abra diretamente no navegador Chrome/Edge.");
         } else {
           toast.error(`Aviso no microfone: ${erro}`);
         }

@@ -102,11 +102,17 @@ export class VoiceRecognizer {
     };
 
     this.recognition.onerror = (event: any) => {
+      this.iniciando = false;
       const err = event?.error;
       // Silêncio e abortos não são falhas: mantêm o texto e o ciclo.
       if (err === 'no-speech' || err === 'aborted') return;
       this.setStatus('error');
       this.options.onError(err || 'Erro no reconhecimento de voz.');
+      setTimeout(() => {
+        if (this.status === 'error') {
+          this.setStatus('idle');
+        }
+      }, 1500);
     };
 
     this.recognition.onend = () => {
