@@ -4,30 +4,45 @@
  */
 
 export interface JessiV2FeatureFlags {
-  v2_global_enabled: boolean;
-  v2_conversacao_natural: boolean;
-  v2_agenda_adapter: boolean;
-  v2_clientes_pets_adapter: boolean;
-  v2_programas_creditos_adapter: boolean;
-  v2_financeiro_relatorios_adapter: boolean;
-  v2_mensagens_whatsapp_adapter: boolean;
-  v2_read_back_verification: boolean;
-  v2_idempotency_check: boolean;
-  v2_auto_fallback_v1: boolean;
+  ai_v2_enabled: boolean;
+  ai_v2_queries: boolean;
+  ai_v2_scheduling: boolean;
+  ai_v2_finance: boolean;
+  ai_v2_programs: boolean;
+  ai_v2_messages: boolean;
+  ai_v2_voice: boolean;
+  ai_v2_proactive: boolean;
+  ai_v2_supervised_actions: boolean;
+  ai_v2_shadow_mode: boolean;
 }
 
+/**
+ * TODAS AS FLAGS SÃO DESATIVADAS POR PADRÃO (false) CONFORME REGRA DE SEGURANÇA
+ * Configuração ausente significa false.
+ */
 export const JESSI_V2_FLAGS_DEFAULT: JessiV2FeatureFlags = {
-  v2_global_enabled: true,
-  v2_conversacao_natural: true,
-  v2_agenda_adapter: true,
-  v2_clientes_pets_adapter: true,
-  v2_programas_creditos_adapter: true,
-  v2_financeiro_relatorios_adapter: true,
-  v2_mensagens_whatsapp_adapter: true,
-  v2_read_back_verification: true,
-  v2_idempotency_check: true,
-  v2_auto_fallback_v1: true,
+  ai_v2_enabled: false,
+  ai_v2_queries: false,
+  ai_v2_scheduling: false,
+  ai_v2_finance: false,
+  ai_v2_programs: false,
+  ai_v2_messages: false,
+  ai_v2_voice: false,
+  ai_v2_proactive: false,
+  ai_v2_supervised_actions: false,
+  ai_v2_shadow_mode: false,
 };
+
+/**
+ * Retorna o valor de uma flag com garantia de que qualquer valor ausente/nulo resultará em false
+ */
+export function checarFlagV2(
+  flags: Partial<JessiV2FeatureFlags> | undefined | null,
+  chave: keyof JessiV2FeatureFlags
+): boolean {
+  if (!flags) return false;
+  return Boolean(flags[chave]);
+}
 
 export const JESSI_V2_LIMITS = {
   TIMEOUT_TOTAL_MS: 8000,

@@ -1,25 +1,31 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
 import { JessiV2ProcessInput, JessiV2ProcessOutput } from "../contracts/jessi-v2-contracts";
-import { JESSI_V2_FLAGS_DEFAULT } from "../config/jessi-v2-config";
+import {
+  JessiV2FeatureFlags,
+  JESSI_V2_FLAGS_DEFAULT,
+  checarFlagV2,
+} from "../config/jessi-v2-config";
 import { processarMensagemJessiV2Core } from "./jessi-v2-agent.core";
 import { processarMensagemJessiCore } from "../../ia/jessi-agent.server";
 
 /**
- * Ponte Inteligente de Despacho (Seletor V1 / V2 com Fallback Transparente)
+ * Ponte Interna de Despacho e Seletor V1 / V2
  * Desenvolvido pelo Agente 1 (Arquitetura e Preservação)
  */
 
 export async function despacharMensagemJessi(
   sb: SupabaseClient<Database>,
   input: JessiV2ProcessInput,
-  user?: { id: string; nome?: string; cargo?: string }
+  user?: { id: string; nome?: string; cargo?: string },
+  flagsConfig?: Partial<JessiV2FeatureFlags>
 ): Promise<JessiV2ProcessOutput> {
   const inicioMs = Date.now();
   const correlationId = input.correlationId || `jessi_bridge_${Date.now()}`;
+  const flags = { ...JESSI_V2_FLAGS_DEFAULT, ...(flagsConfig || {}) };
 
-  // Se a V2 estiver desabilitada por Feature Flag, direciona 100% para o Core V1
-  if (!JESSI_V2_FLAGS_DEFAULT.v2_global_enabled) {
+  // 1. ai_v2_enabled=false: utilizar estritamente a Jessi atual (V1)
+  if (!checarFlagV2(flags, "ai_v2_enabled")) {
     const v1Result = await processarMensagemJessiCore(sb, input as any, user);
     return {
       versao: "v1_fallback",
@@ -34,30 +40,27 @@ export async function despacharMensagemJessi(
   }
 
   try {
-    // Execução primária no Motor Jessi V2
+    // 2. ai_v2_enabled=true: Execução primária no Motor Jessi V2 com validação por área
     return await processarMensagemJessiV2Core(sb, input, user);
   } catch (err) {
-    console.warn("Jessi V2 encontrou instabilidade. Acionando fallback automático para V1:", err);
+    // 3. Fallback seguro antes de qualquer mutação física
+    console.warn("Falha de execução na Jessi V2. Acionando fallback automático para V1:", err);
 
-    if (JESSI_V2_FLAGS_DEFAULT.v2_auto_fallback_v1) {
-      try {
-        const v1Result = await processarMensagemJessiCore(sb, input as any, user);
-        return {
-          versao: "v1_fallback",
-          respostaTexto: v1Result.respostaTexto,
-          cards: v1Result.cards as any,
-          pendingAction: v1Result.pendingAction as any,
-          novoContexto: v1Result.novoContexto as any,
-          tempoProcessamentoMs: Date.now() - inicioMs,
-          correlationId,
-          fallbackAcionado: true,
-        };
-      } catch (fallbackErr) {
-        console.error("Falha crítica em cascata no fallback V1:", fallbackErr);
-        throw fallbackErr;
-      }
+    try {
+      const v1Result = await processarMensagemJessiCore(sb, input as any, user);
+      return {
+        versao: "v1_fallback",
+        respostaTexto: v1Result.respostaTexto,
+        cards: v1Result.cards as any,
+        pendingAction: v1Result.pendingAction as any,
+        novoContexto: v1Result.novoContexto as any,
+        tempoProcessamentoMs: Date.now() - inicioMs,
+        correlationId,
+        fallbackAcionado: true,
+      };
+    } catch (fallbackErr) {
+      console.error("Falha crítica no fallback V1:", fallbackErr);
+      throw fallbackErr;
     }
-
-    throw err;
   }
 }
