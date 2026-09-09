@@ -73,7 +73,8 @@ export interface JessiV2AuditEntry {
  * Registro leve e não-bloqueante de auditoria da Jessi V2.
  * Não lança erros: falhas apenas geram aviso no log.
  */
-export function registrarAuditoriaV2(entry: Record<string, any>): void {
+export function registrarAuditoriaV2(entryOrClient: any, maybeEntry?: Record<string, any>): void {
+  const entry = maybeEntry ?? entryOrClient;
   try {
     console.info("[JessiV2][auditoria]", JSON.stringify(entry));
   } catch (err) {

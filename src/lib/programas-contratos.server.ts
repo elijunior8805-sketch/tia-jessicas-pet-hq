@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-export { calcularSaldoContrato, type SaldoServico } from "./programas-contratos-calc";
+import { calcularSaldoContrato, type SaldoServico } from "./programas-contratos-calc";
+export { calcularSaldoContrato, type SaldoServico };
 
 type SB = SupabaseClient<any, any, any>;
 
