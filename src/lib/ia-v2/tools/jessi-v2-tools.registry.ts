@@ -313,6 +313,15 @@ export async function despacharFerramentaV2(
     case "executar_agendamento":
       return await AgendaAdapter.executarAgendamentoConfirmado(sb, params, chave);
 
+    case "executar_remarcacao":
+      return await AgendaAdapter.executarRemarcacaoConfirmada(sb, params as any, chave);
+
+    case "executar_cancelamento":
+      return await AgendaAdapter.executarCancelamentoConfirmado(sb, params as any, chave);
+
+    case "verificar_agendamento_id":
+      return await AgendaAdapter.verificarAgendamentoPorId(sb, params.agendamentoId);
+
     case "executar_cadastro_cliente":
       return await ClientesPetsAdapter.executarCadastroClienteConfirmado(sb, params as any, chave);
 

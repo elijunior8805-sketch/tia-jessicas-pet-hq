@@ -302,4 +302,234 @@ export class AgendaAdapter {
       };
     }
   }
+
+  /**
+   * Executa remarcação (reagendamento) confirmada com revalidação de grade e verificação pós-gravação
+   */
+  static async executarRemarcacaoConfirmada(
+    sb: SupabaseClient<Database>,
+    params: { agendamentoId: string; novaDataHoraISO: string; motivo?: string },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `mut_remarcar_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    try {
+      // 1. Ler registro atual (before)
+      const { data: anterior, error: erroAnterior } = await sb
+        .from("agendamentos")
+        .select("id, data_hora, status, valor_total, pet_id, cliente_id")
+        .eq("id", params.agendamentoId)
+        .maybeSingle();
+
+      if (erroAnterior || !anterior) {
+        return {
+          success: false,
+          entity_id: params.agendamentoId,
+          source: "tabela_agendamentos",
+          summary: "Agendamento não encontrado para remarcação.",
+          error_code: "AGENDAMENTO_NAO_ENCONTRADO",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      // 2. Checar disponibilidade da nova data/hora
+      const checagem = await this.verificarDisponibilidade(sb, params.novaDataHoraISO);
+      if (!checagem.disponivel) {
+        return {
+          success: false,
+          entity_id: params.agendamentoId,
+          source: "tabela_agendamentos",
+          summary: `Remarcação não permitida: ${checagem.motivo}`,
+          error_code: "HORARIO_INDISPONIVEL",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      // 3. Atualizar data_hora no banco
+      const { data: atualizado, error: updateError } = await sb
+        .from("agendamentos")
+        .update({
+          data_hora: params.novaDataHoraISO,
+          observacoes: params.motivo ? `Remarcado: ${params.motivo}` : undefined,
+        } as any)
+        .eq("id", params.agendamentoId)
+        .select("id, data_hora, status, valor_total")
+        .single();
+
+      if (updateError || !atualizado) throw updateError || new Error("Falha ao atualizar agendamento.");
+
+      // 4. Read-Back Verification por ID
+      const { data: readBack } = await sb
+        .from("agendamentos")
+        .select("id, data_hora, status")
+        .eq("id", params.agendamentoId)
+        .maybeSingle();
+
+      const verificado = readBack?.data_hora === params.novaDataHoraISO;
+
+      return {
+        success: true,
+        entity_id: params.agendamentoId,
+        affected_record_id: params.agendamentoId,
+        before: anterior,
+        after: atualizado,
+        source: "tabela_agendamentos",
+        summary: `Agendamento #${params.agendamentoId.slice(0, 8)} remarcado com sucesso para ${new Date(params.novaDataHoraISO).toLocaleString("pt-BR")}.`,
+        executed_at: new Date().toISOString(),
+        verified: verificado,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: params.agendamentoId,
+        source: "tabela_agendamentos",
+        summary: `Erro ao remarcar agendamento: ${err.message}`,
+        error_code: err.code || "ERRO_UPDATE_AGENDAMENTO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
+
+  /**
+   * Executa cancelamento confirmado de agendamento com verificação física e liberação de grade
+   */
+  static async executarCancelamentoConfirmado(
+    sb: SupabaseClient<Database>,
+    params: { agendamentoId: string; motivo?: string },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `mut_cancelar_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    try {
+      const { data: anterior } = await sb
+        .from("agendamentos")
+        .select("id, data_hora, status, valor_total")
+        .eq("id", params.agendamentoId)
+        .maybeSingle();
+
+      if (!anterior) {
+        return {
+          success: false,
+          entity_id: params.agendamentoId,
+          source: "tabela_agendamentos",
+          summary: "Agendamento não localizado para cancelamento.",
+          error_code: "AGENDAMENTO_NAO_ENCONTRADO",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      const { data: cancelado, error } = await sb
+        .from("agendamentos")
+        .update({
+          status: "cancelado",
+          observacoes: params.motivo ? `Cancelado pelo operador: ${params.motivo}` : undefined,
+        } as any)
+        .eq("id", params.agendamentoId)
+        .select("id, data_hora, status, valor_total")
+        .single();
+
+      if (error || !cancelado) throw error || new Error("Falha ao cancelar agendamento.");
+
+      // Read-back Verification
+      const { data: readBack } = await sb
+        .from("agendamentos")
+        .select("id, status")
+        .eq("id", params.agendamentoId)
+        .maybeSingle();
+
+      const verificado = readBack?.status === "cancelado";
+
+      return {
+        success: true,
+        entity_id: params.agendamentoId,
+        affected_record_id: params.agendamentoId,
+        before: anterior,
+        after: cancelado,
+        source: "tabela_agendamentos",
+        summary: `Agendamento #${params.agendamentoId.slice(0, 8)} cancelado e horário liberado na grade com sucesso.`,
+        executed_at: new Date().toISOString(),
+        verified: verificado,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: params.agendamentoId,
+        source: "tabela_agendamentos",
+        summary: `Erro ao cancelar agendamento: ${err.message}`,
+        error_code: err.code || "ERRO_CANCELAMENTO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
+
+  /**
+   * Consulta e verifica agendamento diretamente por ID (Read-Back Verification)
+   */
+  static async verificarAgendamentoPorId(
+    sb: SupabaseClient<Database>,
+    agendamentoId: string
+  ): Promise<JessiV2QueryResult> {
+    try {
+      const { data: agendamento, error } = await sb
+        .from("agendamentos")
+        .select(`
+          id,
+          data_hora,
+          status,
+          valor_total,
+          observacoes,
+          cliente:clientes(id, nome, telefone),
+          pet:pets(id, nome, raca, porte),
+          profissional:profissionais(id, nome)
+        `)
+        .eq("id", agendamentoId)
+        .maybeSingle();
+
+      if (error || !agendamento) {
+        return {
+          success: false,
+          source: "tabela_agendamentos",
+          data: null,
+          summary: `Agendamento #${agendamentoId} não encontrado no banco de dados.`,
+          error_code: "AGENDAMENTO_NAO_ENCONTRADO",
+          executed_at: new Date().toISOString(),
+        };
+      }
+
+      return {
+        success: true,
+        source: "tabela_agendamentos",
+        data: agendamento,
+        total_count: 1,
+        summary: `Agendamento #${agendamento.id.slice(0, 8)} verificado: Status ${agendamento.status}, Data: ${new Date(agendamento.data_hora).toLocaleString("pt-BR")}.`,
+        executed_at: new Date().toISOString(),
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        source: "tabela_agendamentos",
+        data: null,
+        summary: `Erro ao verificar agendamento: ${err.message}`,
+        error_code: "ERRO_VERIFICACAO_AGENDAMENTO",
+        executed_at: new Date().toISOString(),
+      };
+    }
+  }
 }

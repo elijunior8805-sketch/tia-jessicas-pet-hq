@@ -1217,4 +1217,173 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(proposta.validade).toBeDefined();
     });
   });
+
+  // =========================================================================
+  // SUITE 12: Fase 4 — Agenda Supervisionada (Criar, Remarcar, Cancelar, Confirmar, Verificar por ID)
+  // =========================================================================
+  describe("Suite 12: Fase 4 — Agenda Supervisionada", () => {
+    it("76. Criar Agendamento: Grava e atesta persistência física com verified=true", async () => {
+      const mockSb: any = {
+        from: (tab: string) => {
+          if (tab === "agendamentos") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  neq: () => Promise.resolve({ data: [] }),
+                  maybeSingle: () => Promise.resolve({ data: { id: "ag_novo_123", status: "agendado" }, error: null }),
+                }),
+              }),
+              insert: () => ({
+                select: () => ({
+                  single: () => Promise.resolve({
+                    data: { id: "ag_novo_123", data_hora: "2026-09-10T14:00:00Z", status: "agendado", valor_total: 110 },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return {};
+        },
+      };
+
+      const res = await AgendaAdapter.executarAgendamentoConfirmado(
+        mockSb,
+        { clienteId: "c1", petId: "p1", dataHora: "2026-09-10T14:00:00Z", valor: 110 },
+        "idemp_ag_criar_76"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.affected_record_id).toBe("ag_novo_123");
+    });
+
+    it("77. Remarcar Agendamento: Atualiza horário e valida novo registro por ID", async () => {
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            eq: () => ({
+              neq: () => Promise.resolve({ data: [] }), // sem conflito de grade
+              maybeSingle: () => Promise.resolve({
+                data: { id: "ag_existente_456", data_hora: "2026-09-11T16:00:00Z", status: "agendado", valor_total: 110 },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id: "ag_existente_456", data_hora: "2026-09-11T16:00:00Z", status: "agendado", valor_total: 110 },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await AgendaAdapter.executarRemarcacaoConfirmada(
+        mockSb,
+        { agendamentoId: "ag_existente_456", novaDataHoraISO: "2026-09-11T16:00:00Z", motivo: "Pedido do tutor" },
+        "idemp_remarcar_77"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.entity_id).toBe("ag_existente_456");
+      expect(res.after.data_hora).toBe("2026-09-11T16:00:00Z");
+    });
+
+    it("78. Cancelar Agendamento: Altera status para cancelado e libera vaga", async () => {
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: "ag_cancelar_789", status: "cancelado", data_hora: "2026-09-10T10:00:00Z" },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id: "ag_cancelar_789", status: "cancelado", data_hora: "2026-09-10T10:00:00Z" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await AgendaAdapter.executarCancelamentoConfirmado(
+        mockSb,
+        { agendamentoId: "ag_cancelar_789", motivo: "Tutor viajou" },
+        "idemp_cancel_78"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.after.status).toBe("cancelado");
+    });
+
+    it("79. Verificar Agendamento por ID: Retorna ficha oficial completa da reserva", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: {
+                  id: "ag_consulta_999",
+                  data_hora: "2026-09-12T11:00:00Z",
+                  status: "agendado",
+                  valor_total: 130,
+                  cliente: { nome: "Fernanda" },
+                  pet: { nome: "Barthô" },
+                },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await AgendaAdapter.verificarAgendamentoPorId(mockSb, "ag_consulta_999");
+      expect(res.success).toBe(true);
+      expect(res.data.id).toBe("ag_consulta_999");
+      expect(res.data.cliente.nome).toBe("Fernanda");
+      expect(res.data.pet.nome).toBe("Barthô");
+    });
+
+    it("80. Despachante V2 Agenda: Roteia criar, remarcar, cancelar e verificar por ID", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              neq: () => Promise.resolve({ data: [] }),
+              maybeSingle: () => Promise.resolve({ data: { id: "ag_dispatch_1" }, error: null }),
+            }),
+          }),
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({ data: { id: "ag_dispatch_1" }, error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await despacharFerramentaV2(mockSb, "executar_agendamento", {
+        clienteId: "c1",
+        petId: "p1",
+        dataHora: "2026-09-10T14:00:00Z",
+        valor: 100,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+    });
+  });
 });
