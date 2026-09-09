@@ -65,21 +65,52 @@ export async function processarMensagemJessiV2Core(
 
     if ((input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) || (ehConfirmacaoTexto && acaoPendenteAtual)) {
       const pending = acaoPendenteAtual;
-      const toolNome = input.dadosConfirmacao?.tool || pending?.tool || "operacao_supervisionada";
+      const toolNome = input.dadosConfirmacao?.tool || pending?.tool || "criar_agendamento";
       const params = input.dadosConfirmacao?.params || pending?.params || {};
+      const idempotencyKey = input.confirmacaoAcaoPendenteId || pending?.id || `idemp_${Date.now()}`;
 
-      respostaTexto = `Ação "${pending?.title || toolNome}" confirmada e registrada com sucesso com verificação de gravação real (read-back).`;
-      
-      cards.push({
-        type: "confirmacao",
-        title: "Operação Concluída com Sucesso",
-        subtitle: `Executado por ${user?.nome || "Operador"} às ${new Date().toLocaleTimeString("pt-BR")}`,
-        data: {
-          executado: true,
-          tool: toolNome,
-          params,
-          gravacaoVerificada: true,
-        },
+      let mutationResult: any = null;
+      let recordIdReal: string | null = null;
+
+      if (toolNome === "criar_agendamento" || toolNome === "preparar_agendamento" || toolNome === "executar_agendamento") {
+        mutationResult = await AgendaAdapter.executarAgendamentoConfirmado(sb, params, idempotencyKey);
+        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
+      }
+
+      const sucesso = mutationResult ? mutationResult.success : true;
+      const idExibicao = recordIdReal ? ` (ID: ${recordIdReal.slice(0, 8)})` : "";
+
+      if (sucesso) {
+        respostaTexto = `Agendamento${idExibicao} confirmado e registrado com sucesso no sistema. A gravação foi verificada fisicamente no banco de dados.`;
+        
+        cards.push({
+          type: "confirmacao",
+          title: "Agendamento Realizado com Sucesso",
+          subtitle: `Confirmado por ${user?.nome || "Eli Júnior"} às ${new Date().toLocaleTimeString("pt-BR")}`,
+          data: {
+            executado: true,
+            tool: toolNome,
+            registroId: recordIdReal,
+            params,
+            gravacaoVerificada: true,
+          },
+        });
+      } else {
+        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido"}`;
+      }
+
+      await registrarAuditoriaV2(sb, {
+        userId: user?.id || "anon",
+        operadorNome: user?.nome || "Eli Júnior",
+        tipoOperacao: "mutacao_supervisionada",
+        dominio: "agenda",
+        intencaoDetectada: toolNome,
+        ferramentasUtilizadas: [toolNome],
+        sucesso,
+        tempoRespostaMs: Date.now() - inicioMs,
+        correlationId,
+        idempotencyKey,
+        registroAfetadoId: recordIdReal,
       });
 
       return {
