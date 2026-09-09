@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
-import { JessiV2QueryResult } from "../contracts/jessi-v2-contracts";
+import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2-contracts";
 
 /**
  * Adaptador Oficial de Financeiro & Relatórios da Jessi V2 (Seção 15)
@@ -416,7 +416,7 @@ export class FinanceiroRelatoriosAdapter {
         .eq("id", params.pagamentoId)
         .maybeSingle();
 
-      const verificado = readBack?.status === "estornado";
+      const verificado = String(readBack?.status) === "estornado";
 
       return {
         success: true,
