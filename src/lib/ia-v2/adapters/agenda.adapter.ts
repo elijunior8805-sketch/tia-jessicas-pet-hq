@@ -564,6 +564,8 @@ export class AgendaAdapter {
         correlation_id: correlationId,
       };
     }
+  }
+
   /**
    * Consulta o último atendimento realizado ou registrado de um pet específico
    */
@@ -602,7 +604,7 @@ export class AgendaAdapter {
       const dataFmt = new Date(`${ultimo.data}T12:00:00`).toLocaleDateString("pt-BR");
       const horaFmt = (ultimo.hora || "").slice(0, 5) || "--:--";
       const srv = (ultimo.servicos as any)?.nome || "Atendimento";
-      const st = ultimo.status === "concluido" ? "Concluído" : ultimo.status === "confirmado" ? "Confirmado" : ultimo.status;
+      const st = String(ultimo.status) === "concluido" ? "Concluído" : ultimo.status === "confirmado" ? "Confirmado" : ultimo.status;
 
       const summary = `O último atendimento registrado para **${nomePet}** foi em **${dataFmt} às ${horaFmt}** — Serviço: **${srv}** (Status: ${st}).`;
 
