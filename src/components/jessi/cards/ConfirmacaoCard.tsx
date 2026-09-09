@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle, AlertTriangle, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle, AlertTriangle, ShieldCheck, XCircle, Clock, Calendar, User, Dog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ConfirmacaoCardProps {
@@ -15,19 +15,28 @@ export const ConfirmacaoCard: React.FC<ConfirmacaoCardProps> = ({
   onCancelar,
   isLoading,
 }) => {
-  const pendingAction = data?.pendingAction;
+  const pendingAction = data?.pendingAction || data?.acaoPendente || {
+    id: data?.proposta?.id || data?.id || `idemp_${Date.now()}`,
+    title: data?.proposta?.motivo || "Confirmar Operação",
+    summary: data?.proposta?.motivo || data?.resumo || "Deseja confirmar a execução?",
+    tool: data?.proposta?.acao || data?.tool || "criar_agendamento",
+    params: data?.proposta?.estadoProposto || data?.params || {},
+  };
+
   const executado = data?.executado;
-  const resumo = data?.resumo || pendingAction?.summary || "Deseja confirmar a execução?";
+  const proposta = data?.proposta;
+  const resumoVisual = data?.resumoVisual || proposta?.resumoVisual;
+  const resumo = data?.resumo || resumoVisual?.entendido || pendingAction?.summary || "Deseja confirmar a execução?";
 
   if (executado) {
     return (
-      <div className="rounded-xl border border-emerald-300 bg-emerald-50/80 p-3.5 space-y-2 text-xs text-emerald-950">
+      <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-3.5 space-y-2 text-xs text-emerald-950 shadow-xs">
         <div className="flex items-center gap-1.5 font-semibold text-emerald-800">
           <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
           <span>Ação Executada e Registrada com Sucesso</span>
         </div>
         <p className="text-[11px] text-emerald-900 leading-relaxed">
-          {data?.resultado?.summary || "Operação realizada no sistema e auditada com sucesso."}
+          {data?.resultado?.summary || data?.summary || "Operação realizada no sistema e auditada com sucesso."}
         </p>
       </div>
     );
@@ -40,7 +49,14 @@ export const ConfirmacaoCard: React.FC<ConfirmacaoCardProps> = ({
         <span>Confirmação Operacional Obrigatória</span>
       </div>
 
-      <p className="text-[12px] font-medium leading-relaxed">{resumo}</p>
+      <div className="space-y-1.5">
+        <p className="text-[12px] font-medium leading-relaxed text-amber-950">{resumo}</p>
+        {resumoVisual?.seraAlterado && (
+          <p className="text-[11px] text-amber-800">
+            <strong>Ação:</strong> {resumoVisual.seraAlterado}
+          </p>
+        )}
+      </div>
 
       {onConfirmar && (
         <div className="flex items-center gap-2 pt-1">
@@ -48,7 +64,7 @@ export const ConfirmacaoCard: React.FC<ConfirmacaoCardProps> = ({
             size="sm"
             disabled={isLoading}
             onClick={() => onConfirmar(pendingAction)}
-            className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-8 px-3 font-semibold gap-1.5"
+            className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-8 px-3 font-semibold gap-1.5 rounded-lg"
           >
             <CheckCircle className="h-3.5 w-3.5" />
             {isLoading ? "Registrando..." : "Confirmar e Executar"}
@@ -59,7 +75,7 @@ export const ConfirmacaoCard: React.FC<ConfirmacaoCardProps> = ({
               variant="outline"
               disabled={isLoading}
               onClick={onCancelar}
-              className="text-xs h-8 px-3 border-amber-300 text-amber-900 hover:bg-amber-100/60 gap-1"
+              className="text-xs h-8 px-3 border-amber-300 text-amber-900 hover:bg-amber-100/60 gap-1 rounded-lg"
             >
               <XCircle className="h-3.5 w-3.5" />
               Cancelar
