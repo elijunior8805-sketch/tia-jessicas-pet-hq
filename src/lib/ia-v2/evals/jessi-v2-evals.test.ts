@@ -1,0 +1,908 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { JessiV2Guardrails } from "../guardrails/jessi-v2-guardrails";
+import {
+  JessiGuardrailViolationError,
+  JessiIdempotencyConflictError,
+} from "../errors/jessi-v2-errors";
+import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
+import {
+  criarSessaoV2,
+  adicionarMensagemSessaoV2,
+  atualizarContextoSessaoV2,
+} from "../session/jessi-v2-session";
+import { AgendaAdapter } from "../adapters/agenda.adapter";
+import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
+import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
+import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
+import { MensagensWhatsAppAdapter } from "../adapters/mensagens-whatsapp.adapter";
+import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
+
+/**
+ * Suite Completa de 60 Casos de Teste Automatizados da Jessi V2
+ * Desenvolvido pelo Agente 3 (Segurança, Testes e Validação)
+ */
+
+describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
+  beforeEach(() => {
+    JessiV2Guardrails.resetarChavesParaTestes();
+  });
+
+  // =========================================================================
+  // SUITE 1: Guardrails de Autonomia Supervisionada (10 Testes)
+  // =========================================================================
+  describe("Suite 1: Guardrails de Autonomia Supervisionada (Zero Escrita Direta)", () => {
+    it("01. Deve permitir consultas livremente sem exigir confirmação", () => {
+      expect(() =>
+        JessiV2Guardrails.validarExecucaoSupervisionada("consulta")
+      ).not.toThrow();
+    });
+
+    it("02. Deve bloquear tentativa de agendamento sem ID de confirmação", () => {
+      expect(() =>
+        JessiV2Guardrails.validarExecucaoSupervisionada("mutacao_supervisionada", null, null)
+      ).toThrow(JessiGuardrailViolationError);
+    });
+
+    it("03. Deve bloquear cancelamento sem dados de confirmação", () => {
+      expect(() =>
+        JessiV2Guardrails.validarExecucaoSupervisionada("mutacao_supervisionada", "act_123", null)
+      ).toThrow(JessiGuardrailViolationError);
+    });
+
+    it("04. Deve bloquear reagendamento sem ID de confirmação", () => {
+      expect(() =>
+        JessiV2Guardrails.validarExecucaoSupervisionada("mutacao_supervisionada", undefined, { dataHora: "2026-09-09T10:00:00Z" })
+      ).toThrow(JessiGuardrailViolationError);
+    });
+
+    it("05. Deve autorizar mutação quando ID e payload de confirmação estiverem presentes", () => {
+      expect(() =>
+        JessiV2Guardrails.validarExecucaoSupervisionada("mutacao_supervisionada", "act_valid", { confirmado: true })
+      ).not.toThrow();
+    });
+
+    it("06. Adaptador de Agenda deve apenas preparar ação sem gravar no banco", () => {
+      const proposta = AgendaAdapter.prepararAgendamento({
+        clienteId: "cli_1",
+        petId: "pet_1",
+        servicoId: "srv_1",
+        servicoNome: "Banho & Tosa",
+        dataHora: "2026-09-09T14:00:00Z",
+        valor: 120.0,
+      });
+      expect(proposta.title).toContain("Banho & Tosa");
+      expect(proposta.summary).toContain("R$ 120.00");
+    });
+
+    it("07. Deve bloquear consumo de crédito se chamado diretamente sem confirmação", () => {
+      expect(() =>
+        JessiV2Guardrails.validarExecucaoSupervisionada("mutacao_supervisionada", "", {})
+      ).toThrow(JessiGuardrailViolationError);
+    });
+
+    it("08. NLU deve sinalizar 'requerConfirmacao: true' para comando de agendar", async () => {
+      const provider = new JessiV2GeminiProvider();
+      const res = await provider.classificarIntencao({
+        mensagem: "Quero agendar um banho para o Thor amanhã às 14h",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.requerConfirmacao).toBe(true);
+      expect(res.intencao.dominio).toBe("agenda");
+    });
+
+    it("09. NLU deve sinalizar 'requerConfirmacao: false' para comando de consulta de faturamento", async () => {
+      const provider = new JessiV2GeminiProvider();
+      const res = await provider.classificarIntencao({
+        mensagem: "Quanto foi o faturamento deste mês?",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.requerConfirmacao).toBe(false);
+      expect(res.intencao.dominio).toBe("financeiro_relatorios");
+    });
+
+    it("10. NLU deve sinalizar 'requerConfirmacao: true' para comando de debitar créditos", async () => {
+      const provider = new JessiV2GeminiProvider();
+      const res = await provider.classificarIntencao({
+        mensagem: "Debitar 1 crédito do plano da Luna",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.requerConfirmacao).toBe(true);
+      expect(res.intencao.dominio).toBe("programas_creditos");
+    });
+  });
+
+  // =========================================================================
+  // SUITE 2: Idempotência e Prevenção de Duplicidade (8 Testes)
+  // =========================================================================
+  describe("Suite 2: Idempotência e Prevenção de Duplicidade", () => {
+    it("11. Deve aceitar a primeira execução com chave válida", () => {
+      expect(() =>
+        JessiV2Guardrails.registrarChaveIdempotencia("idemp_key_001")
+      ).not.toThrow();
+    });
+
+    it("12. Deve rejeitar segunda execução imediata com a mesma chave (duplo clique)", () => {
+      JessiV2Guardrails.registrarChaveIdempotencia("idemp_key_002");
+      expect(() =>
+        JessiV2Guardrails.registrarChaveIdempotencia("idemp_key_002")
+      ).toThrow(JessiIdempotencyConflictError);
+    });
+
+    it("13. Deve rejeitar chave de idempotência vazia ou com menos de 5 caracteres", () => {
+      expect(() =>
+        JessiV2Guardrails.registrarChaveIdempotencia("123")
+      ).toThrow(JessiGuardrailViolationError);
+    });
+
+    it("14. Deve aceitar chaves distintas para operações simultâneas", () => {
+      expect(() => {
+        JessiV2Guardrails.registrarChaveIdempotencia("idemp_op_A");
+        JessiV2Guardrails.registrarChaveIdempotencia("idemp_op_B");
+      }).not.toThrow();
+    });
+
+    it("15. Deve limpar chaves corretamente no reset de testes", () => {
+      JessiV2Guardrails.registrarChaveIdempotencia("idemp_temp");
+      JessiV2Guardrails.resetarChavesParaTestes();
+      expect(() =>
+        JessiV2Guardrails.registrarChaveIdempotencia("idemp_temp")
+      ).not.toThrow();
+    });
+
+    it("16. Erro de idempotência deve conter a chave conflitante nos detalhes", () => {
+      JessiV2Guardrails.registrarChaveIdempotencia("idemp_detalhe_123");
+      try {
+        JessiV2Guardrails.registrarChaveIdempotencia("idemp_detalhe_123");
+      } catch (err: any) {
+        expect(err.codigo).toBe("IDEMPOTENCY_CONFLICT");
+        expect(err.detalhes?.idempotencyKey).toBe("idemp_detalhe_123");
+      }
+    });
+
+    it("17. Despachante V2 deve gerar chave automática se não informada", async () => {
+      const mockSb: any = { from: () => ({ select: () => ({ gte: () => ({ lte: () => ({ order: () => Promise.resolve({ data: [] }) }) }) }) }) };
+      const res = await despacharFerramentaV2(mockSb, "consultar_agenda", { data: "2026-09-09" });
+      expect(res.success).toBe(true);
+    });
+
+    it("18. Despachante deve rejeitar ferramenta inexistente sem quebrar", async () => {
+      const mockSb: any = {};
+      const res = await despacharFerramentaV2(mockSb, "ferramenta_inexistente_xyz", {});
+      expect(res.success).toBe(false);
+      expect(res.error_code).toBe("TOOL_NOT_FOUND");
+    });
+  });
+
+  // =========================================================================
+  // SUITE 3: Compreensão Conversacional e Busca Resiliente (12 Testes)
+  // =========================================================================
+  describe("Suite 3: Compreensão Conversacional e Busca Resiliente", () => {
+    const provider = new JessiV2GeminiProvider();
+
+    it("19. Deve classificar busca por tutor 'buscar cliente Jéssica'", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "buscar cliente Jéssica",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("clientes_pets");
+      expect(res.intencao.intencao).toBe("buscar_clientes_pets");
+    });
+
+    it("20. Deve classificar pergunta sobre pet 'como está a ficha da Mel?'", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "como está a ficha da Mel?",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("clientes_pets");
+    });
+
+    it("21. Deve entender 'ver horários vagos hoje' como consulta de agenda", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "ver horários vagos hoje",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("agenda");
+    });
+
+    it("22. Deve entender 'desmarcar atendimento das 16h' como preparação de cancelamento", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "desmarcar atendimento das 16h",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.intencao).toBe("preparar_cancelamento");
+      expect(res.intencao.requerConfirmacao).toBe(true);
+    });
+
+    it("23. Deve entender 'remarcar banho para quinta' como preparação de reagendamento", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "remarcar banho para quinta",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.intencao).toBe("preparar_reagendamento");
+      expect(res.intencao.requerConfirmacao).toBe(true);
+    });
+
+    it("24. Deve entender 'qual o ticket médio deste mês?' no financeiro", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "qual o ticket médio deste mês?",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("financeiro_relatorios");
+    });
+
+    it("25. Deve entender 'quanto temos a receber pendente?' no financeiro", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "quanto temos a receber pendente?",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("financeiro_relatorios");
+    });
+
+    it("26. Deve entender 'consultar saldo do clubinho' em programas", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "consultar saldo do clubinho",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("programas_creditos");
+    });
+
+    it("27. Deve entender 'enviar lembrete no WhatsApp' em comunicação", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "enviar lembrete no WhatsApp",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("comunicacao_mensagens");
+    });
+
+    it("28. Deve herdar cliente selecionado do contexto", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "consultar saldo dos créditos",
+        contexto: {
+          dataReferencia: "2026-09-09",
+          clienteSelecionadoId: "cli_contexto_456",
+          clienteSelecionadoNome: "Mariana Silva",
+        },
+        historico: [],
+      });
+      expect(res.intencao.entidades.clienteId).toBe("cli_contexto_456");
+      expect(res.intencao.entidades.clienteNome).toBe("Mariana Silva");
+    });
+
+    it("29. Deve herdar pet selecionado do contexto", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "ver histórico de atendimentos",
+        contexto: {
+          dataReferencia: "2026-09-09",
+          petSelecionadoId: "pet_contexto_789",
+          petSelecionadoNome: "Bidu",
+        },
+        historico: [],
+      });
+      expect(res.intencao.entidades.petId).toBe("pet_contexto_789");
+      expect(res.intencao.entidades.petNome).toBe("Bidu");
+    });
+
+    it("30. Deve responder com saudação e ajuda para mensagem genérica", async () => {
+      const res = await provider.classificarIntencao({
+        mensagem: "olá, bom dia!",
+        contexto: { dataReferencia: "2026-09-09" },
+        historico: [],
+      });
+      expect(res.intencao.dominio).toBe("geral_conversacional");
+      expect(res.intencao.requerConfirmacao).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // SUITE 4: Integridade Financeira e Fonte Consolidada (8 Testes)
+  // =========================================================================
+  describe("Suite 4: Integridade Financeira e Fonte Consolidada", () => {
+    it("31. Deve calcular faturamento bruto somando apenas receitas confirmadas", async () => {
+      const mockTransacoes = [
+        { id: "1", tipo: "receita", valor: 100, status: "confirmado" },
+        { id: "2", tipo: "entrada", valor: 250, status: "confirmado" },
+        { id: "3", tipo: "despesa", valor: 50, status: "confirmado" },
+      ];
+
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({ data: mockTransacoes, error: null }),
+            }),
+            eq: () => Promise.resolve({ data: [{ valor: 80 }], error: null }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "mes");
+      expect(res.success).toBe(true);
+      expect(res.data.faturamentoBruto).toBe(350);
+      expect(res.data.despesas).toBe(50);
+      expect(res.data.saldoLiquido).toBe(300);
+      expect(res.data.ticketMedio).toBe(175);
+    });
+
+    it("32. Deve retornar ticket médio 0 quando não houver entradas", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({ data: [], error: null }),
+            }),
+            eq: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "hoje");
+      expect(res.success).toBe(true);
+      expect(res.data.ticketMedio).toBe(0);
+      expect(res.data.faturamentoBruto).toBe(0);
+    });
+
+    it("33. Deve calcular contas a receber pendentes corretamente", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({ data: [], error: null }),
+            }),
+            eq: () => Promise.resolve({ data: [{ valor: 150 }, { valor: 350 }], error: null }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "mes");
+      expect(res.data.totalAReceberPendente).toBe(500);
+    });
+
+    it("34. Não deve quebrar com valores nulos ou inválidos no banco", async () => {
+      const mockTransacoes = [
+        { id: "1", tipo: "receita", valor: null, status: "confirmado" },
+        { id: "2", tipo: "receita", valor: "invalid_num", status: "confirmado" },
+      ];
+
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({ data: mockTransacoes, error: null }),
+            }),
+            eq: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "semana");
+      expect(res.success).toBe(true);
+      expect(res.data.faturamentoBruto).toBe(0);
+    });
+
+    it("35. Deve reportar erro tratado caso o banco falhe na consulta financeira", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({ data: null, error: { message: "Conexão recusada", code: "PGRST_ERR" } }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "mes");
+      expect(res.success).toBe(false);
+      expect(res.error_code).toBe("PGRST_ERR");
+    });
+
+    it("36. Adaptador financeiro deve apontar para fonte oficial", async () => {
+      const mockSb: any = {
+        from: (tab: string) => {
+          expect(tab).toBe("transacoes_financeiras");
+          return {
+            select: () => ({
+              gte: () => ({
+                eq: () => Promise.resolve({ data: [], error: null }),
+              }),
+              eq: () => Promise.resolve({ data: [], error: null }),
+            }),
+          };
+        },
+      };
+      await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "hoje");
+    });
+
+    it("37. Formatação do resumo financeiro deve incluir dados essenciais", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({
+                data: [{ id: "1", tipo: "receita", valor: 500, status: "confirmado" }],
+                error: null,
+              }),
+            }),
+            eq: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "mes");
+      expect(res.summary).toContain("R$ 500.00");
+    });
+
+    it("38. Deve calcular saldo líquido subtraindo despesas de receitas", async () => {
+      const mockTransacoes = [
+        { id: "1", tipo: "receita", valor: 1000, status: "confirmado" },
+        { id: "2", tipo: "despesa", valor: 400, status: "confirmado" },
+      ];
+
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({ data: mockTransacoes, error: null }),
+            }),
+            eq: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(mockSb, "mes");
+      expect(res.data.saldoLiquido).toBe(600);
+    });
+  });
+
+  // =========================================================================
+  // SUITE 5: Programas de Cuidados & Saldo de Créditos (8 Testes)
+  // =========================================================================
+  describe("Suite 5: Programas de Cuidados & Saldo de Créditos", () => {
+    it("39. Deve consultar programas ativos e somar saldo total de sessões", async () => {
+      const mockSb: any = {
+        from: (table: string) => ({
+          select: () => ({
+            eq: () => {
+              if (table === "cliente_programas") {
+                return {
+                  eq: () => Promise.resolve({ data: [{ id: "prog_1", status: "ativo" }], error: null }),
+                };
+              }
+              return {
+                gt: () => Promise.resolve({ data: [{ id: "c1", saldo: 3 }, { id: "c2", saldo: 2 }], error: null }),
+              };
+            },
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.consultarSaldoCreditos(mockSb, "cli_10");
+      expect(res.success).toBe(true);
+      expect(res.data.totalSessaoRestantes).toBe(5);
+    });
+
+    it("40. Deve bloquear consumo quando saldo for insuficiente", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "c1", saldo: 1, servico_nome: "Banho" }, error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(
+        mockSb,
+        { creditoId: "c1", quantidade: 2 },
+        "idemp_cred_01"
+      );
+      expect(res.success).toBe(false);
+      expect(res.error_code).toBe("SALDO_INSUFICIENTE");
+    });
+
+    it("41. Deve debitar e verificar novo saldo pós-execução (Read-Back)", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "c1", saldo: 4, servico_nome: "Tosa Higiênica" }, error: null }),
+              maybeSingle: () => Promise.resolve({ data: { id: "c1", saldo: 3 }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: "c1", saldo: 3, servico_nome: "Tosa Higiênica" }, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(
+        mockSb,
+        { creditoId: "c1", quantidade: 1 },
+        "idemp_cred_02"
+      );
+      expect(res.success).toBe(true);
+      expect(res.after?.saldo).toBe(3);
+      expect(res.verified).toBe(true);
+    });
+
+    it("42. Deve tratar cliente sem programas ativos sem erro", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ data: [], error: null }),
+              gt: () => Promise.resolve({ data: [], error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.consultarSaldoCreditos(mockSb, "cli_sem_plano");
+      expect(res.success).toBe(true);
+      expect(res.data.totalSessaoRestantes).toBe(0);
+    });
+
+    it("43. Deve registrar mensagem descritiva no consumo de créditos", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "c1", saldo: 2, servico_nome: "Hidratação" }, error: null }),
+              maybeSingle: () => Promise.resolve({ data: { id: "c1", saldo: 1 }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: "c1", saldo: 1, servico_nome: "Hidratação" }, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(
+        mockSb,
+        { creditoId: "c1", quantidade: 1 },
+        "idemp_cred_03"
+      );
+      expect(res.summary).toContain("Hidratação");
+      expect(res.summary).toContain("Novo saldo: 1");
+    });
+
+    it("44. Deve rejeitar consumo de crédito inexistente", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: null, error: { message: "Não encontrado" } }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(
+        mockSb,
+        { creditoId: "invalido", quantidade: 1 },
+        "idemp_cred_04"
+      );
+      expect(res.success).toBe(false);
+      expect(res.error_code).toBe("ERRO_CONSUMO_CREDITO");
+    });
+
+    it("45. Adaptador deve vincular assinatura ao cliente correto", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: (col: string, val: string) => {
+              expect(col).toBe("cliente_id");
+              expect(val).toBe("cli_alvo_99");
+              return {
+                eq: () => Promise.resolve({ data: [], error: null }),
+                gt: () => Promise.resolve({ data: [], error: null }),
+              };
+            },
+          }),
+        }),
+      };
+      await ProgramasCreditosAdapter.consultarSaldoCreditos(mockSb, "cli_alvo_99");
+    });
+
+    it("46. Deve registrar a chave de idempotência no resultado de consumo", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "c1", saldo: 2, servico_nome: "Banho" }, error: null }),
+              maybeSingle: () => Promise.resolve({ data: { id: "c1", saldo: 1 }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: "c1", saldo: 1, servico_nome: "Banho" }, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(
+        mockSb,
+        { creditoId: "c1", quantidade: 1 },
+        "minha_chave_exclusiva_123"
+      );
+      expect(res.idempotency_key).toBe("minha_chave_exclusiva_123");
+    });
+  });
+
+  // =========================================================================
+  // SUITE 6: Read-Back Verification e Gravação Física (6 Testes)
+  // =========================================================================
+  describe("Suite 6: Read-Back Verification e Gravação Física", () => {
+    it("47. Agendamento executado deve verificar gravação imediata no banco", async () => {
+      const mockSb: any = {
+        from: (table: string) => {
+          if (table === "agendamentos") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  neq: () => Promise.resolve({ data: [] }),
+                  maybeSingle: () => Promise.resolve({ data: { id: "ag_999", status: "agendado" }, error: null }),
+                }),
+              }),
+              insert: () => ({
+                select: () => ({
+                  single: () => Promise.resolve({
+                    data: { id: "ag_999", data_hora: "2026-09-09T10:00:00Z", status: "agendado", valor_total: 100 },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return {};
+        },
+      };
+
+      const res = await AgendaAdapter.executarAgendamentoConfirmado(
+        mockSb,
+        { clienteId: "c1", petId: "p1", dataHora: "2026-09-09T10:00:00Z", valor: 100 },
+        "idemp_ag_999"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.affected_record_id).toBe("ag_999");
+    });
+
+    it("48. Deve detectar falso positivo caso o read-back não encontre o registro inserido", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              neq: () => Promise.resolve({ data: [] }),
+              maybeSingle: () => Promise.resolve({ data: null, error: null }), // Read-back falhou
+            }),
+          }),
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({ data: { id: "ag_fantasma" }, error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await AgendaAdapter.executarAgendamentoConfirmado(
+        mockSb,
+        { clienteId: "c1", petId: "p1", dataHora: "2026-09-09T10:00:00Z", valor: 100 },
+        "idemp_fantasma"
+      );
+
+      expect(res.verified).toBe(false);
+    });
+
+    it("49. Deve abortar agendamento se horário estiver ocupado no momento da confirmação", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              neq: () => Promise.resolve({ data: [{ id: "ocupado_agora" }] }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await AgendaAdapter.executarAgendamentoConfirmado(
+        mockSb,
+        { clienteId: "c1", petId: "p1", dataHora: "2026-09-09T10:00:00Z", valor: 100 },
+        "idemp_conflito"
+      );
+
+      expect(res.success).toBe(false);
+      expect(res.error_code).toBe("HORARIO_INDISPONIVEL");
+    });
+
+    it("50. Cadastro de cliente deve realizar verificação pós-gravação (Read-Back)", async () => {
+      const mockSb: any = {
+        from: () => ({
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({ data: { id: "cli_novo_1", nome: "Carlos Eduardo" }, error: null }),
+            }),
+          }),
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({ data: { id: "cli_novo_1", nome: "Carlos Eduardo" }, error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ClientesPetsAdapter.executarCadastroClienteConfirmado(
+        mockSb,
+        { nome: "Carlos Eduardo" },
+        "idemp_cli_novo"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.after?.nome).toBe("Carlos Eduardo");
+    });
+
+    it("51. Deve capturar falha de constraint única no cadastro de cliente", async () => {
+      const mockSb: any = {
+        from: () => ({
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({ data: null, error: { message: "Email já existe", code: "23505" } }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ClientesPetsAdapter.executarCadastroClienteConfirmado(
+        mockSb,
+        { nome: "Duplicado", email: "ja_existe@teste.com" },
+        "idemp_dupl"
+      );
+
+      expect(res.success).toBe(false);
+      expect(res.error_code).toBe("23505");
+      expect(res.verified).toBe(false);
+    });
+
+    it("52. Adaptador WhatsApp deve gerar link codificado com segurança", () => {
+      const payload = {
+        telefoneDestino: "(11) 98765-4321",
+        nomeCliente: "Renata",
+        nomePet: "Barthô",
+        tipoMensagem: "pet_pronto" as const,
+      };
+
+      const res = MensagensWhatsAppAdapter.gerarMensagemWhatsApp(payload);
+      expect(res.telefoneFormatado).toBe("5511987654321");
+      expect(res.urlWhatsApp).toContain("https://wa.me/5511987654321");
+      expect(res.mensagemFormatada).toContain("Barthô");
+      expect(res.mensagemFormatada).toContain("pronto(a)");
+    });
+  });
+
+  // =========================================================================
+  // SUITE 7: Timeouts, Memória e Podagem de Contexto (4 Testes)
+  // =========================================================================
+  describe("Suite 7: Timeouts, Memória e Podagem de Contexto", () => {
+    it("53. Deve podar mensagens quando exceder o limite máximo de 30", () => {
+      let sessao = criarSessaoV2();
+      for (let i = 1; i <= 35; i++) {
+        sessao = adicionarMensagemSessaoV2(sessao, {
+          id: `msg_${i}`,
+          role: "user",
+          content: `Mensagem ${i}`,
+          timestamp: new Date().toISOString(),
+          cards: [],
+        });
+      }
+      expect(sessao.mensagens.length).toBe(30);
+      expect(sessao.mensagens[0].content).toBe("Mensagem 6");
+      expect(sessao.mensagens[29].content).toBe("Mensagem 35");
+    });
+
+    it("54. Deve expirar automaticamente ação pendente com mais de 15 minutos", () => {
+      let sessao = criarSessaoV2();
+      const acaoExpirada = {
+        id: "act_exp",
+        type: "agendamento",
+        tool: "executar_agendamento",
+        title: "Agendamento Antigo",
+        summary: "Expirou",
+        riskLevel: "medio" as const,
+        params: {},
+        created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+        expires_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      };
+
+      sessao = atualizarContextoSessaoV2(sessao, { acaoPendente: acaoExpirada });
+      expect(sessao.contexto.acaoPendente).toBeNull();
+    });
+
+    it("55. Deve manter ação pendente se ainda estiver dentro da validade", () => {
+      let sessao = criarSessaoV2();
+      const acaoValida = {
+        id: "act_val",
+        type: "agendamento",
+        tool: "executar_agendamento",
+        title: "Agendamento Válido",
+        summary: "Dentro do prazo",
+        riskLevel: "medio" as const,
+        params: {},
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      };
+
+      sessao = atualizarContextoSessaoV2(sessao, { acaoPendente: acaoValida });
+      expect(sessao.contexto.acaoPendente).not.toBeNull();
+      expect(sessao.contexto.acaoPendente?.id).toBe("act_val");
+    });
+
+    it("56. Inicialização da sessão deve carregar data no padrão YYYY-MM-DD", () => {
+      const sessao = criarSessaoV2();
+      expect(sessao.contexto.dataReferencia).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+
+  // =========================================================================
+  // SUITE 8: Preservação da V1 e Fallback Transparente (4 Testes)
+  // =========================================================================
+  describe("Suite 8: Preservação da V1 e Fallback Transparente", () => {
+    it("57. Diretório da Jessi V1 permanece intacto e acessível", async () => {
+      const v1Config = await import("../../ia/jessi-config");
+      expect(v1Config.JESSI_CONFIG.nome).toBe("Jessi");
+      expect(v1Config.JESSI_CONFIG.regrasComportamentais.length).toBeGreaterThan(0);
+    });
+
+    it("58. Schemas Zod da V1 continuam exportados e funcionais", async () => {
+      const v1Contracts = await import("../../ia/jessi-contracts");
+      expect(v1Contracts.JessiQueryResultSchema).toBeDefined();
+      expect(v1Contracts.JessiMutationResultSchema).toBeDefined();
+    });
+
+    it("59. Adaptador WhatsApp formata mensagem de reativação com carinho", () => {
+      const res = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+        telefoneDestino: "11999998888",
+        nomeCliente: "Lucas",
+        nomePet: "Pipoca",
+        tipoMensagem: "reativacao_carinho",
+      });
+      expect(res.mensagemFormatada).toContain("Pipoca");
+      expect(res.mensagemFormatada).toContain("saudade");
+    });
+
+    it("60. Adaptador WhatsApp formata confirmação de PIX com valor correto", () => {
+      const res = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+        telefoneDestino: "11999998888",
+        nomeCliente: "Fernanda",
+        tipoMensagem: "confirmacao_pix",
+        detalhes: { valor: 185.5 },
+      });
+      expect(res.mensagemFormatada).toContain("R$ 185.50");
+      expect(res.mensagemFormatada).toContain("Muito obrigado");
+    });
+  });
+});

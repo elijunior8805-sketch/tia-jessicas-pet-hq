@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { processarMensagemJessiCore } from "./jessi-agent.server";
+import { despacharMensagemJessi } from "@/lib/ia-v2/agent/jessi-v2-bridge";
 import { gerarCentralOperacionalJessi } from "./jessi-proactive.server";
 
 /**
@@ -29,9 +30,9 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
       .eq("id", userId)
       .maybeSingle();
 
-    return await processarMensagemJessiCore(
+    return await despacharMensagemJessi(
       supabase,
-      data,
+      data as any,
       {
         id: userId,
         nome: (profile as any)?.nome || "Proprietário",
