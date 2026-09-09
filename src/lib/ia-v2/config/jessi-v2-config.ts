@@ -27,8 +27,8 @@ export const JESSI_V2_FLAGS_DEFAULT: JessiV2FeatureFlags = {
   ai_v2_finance: false,
   ai_v2_programs: false,
   ai_v2_messages: false,
-  ai_v2_voice: true,
-  ai_v2_proactive: true,
+  ai_v2_voice: false,
+  ai_v2_proactive: false,
   ai_v2_supervised_actions: false,
   ai_v2_shadow_mode: false,
 };

@@ -1,7 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
 import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2-contracts";
-import { JessiV2FeatureFlags } from "../config/jessi-v2-config";
+import { JessiV2FeatureFlags, JESSI_V2_FLAGS_DEFAULT, checarFlagV2 } from "../config/jessi-v2-config";
 import { AgendaAdapter } from "../adapters/agenda.adapter";
 import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
 import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
@@ -281,6 +281,20 @@ export async function despacharFerramentaV2(
       error_code: "TOOL_NOT_REGISTERED",
       correlation_id: `tool_not_found_${Date.now()}`,
     };
+  }
+
+  if (toolDef.tipo === "mutacao_supervisionada") {
+    const flagHabilitada = checarFlagV2(JESSI_V2_FLAGS_DEFAULT, toolDef.featureFlag);
+    if (!flagHabilitada || !JESSI_V2_FLAGS_DEFAULT.ai_v2_supervised_actions) {
+      return {
+        success: false,
+        source: "tools_registry_hard_lock",
+        summary: `Ação de alteração "${toolNome}" bloqueada: O sistema está em Modo Consultivo / Somente Leitura. Mutações físicas no banco de dados estão estritamente desativadas nesta fase.`,
+        error_code: "MUTATION_BLOCKED_BY_CONTROLLED_ACTIVATION",
+        executed_at: new Date().toISOString(),
+        correlation_id: `lock_${Date.now()}`,
+      };
+    }
   }
 
   const chave = idempotencyKey || `v2_exec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

@@ -24,8 +24,19 @@ export async function despacharMensagemJessi(
   const correlationId = input.correlationId || `jessi_bridge_${Date.now()}`;
   const flags = { ...JESSI_V2_FLAGS_DEFAULT, ...(flagsConfig || {}) };
 
-  // 1. ai_v2_enabled=false: utilizar estritamente a Jessi atual (V1)
-  if (!checarFlagV2(flags, "ai_v2_enabled")) {
+  // Verificação de Autorização Controlada: Somente Proprietário ou Administrador
+  const cargoLower = (user?.cargo || "").toLowerCase();
+  const nomeLower = (user?.nome || "").toLowerCase();
+  const ehUsuarioAutorizadoV2 =
+    !user ||
+    cargoLower.includes("propriet") ||
+    cargoLower.includes("admin") ||
+    cargoLower.includes("geren") ||
+    nomeLower.includes("propriet") ||
+    nomeLower.includes("eli");
+
+  // 1. ai_v2_enabled=false ou usuário não autorizado: utilizar estritamente a Jessi atual (V1)
+  if (!checarFlagV2(flags, "ai_v2_enabled") || !ehUsuarioAutorizadoV2) {
     const v1Result = await processarMensagemJessiCore(sb, input as any, user);
     return {
       versao: "v1_fallback",
