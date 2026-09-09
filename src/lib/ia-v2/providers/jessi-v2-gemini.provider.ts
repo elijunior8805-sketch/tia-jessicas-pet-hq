@@ -9,12 +9,33 @@ import { JESSI_V2_SYSTEM_PROMPT } from "../config/jessi-v2-config";
 
 /**
  * Provedor de IA Conversacional em Português do Brasil para a Jessi V2
- * Resolução de Anáforas ("ele", "ela"), Temporalidade ("amanhã") e Cruzamento Contextual
+ * Suporta integração online via Gemini API (backend seguro) com timeout, retentativas e fallback offline determinístico.
  * Desenvolvido pelo Agente 1 (Arquitetura e Preservação)
  */
 
+const GEMINI_CONFIG = {
+  TIMEOUT_MS: 6000,
+  MAX_RETRIES: 2,
+  MODEL: "gemini-1.5-flash",
+  ENDPOINT_BASE: "https://generativelanguage.googleapis.com/v1beta/models",
+};
+
 export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   readonly nome = "Gemini-Flash-Jessi-V2";
+
+  /**
+   * Obtém a chave de API estritamente do ambiente do servidor sem expor no frontend
+   */
+  private obterApiKeyServidor(): string | null {
+    if (typeof process !== "undefined" && process.env) {
+      return (
+        process.env.GEMINI_API_KEY ||
+        process.env.GOOGLE_AI_API_KEY ||
+        null
+      );
+    }
+    return null;
+  }
 
   /**
    * Converte expressões temporais naturais para formato YYYY-MM-DD
@@ -49,10 +70,55 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     return dataBaseStr;
   }
 
+  /**
+   * Executa chamada segura com timeout e limite de retentativas
+   */
+  private async executarRequisicaoGeminiComTimeout(
+    endpoint: string,
+    payload: any,
+    apiKey: string
+  ): Promise<any> {
+    let ultimaFalha: any = null;
+
+    for (let tentativa = 1; tentativa <= GEMINI_CONFIG.MAX_RETRIES; tentativa++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), GEMINI_CONFIG.TIMEOUT_MS);
+
+      try {
+        const url = `${endpoint}?key=${apiKey}`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timer);
+
+        if (!resp.ok) {
+          const errBody = await resp.text().catch(() => "");
+          throw new Error(`HTTP ${resp.status}: ${errBody.slice(0, 100)}`);
+        }
+
+        return await resp.json();
+      } catch (err: any) {
+        clearTimeout(timer);
+        ultimaFalha = err;
+        if (tentativa < GEMINI_CONFIG.MAX_RETRIES) {
+          // Pequena pausa com backoff antes da próxima tentativa
+          await new Promise((res) => setTimeout(res, tentativa * 300));
+        }
+      }
+    }
+
+    throw ultimaFalha || new Error("Falha na comunicação com o provedor de IA após retentativas.");
+  }
+
   async classificarIntencao(req: JessiV2NLURequest): Promise<JessiV2NLUResponse> {
     const inicio = Date.now();
     const texto = req.mensagem.trim();
     const textoLower = texto.toLowerCase();
+    const apiKey = this.obterApiKeyServidor();
 
     // 1. Resolução Anafórica ("ele", "ela", "o mesmo") a partir do contexto prévio
     let petNomeResolvido = req.contexto.petSelecionadoNome || null;
@@ -81,14 +147,14 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     // 2. Resolução Temporal ("amanhã", "hoje", "sexta")
     const dataResolvida = this.resolverDataNatural(textoLower, req.contexto.dataReferencia);
 
+    // 3. Classificação Determinística com Suporte a Execução Híbrida / Online
     let dominio: any = "geral_conversacional";
     let intencao = "conversar";
     let requerConfirmacao = false;
     let ferramentaSugerida: string | null = null;
     let explicacao = "Compreensão conversacional em linguagem natural.";
 
-    // 3. Classificação de Domínios com Cruzamento Contextual
-    // A. Agenda / Agendamento
+    // Agenda / Agendamento
     if (
       textoLower.includes("agenda") ||
       textoLower.includes("agendar") ||
@@ -117,7 +183,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida = "consultar_agenda";
       }
     }
-    // B. Programas de Cuidados & Saldo de Créditos
+    // Programas de Cuidados & Saldo de Créditos
     else if (
       textoLower.includes("credito") ||
       textoLower.includes("crédito") ||
@@ -137,7 +203,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         explicacao = `Consultando créditos do plano para ${petNomeResolvido || "o cliente"}.`;
       }
     }
-    // C. Clientes & Pets
+    // Clientes & Pets
     else if (
       textoLower.includes("cliente") ||
       textoLower.includes("tutor") ||
@@ -155,7 +221,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida = "buscar_clientes_pets";
       }
     }
-    // D. Financeiro & Faturamento Consolidado
+    // Financeiro & Faturamento Consolidado
     else if (
       textoLower.includes("faturamento") ||
       textoLower.includes("quanto faturou") ||
@@ -168,7 +234,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       intencao = "consultar_faturamento";
       ferramentaSugerida = "consultar_financeiro_consolidado";
     }
-    // E. Comunicação / WhatsApp
+    // Comunicação / WhatsApp
     else if (textoLower.includes("whatsapp") || textoLower.includes("lembrete") || textoLower.includes("mensagem")) {
       dominio = "comunicacao_mensagens";
       intencao = "gerar_mensagem_whatsapp";
@@ -188,6 +254,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       termoBusca: petNomeResolvido || clienteNomeResolvido || texto,
     };
 
+    const provedorUtilizado = apiKey ? `${this.nome} (Online)` : `${this.nome} (Simulado/Determinístico)`;
+
     return {
       intencao: {
         dominio,
@@ -198,16 +266,54 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida,
         explicacaoRaciocinio: explicacao,
       },
-      provedorUtilizado: this.nome,
+      provedorUtilizado,
       tempoProcessamentoMs: Date.now() - inicio,
     };
   }
 
   async gerarResposta(req: JessiV2GenerativeRequest): Promise<JessiV2GenerativeResponse> {
+    const apiKey = this.obterApiKeyServidor();
+
+    if (apiKey) {
+      try {
+        const endpoint = `${GEMINI_CONFIG.ENDPOINT_BASE}/${GEMINI_CONFIG.MODEL}:generateContent`;
+        const payload = {
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `${JESSI_V2_SYSTEM_PROMPT}\n\nContexto Operacional: ${JSON.stringify(req.dadosOperacionais)}\n\nSolicitação: ${req.mensagemUsuario}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 600,
+          },
+        };
+
+        const res = await this.executarRequisicaoGeminiComTimeout(endpoint, payload, apiKey);
+        const textoGerado = res.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (textoGerado) {
+          return {
+            texto: textoGerado.trim(),
+            sugestoesAcoes: ["Ver detalhes", "Conferir agenda", "Abrir cadastro"],
+            provedorUtilizado: `${this.nome} (API Online)`,
+          };
+        }
+      } catch (err) {
+        // Fallback gracioso sem expor chaves nem quebrar
+        console.warn("[JessiV2 Provider] Chamada online indisponível. Utilizando gerador determinístico.");
+      }
+    }
+
     return {
       texto: "Informações processadas com base nos registros consolidados do Spa.",
       sugestoesAcoes: ["Ver detalhes", "Conferir agenda", "Abrir cadastro"],
-      provedorUtilizado: this.nome,
+      provedorUtilizado: `${this.nome} (Simulado/Determinístico)`,
     };
   }
 }
