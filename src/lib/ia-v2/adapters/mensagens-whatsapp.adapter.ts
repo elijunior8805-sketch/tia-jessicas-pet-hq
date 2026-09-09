@@ -1,5 +1,8 @@
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "@/integrations/supabase/types";
+
 /**
- * Adaptador Oficial de Comunicação & WhatsApp para a Jessi V2
+ * Adaptador Oficial de Comunicação & WhatsApp para a Jessi V2 (Seção 15)
  * Desenvolvido pelo Agente 2 (Integrações e Regras)
  */
 
@@ -7,7 +10,17 @@ export interface JessiV2WhatsAppPayload {
   telefoneDestino: string;
   nomeCliente: string;
   nomePet?: string;
-  tipoMensagem: "lembrete_agenda" | "pet_pronto" | "confirmacao_pix" | "reativacao_carinho";
+  tipoMensagem: "lembrete_agenda" | "pet_pronto" | "confirmacao_pix" | "reativacao_carinho" | "cobranca";
+  detalhes?: Record<string, any>;
+}
+
+export interface JessiV2ComunicacaoLog {
+  destinatario: string;
+  conteudoAprovado: string;
+  usuarioId: string;
+  usuarioNome?: string;
+  canal: "whatsapp" | "sms";
+  resultado: "sucesso" | "falha" | "preparado";
   detalhes?: Record<string, any>;
 }
 
@@ -42,6 +55,10 @@ export class MensagensWhatsAppAdapter {
         texto = `Oi, ${payload.nomeCliente}! Sentimos muita saudade do(a) ${payload.nomePet || "seu pet"} aqui no Spa! Que tal agendarmos um momento especial de cuidados para ele(a) esta semana? 🛁✨`;
         break;
 
+      case "cobranca":
+        texto = `Olá, ${payload.nomeCliente}! Consta uma pendência em aberto no valor de R$ ${Number(payload.detalhes?.valor || 0).toFixed(2)} referente aos serviços do(a) ${payload.nomePet || "seu pet"}. Segue nossa chave PIX para acerto. Qualquer dúvida estamos à disposição!`;
+        break;
+
       default:
         texto = `Olá, ${payload.nomeCliente}! Mensagem do Spa de Pet Tia Jéssica.`;
     }
@@ -53,5 +70,34 @@ export class MensagensWhatsAppAdapter {
       urlWhatsApp: url,
       telefoneFormatado: telefoneComPais,
     };
+  }
+
+  /**
+   * Registra auditoria do disparo de comunicação aprovado pelo operador (Seção 15)
+   */
+  static async registrarEnvioComunicacao(
+    sb: SupabaseClient<Database>,
+    log: JessiV2ComunicacaoLog
+  ): Promise<void> {
+    try {
+      await sb.from("ia_auditoria" as any).insert({
+        user_id: log.usuarioId,
+        comando_original: `COMUNICACAO_${log.canal.toUpperCase()}: Destinatário ${log.destinatario}`,
+        intencao_detectada: "envio_comunicacao",
+        ferramenta_utilizada: "MensagensWhatsAppAdapter",
+        parametros: {
+          destinatario: log.destinatario,
+          conteudoAprovado: log.conteudoAprovado,
+          canal: log.canal,
+          detalhes: log.detalhes,
+        },
+        resposta_ia: log.resultado === "sucesso" ? "Disparo registrado e autorizado" : "Tentativa de disparo",
+        sucesso: log.resultado === "sucesso",
+        tempo_resposta_ms: 0,
+        created_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn("Aviso ao registrar log de comunicação:", err);
+    }
   }
 }
