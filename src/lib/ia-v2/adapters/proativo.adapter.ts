@@ -167,4 +167,93 @@ export class ProativoAdapter {
       };
     }
   }
+
+  /**
+   * Vetor 1: Resumo Diário Consolidado
+   */
+  static async gerarResumoDiario(sb: SupabaseClient<Database>): Promise<JessiV2QueryResult> {
+    const central = await this.gerarCentralProativa(sb);
+    return {
+      success: central.success,
+      source: "resumo_diario_proativo",
+      data: central.data?.resumoGeral,
+      summary: central.data?.resumoGeral || "Resumo diário compilado.",
+      executed_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Vetor 2: Horários Vagos e Oportunidades de Encaixe
+   */
+  static async identificarHorariosVagos(sb: SupabaseClient<Database>, data?: string): Promise<JessiV2QueryResult> {
+    const hojeStr = data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    return await AgendaAdapter.identificarEncaixesDisponiveis(sb, hojeStr);
+  }
+
+  /**
+   * Vetor 3 & 4: Programas Vencendo e Créditos Não Utilizados
+   */
+  static async identificarProgramasVencendo(sb: SupabaseClient<Database>, dias = 7): Promise<JessiV2QueryResult> {
+    const res = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
+    const vencendo = (res.data || []).filter((p: any) => p.diasRestantes <= dias && p.creditosDisponiveis > 0);
+    return {
+      success: true,
+      source: "programas_vencendo",
+      data: vencendo,
+      total_count: vencendo.length,
+      summary: `Existem ${vencendo.length} programa(s) com créditos ativos vencendo nos próximos ${dias} dias.`,
+      executed_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Vetor 5: Clientes para Retorno (Reativação e Saudade)
+   */
+  static async identificarClientesParaRetorno(sb: SupabaseClient<Database>): Promise<JessiV2QueryResult> {
+    const { data: clientes } = await sb
+      .from("clientes")
+      .select("id, nome, telefone, pets(id, nome, raca)")
+      .limit(10);
+
+    const sugestoes = (clientes || []).map((c: any) => ({
+      cliente: c,
+      mensagemSugerida: MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+        telefoneDestino: c.telefone || "",
+        nomeCliente: c.nome,
+        nomePet: c.pets?.[0]?.nome || "seu pet",
+        tipoMensagem: "reativacao_carinho",
+      }),
+    }));
+
+    return {
+      success: true,
+      source: "clientes_para_retorno",
+      data: sugestoes,
+      total_count: sugestoes.length,
+      summary: `Localizados ${sugestoes.length} cliente(s) com sugestões de contato personalizadas.`,
+      executed_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Processador de Voz Supervisionado (Seção 18)
+   * Preserva o áudio durante todo o processamento e exige as mesmas confirmações
+   */
+  static processarTranscricaoVoz(params: {
+    audioUrl?: string;
+    transcricao: string;
+    confiancaAudio?: number;
+  }): {
+    transcricaoApresentada: string;
+    audioPreservadoUrl?: string;
+    requerRevisaoTexto: boolean;
+    aviso: string;
+  } {
+    return {
+      transcricaoApresentada: params.transcricao.trim(),
+      audioPreservadoUrl: params.audioUrl,
+      requerRevisaoTexto: (params.confiancaAudio ?? 1.0) < 0.85,
+      aviso: "Áudio processado em PT-BR. Comandos de alteração exigirão confirmação no cartão.",
+    };
+  }
 }

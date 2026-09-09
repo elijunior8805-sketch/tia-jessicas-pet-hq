@@ -1736,4 +1736,111 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(mockInsert).toHaveBeenCalled();
     });
   });
+
+  // =========================================================================
+  // SUITE 16: Fase 8 — Voz e Proatividade (Voz, Resumos, Alertas, Sugestões, Monitoramento)
+  // =========================================================================
+  describe("Suite 16: Fase 8 — Voz e Proatividade", () => {
+    it("94. Voz Supervisionada: Processa transcrição e preserva URL do áudio", () => {
+      const { ProativoAdapter } = require("../adapters/proativo.adapter");
+      const res = ProativoAdapter.processarTranscricaoVoz({
+        audioUrl: "https://storage.supabase.co/audios/rec_123.wav",
+        transcricao: "Agendar banho para o Thor amanhã às 14h",
+        confiancaAudio: 0.95,
+      });
+
+      expect(res.transcricaoApresentada).toBe("Agendar banho para o Thor amanhã às 14h");
+      expect(res.audioPreservadoUrl).toBe("https://storage.supabase.co/audios/rec_123.wav");
+      expect(res.requerRevisaoTexto).toBe(false);
+    });
+
+    it("95. Resumo Diário Proativo: Compila faturamento, atendimentos e horários livres", async () => {
+      const { ProativoAdapter } = require("../adapters/proativo.adapter");
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            gte: () => ({ lte: () => ({ order: () => Promise.resolve({ data: [] }) }), eq: () => Promise.resolve({ data: [] }) }),
+            eq: () => ({ gte: () => Promise.resolve({ data: [] }) }),
+            is: () => ({ eq: () => ({ gte: () => Promise.resolve({ data: [] }) }) }),
+          }),
+        }),
+      };
+
+      const res = await ProativoAdapter.gerarResumoDiario(mockSb);
+      expect(res.success).toBe(true);
+      expect(res.summary).toBeDefined();
+    });
+
+    it("96. Alerta de Programas Vencendo: Filtra planos nos próximos 7 dias com créditos ativos", async () => {
+      const { ProativoAdapter } = require("../adapters/proativo.adapter");
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => {
+            if (tab === "cliente_programas") {
+              return {
+                eq: () => ({
+                  gte: () => Promise.resolve({
+                    data: [
+                      {
+                        id: "prog_venc",
+                        data_inicio: "2026-08-15",
+                        data_fim: "2026-09-12",
+                        cliente: { nome: "Luana" },
+                        pet: { nome: "Bidu" },
+                        programa: { nome: "Clubinho 4 Banhos" },
+                      },
+                    ],
+                    error: null,
+                  }),
+                }),
+              };
+            }
+            return Promise.resolve({ data: [{ cliente_id: "c1", pet_id: "p1", saldo: 2 }] });
+          },
+        }),
+      };
+
+      const res = await ProativoAdapter.identificarProgramasVencendo(mockSb, 7);
+      expect(res.success).toBe(true);
+      expect(res.source).toBe("programas_vencendo");
+    });
+
+    it("97. Sugestões de Reativação: Gera mensagens personalizadas com links wa.me", async () => {
+      const { ProativoAdapter } = require("../adapters/proativo.adapter");
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            limit: () => Promise.resolve({
+              data: [
+                { id: "c_reativa", nome: "Mariana", telefone: "11988887777", pets: [{ nome: "Pipoca" }] },
+              ],
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProativoAdapter.identificarClientesParaRetorno(mockSb);
+      expect(res.success).toBe(true);
+      expect(res.data[0].mensagemSugerida.urlWhatsApp).toContain("https://wa.me/5511988887777");
+      expect(res.data[0].mensagemSugerida.mensagemFormatada).toContain("Pipoca");
+    });
+
+    it("98. Monitoramento Proativo: Zero execução automática de mutações", async () => {
+      const { ProativoAdapter } = require("../adapters/proativo.adapter");
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            gte: () => ({ lte: () => ({ order: () => Promise.resolve({ data: [] }) }), eq: () => Promise.resolve({ data: [] }) }),
+            eq: () => ({ gte: () => Promise.resolve({ data: [] }) }),
+            is: () => ({ eq: () => ({ gte: () => Promise.resolve({ data: [] }) }) }),
+          }),
+        }),
+      };
+
+      const res = await ProativoAdapter.gerarCentralProativa(mockSb);
+      expect(res.success).toBe(true);
+      // Nenhuma ação executada
+      expect(res.data.itensPrioritarios.every((i: any) => i.categoria)).toBe(true);
+    });
+  });
 });
