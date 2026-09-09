@@ -164,17 +164,47 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     const ehPerguntaValidade =
       textoLower.includes("quando vence") ||
       textoLower.includes("qual a validade") ||
+      textoLower.includes("qual é a validade") ||
       textoLower.includes("quando expira") ||
       textoLower.includes("validade") ||
       textoLower.includes("vencimento") ||
       textoLower.includes("tem credito") ||
       textoLower.includes("tem crédito") ||
+      textoLower.includes("possui credito") ||
+      textoLower.includes("possui crédito") ||
+      textoLower.includes("possui créditos") ||
       textoLower.includes("ainda tem") ||
       textoLower.includes("restam sessoes") ||
       textoLower.includes("restam sessões");
 
     // Seleção ordinal em caso de desambiguação prévia ("o primeiro", "opção 1", "o segundo", "o 1")
-    const matchOrdinal = textoLower.match(/\b(o primeiro|a primeira|o 1|opção 1|opcao 1|o segundo|a segunda|o 2|opção 2|opcao 2|esse|este)\b/);
+    const matchOrdinal = textoLower.match(/\b(o primeiro cliente|a primeira opção|o 1|opção 1|opcao 1|o segundo|a segunda|o 2|opção 2|opcao 2)\b/);
+
+    // Consulta de Último Atendimento / Histórico do Pet
+    const ehConsultaUltimoAtendimento =
+      textoLower.includes("último atendimento") ||
+      textoLower.includes("ultimo atendimento") ||
+      textoLower.includes("último banho") ||
+      textoLower.includes("ultimo banho") ||
+      textoLower.includes("quando foi o último") ||
+      textoLower.includes("quando foi o ultimo") ||
+      textoLower.includes("última visita") ||
+      textoLower.includes("ultima visita");
+
+    // Consulta de Horários Livres / Encaixes / Primeiro Horário
+    const ehConsultaHorarioLivre =
+      textoLower.includes("primeiro horário livre") ||
+      textoLower.includes("primeiro horario livre") ||
+      textoLower.includes("primeiro horário") ||
+      textoLower.includes("primeiro horario") ||
+      textoLower.includes("horário livre") ||
+      textoLower.includes("horario livre") ||
+      textoLower.includes("horários livres") ||
+      textoLower.includes("horarios livres") ||
+      textoLower.includes("tem vaga") ||
+      textoLower.includes("tem horário") ||
+      textoLower.includes("tem horario") ||
+      textoLower.includes("encaixe");
 
     if (matchOrdinal) {
       dominio = "clientes_pets";
@@ -182,21 +212,48 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       ferramentaSugerida = "buscar_clientes_pets";
       explicacao = `Seleção da opção ordinal "${matchOrdinal[1]}" da lista de desambiguação.`;
     }
+    // Último Atendimento do Pet
+    else if (ehConsultaUltimoAtendimento) {
+      dominio = "agenda";
+      intencao = "consultar_ultimo_atendimento";
+      ferramentaSugerida = "consultar_agenda";
+      explicacao = `Consultando o último atendimento registrado para ${petNomeResolvido || "o pet em contexto"}.`;
+    }
+    // Horários Livres / Primeiro Horário Livre
+    else if (ehConsultaHorarioLivre) {
+      dominio = "agenda";
+      intencao = "consultar_horarios_livres";
+      ferramentaSugerida = "consultar_agenda";
+      explicacao = `Verificando horários e encaixes livres na grade para ${dataResolvida}.`;
+    }
     // Programas de Cuidados & Saldo de Créditos & Validade
     else if (
       ehPerguntaValidade ||
+      textoLower.includes("programa") ||
+      textoLower.includes("programas") ||
       textoLower.includes("credito") ||
       textoLower.includes("crédito") ||
+      textoLower.includes("créditos") ||
       textoLower.includes("saldo") ||
       textoLower.includes("clubinho") ||
       textoLower.includes("plano") ||
-      textoLower.includes("pacote")
+      textoLower.includes("pacote") ||
+      textoLower.includes("contrato") ||
+      textoLower.includes("contratos")
     ) {
       dominio = "programas_creditos";
       if (textoLower.includes("debitar") || textoLower.includes("usar credito") || textoLower.includes("baixar")) {
         intencao = "preparar_consumo_credito";
         requerConfirmacao = true;
         ferramentaSugerida = "executar_consumo_credito";
+      } else if (textoLower.includes("programas estão ativos") || textoLower.includes("programas ativos") || (textoLower.includes("quais programas") && !petNomeResolvido)) {
+        intencao = "consultar_programas_ativos";
+        ferramentaSugerida = "consultar_saldo_programas";
+        explicacao = "Consultando contratos de programas ativos dos clientes no Spa.";
+      } else if (ehPerguntaValidade && (textoLower.includes("validade") || textoLower.includes("vence") || textoLower.includes("expira"))) {
+        intencao = "consultar_validade_programa";
+        ferramentaSugerida = "consultar_saldo_programas";
+        explicacao = `Consultando a data de validade do programa para ${petNomeResolvido || "o pet em contexto"}.`;
       } else {
         intencao = "consultar_saldo_programas";
         ferramentaSugerida = "consultar_saldo_programas";
@@ -206,11 +263,14 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     // Agenda / Agendamento
     else if (
       textoLower.includes("agenda") ||
+      textoLower.includes("agendado") ||
+      textoLower.includes("agendados") ||
       textoLower.includes("agendar") ||
       textoLower.includes("marcar") ||
       textoLower.includes("desmarcar") ||
       textoLower.includes("reagendar") ||
       textoLower.includes("horario") ||
+      textoLower.includes("horário") ||
       textoLower.includes("vaga") ||
       textoLower.includes("atendimento")
     ) {
@@ -233,6 +293,35 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida = "consultar_agenda";
       }
     }
+    // Financeiro & Faturamento Consolidado & Contas a Receber & Devedores
+    else if (
+      textoLower.includes("faturamento") ||
+      textoLower.includes("quanto faturou") ||
+      textoLower.includes("quanto foi o faturamento") ||
+      textoLower.includes("recebemos hoje") ||
+      textoLower.includes("para receber") ||
+      textoLower.includes("a receber") ||
+      textoLower.includes("devendo") ||
+      textoLower.includes("devedor") ||
+      textoLower.includes("devedores") ||
+      textoLower.includes("pagamento pendente") ||
+      textoLower.includes("pagamentos pendentes") ||
+      textoLower.includes("inadimplente") ||
+      textoLower.includes("inadimplentes") ||
+      textoLower.includes("financeiro") ||
+      textoLower.includes("ticket") ||
+      textoLower.includes("pix")
+    ) {
+      dominio = "financeiro_relatorios";
+      if (textoLower.includes("para receber") || textoLower.includes("a receber")) {
+        intencao = "consultar_contas_a_receber";
+      } else if (textoLower.includes("pendente") || textoLower.includes("devendo") || textoLower.includes("devedor") || textoLower.includes("inadimplente")) {
+        intencao = "consultar_inadimplencia_devedores";
+      } else {
+        intencao = "consultar_faturamento";
+      }
+      ferramentaSugerida = "consultar_financeiro_consolidado";
+    }
     // Clientes & Pets
     else if (
       textoLower.includes("cliente") ||
@@ -252,19 +341,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         intencao = "buscar_clientes_pets";
         ferramentaSugerida = "buscar_clientes_pets";
       }
-    }
-    // Financeiro & Faturamento Consolidado
-    else if (
-      textoLower.includes("faturamento") ||
-      textoLower.includes("quanto faturou") ||
-      textoLower.includes("financeiro") ||
-      textoLower.includes("ticket") ||
-      textoLower.includes("a receber") ||
-      textoLower.includes("pix")
-    ) {
-      dominio = "financeiro_relatorios";
-      intencao = "consultar_faturamento";
-      ferramentaSugerida = "consultar_financeiro_consolidado";
     }
     // Comunicação / WhatsApp
     else if (textoLower.includes("whatsapp") || textoLower.includes("lembrete") || textoLower.includes("mensagem")) {

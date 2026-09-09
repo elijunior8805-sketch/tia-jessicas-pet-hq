@@ -564,5 +564,68 @@ export class AgendaAdapter {
         correlation_id: correlationId,
       };
     }
+  /**
+   * Consulta o último atendimento realizado ou registrado de um pet específico
+   */
+  static async consultarUltimoAtendimentoPet(
+    sb: SupabaseClient<Database>,
+    petId: string,
+    petNome?: string
+  ): Promise<JessiV2QueryResult> {
+    const correlationId = `ultimo_atendimento_${Date.now()}`;
+    try {
+      const { data: agendamentos, error } = await sb
+        .from("agendamentos")
+        .select(SELECT_AGENDA)
+        .eq("pet_id", petId)
+        .order("data", { ascending: false })
+        .order("hora", { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      const ultimo = agendamentos?.[0];
+      const nomePet = petNome || (ultimo?.pets as any)?.nome || "o pet";
+
+      if (!ultimo) {
+        return {
+          success: true,
+          source: "tabela_agendamentos",
+          data: null,
+          total_count: 0,
+          summary: `Não encontrei nenhum histórico de atendimentos anteriores registrado para ${nomePet}.`,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+        };
+      }
+
+      const dataFmt = new Date(`${ultimo.data}T12:00:00`).toLocaleDateString("pt-BR");
+      const horaFmt = (ultimo.hora || "").slice(0, 5) || "--:--";
+      const srv = (ultimo.servicos as any)?.nome || "Atendimento";
+      const st = ultimo.status === "concluido" ? "Concluído" : ultimo.status === "confirmado" ? "Confirmado" : ultimo.status;
+
+      const summary = `O último atendimento registrado para **${nomePet}** foi em **${dataFmt} às ${horaFmt}** — Serviço: **${srv}** (Status: ${st}).`;
+
+      return {
+        success: true,
+        source: "tabela_agendamentos",
+        data: ultimo,
+        total_count: agendamentos.length,
+        summary,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        source: "tabela_agendamentos",
+        data: null,
+        total_count: 0,
+        summary: `Erro ao consultar último atendimento: ${err.message}`,
+        error_code: "ERRO_ULTIMO_ATENDIMENTO",
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+      };
+    }
   }
 }

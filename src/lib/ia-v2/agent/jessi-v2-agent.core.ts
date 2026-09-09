@@ -280,36 +280,96 @@ export async function processarMensagemJessiV2Core(
       // RESPOSTAS CONVERSACIONAIS E CONSULTAS REAIS (FASE 2 — SOMENTE LEITURA)
       if (intencao.dominio === "agenda") {
         const dataAlvo = intencao.entidades.data || contextoAtual.dataReferencia;
-        const resAgenda = await AgendaAdapter.consultarAgendaPorData(sb, dataAlvo);
-        respostaTexto = resAgenda.summary || `Consultei a agenda para ${dataAlvo}.`;
-        cards.push({
-          type: "agenda",
-          title: `Agenda de Atendimentos — ${dataAlvo}`,
-          subtitle: `${resAgenda.total_count || 0} agendamento(s) encontrado(s)`,
-          data: resAgenda.data,
-        });
-      } else if (intencao.dominio === "financeiro_relatorios") {
-        const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, "mes");
-        respostaTexto = resFin.summary || `Consultei o resumo financeiro consolidado oficial do Spa.`;
-        cards.push({
-          type: "financeiro",
-          title: "Resumo Financeiro Consolidado (Oficial)",
-          subtitle: "Fonte: Transações Oficiais",
-          data: resFin.data,
-        });
-      } else if (intencao.dominio === "programas_creditos") {
-        if (novoContexto.cliente?.id || contextoAtual.cliente?.id) {
-          const cliId = novoContexto.cliente?.id || contextoAtual.cliente?.id || "";
-          const petId = novoContexto.pet?.id || contextoAtual.pet?.id || undefined;
-          const resCred = await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, cliId, petId);
-          respostaTexto = resCred.summary || `Consultei o saldo de créditos do plano.`;
+        const petAlvoId = novoContexto.pet?.id || contextoAtual.pet?.id;
+        const petAlvoNome = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome;
+
+        if (intencao.intencao === "consultar_ultimo_atendimento" && petAlvoId) {
+          const resUltimo = await AgendaAdapter.consultarUltimoAtendimentoPet(sb, petAlvoId, petAlvoNome || undefined);
+          respostaTexto = resUltimo.summary || `Consultei o histórico de atendimentos do pet.`;
           cards.push({
-            type: "programa",
-            title: "Créditos e Programas do Clubinho",
-            subtitle: `Cliente: ${novoContexto.cliente?.nome || contextoAtual.cliente?.nome}`,
-            data: resCred.data,
+            type: "agenda",
+            title: `Último Atendimento — ${petAlvoNome || "Pet"}`,
+            subtitle: "Histórico Oficial do Sistema",
+            data: resUltimo.data,
+          });
+        } else if (intencao.intencao === "consultar_horarios_livres") {
+          const resEncaixes = await AgendaAdapter.identificarEncaixesDisponiveis(sb, dataAlvo);
+          const livres = (resEncaixes.data as any)?.horariosSugeridos || [];
+          const primeiro = livres[0];
+
+          if (livres.length > 0) {
+            respostaTexto = `O primeiro horário livre para **${dataAlvo}** é às **${primeiro}**.\n\nHorários disponíveis na grade:\n${livres.map((h: string) => `• ${h}`).join("\n")}`;
+          } else {
+            respostaTexto = `Não há horários livres disponíveis na grade para a data **${dataAlvo}**. Todos os horários estão ocupados.`;
+          }
+
+          cards.push({
+            type: "agenda",
+            title: `Horários Livres na Grade — ${dataAlvo}`,
+            subtitle: `${livres.length} horário(s) disponível(is)`,
+            data: resEncaixes.data,
           });
         } else {
+          const resAgenda = await AgendaAdapter.consultarAgendaPorData(sb, dataAlvo);
+          respostaTexto = resAgenda.summary || `Consultei a agenda para ${dataAlvo}.`;
+          cards.push({
+            type: "agenda",
+            title: `Agenda de Atendimentos — ${dataAlvo}`,
+            subtitle: `${resAgenda.total_count || 0} agendamento(s) encontrado(s)`,
+            data: resAgenda.data,
+          });
+        }
+      } else if (intencao.dominio === "financeiro_relatorios") {
+        const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, "mes");
+        const dadosFin = resFin.data as any;
+
+        if (intencao.intencao === "consultar_contas_a_receber") {
+          const aReceber = dadosFin?.valoresAReceber || 0;
+          const vencidos = dadosFin?.valoresVencidosDevedores || 0;
+          const totalPendente = aReceber + vencidos;
+
+          respostaTexto =
+            `Atualmente temos **R$ ${aReceber.toFixed(2)}** a receber dentro do prazo` +
+            (vencidos > 0 ? ` e **R$ ${vencidos.toFixed(2)}** em faturas vencidas/inadimplentes.\n\nTotal geral a receber: **R$ ${totalPendente.toFixed(2)}**.` : ".");
+
+          cards.push({
+            type: "financeiro",
+            title: "Contas a Receber (Oficial)",
+            subtitle: `Total pendente: R$ ${totalPendente.toFixed(2)}`,
+            data: dadosFin,
+          });
+        } else if (intencao.intencao === "consultar_inadimplencia_devedores") {
+          const devedores: any[] = dadosFin?.devedores || [];
+          if (devedores.length > 0) {
+            const itens = devedores.map(
+              (d) => `• **${d.clienteNome}**: R$ ${Number(d.valor).toFixed(2)} (Vencimento: ${new Date(`${d.vencimento}T12:00:00`).toLocaleDateString("pt-BR")})`
+            );
+            respostaTexto = `Encontrei ${devedores.length} cliente(s) com pagamentos pendentes/vencidos:\n\n${itens.join("\n")}\n\nTotal em aberto: **R$ ${dadosFin.valoresVencidosDevedores.toFixed(2)}**.`;
+          } else {
+            respostaTexto = `Não há clientes com pagamentos em atraso registrados no momento. A inadimplência está zerada.`;
+          }
+
+          cards.push({
+            type: "financeiro",
+            title: "Clientes com Pagamentos Pendentes",
+            subtitle: `${devedores.length} cliente(s) listado(s)`,
+            data: { devedores, totalVencido: dadosFin?.valoresVencidosDevedores },
+          });
+        } else {
+          respostaTexto = resFin.summary || `Consultei o resumo financeiro consolidado oficial do Spa.`;
+          cards.push({
+            type: "financeiro",
+            title: "Resumo Financeiro Consolidado (Oficial)",
+            subtitle: "Fonte: Transações Oficiais",
+            data: resFin.data,
+          });
+        }
+      } else if (intencao.dominio === "programas_creditos") {
+        const cliId = novoContexto.cliente?.id || contextoAtual.cliente?.id;
+        const petId = novoContexto.pet?.id || contextoAtual.pet?.id;
+        const petNome = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome;
+
+        if (intencao.intencao === "consultar_programas_ativos" || (!cliId && !petId)) {
           const resProgGeral = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
           respostaTexto = resProgGeral.summary || `Consultei os contratos de programas ativos no Spa.`;
           cards.push({
@@ -317,6 +377,21 @@ export async function processarMensagemJessiV2Core(
             title: "Contratos Ativos do Clubinho",
             subtitle: `${resProgGeral.total_count || 0} contrato(s) ativo(s)`,
             data: resProgGeral.data,
+          });
+        } else {
+          const resCred = await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, cliId || "", petId || undefined);
+          
+          if (intencao.intencao === "consultar_validade_programa" && (resCred.data as any)?.validade) {
+            respostaTexto = `O programa de cuidados de **${petNome || "o pet"}** possui validade até **${(resCred.data as any).validade}**. ${(resCred.data as any).totalSessaoRestantes || 0} crédito(s) restante(s).`;
+          } else {
+            respostaTexto = resCred.summary || `Consultei o saldo de créditos do plano.`;
+          }
+
+          cards.push({
+            type: "programa",
+            title: "Créditos e Programas do Clubinho",
+            subtitle: `Pet: ${petNome || "Pet"} • Tutor: ${novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "Cliente"}`,
+            data: resCred.data,
           });
         }
       } else if (intencao.dominio === "clientes_pets") {
