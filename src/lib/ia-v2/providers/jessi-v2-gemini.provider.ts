@@ -188,6 +188,12 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("ultimo banho") ||
       textoLower.includes("quando foi o último") ||
       textoLower.includes("quando foi o ultimo") ||
+      textoLower.includes("quando ele veio") ||
+      textoLower.includes("quando ela veio") ||
+      textoLower.includes("veio pela última vez") ||
+      textoLower.includes("veio pela ultima vez") ||
+      textoLower.includes("última vez") ||
+      textoLower.includes("ultima vez") ||
       textoLower.includes("última visita") ||
       textoLower.includes("ultima visita");
 
