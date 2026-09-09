@@ -905,4 +905,85 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(res.mensagemFormatada).toContain("Muito obrigado");
     });
   });
+
+  // =========================================================================
+  // SUITE 9: Fase 1 — Conversa e Memória (Chat, Histórico, Contexto, Busca, Ambiguidade e Respostas Progressivas)
+  // =========================================================================
+  describe("Suite 9: Fase 1 — Conversa e Memória", () => {
+    it("61. Chat Natural: Resposta acolhedora para cumprimentos e apresentação da Jessi", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {};
+      const res = await processarMensagemJessiV2Core(mockSb, { mensagem: "Olá Jessi, boa tarde!" });
+      expect(res.versao).toBe("v2");
+      expect(res.respostaTexto).toContain("Jessi");
+      expect(res.respostaTexto).toContain("Tia Jéssica");
+    });
+
+    it("62. Contexto & Anáfora: Deve resolver pronome 'ele' mantendo pet ativo do contexto", async () => {
+      const provider = new JessiV2GeminiProvider();
+      const res = await provider.classificarIntencao({
+        mensagem: "Quero agendar um banho para ele amanhã às 15h",
+        contexto: {
+          dataReferencia: "2026-09-09",
+          petSelecionadoId: "pet_thor_123",
+          petSelecionadoNome: "Thor",
+        },
+        historico: [],
+      });
+      expect(res.intencao.entidades.petNome).toBe("Thor");
+      expect(res.intencao.entidades.petId).toBe("pet_thor_123");
+    });
+
+    it("63. Busca Inteligente: Deve localizar cliente por telefone mesmo com formatação diferente", async () => {
+      const mockClientes = [
+        { id: "cli_1", nome: "Mariana Souza", telefone: "11988887777", pets: [] },
+      ];
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            limit: () => Promise.resolve({ data: mockClientes }),
+          }),
+        }),
+      };
+      const res = await ClientesPetsAdapter.buscarClientesPets(mockSb, "(11) 98888-7777");
+      expect(res.success).toBe(true);
+      expect(res.data.candidatos[0].nomePrincipal).toBe("Mariana Souza");
+      expect(res.data.exigeDesambiguacao).toBe(false);
+    });
+
+    it("64. Ambiguidade: Não deve escolher silenciosamente entre clientes homônimos", async () => {
+      const mockClientes = [
+        { id: "cli_1", nome: "Juliana Santos", telefone: "11911112222", pets: [] },
+        { id: "cli_2", nome: "Juliana Santos Silva", telefone: "11933334444", pets: [] },
+      ];
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            limit: () => Promise.resolve({ data: mockClientes }),
+          }),
+        }),
+      };
+      const res = await ClientesPetsAdapter.buscarClientesPets(mockSb, "Juliana");
+      expect(res.success).toBe(true);
+      expect(res.data.exigeDesambiguacao).toBe(true);
+      expect(res.summary).toContain("opções semelhantes");
+    });
+
+    it("65. Resposta Progressiva: Decomposição em etapas claras e cartões contextuais", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            limit: () => Promise.resolve({ data: [] }),
+          }),
+        }),
+      };
+      const res = await processarMensagemJessiV2Core(mockSb, {
+        mensagem: "Agendar banho para o Rex amanhã às 10h",
+      });
+      expect(res.pendingAction).toBeDefined();
+      expect(res.cards.some(c => c.type === "confirmacao")).toBe(true);
+      expect(res.respostaTexto).toContain("Preparei a operação");
+    });
+  });
 });

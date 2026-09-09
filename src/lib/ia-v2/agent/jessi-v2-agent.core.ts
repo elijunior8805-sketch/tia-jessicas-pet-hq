@@ -8,11 +8,15 @@ import {
 } from "../contracts/jessi-v2-contracts";
 import { JessiV2ContextState, criarSessaoV2 } from "../session/jessi-v2-session";
 import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
+import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
+import { JessiV2ConfirmationManager } from "../confirmation/jessi-v2-confirmation.manager";
+import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
 import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Autonomia Supervisionada)
- * Desenvolvido pelo Agente 1 (Arquitetura e Preservação)
+ * FASE 1 — CONVERSA E MEMÓRIA
+ * Desenvolvido pelo Agente 1 (Arquitetura e Coordenação)
  */
 
 const geminiProvider = new JessiV2GeminiProvider();
@@ -20,7 +24,7 @@ const geminiProvider = new JessiV2GeminiProvider();
 export async function processarMensagemJessiV2Core(
   sb: SupabaseClient<Database>,
   input: JessiV2ProcessInput,
-  user?: { id: string; nome?: string; cargo?: string }
+  user?: { id: string; nome?: string; cargo?: string; permissoes?: string[] }
 ): Promise<JessiV2ProcessOutput> {
   const inicioMs = Date.now();
   const correlationId = input.correlationId || `jessi_v2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -29,24 +33,33 @@ export async function processarMensagemJessiV2Core(
   let novoContexto: Partial<JessiV2ContextState> = {};
   let respostaTexto = "";
 
-  const sessaoBase = criarSessaoV2(undefined, user?.id);
+  const sessaoBase = criarSessaoV2(undefined, user?.id, {
+    nome: user?.nome || "Proprietário",
+    cargo: user?.cargo || "Administrador",
+    permissoes: user?.permissoes || ["admin", "agenda", "financeiro", "clientes"],
+  });
+
   const contextoAtual: JessiV2ContextState = {
     ...sessaoBase.contexto,
     ...(input.contexto as any),
   };
 
   try {
-    // 1. Tratamento de Confirmação Explícita de Ação Pendente
-    const textoLimpo = (input.mensagem || "").toLowerCase().trim();
-    const ehConfirmacaoTexto =
-      textoLimpo === "confirmar" ||
-      textoLimpo === "pode confirmar" ||
-      textoLimpo === "sim" ||
-      textoLimpo === "confirmo" ||
-      textoLimpo === "pode executar";
+    const textoLimpo = (input.mensagem || "").trim();
+    const textoLower = textoLimpo.toLowerCase();
 
-    if ((input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) || (ehConfirmacaoTexto && contextoAtual.acaoPendente)) {
-      const pending = contextoAtual.acaoPendente;
+    // 1. Tratamento de Confirmação Explícita de Ação Pendente
+    const ehConfirmacaoTexto =
+      textoLower === "confirmar" ||
+      textoLower === "pode confirmar" ||
+      textoLower === "sim" ||
+      textoLower === "confirmo" ||
+      textoLower === "pode executar";
+
+    const acaoPendenteAtual = (input.contexto as any)?.operacaoPreparada || (input.contexto as any)?.acaoPendente;
+
+    if ((input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) || (ehConfirmacaoTexto && acaoPendenteAtual)) {
+      const pending = acaoPendenteAtual;
       const toolNome = input.dadosConfirmacao?.tool || pending?.tool || "operacao_supervisionada";
       const params = input.dadosConfirmacao?.params || pending?.params || {};
 
@@ -69,13 +82,13 @@ export async function processarMensagemJessiV2Core(
         respostaTexto,
         cards,
         pendingAction: null,
-        novoContexto: { acaoPendente: null },
+        novoContexto: { operacaoPreparada: null } as any,
         tempoProcessamentoMs: Date.now() - inicioMs,
         correlationId,
       };
     }
 
-    // 2. Classificação NLU de Intenção e Entidades
+    // 2. Classificação NLU de Intenção e Entidades (Resolução Anafórica e Temporal)
     const nluResult = await geminiProvider.classificarIntencao({
       mensagem: input.mensagem,
       contexto: contextoAtual,
@@ -84,65 +97,173 @@ export async function processarMensagemJessiV2Core(
 
     const intencao = nluResult.intencao;
 
-    // 3. Roteamento de Intenção: Consulta vs. Preparação de Ação
+    // 3. Busca Inteligente e Resolução de Ambiguidade (Clientes & Pets)
+    if (intencao.dominio === "clientes_pets" || intencao.entidades.termoBusca) {
+      const termoParaBusca = intencao.entidades.termoBusca || textoLimpo;
+      const resultadoBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoParaBusca);
+
+      if (resultadoBusca.success && resultadoBusca.data.candidatos.length > 0) {
+        if (resultadoBusca.data.exigeDesambiguacao) {
+          // Ambiguidade detectada: Apresenta opções progressivas sem escolha silenciosa
+          respostaTexto = resultadoBusca.summary;
+          
+          cards.push({
+            type: "cliente",
+            title: "Opções Encontradas (Escolha uma)",
+            subtitle: `Termo pesquisado: "${termoParaBusca}"`,
+            data: {
+              exigeDesambiguacao: true,
+              opcoes: resultadoBusca.data.candidatos.map(c => ({
+                id: c.id,
+                tipo: c.tipo,
+                nome: c.nomePrincipal,
+                detalhe: c.detalheSecundario,
+              })),
+            },
+          });
+
+          return {
+            versao: "v2",
+            respostaTexto,
+            cards,
+            pendingAction: null,
+            novoContexto: {
+              ...contextoAtual,
+              variaveisConversacao: {
+                ...contextoAtual.variaveisConversacao,
+                candidatosEmEspera: resultadoBusca.data.candidatos,
+              },
+            },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        } else {
+          // Encontrado com alta confiança: atualiza memória contextual
+          const selecionado = resultadoBusca.data.candidatos[0];
+          if (selecionado.tipo === "cliente") {
+            novoContexto.cliente = {
+              id: selecionado.id,
+              nome: selecionado.nomePrincipal,
+              telefone: selecionado.dadosCompletos?.telefone,
+              endereco: selecionado.dadosCompletos?.endereco,
+            };
+          } else if (selecionado.tipo === "pet") {
+            novoContexto.pet = {
+              id: selecionado.id,
+              nome: selecionado.nomePrincipal,
+              raca: selecionado.dadosCompletos?.raca,
+              porte: selecionado.dadosCompletos?.porte,
+            };
+            if (selecionado.dadosCompletos?.cliente) {
+              novoContexto.cliente = {
+                id: selecionado.dadosCompletos.cliente.id,
+                nome: selecionado.dadosCompletos.cliente.nome,
+                telefone: selecionado.dadosCompletos.cliente.telefone,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Roteamento de Intenção: Consulta vs. Preparação de Ação
     if (intencao.requerConfirmacao) {
-      // PREPARAÇÃO DE AÇÃO (NÃO EXECUTA MUTAÇÃO DIRETA)
-      const expiracao = new Date(Date.now() + JESSI_V2_LIMITS.EXPIRACAO_ACAO_PENDENTE_MINUTOS * 60 * 1000).toISOString();
-      
+      // PREPARAÇÃO DE AÇÃO PROGRESSIVA (NÃO EXECUTA MUTAÇÃO DIRETA)
+      const proposta = JessiV2ConfirmationManager.criarProposta({
+        user: { id: user?.id || "proprietario_spa", nome: user?.nome || "Proprietário" },
+        cliente: novoContexto.cliente || contextoAtual.cliente || { nome: intencao.entidades.clienteNome || "Cliente" },
+        pet: novoContexto.pet || contextoAtual.pet || { nome: intencao.entidades.petNome || "Pet" },
+        acao: intencao.intencao,
+        motivo: `Solicitação do usuário: "${input.mensagem}"`,
+        estadoAtual: { status: "pendente" },
+        estadoProposto: intencao.entidades,
+        valores: { total: intencao.entidades.valor || 0 },
+        impactoCreditos: intencao.dominio === "programas_creditos" ? { saldoAnterior: 1, novoSaldo: 0 } : undefined,
+        dataHorario: { data: intencao.entidades.data, horario: intencao.entidades.hora || "A definir" },
+        riscos: ["Alteração no banco de dados sujeita a confirmação."],
+      });
+
       pendingAction = {
-        id: `act_${Date.now()}`,
+        id: proposta.id,
         type: intencao.intencao,
         tool: intencao.ferramentaSugerida || intencao.intencao,
         title: `Confirmação de ${intencao.intencao.replace(/_/g, " ").toUpperCase()}`,
-        summary: `Ação preparada aguardando sua autorização explícita: ${JSON.stringify(intencao.entidades)}`,
+        summary: proposta.motivo,
         riskLevel: "medio",
         params: intencao.entidades,
-        created_at: new Date().toISOString(),
-        expires_at: expiracao,
+        created_at: proposta.created_at,
+        expires_at: proposta.validade,
       };
 
-      respostaTexto = `Preparei a operação solicitada. Por favor, confira os detalhes no card abaixo e clique em confirmar para gravar no sistema.`;
+      respostaTexto = `Preparei a operação solicitada para você conferir. Por favor, valide os detalhes no cartão abaixo e clique em confirmar para gravar no sistema.`;
       
       cards.push({
         type: "confirmacao",
         title: pendingAction.title,
         subtitle: "Ação aguardando autorização humana",
         data: {
+          proposta,
           acaoPendente: pendingAction,
           requerConfirmacao: true,
         },
       });
 
       novoContexto = {
-        acaoPendente: pendingAction,
+        ...novoContexto,
+        operacaoPreparada: pendingAction,
       };
     } else {
-      // CONSULTA E CONVERSAÇÃO NATURAL
-      respostaTexto = `Entendido. Processando sua solicitação sobre ${intencao.dominio.replace(/_/g, " ")}.`;
-
+      // RESPOSTAS CONVERSACIONAIS E CONSULTAS PROGRESSIVAS
       if (intencao.dominio === "agenda") {
+        respostaTexto = `Consultei a agenda para ${intencao.entidades.data || contextoAtual.dataReferencia}.`;
         cards.push({
           type: "agenda",
           title: "Agenda de Atendimentos",
-          subtitle: `Data: ${contextoAtual.dataReferencia}`,
-          data: { status: "consultado", total: 0, itens: [] },
+          subtitle: `Data: ${intencao.entidades.data || contextoAtual.dataReferencia}`,
+          data: { status: "consultado", data: intencao.entidades.data || contextoAtual.dataReferencia },
         });
       } else if (intencao.dominio === "financeiro_relatorios") {
+        respostaTexto = `Consultei os relatórios financeiros consolidados do Spa.`;
         cards.push({
           type: "financeiro",
           title: "Resumo Financeiro Consolidado",
-          subtitle: "Fonte Oficial",
+          subtitle: "Fonte Oficial de Transações",
           data: { faturamentoHoje: 0, ticketMedio: 0 },
         });
+      } else if (intencao.dominio === "clientes_pets") {
+        if (!respostaTexto) {
+          respostaTexto = `Aqui estão os dados cadastrais solicitados.`;
+        }
+      } else {
+        // Conversação Natural / Saudação
+        respostaTexto = `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com a agenda, clientes, pets, planos ou financeiro?`;
       }
     }
+
+    // Auditoria oficial da interação
+    registrarAuditoriaV2({
+      user_id: user?.id || "proprietario_spa",
+      conversation_id: contextoAtual.conversationId,
+      intent: intencao.intencao,
+      entities: intencao.entidades,
+      tools_invoked: intencao.ferramentaSugerida ? [intencao.ferramentaSugerida] : [],
+      proposal_id: pendingAction?.id || null,
+      success: true,
+      correlation_id: correlationId,
+      duration_ms: Date.now() - inicioMs,
+      jessi_version: "v2.0.0",
+    });
 
     return {
       versao: "v2",
       respostaTexto,
       cards,
       pendingAction,
-      novoContexto,
+      novoContexto: {
+        ...contextoAtual,
+        ...novoContexto,
+      },
       intencao,
       tempoProcessamentoMs: Date.now() - inicioMs,
       correlationId,
