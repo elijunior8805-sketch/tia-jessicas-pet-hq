@@ -9,35 +9,63 @@ interface FinanceiroCardProps {
 
 export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionClick }) => {
   const faturamento = Number(data?.faturamentoBruto ?? data?.faturamento ?? data?.faturamento_total ?? data?.receita ?? 0);
-  const pendente = Number(data?.valoresAReceber ?? data?.pendente ?? data?.a_receber ?? data?.valor_pendente ?? 0);
-  const itensPendentes = Array.isArray(data?.itens_pendentes) ? data.itens_pendentes : (Array.isArray(data) ? data : []);
+  const recebido = Number(data?.valoresRecebidos ?? data?.recebido ?? faturamento);
+  const pendente = Number(data?.valoresAReceber ?? data?.pendente ?? data?.a_receber ?? 0);
+  const vencidos = Number(data?.valoresVencidosDevedores ?? 0);
+  const ticketMedio = Number(data?.ticketMedio ?? 0);
+  const formas = data?.formasPagamento || {};
+  const itensPendentes = Array.isArray(data?.devedores)
+    ? data.devedores
+    : Array.isArray(data?.itens_pendentes)
+    ? data.itens_pendentes
+    : Array.isArray(data)
+    ? data
+    : [];
 
   return (
     <div className="rounded-2xl border border-emerald-800/20 bg-card p-4 space-y-3 text-xs shadow-xs my-2">
       <div className="font-semibold text-emerald-950 flex items-center justify-between border-b border-border/60 pb-2.5">
         <div className="flex items-center gap-1.5">
           <DollarSign className="h-4 w-4 text-emerald-700" />
-          <span>Indicadores Financeiros Oficiais (vw_financeiro_indicadores)</span>
+          <span>Resumo Financeiro Consolidado Oficial</span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-muted/40 p-3 border border-border/80">
-          <span className="text-[11px] text-muted-foreground block mb-0.5">Faturamento (Mês)</span>
-          <span className="text-base font-bold text-emerald-800 flex items-center gap-1">
-            <TrendingUp className="h-4 w-4 text-emerald-600" />
-            R$ {faturamento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+        <div className="rounded-xl bg-emerald-50/70 p-3 border border-emerald-200/80">
+          <span className="text-[11px] text-emerald-900 block mb-0.5">Faturamento (Recebido)</span>
+          <span className="text-base font-bold text-emerald-900 flex items-center gap-1">
+            <TrendingUp className="h-4 w-4 text-emerald-700" />
+            R$ {recebido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </span>
+          {ticketMedio > 0 && (
+            <span className="text-[10px] text-emerald-700 block mt-0.5">
+              Ticket Médio: R$ {ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </span>
+          )}
         </div>
 
-        <div className="rounded-xl bg-muted/40 p-3 border border-border/80">
-          <span className="text-[11px] text-muted-foreground block mb-0.5">Valores em Aberto</span>
-          <span className="text-base font-bold text-amber-600 flex items-center gap-1">
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-            R$ {pendente.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+        <div className="rounded-xl bg-amber-50/70 p-3 border border-amber-200/80">
+          <span className="text-[11px] text-amber-900 block mb-0.5">Valores em Aberto</span>
+          <span className="text-base font-bold text-amber-800 flex items-center gap-1">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            R$ {(pendente + vencidos).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </span>
+          {vencidos > 0 && (
+            <span className="text-[10px] text-red-600 font-medium block mt-0.5">
+              Vencidos: R$ {vencidos.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </span>
+          )}
         </div>
       </div>
+
+      {formas.pix !== undefined && (
+        <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 text-[11px] flex justify-between items-center">
+          <span>Pix: <strong>R$ {Number(formas.pix || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></span>
+          <span>Dinheiro: <strong>R$ {Number(formas.dinheiro || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></span>
+          <span>Cartões: <strong>R$ {Number((formas.cartaoCredito || 0) + (formas.cartaoDebito || 0)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></span>
+        </div>
+      )}
 
       {itensPendentes.length > 0 && (
         <div className="space-y-1.5 pt-1">

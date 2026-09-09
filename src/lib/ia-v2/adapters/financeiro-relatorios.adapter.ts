@@ -75,6 +75,11 @@ export class FinanceiroRelatoriosAdapter {
       let despesas = 0;
       let estornos = 0;
       let totalEntradasCount = 0;
+      let totalPix = 0;
+      let totalDinheiro = 0;
+      let totalCartaoCredito = 0;
+      let totalCartaoDebito = 0;
+      let totalOutrasFormas = 0;
 
       (transacoes || []).forEach((t: any) => {
         const valor = Number(t.valor_total) || 0;
@@ -83,29 +88,47 @@ export class FinanceiroRelatoriosAdapter {
 
         faturamentoBruto += valor;
         if (ehConfirmado) {
-          valoresRecebidos += recebido || valor;
+          const valEfetivo = recebido || valor;
+          valoresRecebidos += valEfetivo;
           totalEntradasCount++;
+
+          const forma = (t.forma || "").toLowerCase();
+          if (forma.includes("pix")) totalPix += valEfetivo;
+          else if (forma.includes("dinheiro")) totalDinheiro += valEfetivo;
+          else if (forma.includes("credito") || forma.includes("crédito")) totalCartaoCredito += valEfetivo;
+          else if (forma.includes("debito") || forma.includes("débito")) totalCartaoDebito += valEfetivo;
+          else totalOutrasFormas += valEfetivo;
         }
         if (t.status === "estornado" || t.status === "cancelado") {
           estornos += valor;
         }
       });
 
-      // 2. Consulta de valores pendentes e devedores (vencidos)
+      // 2. Consulta de valores pendentes e devedores (vencidos) com vínculo do cliente
       const { data: pagamentosPendentes } = await sb
         .from("pagamentos")
-        .select("id, valor_total, valor_pago, vencimento, status")
+        .select("id, valor_total, valor_pago, vencimento, status, clientes(id, nome, whatsapp)")
         .neq("status", "pago")
         .neq("status", "cancelado")
         .is("arquivado_em", null);
 
       let valoresAReceber = 0;
       let valoresVencidosDevedores = 0;
+      const devedoresLista: any[] = [];
 
       (pagamentosPendentes || []).forEach((p: any) => {
         const pendente = Math.max((Number(p.valor_total) || 0) - (Number(p.valor_pago) || 0), 0);
+        const nomeCli = p.clientes?.nome || "Cliente";
+
         if (p.vencimento && p.vencimento < hojeDataStr) {
           valoresVencidosDevedores += pendente;
+          devedoresLista.push({
+            id: p.id,
+            clienteNome: nomeCli,
+            valor: pendente,
+            vencimento: p.vencimento,
+            status: "vencido",
+          });
         } else {
           valoresAReceber += pendente;
         }
@@ -114,7 +137,7 @@ export class FinanceiroRelatoriosAdapter {
       const ticketMedio = totalEntradasCount > 0 ? valoresRecebidos / totalEntradasCount : 0;
       const saldoLiquido = valoresRecebidos - despesas;
 
-      const resultado: JessiV2ResumoFinanceiroDetalhado = {
+      const resultado = {
         periodo,
         faturamentoBruto,
         valoresRecebidos,
@@ -126,19 +149,29 @@ export class FinanceiroRelatoriosAdapter {
         totalAtendimentosPagos: totalEntradasCount,
         estornos,
         valorQuitadoPorCredito: 0,
+        formasPagamento: {
+          pix: totalPix,
+          dinheiro: totalDinheiro,
+          cartaoCredito: totalCartaoCredito,
+          cartaoDebito: totalCartaoDebito,
+          outros: totalOutrasFormas,
+        },
+        devedores: devedoresLista,
       };
 
       const resumoFormatado =
-        `Resumo Financeiro Consolidado (${periodo}):\n` +
-        `• Faturamento: R$ ${faturamentoBruto.toFixed(2)} (Recebido: R$ ${valoresRecebidos.toFixed(2)})\n` +
-        `• Ticket Médio: R$ ${ticketMedio.toFixed(2)} (${totalEntradasCount} atendimentos)\n` +
-        `• A Receber: R$ ${valoresAReceber.toFixed(2)} | Vencidos/Devedores: R$ ${valoresVencidosDevedores.toFixed(2)}\n` +
-        `• Saldo Líquido: R$ ${saldoLiquido.toFixed(2)}`;
+        `Resumo Financeiro Consolidado (${periodo === "hoje" ? "Hoje" : periodo === "semana" ? "Últimos 7 dias" : "Mês Atual"}):\n\n` +
+        `• **Faturamento Bruto:** R$ ${faturamentoBruto.toFixed(2)} (Recebido: R$ ${valoresRecebidos.toFixed(2)})\n` +
+        `• **Ticket Médio:** R$ ${ticketMedio.toFixed(2)} (${totalEntradasCount} atendimentos pagos)\n` +
+        `• **Entradas por Forma:** Pix: R$ ${totalPix.toFixed(2)} | Dinheiro: R$ ${totalDinheiro.toFixed(2)} | Cartões: R$ ${(totalCartaoCredito + totalCartaoDebito).toFixed(2)}\n` +
+        `• **A Receber (No prazo):** R$ ${valoresAReceber.toFixed(2)}\n` +
+        `• **Inadimplência (Vencidos):** R$ ${valoresVencidosDevedores.toFixed(2)}${devedoresLista.length > 0 ? ` (${devedoresLista.length} cliente(s) com pendências)` : ""}\n` +
+        `• **Saldo Líquido:** R$ ${saldoLiquido.toFixed(2)}`;
 
       return {
         success: true,
         source: "financeiro_consolidado_oficial",
-        data: resultado,
+        data: resultado as any,
         total_count: transacoes?.length || 0,
         summary: resumoFormatado,
         filters_applied: { periodo, inicioPeriodo },
