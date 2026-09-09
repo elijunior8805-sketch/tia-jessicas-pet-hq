@@ -133,7 +133,7 @@ export const JessiLayout: React.FC = () => {
         role: "assistant",
         content: res.respostaTexto,
         timestamp: new Date().toISOString(),
-        cards: res.cards,
+        cards: res.cards as any,
         pendingAction: res.pendingAction,
         intent: res.intencao,
       };
@@ -200,7 +200,7 @@ export const JessiLayout: React.FC = () => {
         role: "assistant",
         content: res.respostaTexto,
         timestamp: new Date().toISOString(),
-        cards: res.cards,
+        cards: res.cards as any,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);

@@ -283,13 +283,13 @@ export class ClientesPetsAdapter {
         .select(`
           id,
           nome,
-          especie,
           raca,
           porte,
           peso,
-          data_nascimento,
-          observacoes_saude,
-          cliente:clientes(id, nome, telefone, email)
+          nascimento,
+          cuidados_saude,
+          alergias,
+          clientes(id, nome, whatsapp, email)
         `)
         .eq("id", petId)
         .maybeSingle();
@@ -298,19 +298,19 @@ export class ClientesPetsAdapter {
 
       const { data: atendimentos } = await sb
         .from("agendamentos")
-        .select("id, data_hora, status, valor_total")
+        .select("id, data, hora, status, valor_previsto")
         .eq("pet_id", petId)
-        .order("data_hora", { ascending: false })
+        .order("data", { ascending: false })
         .limit(5);
 
       return {
         success: true,
         source: "ficha_pet_consolidada",
         data: {
-          ...pet,
+          ...(pet as any),
           historicoAtendimentos: atendimentos || [],
         },
-        summary: `Ficha completa de ${pet.nome} (${pet.raca || "Raça não informada"}).`,
+        summary: `Ficha completa de ${(pet as any).nome} (${(pet as any).raca || "Raça não informada"}).`,
         executed_at: new Date().toISOString(),
       };
     } catch (err: any) {
