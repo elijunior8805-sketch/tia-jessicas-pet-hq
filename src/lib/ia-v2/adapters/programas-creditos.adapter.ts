@@ -358,7 +358,7 @@ export class ProgramasCreditosAdapter {
   ): Promise<JessiV2MutationResult> {
     const correlationId = `reserva_credito_${Date.now()}`;
     try {
-      const { data: credito } = await sb
+      const { data: credito }: any = await (sb as any)
         .from("cliente_programa_creditos")
         .select("id, saldo, servico_nome")
         .eq("id", params.creditoId)
@@ -414,7 +414,7 @@ export class ProgramasCreditosAdapter {
   ): Promise<JessiV2MutationResult> {
     const correlationId = `libera_credito_${Date.now()}`;
     try {
-      const { data: creditoAtual } = await sb
+      const { data: creditoAtual }: any = await (sb as any)
         .from("cliente_programa_creditos")
         .select("id, saldo, servico_nome")
         .eq("id", params.creditoId)
@@ -436,7 +436,7 @@ export class ProgramasCreditosAdapter {
 
       const novoSaldo = (creditoAtual.saldo || 0) + 1;
 
-      const { data: atualizado, error } = await sb
+      const { data: atualizado, error }: any = await (sb as any)
         .from("cliente_programa_creditos")
         .update({ saldo: novoSaldo } as any)
         .eq("id", params.creditoId)
@@ -445,7 +445,7 @@ export class ProgramasCreditosAdapter {
 
       if (error || !atualizado) throw error || new Error("Falha ao liberar crédito.");
 
-      const { data: readBack } = await sb
+      const { data: readBack }: any = await (sb as any)
         .from("cliente_programa_creditos")
         .select("id, saldo")
         .eq("id", params.creditoId)
