@@ -46,7 +46,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
         <div className="relative z-10 space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#C8A951]/20 text-[#F5E6BE] border border-[#C8A951]/40 text-xs font-semibold backdrop-blur-xs">
             <Sparkles className="h-3.5 w-3.5 text-[#C8A951] animate-pulse" />
-            <span>Jessi · Central Operacional Inteligente</span>
+            <span>Jessi V2 · Central Operacional Inteligente</span>
           </div>
 
           <h1 className="text-xl md:text-2xl font-bold font-display tracking-tight leading-snug">

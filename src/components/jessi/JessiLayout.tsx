@@ -294,7 +294,7 @@ export const JessiLayout: React.FC = () => {
               <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 font-display">
                 <span>Jessi</span>
                 <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
-                  Operacional
+                  IA V2 Operacional
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">Spa de Pet Tia Jéssica</p>
