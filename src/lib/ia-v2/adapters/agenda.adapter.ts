@@ -18,7 +18,7 @@ const SELECT_AGENDA = `
   leva_traz_modalidade,
   clientes(id, nome, whatsapp),
   pets(id, nome, raca, porte),
-  servicos(id, nome, valor_padrao)
+  servicos(id, nome, valor)
 `;
 
 function partirDataHora(dataHoraISO: string): { data: string; hora: string } {

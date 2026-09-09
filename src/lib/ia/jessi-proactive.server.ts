@@ -74,7 +74,7 @@ export async function gerarCentralOperacionalJessi(
   // 1. Agendamentos de Hoje e Amanhã
   const [agendHojeRes, agendAmanhaRes, pagamentosRes, progRes, clientesAtrasadosRes] = await Promise.all([
     sb.from("agendamentos")
-      .select("id, data, hora, status, leva_traz_modalidade, pets(nome, raca), clientes(nome, telefone), servicos(nome, preco)")
+      .select("id, data, hora, status, leva_traz_modalidade, pets(nome, raca), clientes(nome, telefone), servicos(nome, valor)")
       .eq("data", hojeStr)
       .order("hora", { ascending: true }),
     sb.from("agendamentos")
@@ -107,7 +107,7 @@ export async function gerarCentralOperacionalJessi(
   const concluidosHoje = listaHoje.filter((a: any) => a.status === "finalizado" || a.status === "concluido").length;
   const emAtendimentoHoje = listaHoje.filter((a: any) => a.status === "em_atendimento").length;
   const levaTrazHoje = listaHoje.filter((a: any) => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
-  const faturamentoPrevistoHoje = listaHoje.reduce((acc: number, curr: any) => acc + Number(curr.servicos?.preco || 0), 0);
+  const faturamentoPrevistoHoje = listaHoje.reduce((acc: number, curr: any) => acc + Number(curr.servicos?.valor || 0), 0);
 
   const proximo: any = listaHoje.find((a: any) => a.status === "agendado" || a.status === "confirmado");
   const proximoAtendimento = proximo ? {

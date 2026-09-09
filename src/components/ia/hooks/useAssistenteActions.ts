@@ -148,7 +148,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
     return () => {
       if (recognizerRef.current) {
-        recognizerRef.current.stop();
+        recognizerRef.current.abort();
         recognizerRef.current = null;
       }
     };

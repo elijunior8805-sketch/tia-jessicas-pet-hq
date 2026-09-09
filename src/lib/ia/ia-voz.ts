@@ -114,12 +114,14 @@ export class VoiceRecognizer {
 
       // Reinício automático quando o navegador corta sozinho e o usuário não pediu parada.
       if (!this.pararSolicitado && this.status === 'listening') {
-        try {
-          this.recognition.start();
-          return;
-        } catch {
-          /* segue para finalização */
-        }
+        setTimeout(() => {
+          try {
+            this.recognition.start();
+          } catch {
+            this.setStatus(this.acumulado ? 'reviewing' : 'idle');
+          }
+        }, 80);
+        return;
       }
 
       if (this.status === 'error') return;

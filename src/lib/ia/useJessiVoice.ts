@@ -58,6 +58,12 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
+  const onTranscriptFinalRef = useRef(onTranscriptFinal);
+
+  // Mantém a ref sempre atualizada sem disparar re-render do useEffect
+  useEffect(() => {
+    onTranscriptFinalRef.current = onTranscriptFinal;
+  }, [onTranscriptFinal]);
 
   useEffect(() => {
     recognizerRef.current = new VoiceRecognizer({
@@ -65,8 +71,8 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
         const aperfeicoado = aperfeicoarTextoSpa(texto);
         setFinalTranscript(aperfeicoado);
         setInterimTranscript("");
-        if (onTranscriptFinal) {
-          onTranscriptFinal(aperfeicoado);
+        if (onTranscriptFinalRef.current) {
+          onTranscriptFinalRef.current(aperfeicoado);
         }
       },
       onInterim: (texto) => {
@@ -90,7 +96,7 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
     return () => {
       recognizerRef.current?.abort();
     };
-  }, [onTranscriptFinal]);
+  }, []);
 
   const startListening = useCallback((textoAtual = "") => {
     if (!recognizerRef.current) return;
