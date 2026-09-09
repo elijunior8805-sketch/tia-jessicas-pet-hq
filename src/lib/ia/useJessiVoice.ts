@@ -59,11 +59,28 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
   const [finalTranscript, setFinalTranscript] = useState("");
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
+  const silenceTimerRef = useRef<any>(null);
 
   // Mantém a ref sempre atualizada sem disparar re-render do useEffect
   useEffect(() => {
     onTranscriptFinalRef.current = onTranscriptFinal;
   }, [onTranscriptFinal]);
+
+  const limparTimerSilencio = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  }, []);
+
+  const reiniciarTimerSilencio = useCallback((ms = 2200) => {
+    limparTimerSilencio();
+    silenceTimerRef.current = setTimeout(() => {
+      if (recognizerRef.current && (recognizerRef.current.getStatus() === "listening" || recognizerRef.current.getStatus() === "requesting_permission")) {
+        recognizerRef.current.stop();
+      }
+    }, ms);
+  }, [limparTimerSilencio]);
 
   useEffect(() => {
     recognizerRef.current = new VoiceRecognizer({
@@ -74,14 +91,22 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
         if (onTranscriptFinalRef.current) {
           onTranscriptFinalRef.current(aperfeicoado);
         }
+        // Quando uma frase final for detectada, aguarda 2s de silêncio para concluir automaticamente
+        reiniciarTimerSilencio(2200);
       },
       onInterim: (texto) => {
         setInterimTranscript(texto);
+        // Enquanto o usuário está falando, reinicia o contador
+        reiniciarTimerSilencio(3500);
       },
       onStatusChange: (status) => {
         setVoiceStatus(status);
+        if (status === "idle" || status === "error" || status === "reviewing") {
+          limparTimerSilencio();
+        }
       },
       onError: (erro) => {
+        limparTimerSilencio();
         console.warn("[Jessi Voice Error]:", erro);
         if (erro === "not-allowed" || erro === "permission-denied") {
           toast.error("Permissão de microfone negada. Clique no ícone de cadeado/permissões no navegador e permita o microfone.");
@@ -100,35 +125,41 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
     });
 
     return () => {
+      limparTimerSilencio();
       recognizerRef.current?.abort();
     };
-  }, []);
+  }, [reiniciarTimerSilencio, limparTimerSilencio]);
 
   const startListening = useCallback((textoAtual = "") => {
     if (!recognizerRef.current) return;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
     recognizerRef.current.start(textoAtual);
-  }, []);
+    // Timeout inicial de 8s se não houver nenhuma fala
+    reiniciarTimerSilencio(8000);
+  }, [reiniciarTimerSilencio]);
 
   const stopListening = useCallback(() => {
+    limparTimerSilencio();
     if (!recognizerRef.current) return;
     recognizerRef.current.stop();
-  }, []);
+  }, [limparTimerSilencio]);
 
   const cancelListening = useCallback(() => {
+    limparTimerSilencio();
     if (!recognizerRef.current) return;
     recognizerRef.current.abort();
     setInterimTranscript("");
     setFinalTranscript("");
     setVoiceStatus("idle");
-  }, []);
+  }, [limparTimerSilencio]);
 
   const resetTranscript = useCallback(() => {
+    limparTimerSilencio();
     recognizerRef.current?.reset();
     setInterimTranscript("");
     setFinalTranscript("");
-  }, []);
+  }, [limparTimerSilencio]);
 
   return {
     voiceStatus,
