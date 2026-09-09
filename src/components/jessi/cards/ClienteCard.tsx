@@ -8,7 +8,48 @@ interface ClienteCardProps {
 }
 
 export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick }) => {
-  const clientes = Array.isArray(data) ? data : data?.clientes || (data ? [data] : []);
+  // Tratamento de Desambiguação Explícita (Múltiplos resultados)
+  if (data?.exigeDesambiguacao && Array.isArray(data?.opcoes)) {
+    return (
+      <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4 space-y-3 text-xs shadow-xs my-2">
+        <div className="font-semibold text-amber-950 flex items-center gap-1.5">
+          <User className="h-4 w-4 text-amber-700" />
+          <span>Opções Semelhantes Encontradas — Escolha uma:</span>
+        </div>
+        <p className="text-[11px] text-amber-900/90">
+          Encontrei mais de um resultado possível. Por favor, escolha qual cliente/pet você deseja consultar:
+        </p>
+        <div className="space-y-2">
+          {data.opcoes.map((opcao: any, idx: number) => (
+            <div
+              key={opcao.id || idx}
+              className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-amber-200/90 text-xs shadow-2xs hover:border-emerald-600 transition-colors"
+            >
+              <div>
+                <span className="font-bold text-foreground">
+                  {idx + 1}. {opcao.nome || opcao.nomePrincipal}
+                </span>
+                <span className="text-[11px] text-muted-foreground block">
+                  {opcao.detalhe || opcao.detalheSecundario}
+                </span>
+              </div>
+              {onActionClick && (
+                <Button
+                  size="sm"
+                  onClick={() => onActionClick(`Selecionar opção ${idx + 1}: ${opcao.nome || opcao.nomePrincipal}`)}
+                  className="h-7 px-2.5 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-medium"
+                >
+                  Selecionar
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const clientes = Array.isArray(data) ? data : data?.clientes || (data?.id || data?.nome ? [data] : []);
 
   if (!clientes.length) {
     return (
