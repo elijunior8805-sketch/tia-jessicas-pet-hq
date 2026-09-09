@@ -1,12 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { garantirAdminIa, podeGerenciarIa } from "./ia-config.server";
-
-
 export const obterIaConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { podeGerenciarIa } = await import("./ia-config.server");
     const [cfg, regras, pode] = await Promise.all([
       context.supabase.from("ia_config").select("*").maybeSingle(),
       context.supabase.from("ia_regras_tom").select("*").order("ordem"),
@@ -41,13 +39,13 @@ export const salvarIaConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ConfigSchema.parse(d))
   .handler(async ({ data, context }) => {
+    const { garantirAdminIa } = await import("./ia-config.server");
     await garantirAdminIa(context.supabase, context.userId);
     // Config nova invalida qualquer texto guardado em cache pelo núcleo.
     const { invalidarCacheIa } = await import("./ia-cache.server");
     invalidarCacheIa();
     const { data: existente } = await context.supabase
       .from("ia_config")
-
       .select("id")
       .maybeSingle();
     if (existente) {
@@ -82,6 +80,7 @@ export const salvarRegraTom = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    const { garantirAdminIa } = await import("./ia-config.server");
     await garantirAdminIa(context.supabase, context.userId);
     const { id, ...resto } = data;
     const { error } = await context.supabase.from("ia_regras_tom").update(resto).eq("id", id);
@@ -96,6 +95,7 @@ export const testarGeracaoIA = createServerFn({ method: "POST" })
     z.object({ cenario: z.string().min(3).max(600) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const { garantirAdminIa } = await import("./ia-config.server");
     await garantirAdminIa(context.supabase, context.userId);
     const core = await import("./ia-core.server");
     const { CONTRATO_JSON, REGRAS_INVIOLAVEIS } = await import("./comunicacao-central.server");

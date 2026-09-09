@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import * as obs from "./ia-observabilidade.server";
 
 const faseSchema = z.enum(["observacao", "teste_controlado", "piloto", "producao"]);
 
@@ -37,6 +36,7 @@ export const registrarEventoIA = createServerFn({ method: "POST" })
       .parse(input || {}),
   )
   .handler(async ({ data, context }) => {
+    const obs = await import("./ia-observabilidade.server");
     const fase = await obs.getFaseLiberacaoIA();
     await obs.registrarEventoIA({
       ...data,
@@ -48,7 +48,10 @@ export const registrarEventoIA = createServerFn({ method: "POST" })
 
 export const getFaseLiberacao = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => ({ fase: await obs.getFaseLiberacaoIA() }));
+  .handler(async () => {
+    const obs = await import("./ia-observabilidade.server");
+    return { fase: await obs.getFaseLiberacaoIA() };
+  });
 
 export const setFaseLiberacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -59,17 +62,24 @@ export const setFaseLiberacao = createServerFn({ method: "POST" })
       _role: "admin" as any,
     });
     if (!isAdmin) throw new Error("Apenas administradores podem alterar a fase de liberação da IA.");
+    const obs = await import("./ia-observabilidade.server");
     return obs.setFaseLiberacaoIA(data.fase, context.userId);
   });
 
 export const getPainelQualidade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) => z.object({ dias: z.number().optional().default(7) }).parse(input || {}))
-  .handler(async ({ data }) => obs.getPainelQualidadeIA(data.dias));
+  .handler(async ({ data }) => {
+    const obs = await import("./ia-observabilidade.server");
+    return obs.getPainelQualidadeIA(data.dias);
+  });
 
 export const marcarCorrecaoHumana = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: any) =>
     z.object({ command_id: z.string(), intencao_incorreta: z.boolean().default(true) }).parse(input),
   )
-  .handler(async ({ data }) => obs.marcarCorrecaoHumanaIA(data.command_id, data.intencao_incorreta));
+  .handler(async ({ data }) => {
+    const obs = await import("./ia-observabilidade.server");
+    return obs.marcarCorrecaoHumanaIA(data.command_id, data.intencao_incorreta);
+  });

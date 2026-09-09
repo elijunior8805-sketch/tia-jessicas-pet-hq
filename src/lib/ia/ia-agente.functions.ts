@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { classificarComandoIA } from "./ia-agente.server";
 
 export const classificarIntencao = createServerFn({ method: "POST" })
   .inputValidator((input: any) => z.object({ 
@@ -9,5 +8,6 @@ export const classificarIntencao = createServerFn({ method: "POST" })
     comando_original: z.string().optional().default("classificacao"),
   }).parse(input || { texto: "" }))
   .handler(async ({ data }) => {
+    const { classificarComandoIA } = await import("./ia-agente.server");
     return classificarComandoIA(data.texto || "", data.contexto);
   });

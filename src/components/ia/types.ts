@@ -1,4 +1,4 @@
-import { IAMessage, IAIntent } from "@/lib/ia/ia-agente.server";
+import { IAMessage, IAIntent } from "@/lib/ia/jessi-contracts";
 
 export type IAStatus =
   | "idle"

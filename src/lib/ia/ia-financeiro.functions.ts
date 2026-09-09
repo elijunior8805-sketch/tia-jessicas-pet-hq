@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { registrarPagamentoIA, estornarPagamentoIA } from "./ia-acoes.server";
-import { analisarComprovanteIA } from "./ia-comprovante.server";
 
 export const executarBaixaPagamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -18,6 +16,7 @@ export const executarBaixaPagamento = createServerFn({ method: "POST" })
     comando_original: z.string().optional().default("pagamento"),
   }).parse(input || {}))
   .handler(async ({ data, context }) => {
+    const { registrarPagamentoIA } = await import("./ia-acoes.server");
     const sb = context.supabase;
     
     return registrarPagamentoIA(sb, {
@@ -51,6 +50,7 @@ export const processarComprovanteIA = createServerFn({ method: "POST" })
     contentType: z.string().optional()
   }).parse(input))
   .handler(async ({ data, context }) => {
+    const { analisarComprovanteIA } = await import("./ia-comprovante.server");
     const sb = context.supabase;
     return analisarComprovanteIA(sb, data.imagemBase64, data.contentType);
   });

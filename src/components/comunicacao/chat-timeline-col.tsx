@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { brl } from "@/lib/comunicacao-central.server";
+const brl = (v: number) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 import { toast } from "sonner";
 import { abrirWhatsAppBusiness } from "@/lib/whatsapp";
 

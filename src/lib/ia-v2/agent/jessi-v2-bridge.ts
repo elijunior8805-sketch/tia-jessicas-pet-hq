@@ -7,7 +7,6 @@ import {
   checarFlagV2,
 } from "../config/jessi-v2-config";
 import { processarMensagemJessiV2Core } from "./jessi-v2-agent.core";
-import { processarMensagemJessiCore } from "../../ia/jessi-agent.server";
 
 /**
  * Ponte Interna de Despacho e Seletor V1 / V2
@@ -37,6 +36,7 @@ export async function despacharMensagemJessi(
 
   // 1. ai_v2_enabled=false ou usuário não autorizado: utilizar estritamente a Jessi atual (V1)
   if (!checarFlagV2(flags, "ai_v2_enabled") || !ehUsuarioAutorizadoV2) {
+    const { processarMensagemJessiCore } = await import("../../ia/jessi-agent.server");
     const v1Result = await processarMensagemJessiCore(sb, input as any, user);
     return {
       versao: "v1_fallback",
@@ -58,6 +58,7 @@ export async function despacharMensagemJessi(
     console.warn("Falha de execução na Jessi V2. Acionando fallback automático para V1:", err);
 
     try {
+      const { processarMensagemJessiCore } = await import("../../ia/jessi-agent.server");
       const v1Result = await processarMensagemJessiCore(sb, input as any, user);
       return {
         versao: "v1_fallback",

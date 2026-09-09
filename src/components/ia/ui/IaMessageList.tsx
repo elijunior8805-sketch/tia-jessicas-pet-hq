@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
-import { IAMessage } from "@/lib/ia/ia-agente.server";
+import { IAMessage } from "@/lib/ia/jessi-contracts";
 import { IAResults } from "../types";
 
 interface IaMessageListProps {

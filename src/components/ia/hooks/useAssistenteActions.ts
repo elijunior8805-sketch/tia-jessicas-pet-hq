@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { VoiceRecognizer, VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
-import { IAMessage, IAIntent } from "@/lib/ia/ia-agente.server";
+import { IAMessage, IAIntent } from "@/lib/ia/jessi-contracts";
 import { IAStatus, IAResults } from "../types";
 import { toast } from "sonner";
 import { classificarIntencao } from "@/lib/ia/ia-agente.functions";

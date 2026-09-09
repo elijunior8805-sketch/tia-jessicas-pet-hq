@@ -1,7 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
 import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2-contracts";
-import { calcularSaldoContrato } from "@/lib/programas-contratos.server";
+import { calcularSaldoContrato } from "@/lib/programas-contratos-calc";
 
 /**
  * Interface do Contrato Real de Programa Ativo (Seção 16)

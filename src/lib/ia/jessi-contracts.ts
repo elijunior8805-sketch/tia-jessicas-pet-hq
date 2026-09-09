@@ -38,6 +38,32 @@ export type JessiMutationResult<T = any> = z.infer<typeof JessiMutationResultSch
   before?: T;
 };
 
+export const IAIntentSchema = z.object({
+  intencao: z.string(),
+  especialista: z.enum(["agenda", "clientes_pets", "financeiro", "cobranca", "comunicacao", "estoque_compras", "relatorios", "gestao_estrategica", "programas_cuidado"]).optional().nullable(),
+  tipo_operacao: z.enum(["consulta", "acao"]),
+  parametros: z.object({
+    comando_original: z.string().optional(),
+  }).catchall(z.any()).optional().nullable(),
+  informacoes_faltantes: z.array(z.string()).optional().nullable(),
+  ambiguidades: z.array(z.string()).optional().nullable(),
+  nivel_confianca: z.number().min(0).max(1),
+  ferramenta: z.string().optional().nullable(),
+  exige_confirmacao: z.boolean().default(false),
+  proxima_etapa: z.string().optional().nullable(),
+  resposta_ia: z.string().optional().nullable(),
+  resumo_acao: z.string().optional().nullable(),
+});
+
+export type IAIntent = z.infer<typeof IAIntentSchema>;
+
+export interface IAMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  intent?: IAIntent;
+}
+
 export interface JessiPendingAction {
   id: string;
   type: string;

@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { processarMensagemJessiCore } from "./jessi-agent.server";
-import { despacharMensagemJessi } from "@/lib/ia-v2/agent/jessi-v2-bridge";
-import { gerarCentralOperacionalJessi } from "./jessi-proactive.server";
 
 /**
  * Server Function Pública para a Assistente Operacional Jessi
@@ -22,6 +19,7 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { despacharMensagemJessi } = await import("@/lib/ia-v2/agent/jessi-v2-bridge");
 
     // Busca dados do perfil do usuário para contexto
     const { data: profile } = await supabase
@@ -48,6 +46,7 @@ export const obterCentralOperacionalJessiFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { gerarCentralOperacionalJessi } = await import("./jessi-proactive.server");
 
     const { data: profile } = await supabase
       .from("profiles")

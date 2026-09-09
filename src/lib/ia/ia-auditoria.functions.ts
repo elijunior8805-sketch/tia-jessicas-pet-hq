@@ -1,20 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import * as auditoriaServer from "./ia-auditoria.server";
 
 export const getResumoProprietarioIA = createServerFn({ method: "GET" })
   .handler(async () => {
+    const auditoriaServer = await import("./ia-auditoria.server");
     return auditoriaServer.getResumoNegocioIA();
   });
 
 export const getQualidadeIA = createServerFn({ method: "GET" })
   .handler(async () => {
+    const auditoriaServer = await import("./ia-auditoria.server");
     return auditoriaServer.getIndicadoresQualidadeIA();
   });
 
 export const getAuditoriaIA = createServerFn({ method: "GET" })
   .inputValidator((input: any) => z.object({ limit: z.number().optional() }).parse(input))
   .handler(async ({ data }) => {
+    const auditoriaServer = await import("./ia-auditoria.server");
     return auditoriaServer.getLogsAuditoriaIA(data.limit);
   });
 
@@ -34,7 +36,7 @@ export const registrarAuditoriaIA = createServerFn({ method: "POST" })
     tempo_ms: z.number().optional(),
   }).parse(input))
   .handler(async ({ data }) => {
-    // Mapping keys to match the server side expectations if needed, or just passing through
+    const auditoriaServer = await import("./ia-auditoria.server");
     const mappedData = {
       comando_original: data.comando_original || data.comando || "Comando não capturado",
       intencao_detectada: data.intencao_detectada || data.intencao,
@@ -50,5 +52,6 @@ export const registrarAuditoriaIA = createServerFn({ method: "POST" })
 
 export const realizarAuditoriaDadosIA = createServerFn({ method: "POST" })
   .handler(async () => {
+    const auditoriaServer = await import("./ia-auditoria.server");
     return auditoriaServer.realizarAuditoriaDadosIA();
   });
