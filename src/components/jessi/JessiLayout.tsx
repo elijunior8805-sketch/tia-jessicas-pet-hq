@@ -124,7 +124,7 @@ export const JessiLayout: React.FC = () => {
         data: {
           mensagem: textToSend,
           contexto: contexto as any,
-          historico: messages.slice(-8) as any,
+          historico: messages.slice(-20) as any,
         },
       });
 
