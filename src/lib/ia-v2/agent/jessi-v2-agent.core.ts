@@ -167,21 +167,67 @@ export async function processarMensagemJessiV2Core(
       }
     }
 
-    // 4. Roteamento de Intenção: Consulta vs. Preparação de Ação
+    // 4. Roteamento de Intenção: Consulta vs. Preparação de Ação (FASE 3 — SEM EXECUÇÃO)
     if (intencao.requerConfirmacao) {
-      // PREPARAÇÃO DE AÇÃO PROGRESSIVA (NÃO EXECUTA MUTAÇÃO DIRETA)
+      // PREPARAÇÃO DE OPERAÇÃO SUPERVISIONADA (NUNCA EXECUTA DIRETAMENTE NO BANCO)
+      const nomeCliente = novoContexto.cliente?.nome || contextoAtual.cliente?.nome || intencao.entidades.clienteNome || "Cliente";
+      const nomePet = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome || "Pet";
+      const servicoNome = intencao.entidades.servicoNome || contextoAtual.servico?.nome || "Atendimento";
+      const dataHoraAlvo = intencao.entidades.data ? `${intencao.entidades.data}${intencao.entidades.hora ? ` às ${intencao.entidades.hora}` : ""}` : "Data a definir";
+
+      let entendido = `Comando recebido: "${input.mensagem}"`;
+      let seraAlterado = `Gravação pendente para ${nomePet} (Tutor: ${nomeCliente}).`;
+      let situacaoAtual = "Registro em estado draft aguardando aprovação.";
+      let resultadoEsperado = `Execução oficial de ${intencao.intencao.replace(/_/g, " ")} após confirmação humana.`;
+      const alertas: string[] = ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."];
+
+      if (intencao.dominio === "agenda") {
+        entendido = `Solicitação de agendamento de ${servicoNome} para o pet ${nomePet} em ${dataHoraAlvo}.`;
+        seraAlterado = `Criação de reserva na grade de horários para ${dataHoraAlvo}.`;
+        situacaoAtual = "Horário disponível na grade.";
+        resultadoEsperado = `Agendamento confirmado no sistema para ${nomePet}.`;
+      } else if (intencao.dominio === "programas_creditos") {
+        entendido = `Uso/liberação de 1 crédito do plano do Clubinho para ${nomePet}.`;
+        seraAlterado = `Abatimento de 1 sessão no saldo de créditos do cliente ${nomeCliente}.`;
+        situacaoAtual = `Cliente possui créditos ativos.`;
+        resultadoEsperado = `Saldo debitado e atendimento quitado com crédito oficial.`;
+        alertas.push("Serviços extras devem ser cobrados separadamente.");
+      } else if (intencao.dominio === "clientes_pets") {
+        entendido = `Cadastro/edição de dados cadastrais de ${nomeCliente}.`;
+        seraAlterado = `Inserção do novo registro de cliente/pet na base oficial.`;
+        situacaoAtual = "Registro não existente.";
+        resultadoEsperado = `Ficha cadastral criada e vinculada.`;
+      } else if (intencao.dominio === "financeiro_relatorios") {
+        entendido = `Registro de pagamento / baixa financeira para ${nomeCliente}.`;
+        seraAlterado = `Lançamento de receita no valor de R$ ${Number(intencao.entidades.valor || 0).toFixed(2)}.`;
+        situacaoAtual = "Pagamento pendente de registro.";
+        resultadoEsperado = `Transação financeira oficial registrada.`;
+      } else if (intencao.dominio === "comunicacao_mensagens") {
+        entendido = `Preparação de mensagem no WhatsApp para ${nomeCliente} (${intencao.entidades.clienteId || "Tutor"}).`;
+        seraAlterado = `Disparo supervisionado de mensagem com link wa.me pronto.`;
+        situacaoAtual = "Mensagem em rascunho.";
+        resultadoEsperado = `Link do WhatsApp gerado para envio pelo operador.`;
+      }
+
       const proposta = JessiV2ConfirmationManager.criarProposta({
-        user: { id: user?.id || "proprietario_spa", nome: user?.nome || "Proprietário" },
-        cliente: novoContexto.cliente || contextoAtual.cliente || { nome: intencao.entidades.clienteNome || "Cliente" },
-        pet: novoContexto.pet || contextoAtual.pet || { nome: intencao.entidades.petNome || "Pet" },
+        userId: user?.id || "proprietario_spa",
+        cliente: novoContexto.cliente || contextoAtual.cliente || { nome: nomeCliente },
+        pet: novoContexto.pet || contextoAtual.pet || { nome: nomePet },
         acao: intencao.intencao,
-        motivo: `Solicitação do usuário: "${input.mensagem}"`,
+        motivo: `Solicitação: "${input.mensagem}"`,
         estadoAtual: { status: "pendente" },
         estadoProposto: intencao.entidades,
-        valores: { total: intencao.entidades.valor || 0 },
-        impactoCreditos: intencao.dominio === "programas_creditos" ? { saldoAnterior: 1, novoSaldo: 0 } : undefined,
-        dataHorario: { data: intencao.entidades.data, horario: intencao.entidades.hora || "A definir" },
-        riscos: ["Alteração no banco de dados sujeita a confirmação."],
+        valores: { valorBruto: intencao.entidades.valor || 0, valorFinal: intencao.entidades.valor || 0 },
+        impactoCreditos: intencao.dominio === "programas_creditos" ? { debitoSessoes: 1, saldoRestanteEsperado: 0, servico: servicoNome } : undefined,
+        dataHora: dataHoraAlvo,
+        riscos: ["Alteração no banco sujeita a confirmação com verificação física (read-back)."],
+        resumoVisual: {
+          entendido,
+          seraAlterado,
+          situacaoAtual,
+          resultadoEsperado,
+          alertas,
+        },
       });
 
       pendingAction = {
@@ -196,16 +242,18 @@ export async function processarMensagemJessiV2Core(
         expires_at: proposta.validade,
       };
 
-      respostaTexto = `Preparei a operação solicitada para você conferir. Por favor, valide os detalhes no cartão abaixo e clique em confirmar para gravar no sistema.`;
+      respostaTexto = `Preparei a operação solicitada no cartão de revisão abaixo. Por favor, confira os dados e clique em "Confirmar operação" para gravar no sistema.`;
       
       cards.push({
         type: "confirmacao",
         title: pendingAction.title,
-        subtitle: "Ação aguardando autorização humana",
+        subtitle: `Cliente: ${nomeCliente} • Pet: ${nomePet}`,
         data: {
           proposta,
           acaoPendente: pendingAction,
           requerConfirmacao: true,
+          resumoVisual: proposta.resumoVisual,
+          acoesDisponiveis: ["Confirmar operação", "Cancelar"],
         },
       });
 

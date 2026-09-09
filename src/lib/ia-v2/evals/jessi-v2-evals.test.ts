@@ -1130,4 +1130,91 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(res.pendingAction).toBeNull();
     });
   });
+
+  // =========================================================================
+  // SUITE 11: Fase 3 — Preparação de Operações (Sem Execução)
+  // =========================================================================
+  describe("Suite 11: Fase 3 — Preparação de Operações (Sem Execução)", () => {
+    it("71. Preparação de Agendamento: Emite cartão de revisão completo com resumoVisual", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: () => ({ select: () => ({ limit: () => Promise.resolve({ data: [] }) }) }),
+      };
+
+      const res = await processarMensagemJessiV2Core(mockSb, {
+        mensagem: "Agendar banho para o Rex amanhã às 14h",
+      });
+
+      expect(res.pendingAction).toBeDefined();
+      expect(res.pendingAction?.type).toBe("preparar_agendamento");
+      expect(res.cards[0].type).toBe("confirmacao");
+      expect(res.cards[0].data.proposta.resumoVisual.entendido).toContain("Rex");
+      expect(res.cards[0].data.proposta.resumoVisual.alertas.length).toBeGreaterThan(0);
+      expect(res.cards[0].data.acoesDisponiveis).toContain("Confirmar operação");
+      expect(res.cards[0].data.acoesDisponiveis).toContain("Cancelar");
+    });
+
+    it("72. Preparação de Programas/Créditos: Prepara abatimento com alerta de extras separados", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: () => ({ select: () => ({ limit: () => Promise.resolve({ data: [] }) }) }),
+      };
+
+      const res = await processarMensagemJessiV2Core(mockSb, {
+        mensagem: "Debitar 1 crédito de banho do plano do Thor",
+      });
+
+      expect(res.pendingAction).toBeDefined();
+      expect(res.cards[0].data.proposta.resumoVisual.seraAlterado).toContain("Abatimento");
+      expect(res.cards[0].data.proposta.resumoVisual.alertas.some((a: string) => a.includes("extras"))).toBe(true);
+    });
+
+    it("73. Preparação de Cadastros: Estrutura proposta com dados do cliente sem persistir no banco", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: () => ({ select: () => ({ limit: () => Promise.resolve({ data: [] }) }) }),
+      };
+
+      const res = await processarMensagemJessiV2Core(mockSb, {
+        mensagem: "Cadastrar cliente Roberto Silva telefone 11977776666",
+      });
+
+      expect(res.pendingAction).toBeDefined();
+      expect(res.pendingAction?.type).toBe("preparar_cadastro_cliente");
+      expect(res.cards[0].data.proposta.status).toBe("awaiting_confirmation");
+    });
+
+    it("74. Preparação de Mensagens: Formata template de WhatsApp sem disparo automático", () => {
+      const payload = {
+        telefoneDestino: "11988889999",
+        nomeCliente: "Beatriz",
+        nomePet: "Pipoca",
+        tipoMensagem: "pet_pronto" as const,
+      };
+
+      const res = MensagensWhatsAppAdapter.gerarMensagemWhatsApp(payload);
+      expect(res.urlWhatsApp).toContain("wa.me/5511988889999");
+      expect(res.mensagemFormatada).toContain("pronto");
+    });
+
+    it("75. Garantia Estrita Sem Execução: Proposta gerada permanece em 'awaiting_confirmation'", () => {
+      const proposta = JessiV2ConfirmationManager.criarProposta({
+        userId: "operador_1",
+        acao: "executar_agendamento",
+        motivo: "Teste sem execução",
+        estadoProposto: { pet: "Thor", data: "2026-09-10" },
+        resumoVisual: {
+          entendido: "Agendar banho",
+          seraAlterado: "Gravar agendamento",
+          situacaoAtual: "Vago",
+          resultadoEsperado: "Agendado",
+          alertas: ["Aguardando autorização"],
+        },
+      });
+
+      expect(proposta.status).toBe("awaiting_confirmation");
+      expect(proposta.assinaturaConteudo).toBeDefined();
+      expect(proposta.validade).toBeDefined();
+    });
+  });
 });
