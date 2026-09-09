@@ -9,7 +9,7 @@ import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.a
 import { MensagensWhatsAppAdapter, JessiV2WhatsAppPayload } from "../adapters/mensagens-whatsapp.adapter";
 
 /**
- * Registro e Catálogo Oficial de Ferramentas da Jessi V2 (Seção 10)
+ * Registro e Catálogo Oficial de Ferramentas da Jessi V2 (Seções 10, 16 e 17)
  * Desenvolvido pelo Agente 2 (Integrações e Regras)
  */
 
@@ -113,6 +113,44 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  consultar_programas_ativos_geral: {
+    nomeInterno: "consultar_programas_ativos_geral",
+    descricao: "Consulta todos os contratos reais de programas ativos no sistema",
+    intencoes: ["consultar_programas_ativos_geral", "quais_programas_estao_ativos", "programas_ativos"],
+    area: "programas_creditos",
+    parametros: {},
+    retorno: "Lista de contratos reais com tutor, pet, plano, validade, utilizados e saldo",
+    permissoes: ["clientes", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProgramasCreditosAdapter.consultarProgramasAtivosGeral",
+    featureFlag: "ai_v2_programs",
+    timeoutMs: 6000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  gerar_termo_programa_pdf: {
+    nomeInterno: "gerar_termo_programa_pdf",
+    descricao: "Prepara o termo de contratação do programa em PDF com link para download e WhatsApp",
+    intencoes: ["gerar_termo_programa_pdf", "termo_pdf", "pdf_clubinho"],
+    area: "programas_creditos",
+    parametros: {
+      contratoId: { tipo: "string", obrigatorio: true, descricao: "ID do contrato do programa" },
+    },
+    retorno: "Estrutura do termo com direitos, deveres e opções de compartilhamento",
+    permissoes: ["clientes", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProgramasCreditosAdapter.prepararTermoPdf",
+    featureFlag: "ai_v2_programs",
+    timeoutMs: 4000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
   consultar_financeiro_consolidado: {
     nomeInterno: "consultar_financeiro_consolidado",
     descricao: "Consulta a base oficial consolidada de faturamento e recebíveis",
@@ -136,7 +174,7 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
   gerar_mensagem_whatsapp: {
     nomeInterno: "gerar_mensagem_whatsapp",
     descricao: "Gera mensagem contextual formatada para disparo supervisionado no WhatsApp",
-    intencoes: ["gerar_mensagem_whatsapp", "lembrete_whatsapp", "avisar_pet_pronto"],
+    intencoes: ["gerar_mensagem_whatsapp", "lembrete_whatsapp", "avisar_pet_pronto", "cobranca_whatsapp"],
     area: "comunicacao_mensagens",
     parametros: {
       telefoneDestino: { tipo: "string", obrigatorio: true, descricao: "Telefone do cliente" },
@@ -225,8 +263,6 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
 
 /**
  * Despachante Central com Whitelist Estrita e Tratamento de Erros
- * Ferramentas não registradas no catálogo NUNCA podem ser chamadas.
- * Nomes técnicos nunca aparecem no texto da conversa.
  */
 export async function despacharFerramentaV2(
   sb: SupabaseClient<Database>,
@@ -236,7 +272,6 @@ export async function despacharFerramentaV2(
 ): Promise<JessiV2QueryResult | JessiV2MutationResult | any> {
   const toolDef = JESSI_V2_TOOLS_CATALOG[toolNome];
 
-  // Whitelist Estrita: Rejeita qualquer ferramenta não catalogada
   if (!toolDef) {
     return {
       success: false,
@@ -244,6 +279,7 @@ export async function despacharFerramentaV2(
       summary: "A operação solicitada não está disponível no catálogo de ferramentas autorizadas.",
       executed_at: new Date().toISOString(),
       error_code: "TOOL_NOT_REGISTERED",
+      correlation_id: `tool_not_found_${Date.now()}`,
     };
   }
 
@@ -263,7 +299,10 @@ export async function despacharFerramentaV2(
       return await ClientesPetsAdapter.obterFichaPet(sb, params.petId);
 
     case "consultar_saldo_programas":
-      return await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, params.clienteId);
+      return await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, params.clienteId, params.petId);
+
+    case "consultar_programas_ativos_geral":
+      return await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
 
     case "consultar_financeiro_consolidado":
       return await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, params.periodo || "mes");
@@ -287,6 +326,7 @@ export async function despacharFerramentaV2(
         summary: "Operação não autorizada.",
         executed_at: new Date().toISOString(),
         error_code: "TOOL_NOT_REGISTERED",
+        correlation_id: `tool_not_found_${Date.now()}`,
       };
   }
 }
