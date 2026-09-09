@@ -68,7 +68,7 @@ export const JessiV2QueryResultSchema = z.object({
   filters_applied: z.record(z.any()).optional().nullable(),
   executed_at: z.string(),
   error_code: z.string().optional().nullable(),
-  correlation_id: z.string(),
+  correlation_id: z.string().optional(),
   summary: z.string().optional(),
   total_count: z.number().optional(),
 });
@@ -84,10 +84,11 @@ export const JessiV2MutationResultSchema = z.object({
   affected_record_id: z.string().optional().nullable(), // Alias para retrocompatibilidade
   before: z.any().optional().nullable(),
   after: z.any().optional().nullable(),
-  idempotency_key: z.string(),
+  idempotency_key: z.string().optional(),
+  source: z.string().optional(),
   verified: z.boolean().default(true), // Read-Back Verification
   error_code: z.string().optional().nullable(),
-  correlation_id: z.string(),
+  correlation_id: z.string().optional(),
   summary: z.string().optional(),
   executed_at: z.string(),
 });

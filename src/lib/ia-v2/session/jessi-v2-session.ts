@@ -71,6 +71,14 @@ export interface JessiV2ContextState {
   ultimoResultado?: any;
   resumoHistorico?: string | null;
   variaveisConversacao: Record<string, any>;
+  // Aliases legados usados pelo provedor de NLU
+  clienteSelecionadoId?: string | null;
+  clienteSelecionadoNome?: string | null;
+  petSelecionadoId?: string | null;
+  petSelecionadoNome?: string | null;
+  servicoSelecionadoId?: string | null;
+  servicoSelecionadoNome?: string | null;
+  servicoValor?: number | null;
 }
 
 export interface JessiV2Session {

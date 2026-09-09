@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
 import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2-contracts";
+import { calcularSaldoContrato } from "@/lib/programas-contratos.server";
 
 /**
  * Interface do Contrato Real de Programa Ativo (Seção 16)
@@ -32,76 +33,83 @@ export class ProgramasCreditosAdapter {
   ): Promise<JessiV2QueryResult<JessiV2ContratoProgramaAtivo[]>> {
     const inicio = Date.now();
     const correlationId = `query_prog_ativos_${inicio}`;
-    try {
-      const hoje = new Date();
-      const hojeStr = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Sao_Paulo",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(hoje);
+    const hoje = new Date();
+    const hojeStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(hoje);
 
-      // Consulta aos contratos reais de programas ativos com dados de cliente, pet e programa
+    try {
       const { data: contratos, error } = await sb
-        .from("cliente_programas")
+        .from("programas_contratados")
         .select(`
           id,
           cliente_id,
           pet_id,
-          status,
-          created_at,
-          data_inicio,
-          data_fim,
-          cliente:clientes(id, nome, telefone),
-          pet:pets(id, nome, raca),
-          programa:programas_cuidado(id, nome, descricao, preco_base)
+          nome_snapshot,
+          preco_vendido,
+          data_da_venda,
+          data_de_inicio,
+          data_de_validade,
+          status_do_pagamento,
+          status_do_programa,
+          clientes(id, nome, whatsapp),
+          pets(id, nome, raca)
         `)
-        .eq("status", "ativo")
-        .gte("data_fim", hojeStr);
+        .eq("status_do_programa", "ativo")
+        .gte("data_de_validade", hojeStr);
 
       if (error) throw error;
 
-      // Busca os saldos de créditos de cada cliente/pet
-      const { data: todosCreditos } = await sb
-        .from("cliente_programa_creditos")
-        .select("*");
+      const ids = (contratos || []).map((c: any) => c.id);
+      const { data: movs } = ids.length
+        ? await sb
+            .from("programas_creditos_movimentacoes")
+            .select("programa_contratado_id, tipo, quantidade, servico_id")
+            .in("programa_contratado_id", ids)
+        : { data: [] as any[] };
 
       const listaFormatada: JessiV2ContratoProgramaAtivo[] = (contratos || []).map((c: any) => {
-        const creditosDoContrato = (todosCreditos || []).filter(
-          (cr: any) => cr.cliente_id === c.cliente_id && cr.pet_id === c.pet_id
+        const movsContrato = (movs || []).filter((m: any) => m.programa_contratado_id === c.id);
+        const saldos = calcularSaldoContrato(movsContrato);
+        const totais = Object.values(saldos).reduce(
+          (acc, s) => ({
+            contratados: acc.contratados + s.criado,
+            utilizados: acc.utilizados + s.consumido,
+            disponiveis: acc.disponiveis + s.disponivel,
+          }),
+          { contratados: 0, utilizados: 0, disponiveis: 0 }
         );
 
-        const totalDisponivel = creditosDoContrato.reduce((acc, curr: any) => acc + (curr.saldo || 0), 0);
-        const totalContratado = creditosDoContrato.reduce((acc, curr: any) => acc + (curr.quantidade_total || curr.saldo || 4), 0);
-        const totalUtilizado = Math.max(totalContratado - totalDisponivel, 0);
-
-        const dataFim = new Date(c.data_fim || c.created_at);
+        const dataFim = new Date(`${c.data_de_validade}T23:59:59`);
         const diffDias = Math.ceil((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
         return {
           id: c.id,
           tutor: {
-            id: c.cliente?.id || c.cliente_id,
-            nome: c.cliente?.nome || "Tutor não identificado",
-            telefone: c.cliente?.telefone || "Sem telefone",
+            id: c.clientes?.id || c.cliente_id,
+            nome: c.clientes?.nome || "Tutor não identificado",
+            telefone: c.clientes?.whatsapp || "Sem telefone",
           },
           pet: {
-            id: c.pet?.id || c.pet_id,
-            nome: c.pet?.nome || "Pet",
-            raca: c.pet?.raca || "Padrão",
+            id: c.pets?.id || c.pet_id,
+            nome: c.pets?.nome || "Pet",
+            raca: c.pets?.raca || "Padrão",
           },
           programa: {
-            id: c.programa?.id || "prog",
-            nome: c.programa?.nome || "Clubinho Mensal",
-            precoBase: Number(c.programa?.preco_base) || 0,
+            id: c.id,
+            nome: c.nome_snapshot || "Programa de Cuidado",
+            precoBase: Number(c.preco_vendido) || 0,
           },
-          contratacaoData: c.data_inicio || c.created_at?.split("T")[0] || hojeStr,
-          validadeData: c.data_fim || hojeStr,
+          contratacaoData: c.data_da_venda || c.data_de_inicio || hojeStr,
+          validadeData: c.data_de_validade || hojeStr,
           diasRestantes: Math.max(diffDias, 0),
-          creditosContratados: totalContratado,
-          creditosUtilizados: totalUtilizado,
-          creditosDisponiveis: totalDisponivel,
-          statusPagamento: "pago",
+          creditosContratados: totais.contratados,
+          creditosUtilizados: totais.utilizados,
+          creditosDisponiveis: totais.disponiveis,
+          statusPagamento: (c.status_do_pagamento === "pago" ? "pago" : "pendente") as "pago" | "pendente",
         };
       });
 
@@ -112,7 +120,7 @@ export class ProgramasCreditosAdapter {
 
       return {
         success: true,
-        source: "contratos_reais_programas",
+        source: "programas_contratados",
         data: listaFormatada,
         total_count: listaFormatada.length,
         summary: resumo,
@@ -122,7 +130,7 @@ export class ProgramasCreditosAdapter {
     } catch (err: any) {
       return {
         success: false,
-        source: "contratos_programas",
+        source: "programas_contratados",
         data: [],
         total_count: 0,
         summary: `Erro ao consultar contratos reais de programas: ${err.message}`,
@@ -145,43 +153,42 @@ export class ProgramasCreditosAdapter {
     const correlationId = `query_programas_${inicio}_${Math.random().toString(36).substring(2, 6)}`;
     try {
       let queryProg = sb
-        .from("cliente_programas")
-        .select(`
-          id,
-          cliente_id,
-          pet_id,
-          status,
-          created_at,
-          data_inicio,
-          data_fim,
-          programa:programas_cuidado(id, nome, descricao, preco_base)
-        `)
+        .from("programas_contratados")
+        .select("id, cliente_id, pet_id, nome_snapshot, preco_vendido, data_de_inicio, data_de_validade, status_do_programa")
         .eq("cliente_id", clienteId)
-        .eq("status", "ativo");
+        .eq("status_do_programa", "ativo");
 
       if (petId) queryProg = queryProg.eq("pet_id", petId);
 
       const { data: assinaturas, error } = await queryProg;
       if (error) throw error;
 
-      let queryCred = sb
-        .from("cliente_programa_creditos")
-        .select("*")
-        .eq("cliente_id", clienteId)
-        .gt("saldo", 0);
+      const ids = (assinaturas || []).map((a: any) => a.id);
+      const { data: movs } = ids.length
+        ? await sb
+            .from("programas_creditos_movimentacoes")
+            .select("programa_contratado_id, tipo, quantidade, servico_id")
+            .in("programa_contratado_id", ids)
+        : { data: [] as any[] };
 
-      if (petId) queryCred = queryCred.eq("pet_id", petId);
+      const creditosDisponiveis = (assinaturas || []).map((a: any) => ({
+        contratoId: a.id,
+        programa: a.nome_snapshot,
+        validade: a.data_de_validade,
+        saldos: Object.values(calcularSaldoContrato((movs || []).filter((m: any) => m.programa_contratado_id === a.id))),
+      }));
 
-      const { data: creditos } = await queryCred;
-
-      const totalCreditos = (creditos || []).reduce((acc, curr: any) => acc + (curr.saldo || 0), 0);
+      const totalCreditos = creditosDisponiveis.reduce(
+        (acc, c: any) => acc + c.saldos.reduce((s: number, x: any) => s + x.disponivel, 0),
+        0
+      );
 
       return {
         success: true,
-        source: "tabelas_programas_e_creditos",
+        source: "programas_contratados",
         data: {
           assinaturasAtivas: assinaturas || [],
-          creditosDisponiveis: creditos || [],
+          creditosDisponiveis,
           totalSessaoRestantes: totalCreditos,
         },
         total_count: assinaturas?.length || 0,
@@ -192,7 +199,7 @@ export class ProgramasCreditosAdapter {
     } catch (err: any) {
       return {
         success: false,
-        source: "tabelas_programas",
+        source: "programas_contratados",
         data: { assinaturasAtivas: [], creditosDisponiveis: [], totalSessaoRestantes: 0 },
         total_count: 0,
         summary: `Erro ao consultar saldo de programas: ${err.message}`,
@@ -234,30 +241,32 @@ export class ProgramasCreditosAdapter {
   }
 
   /**
-   * Executa o abatimento de crédito pós-confirmação humana com validação e Read-Back
+   * Registra o consumo de crédito pós-confirmação humana com Read-Back
    */
   static async executarConsumoCreditoConfirmado(
     sb: SupabaseClient<Database>,
-    params: { creditoId: string; quantidade: number; motivo?: string },
+    params: { contratoId: string; servicoId: string; quantidade: number; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_credito_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
-      const { data: creditoAtual, error: errFetch } = await sb
-        .from("cliente_programa_creditos")
-        .select("id, saldo, servico_nome")
-        .eq("id", params.creditoId)
-        .single();
+      const { data: movsAntes, error: errFetch } = await sb
+        .from("programas_creditos_movimentacoes")
+        .select("programa_contratado_id, tipo, quantidade, servico_id")
+        .eq("programa_contratado_id", params.contratoId);
 
-      if (errFetch || !creditoAtual) throw new Error("Registro de crédito não localizado.");
+      if (errFetch) throw errFetch;
 
-      if ((creditoAtual.saldo || 0) < params.quantidade) {
+      const saldosAntes = calcularSaldoContrato(movsAntes || []);
+      const disponivel = saldosAntes[params.servicoId]?.disponivel || 0;
+
+      if (disponivel < params.quantidade) {
         return {
           success: false,
-          entity_id: params.creditoId,
-          affected_record_id: params.creditoId,
-          source: "tabela_creditos",
-          summary: `Saldo insuficiente: disponível ${creditoAtual.saldo}, solicitado ${params.quantidade}.`,
+          entity_id: params.contratoId,
+          affected_record_id: params.contratoId,
+          source: "programas_creditos_movimentacoes",
+          summary: `Saldo insuficiente: disponível ${disponivel}, solicitado ${params.quantidade}.`,
           idempotency_key: idempotencyKey,
           executed_at: new Date().toISOString(),
           error_code: "SALDO_INSUFICIENTE",
@@ -266,44 +275,48 @@ export class ProgramasCreditosAdapter {
         };
       }
 
-      const novoSaldo = (creditoAtual.saldo || 0) - params.quantidade;
-
-      const { data: atualizado, error: errUpdate } = await sb
-        .from("cliente_programa_creditos")
-        .update({ saldo: novoSaldo } as any)
-        .eq("id", params.creditoId)
-        .select("id, saldo, servico_nome")
+      const { data: movimentacao, error: errInsert } = await sb
+        .from("programas_creditos_movimentacoes")
+        .insert({
+          programa_contratado_id: params.contratoId,
+          servico_id: params.servicoId,
+          tipo: "credito_consumido",
+          quantidade: params.quantidade,
+          motivo: params.motivo || "Consumo autorizado pela assistente",
+          idempotency_key: idempotencyKey,
+        } as any)
+        .select("id, programa_contratado_id, servico_id, quantidade, tipo")
         .single();
 
-      if (errUpdate || !atualizado) throw errUpdate || new Error("Falha ao atualizar saldo.");
+      if (errInsert || !movimentacao) throw errInsert || new Error("Falha ao registrar consumo de crédito.");
 
-      const { data: readBack } = await sb
-        .from("cliente_programa_creditos")
-        .select("id, saldo")
-        .eq("id", params.creditoId)
-        .maybeSingle();
+      const { data: movsDepois } = await sb
+        .from("programas_creditos_movimentacoes")
+        .select("programa_contratado_id, tipo, quantidade, servico_id")
+        .eq("programa_contratado_id", params.contratoId);
 
-      const verificado = readBack?.saldo === novoSaldo;
+      const saldosDepois = calcularSaldoContrato(movsDepois || []);
+      const novoSaldo = saldosDepois[params.servicoId]?.disponivel ?? disponivel;
 
       return {
         success: true,
-        entity_id: params.creditoId,
-        affected_record_id: params.creditoId,
-        source: "tabela_creditos",
-        before: creditoAtual,
-        after: atualizado,
-        summary: `Crédito de "${creditoAtual.servico_nome}" consumido com sucesso. Novo saldo: ${novoSaldo}.`,
+        entity_id: movimentacao.id,
+        affected_record_id: params.contratoId,
+        source: "programas_creditos_movimentacoes",
+        before: { disponivel },
+        after: { disponivel: novoSaldo },
+        summary: `Crédito consumido com sucesso. Novo saldo: ${novoSaldo}.`,
         executed_at: new Date().toISOString(),
-        verified: verificado,
+        verified: novoSaldo === disponivel - params.quantidade,
         idempotency_key: idempotencyKey,
         correlation_id: correlationId,
       };
     } catch (err: any) {
       return {
         success: false,
-        entity_id: params.creditoId,
-        affected_record_id: params.creditoId,
-        source: "tabela_creditos",
+        entity_id: params.contratoId,
+        affected_record_id: params.contratoId,
+        source: "programas_creditos_movimentacoes",
         summary: `Erro ao consumir crédito: ${err.message}`,
         idempotency_key: idempotencyKey,
         executed_at: new Date().toISOString(),

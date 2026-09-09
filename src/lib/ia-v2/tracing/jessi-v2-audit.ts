@@ -8,15 +8,17 @@ import { Database } from "@/integrations/supabase/types";
  */
 
 export interface JessiV2AuditEntry {
+  // Campos alternativos aceitos pelos executores supervisionados
+  [chave: string]: any;
   // 1. Usuário
   usuarioId?: string | null;
   usuarioNome?: string | null;
 
   // 2. Conversa
-  conversaId: string;
+  conversaId?: string;
 
   // 3. Intenção
-  intencao: string;
+  intencao?: string;
 
   // 4. Entidades
   entidades?: Record<string, any> | null;
@@ -28,13 +30,13 @@ export interface JessiV2AuditEntry {
   filtros?: Record<string, any> | null;
 
   // 7. Resultado
-  resultadoResumo: string;
+  resultadoResumo?: string;
 
   // 8. Proposta
   propostaSnapshot?: any;
 
   // 9. Confirmação
-  confirmadoPorHumano: boolean;
+  confirmadoPorHumano?: boolean;
 
   // 10. Antes
   antes?: any;
@@ -49,22 +51,34 @@ export interface JessiV2AuditEntry {
   idempotencyKey?: string | null;
 
   // 14. Correlation ID
-  correlationId: string;
+  correlationId?: string;
 
   // 15. Verificação
-  readBackVerificado: boolean;
+  readBackVerificado?: boolean;
 
   // 16. Erro
   erro?: { codigo: string; mensagem: string } | null;
 
   // 17. Data
-  data: string;
+  data?: string;
 
   // 18. Duração
-  duracaoMs: number;
+  duracaoMs?: number;
 
   // 19. Versão da Jessi
-  versaoJessi: "v2.0" | "v1_fallback";
+  versaoJessi?: "v2.0" | "v1_fallback";
+}
+
+/**
+ * Registro leve e não-bloqueante de auditoria da Jessi V2.
+ * Não lança erros: falhas apenas geram aviso no log.
+ */
+export function registrarAuditoriaV2(entry: Record<string, any>): void {
+  try {
+    console.info("[JessiV2][auditoria]", JSON.stringify(entry));
+  } catch (err) {
+    console.warn("Aviso: falha não-bloqueante ao registrar auditoria da Jessi V2:", err);
+  }
 }
 
 export class JessiV2Audit {
@@ -99,7 +113,7 @@ export class JessiV2Audit {
         resposta_ia: entry.resultadoResumo,
         sucesso: !entry.erro,
         tempo_resposta_ms: entry.duracaoMs,
-        created_at: entry.data,
+        created_at: entry.data || new Date().toISOString(),
       });
     } catch (err) {
       console.warn("Aviso: Falha não-bloqueante ao registrar auditoria da Jessi V2:", err);
