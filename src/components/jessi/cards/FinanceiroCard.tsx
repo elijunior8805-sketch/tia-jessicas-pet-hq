@@ -8,8 +8,8 @@ interface FinanceiroCardProps {
 }
 
 export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionClick }) => {
-  const faturamento = Number(data?.faturamento || data?.faturamento_total || data?.receita || 0);
-  const pendente = Number(data?.pendente || data?.a_receber || data?.valor_pendente || 0);
+  const faturamento = Number(data?.faturamentoBruto ?? data?.faturamento ?? data?.faturamento_total ?? data?.receita ?? 0);
+  const pendente = Number(data?.valoresAReceber ?? data?.pendente ?? data?.a_receber ?? data?.valor_pendente ?? 0);
   const itensPendentes = Array.isArray(data?.itens_pendentes) ? data.itens_pendentes : (Array.isArray(data) ? data : []);
 
   return (

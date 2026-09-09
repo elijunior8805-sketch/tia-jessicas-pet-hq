@@ -313,7 +313,7 @@ export async function processarMensagemJessiV2Core(
           const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petId);
           respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do pet.`;
           cards.push({
-            type: "pet",
+            type: "cliente",
             title: `Ficha Cadastral & Histórico`,
             subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
             data: resFicha.data,
