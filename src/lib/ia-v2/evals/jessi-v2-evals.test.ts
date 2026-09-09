@@ -986,4 +986,148 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(res.respostaTexto).toContain("Preparei a operação");
     });
   });
+
+  // =========================================================================
+  // SUITE 10: Fase 2 — Consultas Reais e Somente Leitura (Clientes, Pets, Agenda, Programas, Créditos, Financeiro, Histórico, Relatórios)
+  // =========================================================================
+  describe("Suite 10: Fase 2 — Consultas Reais (Somente Leitura)", () => {
+    it("66. Agenda Read-Only: Consulta agenda do dia sem efetuar mutações", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            gte: () => ({
+              lte: () => ({
+                order: () => Promise.resolve({
+                  data: [
+                    { id: "ag_1", data_hora: "2026-09-09T09:00:00Z", status: "agendado", cliente: { nome: "Paula" }, pet: { nome: "Thor" } }
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await processarMensagemJessiV2Core(mockSb, { mensagem: "Como está a agenda de hoje?" });
+      expect(res.versao).toBe("v2");
+      expect(res.cards.some(c => c.type === "agenda")).toBe(true);
+      expect(res.pendingAction).toBeNull();
+    });
+
+    it("67. Financeiro Read-Only: Consulta faturamento consolidado sem alterar registros", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            gte: () => ({
+              eq: () => Promise.resolve({
+                data: [
+                  { id: "t1", tipo: "receita", valor: 450, status: "confirmado" },
+                  { id: "t2", tipo: "despesa", valor: 100, status: "confirmado" },
+                ],
+                error: null,
+              }),
+            }),
+            eq: () => Promise.resolve({ data: [{ valor: 150 }], error: null }),
+          }),
+        }),
+      };
+
+      const res = await processarMensagemJessiV2Core(mockSb, { mensagem: "Qual foi o faturamento deste mês?" });
+      expect(res.versao).toBe("v2");
+      expect(res.cards.some(c => c.type === "financeiro")).toBe(true);
+      expect(res.respostaTexto).toContain("R$ 450.00");
+    });
+
+    it("68. Programas Ativos Geral: Apresenta contratos reais ativos com campos oficiais", async () => {
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            eq: () => Promise.resolve({
+              data: [
+                {
+                  id: "cp_1",
+                  status: "ativo",
+                  data_inicio: "2026-08-15",
+                  data_fim: "2026-09-15",
+                  cliente: { id: "c1", nome: "Marcos Lima" },
+                  pet: { id: "p1", nome: "Bob" },
+                  plano: { id: "pl1", nome: "Clubinho Mensal 4 Banhos", valor_mensal: 280 },
+                  creditos: [{ id: "cr1", servico_nome: "Banho", saldo: 2 }],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(mockSb);
+      expect(res.success).toBe(true);
+      expect(res.total_count).toBe(1);
+      expect(res.data[0].tutorNome).toBe("Marcos Lima");
+      expect(res.data[0].petNome).toBe("Bob");
+      expect(res.data[0].creditosRestantes).toBe(2);
+      expect(res.data[0].diasRestantes).toBeGreaterThan(0);
+    });
+
+    it("69. Ficha & Histórico do Pet: Retorna atendimentos anteriores e restrições de saúde", async () => {
+      const mockSb: any = {
+        from: (tab: string) => {
+          if (tab === "pets") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  maybeSingle: () => Promise.resolve({
+                    data: {
+                      id: "pet_luna",
+                      nome: "Luna",
+                      raca: "Shih Tzu",
+                      observacoes_saude: "Alergia a perfume",
+                      cliente: { id: "c_luna", nome: "Camila" },
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => Promise.resolve({
+                    data: [{ id: "ag_antigo", data_hora: "2026-09-01T10:00:00Z", status: "concluido", valor_total: 90 }],
+                  }),
+                }),
+              }),
+            }),
+          };
+        },
+      };
+
+      const res = await ClientesPetsAdapter.obterFichaPet(mockSb, "pet_luna");
+      expect(res.success).toBe(true);
+      expect(res.data.nome).toBe("Luna");
+      expect(res.data.observacoes_saude).toBe("Alergia a perfume");
+      expect(res.data.historicoAtendimentos.length).toBe(1);
+    });
+
+    it("70. Garantia Somente Leitura: Nenhuma mutação sem confirmação", async () => {
+      const { processarMensagemJessiV2Core } = await import("../agent/jessi-v2-agent.core");
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            limit: () => Promise.resolve({ data: [] }),
+            gte: () => ({ lte: () => ({ order: () => Promise.resolve({ data: [] }) }) }),
+          }),
+        }),
+      };
+
+      const res = await processarMensagemJessiV2Core(mockSb, { mensagem: "Quem são os clientes com pendências?" });
+      expect(res.pendingAction).toBeNull();
+    });
+  });
 });

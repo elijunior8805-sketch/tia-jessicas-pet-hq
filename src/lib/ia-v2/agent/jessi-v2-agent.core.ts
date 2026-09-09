@@ -214,25 +214,60 @@ export async function processarMensagemJessiV2Core(
         operacaoPreparada: pendingAction,
       };
     } else {
-      // RESPOSTAS CONVERSACIONAIS E CONSULTAS PROGRESSIVAS
+      // RESPOSTAS CONVERSACIONAIS E CONSULTAS REAIS (FASE 2 — SOMENTE LEITURA)
       if (intencao.dominio === "agenda") {
-        respostaTexto = `Consultei a agenda para ${intencao.entidades.data || contextoAtual.dataReferencia}.`;
+        const dataAlvo = intencao.entidades.data || contextoAtual.dataReferencia;
+        const resAgenda = await AgendaAdapter.consultarAgendaPorData(sb, dataAlvo);
+        respostaTexto = resAgenda.summary || `Consultei a agenda para ${dataAlvo}.`;
         cards.push({
           type: "agenda",
-          title: "Agenda de Atendimentos",
-          subtitle: `Data: ${intencao.entidades.data || contextoAtual.dataReferencia}`,
-          data: { status: "consultado", data: intencao.entidades.data || contextoAtual.dataReferencia },
+          title: `Agenda de Atendimentos — ${dataAlvo}`,
+          subtitle: `${resAgenda.total_count || 0} agendamento(s) encontrado(s)`,
+          data: resAgenda.data,
         });
       } else if (intencao.dominio === "financeiro_relatorios") {
-        respostaTexto = `Consultei os relatórios financeiros consolidados do Spa.`;
+        const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, "mes");
+        respostaTexto = resFin.summary || `Consultei o resumo financeiro consolidado oficial do Spa.`;
         cards.push({
           type: "financeiro",
-          title: "Resumo Financeiro Consolidado",
-          subtitle: "Fonte Oficial de Transações",
-          data: { faturamentoHoje: 0, ticketMedio: 0 },
+          title: "Resumo Financeiro Consolidado (Oficial)",
+          subtitle: "Fonte: Transações Oficiais",
+          data: resFin.data,
         });
+      } else if (intencao.dominio === "programas_creditos") {
+        if (novoContexto.cliente?.id || contextoAtual.cliente?.id) {
+          const cliId = novoContexto.cliente?.id || contextoAtual.cliente?.id || "";
+          const petId = novoContexto.pet?.id || contextoAtual.pet?.id || undefined;
+          const resCred = await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, cliId, petId);
+          respostaTexto = resCred.summary || `Consultei o saldo de créditos do plano.`;
+          cards.push({
+            type: "programa",
+            title: "Créditos e Programas do Clubinho",
+            subtitle: `Cliente: ${novoContexto.cliente?.nome || contextoAtual.cliente?.nome}`,
+            data: resCred.data,
+          });
+        } else {
+          const resProgGeral = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
+          respostaTexto = resProgGeral.summary || `Consultei os contratos de programas ativos no Spa.`;
+          cards.push({
+            type: "programa",
+            title: "Contratos Ativos do Clubinho",
+            subtitle: `${resProgGeral.total_count || 0} contrato(s) ativo(s)`,
+            data: resProgGeral.data,
+          });
+        }
       } else if (intencao.dominio === "clientes_pets") {
-        if (!respostaTexto) {
+        if (novoContexto.pet?.id || contextoAtual.pet?.id) {
+          const petId = novoContexto.pet?.id || contextoAtual.pet?.id || "";
+          const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petId);
+          respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do pet.`;
+          cards.push({
+            type: "pet",
+            title: `Ficha Cadastral & Histórico`,
+            subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
+            data: resFicha.data,
+          });
+        } else if (!respostaTexto) {
           respostaTexto = `Aqui estão os dados cadastrais solicitados.`;
         }
       } else {
