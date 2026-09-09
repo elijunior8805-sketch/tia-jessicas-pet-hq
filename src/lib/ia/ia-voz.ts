@@ -56,6 +56,7 @@ export class VoiceRecognizer {
   private recognition: any = null;
   private status: VoiceRecognitionStatus = 'idle';
   private acumulado = '';
+  private interimAtual = '';
   private pararSolicitado = false;
   private iniciando = false;
 
@@ -99,12 +100,14 @@ export class VoiceRecognizer {
 
         if (final.trim()) {
           this.acumulado = consolidarTranscricao(`${this.acumulado} ${final}`);
+          this.interimAtual = '';
           this.options.onFinal(this.acumulado);
           this.options.onInterim('');
         }
 
         if (interim.trim() && this.status === 'listening') {
-          this.options.onInterim(interim.trim());
+          this.interimAtual = interim.trim();
+          this.options.onInterim(this.interimAtual);
         }
       };
 
@@ -175,6 +178,7 @@ export class VoiceRecognizer {
 
     this.pararSolicitado = false;
     this.acumulado = consolidarTranscricao(textoInicial);
+    this.interimAtual = '';
     this.iniciando = true;
 
     try {
@@ -192,6 +196,12 @@ export class VoiceRecognizer {
     if (!this.recognition) return;
     this.pararSolicitado = true;
     if (this.status === 'listening' || this.status === 'requesting_permission') {
+      if (this.interimAtual) {
+        this.acumulado = consolidarTranscricao(`${this.acumulado} ${this.interimAtual}`);
+        this.interimAtual = '';
+        this.options.onInterim('');
+        this.options.onFinal(this.acumulado);
+      }
       this.setStatus('finalizing');
       try {
         this.recognition.stop();
@@ -205,6 +215,7 @@ export class VoiceRecognizer {
   abort() {
     this.pararSolicitado = true;
     this.acumulado = '';
+    this.interimAtual = '';
     try {
       this.recognition?.abort?.();
     } catch {
@@ -215,5 +226,6 @@ export class VoiceRecognizer {
 
   reset() {
     this.acumulado = '';
+    this.interimAtual = '';
   }
 }

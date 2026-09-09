@@ -150,7 +150,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
         <Button
           type="button"
           size="icon"
-          disabled={(!inputText.trim() && !selectedFile) || isLoading}
+          disabled={isListening || (!inputText.trim() && !selectedFile) || isLoading}
           onClick={onSend}
           className="h-10 w-10 shrink-0 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl shadow-xs"
         >
