@@ -138,12 +138,12 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={
               isListening
-                ? "Ouvindo sua voz..."
+                ? "Ouvindo sua voz... (fale agora)"
                 : "Fale com a Jessi: consultar agenda, buscar cliente, verificar saldos, comprovantes..."
             }
             rows={1}
             disabled={isLoading}
-            className="min-h-[40px] max-h-32 resize-none py-2 px-3 text-xs md:text-sm bg-background border-border/80 focus-visible:ring-emerald-700 rounded-xl"
+            className="min-h-[42px] max-h-36 resize-none py-2.5 px-3.5 text-xs md:text-sm leading-relaxed bg-background border-border/80 focus-visible:ring-emerald-700 rounded-xl"
           />
         </div>
 

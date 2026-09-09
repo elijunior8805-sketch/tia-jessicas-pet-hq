@@ -110,7 +110,13 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
-    // 1. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
+    // 1. Se o microfone estiver ativo, encerra a escuta e reseta o buffer de voz imediatamente
+    if (isListening) {
+      stopListening();
+    }
+    resetTranscript();
+
+    // 2. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
     if (isLoading) {
       return;
     }
@@ -126,7 +132,7 @@ export const JessiLayout: React.FC = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // 2. Preserva mensagem enviada no histórico
+    // 3. Preserva mensagem enviada no histórico
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
