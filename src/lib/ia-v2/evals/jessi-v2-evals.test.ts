@@ -1658,4 +1658,82 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(res.summary).toContain("2 lançamento(s) regularizado(s)");
     });
   });
+
+  // =========================================================================
+  // SUITE 15: Fase 7 — PDF e Mensagens (Documento, Prévia, Download, Compartilhamento, Registro do Envio)
+  // =========================================================================
+  describe("Suite 15: Fase 7 — PDF e Mensagens", () => {
+    it("90. Termo em PDF: Gera documento estruturado com dados completos do programa", () => {
+      const termo = ProgramasCreditosAdapter.gerarDocumentoTermoPdf({
+        contratoId: "cont_100",
+        tutorNome: "Patrícia Lima",
+        tutorTelefone: "(11) 97777-8888",
+        petNome: "Floquinho",
+        petRaca: "Maltês",
+        programaNome: "Clubinho 4 Banhos",
+        creditosTotais: 4,
+        valorMensal: 320.0,
+        formaPagamento: "pix",
+        dataContratacao: "2026-09-09",
+        dataValidade: "2026-10-09",
+      });
+
+      expect(termo.documentoId).toContain("termo_cont_100");
+      expect(termo.previaTexto).toContain("Floquinho");
+      expect(termo.previaTexto).toContain("EXCLUSIVIDADE");
+      expect(termo.downloadUrl).toBe("/api/documentos/termo/cont_100.pdf");
+      expect(termo.whatsappShareUrl).toContain("https://wa.me/5511977778888");
+    });
+
+    it("91. Relatório do Pet: Substitui 'Banhos reservados' por 'Banhos utilizados'", () => {
+      const relatorio = ProgramasCreditosAdapter.gerarRelatorioPetPdf({
+        petNome: "Thor",
+        tutorNome: "Mariana",
+        programaNome: "Clubinho Premium",
+        dataContratacao: "2026-08-10",
+        dataValidade: "2026-09-10",
+        totalBanhos: 4,
+        banhosUtilizados: 3,
+        creditosRestantes: 1,
+        historicoDatasUso: ["2026-08-12", "2026-08-20", "2026-08-28"],
+      });
+
+      expect(relatorio.previaTexto).toContain("Banhos Utilizados: 3");
+      expect(relatorio.previaTexto).not.toContain("Banhos reservados");
+      expect(relatorio.dadosEstruturados.termoCorretoBanhos).toBe("Banhos utilizados");
+    });
+
+    it("92. Compartilhamento WhatsApp: Codifica parâmetros via URI de forma segura", () => {
+      const payload = {
+        telefoneDestino: "11999991111",
+        nomeCliente: "Carlos",
+        nomePet: "Toby",
+        tipoMensagem: "pet_pronto" as const,
+      };
+
+      const res = MensagensWhatsAppAdapter.gerarMensagemWhatsApp(payload);
+      expect(res.urlWhatsApp).toContain("https://wa.me/5511999991111?text=");
+      expect(decodeURIComponent(res.urlWhatsApp)).toContain("Toby");
+      expect(decodeURIComponent(res.urlWhatsApp)).toContain("pronto(a)");
+    });
+
+    it("93. Registro do Envio: Grava auditoria de comunicação com destinatário e canal", async () => {
+      const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null });
+      const mockSb: any = {
+        from: (tab: string) => ({
+          insert: mockInsert,
+        }),
+      };
+
+      await MensagensWhatsAppAdapter.registrarEnvioComunicacao(mockSb, {
+        destinatario: "11999992222",
+        conteudoAprovado: "Seu pet está pronto!",
+        usuarioId: "user_jessica",
+        canal: "whatsapp",
+        resultado: "sucesso",
+      });
+
+      expect(mockInsert).toHaveBeenCalled();
+    });
+  });
 });

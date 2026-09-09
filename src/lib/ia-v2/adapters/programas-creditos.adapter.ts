@@ -459,4 +459,111 @@ export class ProgramasCreditosAdapter {
       };
     }
   }
+
+  /**
+   * 1. Gera a estrutura do Termo de Adesão ao Programa em PDF com prévia, download e link de compartilhamento (Seção 17)
+   */
+  static gerarDocumentoTermoPdf(params: {
+    contratoId: string;
+    tutorNome: string;
+    tutorTelefone: string;
+    petNome: string;
+    petRaca: string;
+    programaNome: string;
+    creditosTotais: number;
+    valorMensal: number;
+    formaPagamento: string;
+    dataContratacao: string;
+    dataValidade: string;
+  }): {
+    documentoId: string;
+    titulo: string;
+    previaTexto: string;
+    downloadUrl: string;
+    whatsappShareUrl: string;
+    dadosEstruturados: any;
+  } {
+    const docId = `termo_${params.contratoId}_${Date.now()}`;
+    const logoUrl = "/assets/logo-spa-pet.png";
+
+    const textoTermo =
+      `TERMO DE ADESÃO AO PROGRAMA DE CUIDADOS — SPA DE PET TIA JÉSSICA\n\n` +
+      `CONTRATANTE: ${params.tutorNome} (Tel: ${params.tutorTelefone})\n` +
+      `PET BENEFICIÁRIO: ${params.petNome} (${params.petRaca})\n` +
+      `PLANO: ${params.programaNome}\n` +
+      `CRÉDITOS INCLUSOS: ${params.creditosTotais} sessões de Banho & Cuidados\n` +
+      `VALOR DO PLANO: R$ ${params.valorMensal.toFixed(2)} (${params.formaPagamento.toUpperCase()})\n` +
+      `DATA DE CONTRATAÇÃO: ${params.dataContratacao} | VALIDADE: ${params.dataValidade} (30 dias)\n\n` +
+      `CLÁUSULAS E REGRAS DE USO:\n` +
+      `1. EXCLUSIVIDADE: Os créditos são de uso exclusivo do pet ${params.petNome}, sendo estritamente intransferíveis.\n` +
+      `2. VALIDADE: O saldo possui vigência improrrogável de 30 dias a partir da contratação.\n` +
+      `3. SERVIÇOS EXTRAS: Procedimentos adicionais (desembolo, hidratação premium, tosa) não inclusos no plano serão cobrados à parte.\n` +
+      `4. AGENDAMENTO: O agendamento reserva o crédito e sua conclusão consome a sessão.\n` +
+      `5. CANCELAMENTO: Cancelamentos com antecedência mínima de 24h liberam o crédito para reagendamento dentro da vigência.\n`;
+
+    const telLimpo = params.tutorTelefone.replace(/\D/g, "");
+    const telComPais = telLimpo.startsWith("55") ? telLimpo : `55${telLimpo}`;
+    const msgWhatsApp = `Olá, ${params.tutorNome}! 🐾 Segue o Termo de Adesão do Clubinho do(a) ${params.petNome} no Spa de Pet Tia Jéssica:\n\n${textoTermo}`;
+    const waUrl = `https://wa.me/${telComPais}?text=${encodeURIComponent(msgWhatsApp)}`;
+
+    return {
+      documentoId: docId,
+      titulo: `Termo de Adesão — ${params.programaNome} (${params.petNome})`,
+      previaTexto: textoTermo,
+      downloadUrl: `/api/documentos/termo/${params.contratoId}.pdf`,
+      whatsappShareUrl: waUrl,
+      dadosEstruturados: {
+        logo: logoUrl,
+        ...params,
+        regras: ["Intransferível", "Validade 30 dias", "Extras cobrados separadamente"],
+      },
+    };
+  }
+
+  /**
+   * 2. Gera o Relatório de Cuidados do Pet com "Banhos utilizados" (Seção 17)
+   */
+  static gerarRelatorioPetPdf(params: {
+    petNome: string;
+    tutorNome: string;
+    programaNome: string;
+    dataContratacao: string;
+    dataValidade: string;
+    totalBanhos: number;
+    banhosUtilizados: number;
+    creditosRestantes: number;
+    historicoDatasUso: string[];
+    fotos?: string[];
+  }): {
+    relatorioId: string;
+    titulo: string;
+    previaTexto: string;
+    downloadUrl: string;
+    whatsappShareUrl: string;
+    dadosEstruturados: any;
+  } {
+    const relId = `rel_pet_${Date.now()}`;
+    const textoRelatorio =
+      `RELATÓRIO DE CUIDADOS & CLUBINHO — SPA DE PET TIA JÉSSICA\n\n` +
+      `PET: ${params.petNome} | TUTOR(A): ${params.tutorNome}\n` +
+      `PROGRAMA ATIVO: ${params.programaNome}\n` +
+      `VIGÊNCIA: ${params.dataContratacao} até ${params.dataValidade}\n\n` +
+      `EXTRATO DE UTILIZAÇÃO DO CLUBINHO:\n` +
+      `• Total de Banhos Contratados: ${params.totalBanhos}\n` +
+      `• Banhos Utilizados: ${params.banhosUtilizados}\n` +
+      `• Créditos Restantes: ${params.creditosRestantes}\n` +
+      `• Datas das Sessões Realizadas: ${params.historicoDatasUso.join(", ") || "Nenhuma sessão utilizada ainda"}\n`;
+
+    return {
+      relatorioId: relId,
+      titulo: `Relatório de Cuidados — ${params.petNome}`,
+      previaTexto: textoRelatorio,
+      downloadUrl: `/api/documentos/relatorio/${params.petNome.toLowerCase()}.pdf`,
+      whatsappShareUrl: `https://wa.me/?text=${encodeURIComponent(textoRelatorio)}`,
+      dadosEstruturados: {
+        ...params,
+        termoCorretoBanhos: "Banhos utilizados", // Assegura conformidade com a Seção 17
+      },
+    };
+  }
 }
