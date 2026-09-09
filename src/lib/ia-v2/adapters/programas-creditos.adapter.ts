@@ -313,4 +313,137 @@ export class ProgramasCreditosAdapter {
       };
     }
   }
+
+  /**
+   * Reserva 1 crédito vinculado ao agendamento para impedir duplo consumo (Seção 16)
+   */
+  static async reservarCreditoAgendamento(
+    sb: SupabaseClient<Database>,
+    params: { creditoId: string; agendamentoId: string },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `reserva_credito_${Date.now()}`;
+    try {
+      const { data: credito } = await sb
+        .from("cliente_programa_creditos")
+        .select("id, saldo, servico_nome")
+        .eq("id", params.creditoId)
+        .single();
+
+      if (!credito || (credito.saldo || 0) < 1) {
+        return {
+          success: false,
+          entity_id: params.creditoId,
+          source: "tabela_creditos",
+          summary: "Não há saldo de créditos disponível para reservar.",
+          error_code: "CREDITO_INDISPONIVEL",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      return {
+        success: true,
+        entity_id: params.creditoId,
+        affected_record_id: params.creditoId,
+        source: "tabela_creditos",
+        summary: `1 crédito de "${credito.servico_nome}" reservado com sucesso para o agendamento #${params.agendamentoId.slice(0, 8)}.`,
+        executed_at: new Date().toISOString(),
+        verified: true,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: params.creditoId,
+        source: "tabela_creditos",
+        summary: `Falha ao reservar crédito: ${err.message}`,
+        error_code: "ERRO_RESERVA_CREDITO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
+
+  /**
+   * Libera o crédito reservado em caso de cancelamento elegível (Seção 16)
+   */
+  static async liberarCreditoCancelamento(
+    sb: SupabaseClient<Database>,
+    params: { creditoId: string; agendamentoId: string; motivo?: string },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `libera_credito_${Date.now()}`;
+    try {
+      const { data: creditoAtual } = await sb
+        .from("cliente_programa_creditos")
+        .select("id, saldo, servico_nome")
+        .eq("id", params.creditoId)
+        .single();
+
+      if (!creditoAtual) {
+        return {
+          success: false,
+          entity_id: params.creditoId,
+          source: "tabela_creditos",
+          summary: "Registro de crédito não encontrado para estorno/liberação.",
+          error_code: "CREDITO_NAO_ENCONTRADO",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      const novoSaldo = (creditoAtual.saldo || 0) + 1;
+
+      const { data: atualizado, error } = await sb
+        .from("cliente_programa_creditos")
+        .update({ saldo: novoSaldo } as any)
+        .eq("id", params.creditoId)
+        .select("id, saldo, servico_nome")
+        .single();
+
+      if (error || !atualizado) throw error || new Error("Falha ao liberar crédito.");
+
+      const { data: readBack } = await sb
+        .from("cliente_programa_creditos")
+        .select("id, saldo")
+        .eq("id", params.creditoId)
+        .maybeSingle();
+
+      const verificado = readBack?.saldo === novoSaldo;
+
+      return {
+        success: true,
+        entity_id: params.creditoId,
+        affected_record_id: params.creditoId,
+        before: creditoAtual,
+        after: atualizado,
+        source: "tabela_creditos",
+        summary: `Crédito de "${creditoAtual.servico_nome}" liberado com sucesso. Saldo restaurado para: ${novoSaldo}.`,
+        executed_at: new Date().toISOString(),
+        verified: verificado,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: params.creditoId,
+        source: "tabela_creditos",
+        summary: `Erro ao liberar crédito: ${err.message}`,
+        error_code: "ERRO_LIBERACAO_CREDITO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
 }

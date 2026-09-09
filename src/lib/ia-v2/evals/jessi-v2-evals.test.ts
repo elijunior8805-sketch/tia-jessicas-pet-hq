@@ -1386,4 +1386,131 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(res.verified).toBe(true);
     });
   });
+
+  // =========================================================================
+  // SUITE 13: Fase 5 — Programas e Créditos (Reservar, Consumir, Liberar, Consultar Saldo, Separar Banho e Extras)
+  // =========================================================================
+  describe("Suite 13: Fase 5 — Programas e Créditos", () => {
+    it("81. Reservar Crédito: Vincula crédito ao agendamento para prevenir consumo duplo", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "cr_100", saldo: 2, servico_nome: "Banho" }, error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.reservarCreditoAgendamento(
+        mockSb,
+        { creditoId: "cr_100", agendamentoId: "ag_200" },
+        "idemp_res_81"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.summary).toContain("reservado com sucesso");
+    });
+
+    it("82. Consumir Crédito: Abate 1 sessão e atesta gravação no banco", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "cr_100", saldo: 2, servico_nome: "Banho" }, error: null }),
+              maybeSingle: () => Promise.resolve({ data: { id: "cr_100", saldo: 1 }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: "cr_100", saldo: 1, servico_nome: "Banho" }, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(
+        mockSb,
+        { creditoId: "cr_100", quantidade: 1 },
+        "idemp_consumo_82"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.after?.saldo).toBe(1);
+    });
+
+    it("83. Liberar Crédito: Restaura saldo após cancelamento de agendamento", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { id: "cr_100", saldo: 1, servico_nome: "Banho" }, error: null }),
+              maybeSingle: () => Promise.resolve({ data: { id: "cr_100", saldo: 2 }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: "cr_100", saldo: 2, servico_nome: "Banho" }, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.liberarCreditoCancelamento(
+        mockSb,
+        { creditoId: "cr_100", agendamentoId: "ag_200", motivo: "Cancelamento elegível" },
+        "idemp_libera_83"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.after?.saldo).toBe(2);
+      expect(res.summary).toContain("restaurado para: 2");
+    });
+
+    it("84. Consultar Saldo: Retorna créditos restantes vinculados ao cliente/pet", async () => {
+      const mockSb: any = {
+        from: (tab: string) => ({
+          select: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ data: [{ id: "prog_1", status: "ativo" }], error: null }),
+              gt: () => Promise.resolve({ data: [{ id: "cr_1", saldo: 3, servico_nome: "Banho" }], error: null }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await ProgramasCreditosAdapter.consultarSaldoCreditos(mockSb, "cli_mariana", "pet_thor");
+      expect(res.success).toBe(true);
+      expect(res.data.totalSessaoRestantes).toBe(3);
+    });
+
+    it("85. Separar Banho e Extras: Quita banho com crédito e cobra extras à parte", () => {
+      const proposta = ProgramasCreditosAdapter.prepararFinalizacaoComExtras({
+        clienteId: "cli_1",
+        clienteNome: "Camila",
+        petId: "pet_1",
+        petNome: "Mel",
+        creditoId: "cr_1",
+        saldoAtual: 3,
+        valorBanho: 85.0,
+        servicosExtras: [
+          { nome: "Tosa Higiênica", valor: 35.0 },
+          { nome: "Hidratação de Argan", valor: 45.0 },
+        ],
+      });
+
+      expect(proposta.params.totalExtras).toBe(80.0);
+      expect(proposta.params.debitoCredito).toBe(1);
+      expect(proposta.summary).toContain("Quitado com 1 Crédito do Plano");
+      expect(proposta.summary).toContain("R$ 80.00");
+      expect(proposta.summary).toContain("Saldo Restante de Créditos: 2");
+    });
+  });
 });
