@@ -4,9 +4,41 @@ import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2
 
 /**
  * Adaptador Oficial da Agenda para a Jessi V2 (Seção 15)
- * Suporte a Agenda do Dia, Agenda Futura, Grade, Profissionais, Transporte e Encaixes
- * Desenvolvido pelo Agente 2 (Integrações e Regras)
+ * Suporte a Agenda do Dia, Agenda Futura, Grade, Transporte e Encaixes
+ * Colunas oficiais: data (date) + hora (time) + valor_previsto
  */
+
+const SELECT_AGENDA = `
+  id,
+  data,
+  hora,
+  status,
+  valor_previsto,
+  observacoes,
+  clientes(id, nome, whatsapp),
+  pets(id, nome, raca, porte)
+`;
+
+function partirDataHora(dataHoraISO: string): { data: string; hora: string } {
+  const dt = new Date(dataHoraISO);
+  if (isNaN(dt.getTime())) {
+    const [d, h] = String(dataHoraISO).split(/[T ]/);
+    return { data: d, hora: (h || "00:00").slice(0, 5) };
+  }
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(dt);
+  const hora = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(dt);
+  return { data: fmt, hora };
+}
 
 export class AgendaAdapter {
   /**
@@ -19,24 +51,11 @@ export class AgendaAdapter {
     const inicio = Date.now();
     const correlationId = `query_agenda_${inicio}_${Math.random().toString(36).substring(2, 6)}`;
     try {
-      const inicioDia = `${data}T00:00:00.000Z`;
-      const fimDia = `${data}T23:59:59.999Z`;
-
       const { data: agendamentos, error } = await sb
         .from("agendamentos")
-        .select(`
-          id,
-          data_hora,
-          status,
-          valor_total,
-          observacoes,
-          cliente:clientes(id, nome, telefone),
-          pet:pets(id, nome, raca, porte),
-          profissional:profissionais(id, nome)
-        `)
-        .gte("data_hora", inicioDia)
-        .lte("data_hora", fimDia)
-        .order("data_hora", { ascending: true });
+        .select(SELECT_AGENDA)
+        .eq("data", data)
+        .order("hora", { ascending: true });
 
       if (error) throw error;
 
@@ -74,30 +93,19 @@ export class AgendaAdapter {
     const inicio = Date.now();
     const correlationId = `query_agenda_futura_${inicio}`;
     try {
-      const hojeStr = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Sao_Paulo",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-
-      const dataLimite = new Date(Date.now() + diasAFrente * 24 * 60 * 60 * 1000).toISOString();
+      const hojeStr = partirDataHora(new Date().toISOString()).data;
+      const dataLimite = partirDataHora(
+        new Date(Date.now() + diasAFrente * 24 * 60 * 60 * 1000).toISOString()
+      ).data;
 
       const { data: agendamentos, error } = await sb
         .from("agendamentos")
-        .select(`
-          id,
-          data_hora,
-          status,
-          valor_total,
-          cliente:clientes(id, nome, telefone),
-          pet:pets(id, nome, raca),
-          profissional:profissionais(id, nome)
-        `)
-        .gte("data_hora", `${hojeStr}T00:00:00.000Z`)
-        .lte("data_hora", dataLimite)
+        .select(SELECT_AGENDA)
+        .gte("data", hojeStr)
+        .lte("data", dataLimite)
         .neq("status", "cancelado")
-        .order("data_hora", { ascending: true });
+        .order("data", { ascending: true })
+        .order("hora", { ascending: true });
 
       if (error) throw error;
 
@@ -138,10 +146,7 @@ export class AgendaAdapter {
 
       const horariosOcupados: string[] = agendamentos
         .filter((a: any) => a.status !== "cancelado")
-        .map((a: any) => {
-          const dt = new Date(a.data_hora);
-          return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-        });
+        .map((a: any) => String(a.hora || "").slice(0, 5));
 
       // Grade padrão do Spa: das 08h às 18h de hora em hora
       const gradePadrao = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
@@ -179,10 +184,13 @@ export class AgendaAdapter {
     profissionalId?: string
   ): Promise<{ disponivel: boolean; motivo?: string }> {
     try {
+      const { data, hora } = partirDataHora(dataHoraISO);
+
       let query = sb
         .from("agendamentos")
         .select("id, status")
-        .eq("data_hora", dataHoraISO)
+        .eq("data", data)
+        .eq("hora", hora)
         .neq("status", "cancelado");
 
       if (profissionalId) {
@@ -252,17 +260,21 @@ export class AgendaAdapter {
         };
       }
 
+      const { data: dataAlvo, hora: horaAlvo } = partirDataHora(params.dataHora);
+
       const { data: novoAgendamento, error } = await sb
         .from("agendamentos")
         .insert({
           cliente_id: params.clienteId,
           pet_id: params.petId,
-          data_hora: params.dataHora,
-          valor_total: params.valor,
+          servico_id: params.servicoId || null,
+          data: dataAlvo,
+          hora: horaAlvo,
+          valor_previsto: params.valor || 0,
           status: "agendado",
           profissional_id: params.profissionalId || null,
         } as any)
-        .select("id, data_hora, status, valor_total")
+        .select("id, data, hora, status, valor_previsto")
         .single();
 
       if (error || !novoAgendamento) throw error || new Error("Falha na gravação do registro.");
@@ -316,7 +328,7 @@ export class AgendaAdapter {
       // 1. Ler registro atual (before)
       const { data: anterior, error: erroAnterior } = await sb
         .from("agendamentos")
-        .select("id, data_hora, status, valor_total, pet_id, cliente_id")
+        .select("id, data, hora, status, valor_previsto, pet_id, cliente_id")
         .eq("id", params.agendamentoId)
         .maybeSingle();
 
@@ -350,15 +362,18 @@ export class AgendaAdapter {
         };
       }
 
-      // 3. Atualizar data_hora no banco
+      const { data: novaData, hora: novaHora } = partirDataHora(params.novaDataHoraISO);
+
+      // 3. Atualizar data e hora no banco
       const { data: atualizado, error: updateError } = await sb
         .from("agendamentos")
         .update({
-          data_hora: params.novaDataHoraISO,
+          data: novaData,
+          hora: novaHora,
           observacoes: params.motivo ? `Remarcado: ${params.motivo}` : undefined,
         } as any)
         .eq("id", params.agendamentoId)
-        .select("id, data_hora, status, valor_total")
+        .select("id, data, hora, status, valor_previsto")
         .single();
 
       if (updateError || !atualizado) throw updateError || new Error("Falha ao atualizar agendamento.");
@@ -366,11 +381,12 @@ export class AgendaAdapter {
       // 4. Read-Back Verification por ID
       const { data: readBack } = await sb
         .from("agendamentos")
-        .select("id, data_hora, status")
+        .select("id, data, hora, status")
         .eq("id", params.agendamentoId)
         .maybeSingle();
 
-      const verificado = readBack?.data_hora === params.novaDataHoraISO;
+      const verificado =
+        readBack?.data === novaData && String(readBack?.hora || "").slice(0, 5) === novaHora;
 
       return {
         success: true,
@@ -379,7 +395,7 @@ export class AgendaAdapter {
         before: anterior,
         after: atualizado,
         source: "tabela_agendamentos",
-        summary: `Agendamento #${params.agendamentoId.slice(0, 8)} remarcado com sucesso para ${new Date(params.novaDataHoraISO).toLocaleString("pt-BR")}.`,
+        summary: `Agendamento #${params.agendamentoId.slice(0, 8)} remarcado com sucesso para ${novaData} às ${novaHora}.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
@@ -412,7 +428,7 @@ export class AgendaAdapter {
     try {
       const { data: anterior } = await sb
         .from("agendamentos")
-        .select("id, data_hora, status, valor_total")
+        .select("id, data, hora, status, valor_previsto")
         .eq("id", params.agendamentoId)
         .maybeSingle();
 
@@ -437,7 +453,7 @@ export class AgendaAdapter {
           observacoes: params.motivo ? `Cancelado pelo operador: ${params.motivo}` : undefined,
         } as any)
         .eq("id", params.agendamentoId)
-        .select("id, data_hora, status, valor_total")
+        .select("id, data, hora, status, valor_previsto")
         .single();
 
       if (error || !cancelado) throw error || new Error("Falha ao cancelar agendamento.");
@@ -486,19 +502,11 @@ export class AgendaAdapter {
     sb: SupabaseClient<Database>,
     agendamentoId: string
   ): Promise<JessiV2QueryResult> {
+    const correlationId = `verif_agenda_${Date.now()}`;
     try {
       const { data: agendamento, error } = await sb
         .from("agendamentos")
-        .select(`
-          id,
-          data_hora,
-          status,
-          valor_total,
-          observacoes,
-          cliente:clientes(id, nome, telefone),
-          pet:pets(id, nome, raca, porte),
-          profissional:profissionais(id, nome)
-        `)
+        .select(SELECT_AGENDA)
         .eq("id", agendamentoId)
         .maybeSingle();
 
@@ -510,6 +518,7 @@ export class AgendaAdapter {
           summary: `Agendamento #${agendamentoId} não encontrado no banco de dados.`,
           error_code: "AGENDAMENTO_NAO_ENCONTRADO",
           executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
         };
       }
 
@@ -518,8 +527,9 @@ export class AgendaAdapter {
         source: "tabela_agendamentos",
         data: agendamento,
         total_count: 1,
-        summary: `Agendamento #${agendamento.id.slice(0, 8)} verificado: Status ${agendamento.status}, Data: ${new Date(agendamento.data_hora).toLocaleString("pt-BR")}.`,
+        summary: `Agendamento #${agendamento.id.slice(0, 8)} verificado: Status ${agendamento.status}, Data: ${agendamento.data} às ${String(agendamento.hora).slice(0, 5)}.`,
         executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
       };
     } catch (err: any) {
       return {
@@ -529,6 +539,7 @@ export class AgendaAdapter {
         summary: `Erro ao verificar agendamento: ${err.message}`,
         error_code: "ERRO_VERIFICACAO_AGENDAMENTO",
         executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
       };
     }
   }

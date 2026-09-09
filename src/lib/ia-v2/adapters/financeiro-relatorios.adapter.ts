@@ -62,8 +62,10 @@ export class FinanceiroRelatoriosAdapter {
 
       // 1. Consulta transações financeiras confirmadas no período
       const { data: transacoes, error } = await sb
-        .from("transacoes_financeiras")
-        .select("id, tipo, valor, status, forma_pagamento, created_at")
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, status, forma, data_pagamento, created_at")
+        .is("arquivado_em", null)
+        .eq("is_teste", false)
         .gte("created_at", inicioPeriodo);
 
       if (error) throw error;
@@ -75,8 +77,19 @@ export class FinanceiroRelatoriosAdapter {
       let totalEntradasCount = 0;
 
       (transacoes || []).forEach((t: any) => {
-        const valor = Number(t.valor) || 0;
-        const ehConfirmado = t.status === "confirmado" || t.status === "pago";
+        const valor = Number(t.valor_total) || 0;
+        const recebido = Number(t.valor_pago) || 0;
+        const ehConfirmado = t.status === "pago";
+
+        faturamentoBruto += valor;
+        if (ehConfirmado) {
+          valoresRecebidos += recebido || valor;
+          totalEntradasCount++;
+        }
+        if (t.status === "estornado" || t.status === "cancelado") {
+          estornos += valor;
+        }
+        return;
 
         if (t.tipo === "receita" || t.tipo === "entrada") {
           faturamentoBruto += valor;

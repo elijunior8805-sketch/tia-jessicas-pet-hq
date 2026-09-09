@@ -9,6 +9,9 @@ import {
 import { JessiV2ContextState, criarSessaoV2 } from "../session/jessi-v2-session";
 import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
 import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
+import { AgendaAdapter } from "../adapters/agenda.adapter";
+import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
+import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
 import { JessiV2ConfirmationManager } from "../confirmation/jessi-v2-confirmation.manager";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
 import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
@@ -105,7 +108,7 @@ export async function processarMensagemJessiV2Core(
       if (resultadoBusca.success && resultadoBusca.data.candidatos.length > 0) {
         if (resultadoBusca.data.exigeDesambiguacao) {
           // Ambiguidade detectada: Apresenta opções progressivas sem escolha silenciosa
-          respostaTexto = resultadoBusca.summary;
+          respostaTexto = resultadoBusca.summary || "Encontrei mais de uma opção.";
           
           cards.push({
             type: "cliente",
@@ -113,7 +116,7 @@ export async function processarMensagemJessiV2Core(
             subtitle: `Termo pesquisado: "${termoParaBusca}"`,
             data: {
               exigeDesambiguacao: true,
-              opcoes: resultadoBusca.data.candidatos.map(c => ({
+              opcoes: resultadoBusca.data.candidatos.map((c: any) => ({
                 id: c.id,
                 tipo: c.tipo,
                 nome: c.nomePrincipal,

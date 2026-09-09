@@ -92,9 +92,9 @@ export class ProativoAdapter {
 
       // Vetor 3 & 4: Programas Vencendo e Créditos Não Utilizados
       const programas = progRes.data || [];
-      const programasVencendo = programas.filter((p) => p.diasRestantes <= 7 && p.creditosDisponiveis > 0);
+      const programasVencendo = programas.filter((p: any) => p.diasRestantes <= 7 && p.creditosDisponiveis > 0);
 
-      programasVencendo.slice(0, 3).forEach((p) => {
+      programasVencendo.slice(0, 3).forEach((p: any) => {
         const msgWa = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
           telefoneDestino: p.tutor.telefone,
           nomeCliente: p.tutor.nome,

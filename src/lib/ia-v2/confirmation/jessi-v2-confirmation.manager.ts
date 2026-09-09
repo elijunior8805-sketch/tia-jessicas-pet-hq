@@ -32,6 +32,7 @@ export interface JessiV2Proposal {
   dataHora?: string | null;
   riscos: string[];
   validade: string; // ISO Timestamp (15 minutos)
+  created_at: string;
   assinaturaConteudo: string;
   status: JessiV2ProposalStatus;
   resumoVisual: {
@@ -106,6 +107,7 @@ export class JessiV2ConfirmationManager {
 
     return {
       id,
+      created_at: new Date(agora).toISOString(),
       userId: params.userId,
       cliente: params.cliente || null,
       pet: params.pet || null,
