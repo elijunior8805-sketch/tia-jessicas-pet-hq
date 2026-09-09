@@ -89,19 +89,6 @@ export class FinanceiroRelatoriosAdapter {
         if (t.status === "estornado" || t.status === "cancelado") {
           estornos += valor;
         }
-        return;
-
-        if (t.tipo === "receita" || t.tipo === "entrada") {
-          faturamentoBruto += valor;
-          if (ehConfirmado) {
-            valoresRecebidos += valor;
-            totalEntradasCount++;
-          }
-        } else if (t.tipo === "despesa" || t.tipo === "saida") {
-          if (ehConfirmado) despesas += valor;
-        } else if (t.tipo === "estorno") {
-          estornos += valor;
-        }
       });
 
       // 2. Consulta de valores pendentes e devedores (vencidos)
