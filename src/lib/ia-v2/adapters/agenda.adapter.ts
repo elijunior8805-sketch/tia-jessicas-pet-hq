@@ -9,13 +9,14 @@ import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2
 
 export class AgendaAdapter {
   /**
-   * Consulta os agendamentos de uma data específica
+   * Consulta os agendamentos de uma data específica (Seção 11)
    */
   static async consultarAgendaPorData(
     sb: SupabaseClient<Database>,
     data: string
   ): Promise<JessiV2QueryResult> {
     const inicio = Date.now();
+    const correlationId = `query_agenda_${inicio}_${Math.random().toString(36).substring(2, 6)}`;
     try {
       const inicioDia = `${data}T00:00:00.000Z`;
       const fimDia = `${data}T23:59:59.999Z`;
@@ -46,7 +47,7 @@ export class AgendaAdapter {
         summary: `Foram encontrados ${agendamentos?.length || 0} agendamento(s) para a data ${data}.`,
         filters_applied: { data },
         executed_at: new Date().toISOString(),
-        correlation_id: `query_agenda_${inicio}`,
+        correlation_id: correlationId,
       };
     } catch (err: any) {
       return {
@@ -57,6 +58,7 @@ export class AgendaAdapter {
         summary: `Falha ao consultar agenda: ${err.message}`,
         error_code: err.code || "ERRO_CONSULTA_AGENDA",
         executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
       };
     }
   }
@@ -117,24 +119,28 @@ export class AgendaAdapter {
   }
 
   /**
-   * Executa a gravação física após a confirmação humana com Read-Back Verification
+   * Executa a gravação física após a confirmação humana com Read-Back Verification (Seção 11)
    */
   static async executarAgendamentoConfirmado(
     sb: SupabaseClient<Database>,
     params: any,
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
+    const correlationId = `mut_agenda_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
       // 1. Revalidação de Disponibilidade no momento da escrita
       const checagem = await this.verificarDisponibilidade(sb, params.dataHora, params.profissionalId);
       if (!checagem.disponivel) {
         return {
           success: false,
+          entity_id: null,
+          affected_record_id: null,
           source: "tabela_agendamentos",
           summary: `Operação abortada: ${checagem.motivo}`,
           idempotency_key: idempotencyKey,
           executed_at: new Date().toISOString(),
           error_code: "HORARIO_INDISPONIVEL",
+          correlation_id: correlationId,
           verified: false,
         };
       }
@@ -166,22 +172,27 @@ export class AgendaAdapter {
 
       return {
         success: true,
-        source: "tabela_agendamentos",
+        entity_id: novoAgendamento.id,
         affected_record_id: novoAgendamento.id,
+        source: "tabela_agendamentos",
         after: novoAgendamento,
         summary: `Agendamento #${novoAgendamento.id.slice(0, 8)} criado e verificado com sucesso no banco de dados.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
       };
     } catch (err: any) {
       return {
         success: false,
+        entity_id: null,
+        affected_record_id: null,
         source: "tabela_agendamentos",
         summary: `Falha na execução do agendamento: ${err.message}`,
         idempotency_key: idempotencyKey,
         executed_at: new Date().toISOString(),
         error_code: err.code || "ERRO_INSERT_AGENDAMENTO",
+        correlation_id: correlationId,
         verified: false,
       };
     }

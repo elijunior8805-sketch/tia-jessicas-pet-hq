@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Contratos Zod Rigorosos e Tipagens Padronizadas da Jessi IA V2
+ * Contratos Zod Rigorosos e Tipagens Padronizadas da Jessi IA V2 (Seção 11)
  * Desenvolvido pelo Agente 1 (Arquitetura e Preservação)
  */
 
@@ -60,35 +60,36 @@ export const JessiV2MessageSchema = z.object({
 
 export type JessiV2Message = z.infer<typeof JessiV2MessageSchema>;
 
-// --- Contrato de Consulta (Leitura) ---
+// --- Contrato Oficial de Consulta / Leitura (Seção 11) ---
 export const JessiV2QueryResultSchema = z.object({
   success: z.boolean(),
-  source: z.string(),
   data: z.any(),
-  summary: z.string().optional(),
-  filters_applied: z.record(z.any()).optional(),
-  total_count: z.number().optional(),
+  source: z.string(),
+  filters_applied: z.record(z.any()).optional().nullable(),
   executed_at: z.string(),
   error_code: z.string().optional().nullable(),
-  correlation_id: z.string().optional(),
+  correlation_id: z.string(),
+  summary: z.string().optional(),
+  total_count: z.number().optional(),
 });
 
 export type JessiV2QueryResult<T = any> = z.infer<typeof JessiV2QueryResultSchema> & {
   data: T;
 };
 
-// --- Contrato de Mutação Supervisionada com Read-Back ---
+// --- Contrato Oficial de Ação / Mutação Supervisionada (Seção 11) ---
 export const JessiV2MutationResultSchema = z.object({
   success: z.boolean(),
-  source: z.string(),
-  affected_record_id: z.string().optional().nullable(),
+  entity_id: z.string().optional().nullable(),
+  affected_record_id: z.string().optional().nullable(), // Alias para retrocompatibilidade
   before: z.any().optional().nullable(),
   after: z.any().optional().nullable(),
+  idempotency_key: z.string(),
+  verified: z.boolean().default(true), // Read-Back Verification
+  error_code: z.string().optional().nullable(),
+  correlation_id: z.string(),
   summary: z.string().optional(),
   executed_at: z.string(),
-  verified: z.boolean().default(true), // Read-back check
-  idempotency_key: z.string(),
-  error_code: z.string().optional().nullable(),
 });
 
 export type JessiV2MutationResult<T = any> = z.infer<typeof JessiV2MutationResultSchema> & {

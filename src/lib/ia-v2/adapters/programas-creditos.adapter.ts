@@ -3,7 +3,7 @@ import { Database } from "@/integrations/supabase/types";
 import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2-contracts";
 
 /**
- * Adaptador Oficial de Programas de Cuidados & Clubinho para a Jessi V2
+ * Adaptador Oficial de Programas de Cuidados & Clubinho para a Jessi V2 (Seção 11)
  * Desenvolvido pelo Agente 2 (Integrações e Regras)
  */
 
@@ -16,6 +16,7 @@ export class ProgramasCreditosAdapter {
     clienteId: string
   ): Promise<JessiV2QueryResult> {
     const inicio = Date.now();
+    const correlationId = `query_programas_${inicio}_${Math.random().toString(36).substring(2, 6)}`;
     try {
       // 1. Busca assinaturas de programas ativas do cliente
       const { data: assinaturas, error } = await sb
@@ -55,7 +56,7 @@ export class ProgramasCreditosAdapter {
         total_count: assinaturas?.length || 0,
         summary: `Cliente possui ${assinaturas?.length || 0} programa(s) ativo(s) com ${totalCreditos} crédito(s) restante(s).`,
         executed_at: new Date().toISOString(),
-        correlation_id: `query_programas_${inicio}`,
+        correlation_id: correlationId,
       };
     } catch (err: any) {
       return {
@@ -66,18 +67,20 @@ export class ProgramasCreditosAdapter {
         summary: `Erro ao consultar saldo de programas: ${err.message}`,
         error_code: err.code || "ERRO_CONSULTA_PROGRAMAS",
         executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
       };
     }
   }
 
   /**
-   * Executa o abatimento de crédito pós-confirmação humana com validação e Read-Back
+   * Executa o abatimento de crédito pós-confirmação humana com validação e Read-Back (Seção 11)
    */
   static async executarConsumoCreditoConfirmado(
     sb: SupabaseClient<Database>,
     params: { creditoId: string; quantidade: number; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
+    const correlationId = `mut_credito_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
       // 1. Verifica saldo atual
       const { data: creditoAtual, error: errFetch } = await sb
@@ -91,11 +94,14 @@ export class ProgramasCreditosAdapter {
       if ((creditoAtual.saldo || 0) < params.quantidade) {
         return {
           success: false,
+          entity_id: params.creditoId,
+          affected_record_id: params.creditoId,
           source: "tabela_creditos",
           summary: `Saldo insuficiente: disponível ${creditoAtual.saldo}, solicitado ${params.quantidade}.`,
           idempotency_key: idempotencyKey,
           executed_at: new Date().toISOString(),
           error_code: "SALDO_INSUFICIENTE",
+          correlation_id: correlationId,
           verified: false,
         };
       }
@@ -123,23 +129,28 @@ export class ProgramasCreditosAdapter {
 
       return {
         success: true,
-        source: "tabela_creditos",
+        entity_id: params.creditoId,
         affected_record_id: params.creditoId,
+        source: "tabela_creditos",
         before: creditoAtual,
         after: atualizado,
         summary: `Crédito de "${creditoAtual.servico_nome}" consumido com sucesso. Novo saldo: ${novoSaldo}.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
       };
     } catch (err: any) {
       return {
         success: false,
+        entity_id: params.creditoId,
+        affected_record_id: params.creditoId,
         source: "tabela_creditos",
         summary: `Erro ao consumir crédito: ${err.message}`,
         idempotency_key: idempotencyKey,
         executed_at: new Date().toISOString(),
         error_code: err.code || "ERRO_CONSUMO_CREDITO",
+        correlation_id: correlationId,
         verified: false,
       };
     }
