@@ -282,6 +282,9 @@ export class ClientesPetsAdapter {
   /**
    * Obtém ficha detalhada do pet com histórico recente de atendimentos e restrições
    */
+  /**
+   * Obtém ficha detalhada do pet com histórico completo de atendimentos, restrições e programa ativo
+   */
   static async obterFichaPet(
     sb: SupabaseClient<Database>,
     petId: string
@@ -298,19 +301,60 @@ export class ClientesPetsAdapter {
           nascimento,
           cuidados_saude,
           alergias,
-          clientes(id, nome, whatsapp, email)
+          observacoes,
+          cliente:clientes(id, nome, whatsapp, telefone, email, endereco, bairro, cidade)
         `)
         .eq("id", petId)
         .maybeSingle();
 
       if (error || !pet) throw error || new Error("Pet não encontrado.");
 
+      // Histórico de atendimentos e serviços realizados
       const { data: atendimentos } = await sb
         .from("agendamentos")
-        .select("id, data, hora, status, valor_previsto")
+        .select(`
+          id,
+          data,
+          hora,
+          status,
+          valor_previsto,
+          observacoes,
+          leva_traz_modalidade,
+          servicos(id, nome, valor_padrao)
+        `)
         .eq("pet_id", petId)
         .order("data", { ascending: false })
-        .limit(5);
+        .order("hora", { ascending: false })
+        .limit(10);
+
+      // Programa contratado ativo do pet
+      const { data: programas } = await sb
+        .from("programas_contratados")
+        .select("id, nome_snapshot, data_de_inicio, data_de_validade, status_do_programa")
+        .eq("pet_id", petId)
+        .eq("status_do_programa", "ativo")
+        .limit(3);
+
+      const ultimoAtendimento = atendimentos && atendimentos.length > 0 ? atendimentos[0] : null;
+      const petNome = (pet as any).nome;
+      const raca = (pet as any).raca || "Padrão";
+      const tutor = (pet as any).cliente?.nome || "Tutor não vinculado";
+
+      let summary = `**Ficha Cadastral de ${petNome}** (${raca})\n• Tutor: ${tutor}\n• Porte: ${(pet as any).porte || "Médio"} | Peso: ${(pet as any).peso ? `${(pet as any).peso}kg` : "Não informado"}`;
+
+      if ((pet as any).cuidados_saude || (pet as any).alergias) {
+        summary += `\n• Cuidados/Alergias: ${(pet as any).cuidados_saude || (pet as any).alergias}`;
+      }
+
+      if (ultimoAtendimento) {
+        const dataFmt = new Date(`${ultimoAtendimento.data}T12:00:00`).toLocaleDateString("pt-BR");
+        const srv = (ultimoAtendimento.servicos as any)?.nome || "Atendimento";
+        summary += `\n• Último Atendimento: ${dataFmt} (${srv} - Status: ${ultimoAtendimento.status})`;
+      }
+
+      if (programas && programas.length > 0) {
+        summary += `\n• Programa Ativo: ${programas[0].nome_snapshot} (Válido até ${new Date(`${programas[0].data_de_validade}T12:00:00`).toLocaleDateString("pt-BR")})`;
+      }
 
       return {
         success: true,
@@ -318,8 +362,10 @@ export class ClientesPetsAdapter {
         data: {
           ...(pet as any),
           historicoAtendimentos: atendimentos || [],
+          ultimoAtendimento,
+          programasAtivos: programas || [],
         },
-        summary: `Ficha completa de ${(pet as any).nome} (${(pet as any).raca || "Raça não informada"}).`,
+        summary,
         executed_at: new Date().toISOString(),
       };
     } catch (err: any) {
@@ -329,6 +375,91 @@ export class ClientesPetsAdapter {
         data: null,
         summary: `Não foi possível carregar a ficha do pet: ${err.message}`,
         error_code: "PET_NAO_ENCONTRADO",
+        executed_at: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * Obtém ficha cadastral e financeira completa de um cliente com todos os pets e situação financeira
+   */
+  static async obterFichaClienteCompleta(
+    sb: SupabaseClient<Database>,
+    clienteId: string
+  ): Promise<JessiV2QueryResult> {
+    try {
+      const { data: cliente, error } = await sb
+        .from("clientes")
+        .select(`
+          id,
+          nome,
+          telefone,
+          whatsapp,
+          email,
+          cpf,
+          endereco,
+          bairro,
+          cidade,
+          observacoes,
+          pets(id, nome, raca, porte, peso, cuidados_saude, alergias)
+        `)
+        .eq("id", clienteId)
+        .maybeSingle();
+
+      if (error || !cliente) throw error || new Error("Cliente não encontrado.");
+
+      // Consulta situação financeira do cliente (pagamentos pendentes e histórico)
+      const { data: pagamentos } = await sb
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, status, vencimento, forma")
+        .eq("cliente_id", clienteId)
+        .is("arquivado_em", null)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      // Programas contratados do cliente
+      const { data: programas } = await sb
+        .from("programas_contratados")
+        .select("id, nome_snapshot, data_de_inicio, data_de_validade, status_do_programa, pet_id")
+        .eq("cliente_id", clienteId)
+        .eq("status_do_programa", "ativo");
+
+      const pendentes = (pagamentos || []).filter((p) => p.status !== "pago" && p.status !== "cancelado");
+      const totalPendente = pendentes.reduce(
+        (acc, p) => acc + Math.max((Number(p.valor_total) || 0) - (Number(p.valor_pago) || 0), 0),
+        0
+      );
+
+      const petsList = (cliente.pets || []).map((p: any) => `${p.nome} (${p.raca || "Padrão"})`).join(", ");
+      const sitFin = totalPendente > 0 ? `Possui R$ ${totalPendente.toFixed(2)} em pendências de pagamento` : "Situação financeira regular (Sem débitos pendentes)";
+
+      const summary =
+        `**Ficha Cadastral de ${cliente.nome}**\n` +
+        `• Telefone/WhatsApp: ${cliente.whatsapp || cliente.telefone || "Não informado"}\n` +
+        `• Endereço: ${cliente.endereco || "Não cadastrado"}${cliente.bairro ? ` - ${cliente.bairro}` : ""}${cliente.cidade ? `, ${cliente.cidade}` : ""}\n` +
+        `• Pets Vinculados (${cliente.pets?.length || 0}): ${petsList || "Nenhum"}\n` +
+        `• Programas Ativos: ${programas?.length ? programas.map((pr: any) => pr.nome_snapshot).join(", ") : "Nenhum plano ativo"}\n` +
+        `• Situação Financeira: ${sitFin}`;
+
+      return {
+        success: true,
+        source: "ficha_cliente_consolidada",
+        data: {
+          ...cliente,
+          historicoPagamentos: pagamentos || [],
+          totalPendente,
+          programasAtivos: programas || [],
+        },
+        summary,
+        executed_at: new Date().toISOString(),
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        source: "ficha_cliente",
+        data: null,
+        summary: `Não foi possível carregar a ficha do cliente: ${err.message}`,
+        error_code: "CLIENTE_NAO_ENCONTRADO",
         executed_at: new Date().toISOString(),
       };
     }
