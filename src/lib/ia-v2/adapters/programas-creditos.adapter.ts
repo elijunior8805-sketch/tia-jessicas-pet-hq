@@ -183,6 +183,16 @@ export class ProgramasCreditosAdapter {
         0
       );
 
+      const primeiraValidade = assinaturas && assinaturas[0]?.data_de_validade
+        ? new Date(`${assinaturas[0].data_de_validade}T12:00:00`).toLocaleDateString("pt-BR")
+        : null;
+
+      const summary = totalCreditos > 0
+        ? `Possui ${totalCreditos} crédito(s) ativo(s) do Clubinho${primeiraValidade ? ` com validade até ${primeiraValidade}` : ""}.`
+        : assinaturas?.length
+        ? `Possui contrato do Clubinho cadastrado${primeiraValidade ? ` (válido até ${primeiraValidade})` : ""}, porém sem saldo de créditos disponível no momento.`
+        : "Nenhum plano ativo do Clubinho encontrado.";
+
       return {
         success: true,
         source: "programas_contratados",
@@ -190,9 +200,10 @@ export class ProgramasCreditosAdapter {
           assinaturasAtivas: assinaturas || [],
           creditosDisponiveis,
           totalSessaoRestantes: totalCreditos,
+          validade: primeiraValidade,
         },
         total_count: assinaturas?.length || 0,
-        summary: `Cliente possui ${assinaturas?.length || 0} programa(s) ativo(s) com ${totalCreditos} crédito(s) restante(s).`,
+        summary,
         executed_at: new Date().toISOString(),
         correlation_id: correlationId,
       };

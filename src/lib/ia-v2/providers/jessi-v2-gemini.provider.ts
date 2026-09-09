@@ -120,49 +120,99 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     const textoLower = texto.toLowerCase();
     const apiKey = this.obterApiKeyServidor();
 
-    // 1. Resolução Anafórica ("ele", "ela", "o mesmo") a partir do contexto prévio
-    let petNomeResolvido = req.contexto.petSelecionadoNome || null;
-    let clienteNomeResolvido = req.contexto.clienteSelecionadoNome || null;
+    // 1. Resolução Anafórica e Correção de Contexto
+    let petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || null;
+    let clienteNomeResolvido = req.contexto.clienteSelecionadoNome || req.contexto.cliente?.nome || null;
 
-    // Detecta menção explícita de novo nome de pet ou tutor na mensagem
-    const matchPet = texto.match(/(?:o|a|do|da|para o|para a)\s+([A-ZÀ-Ú][a-zà-ú]+)/);
-    if (matchPet && !["Thor", "Ele", "Ela", "Hoje", "Amanhã", "Amanha"].includes(matchPet[1])) {
-      petNomeResolvido = matchPet[1];
-    } else if (textoLower.includes("thor")) {
-      petNomeResolvido = "Thor";
-    } else if (textoLower.includes("mel")) {
-      petNomeResolvido = "Mel";
-    } else if (textoLower.includes("luna")) {
-      petNomeResolvido = "Luna";
-    } else if (textoLower.includes("bob") || textoLower.includes("bidu")) {
-      petNomeResolvido = textoLower.includes("bob") ? "Bob" : "Bidu";
+    // Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
+    const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
+    if (matchCorrecao && matchCorrecao[1] && !["Ele", "Ela", "Hoje", "Amanhã"].includes(matchCorrecao[1])) {
+      petNomeResolvido = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
+    } else {
+      // Detecta menção explícita de novo nome de pet ou tutor na mensagem
+      const matchPet = texto.match(/(?:o|a|do|da|para o|para a)\s+([A-ZÀ-Ú][a-zà-ú]+)/);
+      if (matchPet && !["Thor", "Ele", "Ela", "Hoje", "Amanhã", "Amanha"].includes(matchPet[1])) {
+        petNomeResolvido = matchPet[1];
+      } else if (textoLower.includes("thor")) {
+        petNomeResolvido = "Thor";
+      } else if (textoLower.includes("mel")) {
+        petNomeResolvido = "Mel";
+      } else if (textoLower.includes("luna")) {
+        petNomeResolvido = "Luna";
+      } else if (textoLower.includes("bob") || textoLower.includes("bidu")) {
+        petNomeResolvido = textoLower.includes("bob") ? "Bob" : "Bidu";
+      }
     }
 
-    // Se o usuário usa anáfora ("ele", "ela", "o mesmo"), mantém o pet do contexto
-    const usaAnafora = /\b(ele|ela|o mesmo|a mesma|nele|nela)\b/i.test(textoLower);
-    if (usaAnafora && req.contexto.petSelecionadoNome) {
-      petNomeResolvido = req.contexto.petSelecionadoNome;
+    // Se o usuário usa anáfora ("ele", "ela", "o mesmo", "desse cliente"), mantém o contexto anterior
+    const usaAnafora = /\b(ele|ela|o mesmo|a mesma|nele|nela|desse cliente|deste cliente|dele|dela|o pet|o animal)\b/i.test(textoLower);
+    if (usaAnafora && (req.contexto.petSelecionadoNome || req.contexto.pet?.nome)) {
+      petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || petNomeResolvido;
     }
 
     // 2. Resolução Temporal ("amanhã", "hoje", "sexta")
     const dataResolvida = this.resolverDataNatural(textoLower, req.contexto.dataReferencia);
 
-    // 3. Classificação Determinística com Suporte a Execução Híbrida / Online
+    // 3. Classificação Determinística de Intenção e Continuidade
     let dominio: any = "geral_conversacional";
     let intencao = "conversar";
     let requerConfirmacao = false;
     let ferramentaSugerida: string | null = null;
     let explicacao = "Compreensão conversacional em linguagem natural.";
 
+    // Continuidade de Programas / Validade ("E quando vence?", "Qual a validade?", "Tem crédito?")
+    const ehPerguntaValidade =
+      textoLower.includes("quando vence") ||
+      textoLower.includes("qual a validade") ||
+      textoLower.includes("quando expira") ||
+      textoLower.includes("validade") ||
+      textoLower.includes("vencimento") ||
+      textoLower.includes("tem credito") ||
+      textoLower.includes("tem crédito") ||
+      textoLower.includes("ainda tem") ||
+      textoLower.includes("restam sessoes") ||
+      textoLower.includes("restam sessões");
+
+    // Seleção ordinal em caso de desambiguação prévia ("o primeiro", "opção 1", "o segundo", "o 1")
+    const matchOrdinal = textoLower.match(/\b(o primeiro|a primeira|o 1|opção 1|opcao 1|o segundo|a segunda|o 2|opção 2|opcao 2|esse|este)\b/);
+
+    if (matchOrdinal) {
+      dominio = "clientes_pets";
+      intencao = "selecionar_candidato_ordinal";
+      ferramentaSugerida = "buscar_clientes_pets";
+      explicacao = `Seleção da opção ordinal "${matchOrdinal[1]}" da lista de desambiguação.`;
+    }
+    // Programas de Cuidados & Saldo de Créditos & Validade
+    else if (
+      ehPerguntaValidade ||
+      textoLower.includes("credito") ||
+      textoLower.includes("crédito") ||
+      textoLower.includes("saldo") ||
+      textoLower.includes("clubinho") ||
+      textoLower.includes("plano") ||
+      textoLower.includes("pacote")
+    ) {
+      dominio = "programas_creditos";
+      if (textoLower.includes("debitar") || textoLower.includes("usar credito") || textoLower.includes("baixar")) {
+        intencao = "preparar_consumo_credito";
+        requerConfirmacao = true;
+        ferramentaSugerida = "executar_consumo_credito";
+      } else {
+        intencao = "consultar_saldo_programas";
+        ferramentaSugerida = "consultar_saldo_programas";
+        explicacao = `Consultando créditos/validade do plano para ${petNomeResolvido || "o pet/cliente ativo no contexto"}.`;
+      }
+    }
     // Agenda / Agendamento
-    if (
+    else if (
       textoLower.includes("agenda") ||
       textoLower.includes("agendar") ||
       textoLower.includes("marcar") ||
       textoLower.includes("desmarcar") ||
       textoLower.includes("reagendar") ||
       textoLower.includes("horario") ||
-      textoLower.includes("vaga")
+      textoLower.includes("vaga") ||
+      textoLower.includes("atendimento")
     ) {
       dominio = "agenda";
       if (textoLower.includes("agendar") || textoLower.includes("marcar") || textoLower.includes("agenda ele") || textoLower.includes("agenda ela")) {
@@ -183,33 +233,15 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida = "consultar_agenda";
       }
     }
-    // Programas de Cuidados & Saldo de Créditos
-    else if (
-      textoLower.includes("credito") ||
-      textoLower.includes("crédito") ||
-      textoLower.includes("saldo") ||
-      textoLower.includes("clubinho") ||
-      textoLower.includes("plano") ||
-      textoLower.includes("pacote")
-    ) {
-      dominio = "programas_creditos";
-      if (textoLower.includes("debitar") || textoLower.includes("usar credito") || textoLower.includes("baixar")) {
-        intencao = "preparar_consumo_credito";
-        requerConfirmacao = true;
-        ferramentaSugerida = "executar_consumo_credito";
-      } else {
-        intencao = "consultar_saldo_programas";
-        ferramentaSugerida = "consultar_saldo_programas";
-        explicacao = `Consultando créditos do plano para ${petNomeResolvido || "o cliente"}.`;
-      }
-    }
     // Clientes & Pets
     else if (
       textoLower.includes("cliente") ||
       textoLower.includes("tutor") ||
       textoLower.includes("pet") ||
       textoLower.includes("ficha") ||
-      textoLower.includes("cadastrar")
+      textoLower.includes("cadastrar") ||
+      textoLower.includes("historico") ||
+      textoLower.includes("histórico")
     ) {
       dominio = "clientes_pets";
       if (textoLower.includes("cadastrar") || textoLower.includes("adicionar")) {
