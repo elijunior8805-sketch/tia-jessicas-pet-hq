@@ -8,10 +8,9 @@ import { JessiInputBar } from "./JessiInputBar";
 import { JessiContextPanel } from "./JessiContextPanel";
 import { JessiStatusIndicator, JessiStatus } from "./JessiStatusIndicator";
 import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia/jessi-agent.functions";
-import { JessiMessage, JessiPendingAction } from "@/lib/ia/jessi-contracts";
+import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
-import { JessiProactiveCentral } from "@/lib/ia/jessi-proactive.server";
 import { Sparkles, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

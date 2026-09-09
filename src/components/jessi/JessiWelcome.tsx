@@ -15,7 +15,7 @@ import {
   ShieldAlert,
   Sparkle
 } from "lucide-react";
-import { JessiProactiveCentral } from "@/lib/ia/jessi-proactive.server";
+import { JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { Button } from "@/components/ui/button";
 
 interface JessiWelcomeProps {

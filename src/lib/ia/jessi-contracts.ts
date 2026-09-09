@@ -62,3 +62,53 @@ export interface JessiMessage {
   pendingAction?: JessiPendingAction | null;
   intent?: any;
 }
+
+export interface BlocoHoje {
+  totalAgendamentos: number;
+  proximoAtendimento?: {
+    hora: string;
+    pet: string;
+    tutor: string;
+    servico: string;
+  } | null;
+  emAtendimento: number;
+  concluidos: number;
+  levaTrazCount: number;
+  faturamentoPrevisto: number;
+  horariosLivres: string[];
+}
+
+export interface BlocoAmanha {
+  totalAgendamentos: number;
+  primeiroHorario?: string | null;
+  levaTrazCount: number;
+  naoConfirmados: number;
+  horariosDisponiveisCount: number;
+}
+
+export interface ItemAtencao {
+  id: string;
+  tipo: "urgente" | "aviso" | "info";
+  titulo: string;
+  descricao: string;
+  acaoSugerida: string;
+  comando: string;
+}
+
+export interface ItemOportunidade {
+  id: string;
+  titulo: string;
+  descricao: string;
+  acaoSugerida: string;
+  comando: string;
+}
+
+export interface JessiProactiveCentral {
+  saudacaoPersonalizada: string;
+  dataReferencia: string;
+  proprietarioNome: string;
+  hoje: BlocoHoje;
+  amanha: BlocoAmanha;
+  precisaAtencao: ItemAtencao[];
+  oportunidades: ItemOportunidade[];
+}
