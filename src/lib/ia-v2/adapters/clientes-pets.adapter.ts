@@ -156,29 +156,38 @@ export class ClientesPetsAdapter {
 
       const candidatosRanqueados: CandidatoLocalizado[] = [];
 
-      // Avaliação de Clientes
+      // Avaliação de Clientes (Nome completo, primeiro nome, sobrenome, abreviado, sem acento, telefone, erros de digitação)
       (todosClientes || []).forEach((cli: any) => {
         const nomeNorm = normalizarTexto(cli.nome);
         const telLimpo = (cli.telefone || "").replace(/\D/g, "");
+        const partesNome = nomeNorm.split(/\s+/);
 
         let score = 0;
 
-        // Tier 2: Correspondência Exata de Nome Completo
+        // 1. Correspondência Exata de Nome Completo
         if (nomeNorm === termoNorm) {
           score = 1.0;
         }
-        // Tier 3: Telefone Exato ou Substring
+        // 2. Telefone Exato ou Substring (com ou sem DDD)
         else if (apenasDigitos.length >= 8 && telLimpo.includes(apenasDigitos)) {
           score = 0.98;
         }
-        // Tier 4: Nome Normalizado (Primeiro Nome / Sobrenome / Substring)
-        else if (nomeNorm.startsWith(termoNorm) || nomeNorm.includes(termoNorm)) {
+        // 3. Primeiro Nome ou Sobrenome Exato
+        else if (partesNome.some((p) => p === termoNorm)) {
+          score = 0.94;
+        }
+        // 4. Nome Abreviado / Iniciais (ex: "J. Silva", "Jessica S", "M. Santos")
+        else if (
+          partesNome.some((p) => p.startsWith(termoNorm) || termoNorm.startsWith(p)) ||
+          nomeNorm.startsWith(termoNorm) ||
+          nomeNorm.includes(termoNorm)
+        ) {
           score = 0.90;
         }
-        // Tier 5: Correspondência Aproximada (Levenshtein / Erro de Digitação)
+        // 5. Correspondência Aproximada / Erro de Digitação (Levenshtein)
         else {
           const sim = calcularSimilaridade(nomeNorm, termoNorm);
-          if (sim >= 0.70) score = sim * 0.85;
+          if (sim >= 0.70) score = sim * 0.86;
         }
 
         if (score > 0) {
@@ -186,14 +195,14 @@ export class ClientesPetsAdapter {
             id: cli.id,
             tipo: "cliente",
             nomePrincipal: cli.nome,
-            detalheSecundario: `Tutor • Tel: ${cli.telefone || "N/A"} • Pets: ${(cli.pets || []).map((p: any) => p.nome).join(", ") || "Nenhum"}`,
+            detalheSecundario: `Tutor • Tel: ${cli.telefone || "Sem telefone"} • Pets: ${(cli.pets || []).map((p: any) => p.nome).join(", ") || "Nenhum"}`,
             scoreConfianca: score,
             dadosCompletos: cli,
           });
         }
       });
 
-      // Avaliação de Pets
+      // Avaliação de Pets (Nome do pet, raça, pequeno erro de digitação, vínculo do tutor)
       (todosPets || []).forEach((pet: any) => {
         const nomeNorm = normalizarTexto(pet.nome);
         let score = 0;
