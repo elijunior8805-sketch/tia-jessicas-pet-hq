@@ -113,10 +113,20 @@ export class ProgramasCreditosAdapter {
         };
       });
 
-      const resumo =
-        listaFormatada.length > 0
-          ? `Existem ${listaFormatada.length} contrato(s) de programas ativos com saldo de créditos no Spa.`
-          : "Nenhum contrato ativo de programas encontrado no momento.";
+      let resumo = "";
+      if (listaFormatada.length === 0) {
+        resumo = "Não há nenhum contrato ativo de programas no momento.";
+      } else {
+        const itens = listaFormatada.map((item) => {
+          const contratacaoFmt = new Date(`${item.contratacaoData}T12:00:00`).toLocaleDateString("pt-BR");
+          const validadeFmt = new Date(`${item.validadeData}T12:00:00`).toLocaleDateString("pt-BR");
+          const situacao = item.statusPagamento === "pago" ? "Ativo (Pago)" : "Aguardando Confirmação de Pagamento";
+
+          return `• **${item.pet.nome}** (${item.tutor.nome}) — *${item.programa.nome}*\n  - Contratação: ${contratacaoFmt} | Validade: ${validadeFmt} (${item.diasRestantes} dias restantes)\n  - Créditos: ${item.creditosDisponiveis} disponíveis de ${item.creditosContratados} contratados (${item.creditosUtilizados} utilizados)\n  - Situação: ${situacao}`;
+        });
+
+        resumo = `Encontrei ${listaFormatada.length} contrato(s) ativo(s) do Clubinho no Spa:\n\n${itens.join("\n\n")}`;
+      }
 
       return {
         success: true,

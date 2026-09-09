@@ -32,17 +32,24 @@ export const ProgramaCard: React.FC<ProgramaCardProps> = ({ data, onActionClick 
           Nenhum plano do Clubinho ou pacote de créditos ativo para este pet.
         </div>
       ) : (
-        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
           {contratos.map((c: any, idx: number) => {
-            const nomeProg = c.programas_de_cuidado?.nome || c.nome_snapshot || "Clubinho";
-            const validade = c.data_de_validade ? new Date(c.data_de_validade).toLocaleDateString("pt-BR") : "Sem validade";
+            const nomeProg = c.programa?.nome || c.programas_de_cuidado?.nome || c.nome_snapshot || "Clubinho";
+            const validadeStr = c.validadeData || c.data_de_validade;
+            const validade = validadeStr ? new Date(`${validadeStr}T12:00:00`).toLocaleDateString("pt-BR") : "Sem validade";
+            const contratacaoStr = c.contratacaoData || c.data_da_venda || c.data_de_inicio;
+            const contratacao = contratacaoStr ? new Date(`${contratacaoStr}T12:00:00`).toLocaleDateString("pt-BR") : null;
             const status = c.status_do_programa || "ativo";
-            const petNome = c.pets?.nome || pet?.nome || "Pet";
+            const petNome = c.pet?.nome || c.pets?.nome || pet?.nome || "Pet";
+            const tutorNome = c.tutor?.nome || c.clientes?.nome || "Tutor";
+            const disponiveis = c.creditosDisponiveis ?? c.saldos?.[0]?.disponivel ?? 0;
+            const contratados = c.creditosContratados ?? c.saldos?.[0]?.criado ?? disponiveis;
+            const utilizados = c.creditosUtilizados ?? c.saldos?.[0]?.consumido ?? (contratados - disponiveis);
 
             return (
               <div
                 key={c.id || idx}
-                className="rounded-xl border border-border/80 bg-background/95 p-3 space-y-2 shadow-2xs"
+                className="rounded-xl border border-border/80 bg-background/95 p-3 space-y-2.5 shadow-2xs"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-foreground flex items-center gap-1.5">
@@ -54,10 +61,17 @@ export const ProgramaCard: React.FC<ProgramaCardProps> = ({ data, onActionClick 
                   </Badge>
                 </div>
 
-                <div className="text-[11px] text-muted-foreground flex justify-between pt-1 border-t border-border/40">
+                <div className="text-[11px] text-muted-foreground grid grid-cols-2 gap-1.5 pt-1 border-t border-border/40">
+                  <span>Pet: <strong className="text-foreground">{petNome}</strong></span>
+                  <span>Tutor: <strong className="text-foreground">{tutorNome}</strong></span>
+                  {contratacao && <span>Início: <strong>{contratacao}</strong></span>}
                   <span>Validade: <strong>{validade}</strong></span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/60 text-xs">
+                  <span className="text-[11px] text-muted-foreground">Saldo de Créditos:</span>
                   <span className="font-bold text-emerald-800">
-                    R$ {Number(c.preco_vendido || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    {disponiveis} disp. / {contratados} total ({utilizados} usados)
                   </span>
                 </div>
 
