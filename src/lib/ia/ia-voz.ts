@@ -60,85 +60,99 @@ export class VoiceRecognizer {
   private iniciando = false;
 
   constructor(private options: VoiceRecognitionOptions) {
-    if (typeof window === 'undefined') return;
+    // Não inicializa o hardware de áudio no construtor para não disparar erros do sistema no load
+  }
+
+  private initRecognition(): boolean {
+    if (this.recognition) return true;
+    if (typeof window === 'undefined') return false;
+
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       this.options.onError('Reconhecimento de voz não suportado neste navegador.');
-      return;
+      return false;
     }
 
-    this.recognition = new SpeechRecognition();
-    this.recognition.lang = 'pt-BR';
-    this.recognition.continuous = true;
-    this.recognition.interimResults = true;
-    this.recognition.maxAlternatives = 1;
+    try {
+      this.recognition = new SpeechRecognition();
+      this.recognition.lang = 'pt-BR';
+      this.recognition.continuous = true;
+      this.recognition.interimResults = true;
+      this.recognition.maxAlternatives = 1;
 
-    this.recognition.onstart = () => {
-      this.iniciando = false;
-      this.setStatus('listening');
-    };
+      this.recognition.onstart = () => {
+        this.iniciando = false;
+        this.setStatus('listening');
+      };
 
-    this.recognition.onresult = (event: any) => {
-      let interim = '';
-      let final = '';
+      this.recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const result = event.results[i];
-        if (result.isFinal) final += ` ${result[0].transcript}`;
-        else interim += ` ${result[0].transcript}`;
-      }
-
-      if (final.trim()) {
-        this.acumulado = consolidarTranscricao(`${this.acumulado} ${final}`);
-        this.options.onFinal(this.acumulado);
-        this.options.onInterim('');
-      }
-
-      if (interim.trim() && this.status === 'listening') {
-        this.options.onInterim(interim.trim());
-      }
-    };
-
-    this.recognition.onerror = (event: any) => {
-      this.iniciando = false;
-      const err = event?.error;
-      // Silêncio e abortos não são falhas: mantêm o texto e o ciclo.
-      if (err === 'no-speech' || err === 'aborted') return;
-      this.setStatus('error');
-      this.options.onError(err || 'Erro no reconhecimento de voz.');
-      setTimeout(() => {
-        if (this.status === 'error') {
-          this.setStatus('idle');
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const result = event.results[i];
+          if (result.isFinal) final += ` ${result[0].transcript}`;
+          else interim += ` ${result[0].transcript}`;
         }
-      }, 1500);
-    };
 
-    this.recognition.onend = () => {
-      this.iniciando = false;
+        if (final.trim()) {
+          this.acumulado = consolidarTranscricao(`${this.acumulado} ${final}`);
+          this.options.onFinal(this.acumulado);
+          this.options.onInterim('');
+        }
 
-      // Reinício automático quando o navegador corta sozinho e o usuário não pediu parada.
-      if (!this.pararSolicitado && this.status === 'listening') {
+        if (interim.trim() && this.status === 'listening') {
+          this.options.onInterim(interim.trim());
+        }
+      };
+
+      this.recognition.onerror = (event: any) => {
+        this.iniciando = false;
+        const err = event?.error;
+        // Silêncio e abortos não são falhas: mantêm o texto e o ciclo.
+        if (err === 'no-speech' || err === 'aborted') return;
+        this.setStatus('error');
+        this.options.onError(err || 'Erro no reconhecimento de voz.');
         setTimeout(() => {
-          try {
-            this.recognition.start();
-          } catch {
-            this.setStatus(this.acumulado ? 'reviewing' : 'idle');
+          if (this.status === 'error') {
+            this.setStatus('idle');
           }
-        }, 80);
-        return;
-      }
+        }, 1500);
+      };
 
-      if (this.status === 'error') return;
+      this.recognition.onend = () => {
+        this.iniciando = false;
 
-      this.setStatus('finalizing');
-      this.acumulado = consolidarTranscricao(this.acumulado);
-      this.options.onInterim('');
-      this.options.onFinal(this.acumulado);
-      this.setStatus(this.acumulado ? 'reviewing' : 'idle');
-      this.pararSolicitado = false;
-    };
+        // Reinício automático quando o navegador corta sozinho e o usuário não pediu parada.
+        if (!this.pararSolicitado && this.status === 'listening') {
+          setTimeout(() => {
+            try {
+              this.recognition?.start();
+            } catch {
+              this.setStatus(this.acumulado ? 'reviewing' : 'idle');
+            }
+          }, 80);
+          return;
+        }
+
+        if (this.status === 'error') return;
+
+        this.setStatus('finalizing');
+        this.acumulado = consolidarTranscricao(this.acumulado);
+        this.options.onInterim('');
+        this.options.onFinal(this.acumulado);
+        this.setStatus(this.acumulado ? 'reviewing' : 'idle');
+        this.pararSolicitado = false;
+      };
+
+      return true;
+    } catch (e: any) {
+      console.warn('[VoiceRecognizer] Erro ao instanciar SpeechRecognition:', e);
+      this.options.onError('Falha ao inicializar o microfone no navegador.');
+      return false;
+    }
   }
 
   private setStatus(s: VoiceRecognitionStatus) {
@@ -150,10 +164,9 @@ export class VoiceRecognizer {
     return this.status;
   }
 
-  /** Inicia a captura preservando qualquer rascunho já revisado. */
+  /** Inicia a captura sob demanda preservando qualquer rascunho já revisado. */
   start(textoInicial = '') {
-    if (!this.recognition) {
-      this.options.onError('Reconhecimento de voz não suportado neste navegador.');
+    if (!this.initRecognition()) {
       return;
     }
     if (this.iniciando || this.status === 'listening' || this.status === 'requesting_permission') {
