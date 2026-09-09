@@ -15,8 +15,10 @@ const SELECT_AGENDA = `
   status,
   valor_previsto,
   observacoes,
+  leva_traz_modalidade,
   clientes(id, nome, whatsapp),
-  pets(id, nome, raca, porte)
+  pets(id, nome, raca, porte),
+  servicos(id, nome, valor_padrao)
 `;
 
 function partirDataHora(dataHoraISO: string): { data: string; hora: string } {
@@ -42,7 +44,7 @@ function partirDataHora(dataHoraISO: string): { data: string; hora: string } {
 
 export class AgendaAdapter {
   /**
-   * Consulta os agendamentos de uma data específica
+   * Consulta os agendamentos de uma data específica com formatação rica
    */
   static async consultarAgendaPorData(
     sb: SupabaseClient<Database>,
@@ -59,12 +61,32 @@ export class AgendaAdapter {
 
       if (error) throw error;
 
+      const total = agendamentos?.length || 0;
+      let summary = "";
+
+      if (total === 0) {
+        summary = `Não há nenhum agendamento registrado para a data ${data}. A grade está totalmente livre.`;
+      } else {
+        const itens = (agendamentos || []).map((ag: any) => {
+          const horaFmt = (ag.hora || "").slice(0, 5) || "--:--";
+          const pet = ag.pets?.nome || "Pet";
+          const raca = ag.pets?.raca ? ` (${ag.pets.raca})` : "";
+          const tutor = ag.clientes?.nome ? ` • Tutor: ${ag.clientes.nome}` : "";
+          const srv = ag.servicos?.nome || "Atendimento";
+          const st = ag.status === "confirmado" ? "Confirmado" : ag.status === "em_atendimento" ? "Em Atendimento" : ag.status === "concluido" ? "Concluído" : "Aguardando confirmação";
+          const transp = ag.leva_traz_modalidade && ag.leva_traz_modalidade !== "nao_utilizar" ? " 🚐 (Leva e Traz)" : "";
+          return `• ${horaFmt} — **${pet}**${raca} • ${srv}${tutor} • Status: ${st}${transp}`;
+        });
+
+        summary = `Encontrei ${total} agendamento(s) para ${data}:\n\n${itens.join("\n")}`;
+      }
+
       return {
         success: true,
         source: "tabela_agendamentos",
         data: agendamentos || [],
-        total_count: agendamentos?.length || 0,
-        summary: `Foram encontrados ${agendamentos?.length || 0} agendamento(s) para a data ${data}.`,
+        total_count: total,
+        summary,
         filters_applied: { data },
         executed_at: new Date().toISOString(),
         correlation_id: correlationId,
