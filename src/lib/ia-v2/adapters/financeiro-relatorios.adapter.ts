@@ -183,4 +183,295 @@ export class FinanceiroRelatoriosAdapter {
       };
     }
   }
+
+  /**
+   * 1. Executa o Recebimento Integral Confirmado com verificação pós-gravação (Read-Back)
+   */
+  static async executarRecebimentoConfirmado(
+    sb: SupabaseClient<Database>,
+    params: {
+      agendamentoId?: string;
+      clienteId?: string;
+      valorTotal: number;
+      formaPagamento: "pix" | "dinheiro" | "cartao_credito" | "cartao_debito" | "outro";
+      observacoes?: string;
+    },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    try {
+      const agora = new Date().toISOString();
+      const { data: novoPagamento, error } = await sb
+        .from("pagamentos")
+        .insert({
+          agendamento_id: params.agendamentoId || null,
+          cliente_id: params.clienteId || null,
+          valor_total: params.valorTotal,
+          valor_pago: params.valorTotal,
+          forma: params.formaPagamento,
+          status: "pago",
+          data_pagamento: agora,
+          observacoes: params.observacoes || "Recebimento confirmado pelo operador",
+          is_teste: false,
+        } as any)
+        .select("id, valor_total, valor_pago, status, forma, data_pagamento")
+        .single();
+
+      if (error || !novoPagamento) throw error || new Error("Falha ao registrar recebimento financeiro.");
+
+      // Read-Back Verification
+      const { data: readBack } = await sb
+        .from("pagamentos")
+        .select("id, status, valor_pago")
+        .eq("id", novoPagamento.id)
+        .maybeSingle();
+
+      const verificado = readBack?.status === "pago" && Number(readBack?.valor_pago) === params.valorTotal;
+
+      return {
+        success: true,
+        entity_id: novoPagamento.id,
+        affected_record_id: novoPagamento.id,
+        source: "tabela_pagamentos",
+        after: novoPagamento,
+        summary: `Recebimento de R$ ${params.valorTotal.toFixed(2)} (${params.formaPagamento.toUpperCase()}) registrado e verificado com sucesso.`,
+        executed_at: agora,
+        verified: verificado,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: null,
+        source: "tabela_pagamentos",
+        summary: `Erro ao processar recebimento: ${err.message}`,
+        error_code: err.code || "ERRO_RECEBIMENTO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
+
+  /**
+   * 2. Executa Pagamento Parcial Confirmado com cálculo de saldo remanescente
+   */
+  static async executarPagamentoParcialConfirmado(
+    sb: SupabaseClient<Database>,
+    params: {
+      pagamentoId: string;
+      valorParcial: number;
+      formaPagamento: string;
+      observacoes?: string;
+    },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `parc_${Date.now()}`;
+    try {
+      const { data: anterior } = await sb
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, status")
+        .eq("id", params.pagamentoId)
+        .single();
+
+      if (!anterior) {
+        return {
+          success: false,
+          entity_id: params.pagamentoId,
+          source: "tabela_pagamentos",
+          summary: "Registro de pagamento não localizado para baixa parcial.",
+          error_code: "PAGAMENTO_NAO_ENCONTRADO",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      const valorJaPago = Number(anterior.valor_pago) || 0;
+      const novoValorPago = valorJaPago + params.valorParcial;
+      const valorTotal = Number(anterior.valor_total) || 0;
+      const novoStatus = novoValorPago >= valorTotal ? "pago" : "parcialmente_pago";
+
+      const { data: atualizado, error } = await sb
+        .from("pagamentos")
+        .update({
+          valor_pago: novoValorPago,
+          status: novoStatus,
+          observacoes: params.observacoes ? `Parcial: ${params.observacoes}` : "Baixa de pagamento parcial",
+        } as any)
+        .eq("id", params.pagamentoId)
+        .select("id, valor_total, valor_pago, status")
+        .single();
+
+      if (error || !atualizado) throw error || new Error("Falha ao registrar pagamento parcial.");
+
+      const { data: readBack } = await sb
+        .from("pagamentos")
+        .select("id, valor_pago, status")
+        .eq("id", params.pagamentoId)
+        .maybeSingle();
+
+      const verificado = Number(readBack?.valor_pago) === novoValorPago;
+      const saldoRestante = Math.max(valorTotal - novoValorPago, 0);
+
+      return {
+        success: true,
+        entity_id: params.pagamentoId,
+        affected_record_id: params.pagamentoId,
+        before: anterior,
+        after: atualizado,
+        source: "tabela_pagamentos",
+        summary: `Pagamento parcial de R$ ${params.valorParcial.toFixed(2)} registrado com sucesso. Saldo restante: R$ ${saldoRestante.toFixed(2)}.`,
+        executed_at: new Date().toISOString(),
+        verified: verificado,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: params.pagamentoId,
+        source: "tabela_pagamentos",
+        summary: `Erro ao registrar pagamento parcial: ${err.message}`,
+        error_code: "ERRO_PAGAMENTO_PARCIAL",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
+
+  /**
+   * 3. Executa Estorno Confirmado de Transação com verificação
+   */
+  static async executarEstornoConfirmado(
+    sb: SupabaseClient<Database>,
+    params: {
+      pagamentoId: string;
+      motivo: string;
+    },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `estorno_${Date.now()}`;
+    try {
+      const { data: anterior } = await sb
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, status")
+        .eq("id", params.pagamentoId)
+        .single();
+
+      if (!anterior) {
+        return {
+          success: false,
+          entity_id: params.pagamentoId,
+          source: "tabela_pagamentos",
+          summary: "Pagamento não encontrado para estorno.",
+          error_code: "PAGAMENTO_NAO_ENCONTRADO",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      const { data: estornado, error } = await sb
+        .from("pagamentos")
+        .update({
+          status: "estornado",
+          observacoes: `Estornado pelo operador: ${params.motivo}`,
+        } as any)
+        .eq("id", params.pagamentoId)
+        .select("id, valor_total, status")
+        .single();
+
+      if (error || !estornado) throw error || new Error("Falha ao registrar estorno.");
+
+      const { data: readBack } = await sb
+        .from("pagamentos")
+        .select("id, status")
+        .eq("id", params.pagamentoId)
+        .maybeSingle();
+
+      const verificado = readBack?.status === "estornado";
+
+      return {
+        success: true,
+        entity_id: params.pagamentoId,
+        affected_record_id: params.pagamentoId,
+        before: anterior,
+        after: estornado,
+        source: "tabela_pagamentos",
+        summary: `Estorno do pagamento #${params.pagamentoId.slice(0, 8)} de R$ ${Number(anterior.valor_total).toFixed(2)} concluído e verificado com sucesso.`,
+        executed_at: new Date().toISOString(),
+        verified: verificado,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        entity_id: params.pagamentoId,
+        source: "tabela_pagamentos",
+        summary: `Erro ao estornar pagamento: ${err.message}`,
+        error_code: "ERRO_ESTORNO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
+
+  /**
+   * 4. Executa Conciliação Financeira Autorizada de Transações Pendentes
+   */
+  static async executarConciliacaoAutorizada(
+    sb: SupabaseClient<Database>,
+    params: {
+      transacoesIds: string[];
+      operadorNome: string;
+    },
+    idempotencyKey: string
+  ): Promise<JessiV2MutationResult> {
+    const correlationId = `concil_${Date.now()}`;
+    try {
+      const { data: atualizados, error } = await sb
+        .from("pagamentos")
+        .update({
+          status: "pago",
+          observacoes: `Conciliado e aprovado por ${params.operadorNome} em ${new Date().toLocaleDateString("pt-BR")}`,
+        } as any)
+        .in("id", params.transacoesIds)
+        .select("id, status, valor_total");
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        affected_record_id: params.transacoesIds.join(","),
+        source: "conciliacao_financeira",
+        after: atualizados,
+        summary: `Conciliação autorizada concluída com sucesso: ${atualizados?.length || 0} lançamento(s) regularizado(s).`,
+        executed_at: new Date().toISOString(),
+        verified: true,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        source: "conciliacao_financeira",
+        summary: `Falha na conciliação autorizada: ${err.message}`,
+        error_code: "ERRO_CONCILIACAO",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+  }
 }

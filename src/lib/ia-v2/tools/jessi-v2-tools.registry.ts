@@ -328,6 +328,18 @@ export async function despacharFerramentaV2(
     case "executar_consumo_credito":
       return await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(sb, params as any, chave);
 
+    case "executar_recebimento":
+      return await FinanceiroRelatoriosAdapter.executarRecebimentoConfirmado(sb, params as any, chave);
+
+    case "executar_pagamento_parcial":
+      return await FinanceiroRelatoriosAdapter.executarPagamentoParcialConfirmado(sb, params as any, chave);
+
+    case "executar_estorno":
+      return await FinanceiroRelatoriosAdapter.executarEstornoConfirmado(sb, params as any, chave);
+
+    case "executar_conciliacao":
+      return await FinanceiroRelatoriosAdapter.executarConciliacaoAutorizada(sb, params as any, chave);
+
     default:
       return {
         success: false,

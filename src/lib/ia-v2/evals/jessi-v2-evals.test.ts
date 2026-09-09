@@ -1514,4 +1514,148 @@ describe("Banco de Testes e Evals da Jessi IA V2 (60 Casos)", () => {
       expect(proposta.summary).toContain("Saldo Restante de Créditos: 2");
     });
   });
+
+  // =========================================================================
+  // SUITE 14: Fase 6 — Financeiro (Recebimento, Pagamento Parcial, Estorno, Conciliação Autorizada)
+  // =========================================================================
+  describe("Suite 14: Fase 6 — Financeiro", () => {
+    it("86. Recebimento Integral: Registra transação paga e valida com Read-Back", async () => {
+      const mockSb: any = {
+        from: () => ({
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({
+                data: { id: "pg_100", valor_total: 120, valor_pago: 120, status: "pago", forma: "pix" },
+                error: null,
+              }),
+            }),
+          }),
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: "pg_100", status: "pago", valor_pago: 120 },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.executarRecebimentoConfirmado(
+        mockSb,
+        { valorTotal: 120, formaPagamento: "pix", agendamentoId: "ag_100" },
+        "idemp_rec_86"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.entity_id).toBe("pg_100");
+    });
+
+    it("87. Pagamento Parcial: Atualiza valor pago acumulado e calcula saldo restante", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: { id: "pg_200", valor_total: 200, valor_pago: 50, status: "parcialmente_pago" },
+                error: null,
+              }),
+              maybeSingle: () => Promise.resolve({
+                data: { id: "pg_200", valor_pago: 150, status: "parcialmente_pago" },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id: "pg_200", valor_total: 200, valor_pago: 150, status: "parcialmente_pago" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.executarPagamentoParcialConfirmado(
+        mockSb,
+        { pagamentoId: "pg_200", valorParcial: 100, formaPagamento: "dinheiro" },
+        "idemp_parc_87"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.summary).toContain("Saldo restante: R$ 50.00");
+    });
+
+    it("88. Estorno Confirmado: Atualiza status para estornado e confere gravação física", async () => {
+      const mockSb: any = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: { id: "pg_300", valor_total: 90, status: "pago" },
+                error: null,
+              }),
+              maybeSingle: () => Promise.resolve({
+                data: { id: "pg_300", status: "estornado" },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id: "pg_300", valor_total: 90, status: "estornado" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.executarEstornoConfirmado(
+        mockSb,
+        { pagamentoId: "pg_300", motivo: "Cliente cancelou antes do banho" },
+        "idemp_estorno_88"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.summary).toContain("Estorno do pagamento #pg_300");
+    });
+
+    it("89. Conciliação Autorizada: Atualiza lote de transações autorizadas pelo operador", async () => {
+      const mockSb: any = {
+        from: () => ({
+          update: () => ({
+            in: () => ({
+              select: () => Promise.resolve({
+                data: [
+                  { id: "pg_c1", status: "pago", valor_total: 100 },
+                  { id: "pg_c2", status: "pago", valor_total: 150 },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const res = await FinanceiroRelatoriosAdapter.executarConciliacaoAutorizada(
+        mockSb,
+        { transacoesIds: ["pg_c1", "pg_c2"], operadorNome: "Jéssica" },
+        "idemp_concil_89"
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.verified).toBe(true);
+      expect(res.summary).toContain("2 lançamento(s) regularizado(s)");
+    });
+  });
 });
