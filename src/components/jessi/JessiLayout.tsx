@@ -58,6 +58,7 @@ export const JessiLayout: React.FC = () => {
     startListening,
     stopListening,
     cancelListening,
+    resetTranscript,
   } = useJessiVoice((textoFinal) => {
     if (textoFinal.trim()) {
       setInputText(textoFinal);
