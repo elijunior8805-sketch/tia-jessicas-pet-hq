@@ -8,6 +8,7 @@ import {
 } from "../contracts/jessi-v2-contracts";
 import { JessiV2ContextState, criarSessaoV2 } from "../session/jessi-v2-session";
 import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
+import { JessiV2FallbackProvider } from "../providers/jessi-v2-fallback.provider";
 import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
 import { AgendaAdapter } from "../adapters/agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
@@ -23,6 +24,7 @@ import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
  */
 
 const geminiProvider = new JessiV2GeminiProvider();
+const fallbackProvider = new JessiV2FallbackProvider();
 
 export async function processarMensagemJessiV2Core(
   sb: SupabaseClient<Database>,
@@ -92,11 +94,21 @@ export async function processarMensagemJessiV2Core(
     }
 
     // 2. Classificação NLU de Intenção e Entidades (Resolução Anafórica e Temporal)
-    const nluResult = await geminiProvider.classificarIntencao({
-      mensagem: input.mensagem,
-      contexto: contextoAtual,
-      historico: input.historico || [],
-    });
+    let nluResult;
+    try {
+      nluResult = await geminiProvider.classificarIntencao({
+        mensagem: input.mensagem,
+        contexto: contextoAtual,
+        historico: input.historico || [],
+      });
+    } catch (providerErr) {
+      console.warn("[JessiV2] Falha no provedor primário. Acionando fallback determinístico:", providerErr);
+      nluResult = await fallbackProvider.classificarIntencao({
+        mensagem: input.mensagem,
+        contexto: contextoAtual,
+        historico: input.historico || [],
+      });
+    }
 
     const intencao = nluResult.intencao;
 
