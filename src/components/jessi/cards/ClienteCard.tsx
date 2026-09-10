@@ -36,7 +36,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
               {onActionClick && (
                 <Button
                   size="sm"
-                  onClick={() => onActionClick(`Selecionar opção ${idx + 1}: ${opcao.nome || opcao.nomePrincipal}`)}
+                  onClick={() => onActionClick(`Selecionar opção ${idx + 1}: ${opcao.nome || opcao.nomePrincipal}${opcao.id ? ` [id:${opcao.id}]` : ""}`)}
                   className="h-7 px-2.5 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-medium"
                 >
                   Selecionar

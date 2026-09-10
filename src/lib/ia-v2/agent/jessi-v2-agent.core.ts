@@ -144,6 +144,220 @@ export async function processarMensagemJessiV2Core(
       };
     }
 
+    // 1.1 Tratamento Imediato de Seleção de Opção / Desambiguação
+    const matchIdDireto = textoLimpo.match(/\[id:([a-f0-9-]+)\]/i);
+    const ehSelecaoOpcao =
+      Boolean(matchIdDireto) ||
+      textoLower.startsWith("selecionar opção") ||
+      textoLower.startsWith("selecionar opcao") ||
+      textoLower.startsWith("opção ") ||
+      textoLower.startsWith("opcao ") ||
+      /^(1|2|3|4|5)$/.test(textoLower) ||
+      /\b(primeiro|primeira|segundo|segunda|terceiro|terceira)\b/i.test(textoLower);
+
+    const candidatosEmEspera =
+      (input.contexto as any)?.variaveisConversacao?.candidatosEmEspera ||
+      (contextoAtual as any)?.variaveisConversacao?.candidatosEmEspera ||
+      (contextoAtual as any)?.candidatosEmEspera;
+
+    if (ehSelecaoOpcao) {
+      let candidatoEscolhido: any = null;
+
+      if (matchIdDireto && matchIdDireto[1]) {
+        const idAlvo = matchIdDireto[1];
+        const { data: petAlvo } = await sb
+          .from("pets")
+          .select("id, nome, raca, porte, cliente_id, clientes(id, nome, whatsapp, telefone)")
+          .eq("id", idAlvo)
+          .maybeSingle();
+
+        if (petAlvo) {
+          candidatoEscolhido = {
+            id: petAlvo.id,
+            tipo: "pet",
+            nomePrincipal: petAlvo.nome,
+            dadosCompletos: {
+              ...petAlvo,
+              cliente: petAlvo.clientes,
+            },
+          };
+        } else {
+          const { data: clienteAlvo } = await sb
+            .from("clientes")
+            .select("id, nome, whatsapp, telefone, rua, numero, bairro, cidade")
+            .eq("id", idAlvo)
+            .maybeSingle();
+
+          if (clienteAlvo) {
+            candidatoEscolhido = {
+              id: clienteAlvo.id,
+              tipo: "cliente",
+              nomePrincipal: clienteAlvo.nome,
+              dadosCompletos: clienteAlvo,
+            };
+          }
+        }
+      } else {
+        let index = 0;
+        const matchNum = textoLower.match(/\b([1-5])\b/);
+        if (matchNum) {
+          index = parseInt(matchNum[1], 10) - 1;
+        } else if (textoLower.includes("segund")) {
+          index = 1;
+        } else if (textoLower.includes("terceir")) {
+          index = 2;
+        }
+
+        if (Array.isArray(candidatosEmEspera) && candidatosEmEspera[index]) {
+          candidatoEscolhido = candidatosEmEspera[index];
+        } else {
+          // Extrai o nome após os dois pontos (ex: "Selecionar opção 1: Thor")
+          const matchNome = textoLimpo.match(/(?:opção|opcao)\s+\d+:\s*([^\n\r\[\]]+)/i);
+          const nomeTermo = matchNome ? matchNome[1].trim() : textoLimpo.replace(/selecionar\s+opção\s+\d+:?/gi, "").trim();
+          if (nomeTermo) {
+            const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, nomeTermo);
+            if (resBusca.success && resBusca.data.candidatos.length > index) {
+              candidatoEscolhido = resBusca.data.candidatos[index];
+            } else if (resBusca.success && resBusca.data.candidatos.length > 0) {
+              candidatoEscolhido = resBusca.data.candidatos[0];
+            }
+          }
+        }
+      }
+
+      if (candidatoEscolhido) {
+        if (candidatoEscolhido.tipo === "pet") {
+          const petNomeSel = candidatoEscolhido.nomePrincipal || candidatoEscolhido.nome;
+          const petIdSel = candidatoEscolhido.id;
+          const tutorNome = candidatoEscolhido.dadosCompletos?.cliente?.nome || candidatoEscolhido.dadosCompletos?.clientes?.nome || "Tutor";
+          const tutorId = candidatoEscolhido.dadosCompletos?.cliente_id || candidatoEscolhido.dadosCompletos?.cliente?.id || candidatoEscolhido.dadosCompletos?.clientes?.id;
+
+          novoContexto.pet = {
+            id: petIdSel,
+            nome: petNomeSel,
+            raca: candidatoEscolhido.dadosCompletos?.raca,
+            porte: candidatoEscolhido.dadosCompletos?.porte,
+          };
+          novoContexto.cliente = {
+            id: tutorId,
+            nome: tutorNome,
+          };
+
+          respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**). Qual serviço você deseja agendar (ex: Banho, Tosa, Banho e Tosa) e para qual data e horário?`;
+
+          cards.push({
+            type: "cliente",
+            title: `Pet Selecionado: ${petNomeSel}`,
+            subtitle: `Tutor: ${tutorNome}`,
+            data: candidatoEscolhido.dadosCompletos || candidatoEscolhido,
+          });
+
+          return {
+            versao: "v2",
+            respostaTexto,
+            cards,
+            pendingAction: null,
+            novoContexto: {
+              ...contextoAtual,
+              ...novoContexto,
+              variaveisConversacao: {
+                ...contextoAtual.variaveisConversacao,
+                candidatosEmEspera: null,
+              },
+            },
+            intencao: {
+              dominio: "agenda",
+              intencao: "preparar_agendamento",
+              confianca: 1.0,
+              entidades: {
+                petNome: petNomeSel,
+                petId: petIdSel,
+                clienteNome: tutorNome,
+                clienteId: tutorId,
+              } as any,
+              requerConfirmacao: false,
+              ferramentaSugerida: "criar_agendamento",
+              explicacaoRaciocinio: "Opção de pet selecionada pelo operador.",
+            },
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        } else if (candidatoEscolhido.tipo === "cliente") {
+          const clienteNomeSel = candidatoEscolhido.nomePrincipal || candidatoEscolhido.nome;
+          const clienteIdSel = candidatoEscolhido.id;
+
+          novoContexto.cliente = {
+            id: clienteIdSel,
+            nome: clienteNomeSel,
+            telefone: candidatoEscolhido.dadosCompletos?.telefone || candidatoEscolhido.dadosCompletos?.whatsapp,
+          };
+
+          // Busca pets deste cliente
+          const { data: petsDoCliente } = await sb
+            .from("pets")
+            .select("id, nome, raca, porte")
+            .eq("cliente_id", clienteIdSel);
+
+          if (petsDoCliente && petsDoCliente.length === 1) {
+            novoContexto.pet = {
+              id: petsDoCliente[0].id,
+              nome: petsDoCliente[0].nome,
+              raca: petsDoCliente[0].raca,
+              porte: petsDoCliente[0].porte,
+            };
+
+            respostaTexto = `Selecionei o tutor **${clienteNomeSel}** e seu pet **${petsDoCliente[0].nome}**. Qual serviço deseja agendar (ex: Banho, Tosa) e para qual data e horário?`;
+          } else if (petsDoCliente && petsDoCliente.length > 1) {
+            respostaTexto = `Selecionei o tutor **${clienteNomeSel}**. Ele possui ${petsDoCliente.length} pets cadastrados (${petsDoCliente.map((p) => `**${p.nome}**`).join(", ")}). Para qual pet você deseja o atendimento?`;
+            cards.push({
+              type: "cliente",
+              title: `Pets de ${clienteNomeSel}`,
+              subtitle: "Selecione o pet desejado",
+              data: {
+                opcoes: petsDoCliente.map((p) => ({
+                  id: p.id,
+                  tipo: "pet",
+                  nome: p.nome,
+                  detalhe: `${p.raca || "Raça não informada"} • ${p.porte || "Porte médio"}`,
+                })),
+              },
+            });
+          } else {
+            respostaTexto = `Selecionei o cliente **${clienteNomeSel}**. O que você deseja consultar ou registrar para ele?`;
+          }
+
+          return {
+            versao: "v2",
+            respostaTexto,
+            cards,
+            pendingAction: null,
+            novoContexto: {
+              ...contextoAtual,
+              ...novoContexto,
+              variaveisConversacao: {
+                ...contextoAtual.variaveisConversacao,
+                candidatosEmEspera: null,
+              },
+            },
+            intencao: {
+              dominio: "clientes_pets",
+              intencao: "selecionar_cliente",
+              confianca: 1.0,
+              entidades: {
+                clienteNome: clienteNomeSel,
+                clienteId: clienteIdSel,
+              } as any,
+              requerConfirmacao: false,
+              ferramentaSugerida: "buscar_clientes_pets",
+              explicacaoRaciocinio: "Opção de cliente selecionada pelo operador.",
+            },
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+      }
+    }
+
     // 2. Classificação NLU de Intenção e Entidades (Resolução Anafórica e Temporal)
     let nluResult;
     try {
