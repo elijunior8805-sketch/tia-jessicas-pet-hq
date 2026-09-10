@@ -91,15 +91,19 @@ export class JessiV2Audit {
     entry: JessiV2AuditEntry
   ): Promise<void> {
     try {
-      await sb.from("ia_auditoria" as any).insert({
-        user_id: entry.usuarioId || null,
-        comando_original: `[${entry.versaoJessi}] ${entry.intencao}`,
-        intencao_detectada: entry.intencao,
-        ferramenta_utilizada: entry.ferramenta || "core",
-        parametros: {
+      const usuarioId = entry.usuarioId || entry.userId || null;
+      const intencao = entry.intencao || entry.intencaoDetectada || "operacao_jessi";
+      const ferramenta = entry.ferramenta || entry.ferramentaUtilizada || "core";
+      const comandoOriginal = entry.comandoOriginal || `[${entry.versaoJessi || "v2.0"}] ${intencao}`;
+
+      await sb.from("ia_auditoria").insert({
+        usuario_id: usuarioId,
+        comando_original: comandoOriginal,
+        intencao_identificada: intencao,
+        ferramentas_chamadas: [ferramenta],
+        dados_extraidos: (entry.entidades || entry.filtros) ? { entidades: entry.entidades, filtros: entry.filtros } : null,
+        metadados: {
           conversaId: entry.conversaId,
-          entidades: entry.entidades,
-          filtros: entry.filtros,
           proposta: entry.propostaSnapshot,
           antes: entry.antes,
           depois: entry.depois,
@@ -108,12 +112,12 @@ export class JessiV2Audit {
           correlationId: entry.correlationId,
           readBackVerificado: entry.readBackVerificado,
           erro: entry.erro,
-          duracaoMs: entry.duracaoMs,
-          versaoJessi: entry.versaoJessi,
+          duracaoMs: entry.duracaoMs || entry.tempoProcessamentoMs,
+          versaoJessi: entry.versaoJessi || "v2.0",
         },
-        resposta_ia: entry.resultadoResumo,
-        sucesso: !entry.erro,
-        tempo_resposta_ms: entry.duracaoMs,
+        status: entry.erro ? "erro" : "sucesso",
+        tempo_resposta_ms: entry.duracaoMs || entry.tempoProcessamentoMs || null,
+        transcricao: entry.resultadoResumo || null,
         created_at: entry.data || new Date().toISOString(),
       });
     } catch (err) {

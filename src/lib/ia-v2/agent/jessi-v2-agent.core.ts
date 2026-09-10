@@ -14,6 +14,7 @@ import { AgendaAdapter } from "../adapters/agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
 import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
 import { JessiV2ConfirmationManager } from "../confirmation/jessi-v2-confirmation.manager";
+import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
 import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
 
@@ -72,27 +73,28 @@ export async function processarMensagemJessiV2Core(
       let mutationResult: any = null;
       let recordIdReal: string | null = null;
 
-      if (
-        toolNome === "criar_agendamento" ||
-        toolNome === "preparar_agendamento" ||
-        toolNome === "executar_agendamento"
-      ) {
-        mutationResult = await AgendaAdapter.executarAgendamentoConfirmado(sb, params, idempotencyKey);
-        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
-      } else if (
-        toolNome === "preparar_reagendamento" ||
-        toolNome === "reagendar_agendamento" ||
-        toolNome === "remarcar_agendamento"
-      ) {
-        mutationResult = await AgendaAdapter.executarRemarcacaoConfirmada(sb, params, idempotencyKey);
-        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
-      } else if (
-        toolNome === "preparar_cancelamento" ||
-        toolNome === "cancelar_agendamento"
-      ) {
-        mutationResult = await AgendaAdapter.executarCancelamentoConfirmado(sb, params, idempotencyKey);
-        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
+      // Mapeia intenções preparadas para as ferramentas de execução registradas
+      let toolEfetivo = toolNome;
+      if (toolNome === "preparar_agendamento" || toolNome === "agendar_horario") {
+        toolEfetivo = "criar_agendamento";
+      } else if (toolNome === "preparar_reagendamento" || toolNome === "remarcar_agendamento" || toolNome === "reagendar_horario") {
+        toolEfetivo = "reagendar_agendamento";
+      } else if (toolNome === "preparar_cancelamento") {
+        toolEfetivo = "cancelar_agendamento";
+      } else if (toolNome === "preparar_cadastro_cliente" || toolNome === "cadastrar_cliente") {
+        toolEfetivo = "executar_cadastro_cliente";
+      } else if (toolNome === "preparar_consumo_credito" || toolNome === "consumir_credito") {
+        toolEfetivo = "executar_consumo_credito";
+      } else if (toolNome === "preparar_recebimento" || toolNome === "receber_pagamento" || toolNome === "registrar_recebimento") {
+        toolEfetivo = "executar_recebimento";
+      } else if (toolNome === "preparar_estorno" || toolNome === "estornar_pagamento") {
+        toolEfetivo = "executar_estorno";
+      } else if (toolNome === "preparar_pagamento_parcial") {
+        toolEfetivo = "executar_pagamento_parcial";
       }
+
+      mutationResult = await despacharFerramentaV2(sb, toolEfetivo, params, idempotencyKey);
+      recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
 
       const sucesso = mutationResult ? Boolean(mutationResult.success) : true;
       const idExibicao = recordIdReal ? ` (ID: ${recordIdReal.slice(0, 8)})` : "";

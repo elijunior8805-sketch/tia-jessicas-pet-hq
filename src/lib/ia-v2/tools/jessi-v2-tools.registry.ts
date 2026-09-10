@@ -7,6 +7,7 @@ import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
 import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
 import { MensagensWhatsAppAdapter, JessiV2WhatsAppPayload } from "../adapters/mensagens-whatsapp.adapter";
+import { ProativoAdapter } from "../adapters/proativo.adapter";
 
 /**
  * Registro e Catálogo Oficial de Ferramentas da Jessi V2 (Seções 10, 16 e 17)
@@ -473,6 +474,188 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: true,
     verificacaoPosterior: true,
   },
+  consultar_horarios_disponiveis: {
+    nomeInterno: "consultar_horarios_disponiveis",
+    descricao: "Verifica horários e encaixes disponíveis para agendamento",
+    intencoes: ["consultar_horarios_disponiveis", "verificar_disponibilidade", "identificar_encaixes"],
+    area: "agenda",
+    parametros: {
+      data: { tipo: "string", obrigatorio: true, descricao: "Data no formato YYYY-MM-DD" },
+      porte: { tipo: "string", obrigatorio: false, descricao: "Porte do pet (pequeno, medio, grande, gigante)" },
+    },
+    retorno: "Lista de horários e vagas livres",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "AgendaAdapter.identificarEncaixesDisponiveis",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  consultar_saldo_creditos: {
+    nomeInterno: "consultar_saldo_creditos",
+    descricao: "Consulta o saldo de créditos e contratos do Clubinho",
+    intencoes: ["consultar_saldo_creditos", "saldo_creditos", "ver_creditos"],
+    area: "programas_creditos",
+    parametros: {
+      clienteId: { tipo: "string", obrigatorio: false, descricao: "ID do cliente" },
+      petId: { tipo: "string", obrigatorio: false, descricao: "ID do pet" },
+    },
+    retorno: "Saldo detalhado de créditos por serviço",
+    permissoes: ["clientes", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProgramasCreditosAdapter.consultarSaldoCreditos",
+    featureFlag: "ai_v2_programs",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  reagendar_horario: {
+    nomeInterno: "reagendar_horario",
+    descricao: "Remarca um agendamento existente para nova data/hora",
+    intencoes: ["reagendar_horario", "remarcar_horario"],
+    area: "agenda",
+    parametros: {
+      agendamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do agendamento" },
+      novaData: { tipo: "string", obrigatorio: true, descricao: "Nova data YYYY-MM-DD" },
+      novaHora: { tipo: "string", obrigatorio: true, descricao: "Novo horário HH:mm" },
+    },
+    retorno: "Agendamento remarcado e verificado",
+    permissoes: ["agenda", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "medio",
+    confirmacaoNecessaria: true,
+    adaptador: "AgendaAdapter.executarRemarcacaoConfirmada",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  gerar_relatorio_financeiro: {
+    nomeInterno: "gerar_relatorio_financeiro",
+    descricao: "Consulta o faturamento consolidado e resumo financeiro",
+    intencoes: ["gerar_relatorio_financeiro", "consultar_faturamento", "relatorio_financeiro"],
+    area: "financeiro_relatorios",
+    parametros: {
+      periodo: { tipo: "string", obrigatorio: false, descricao: "dia | semana | mes" },
+    },
+    retorno: "Quadro financeiro consolidado",
+    permissoes: ["financeiro", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "FinanceiroRelatoriosAdapter.consultarResumoConsolidado",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 6000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  obter_ficha_cliente: {
+    nomeInterno: "obter_ficha_cliente",
+    descricao: "Obtém ficha cadastral consolidada do cliente e seus pets",
+    intencoes: ["obter_ficha_cliente", "ver_cliente_completo"],
+    area: "clientes_pets",
+    parametros: {
+      clienteId: { tipo: "string", obrigatorio: true, descricao: "ID do cliente" },
+    },
+    retorno: "Ficha cadastral completa do cliente",
+    permissoes: ["clientes", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ClientesPetsAdapter.obterFichaClienteCompleta",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  gerar_central_proativa: {
+    nomeInterno: "gerar_central_proativa",
+    descricao: "Gera a central operacional com os 8 vetores proativos",
+    intencoes: ["gerar_central_proativa", "resumo_operacional", "painel_proativo"],
+    area: "agenda",
+    parametros: {},
+    retorno: "Resumo diário consolidado e alertas proativos",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProativoAdapter.gerarCentralProativa",
+    featureFlag: "ai_v2_proactive",
+    timeoutMs: 8000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  identificar_horarios_vagos: {
+    nomeInterno: "identificar_horarios_vagos",
+    descricao: "Identifica horários ociosos na grade",
+    intencoes: ["identificar_horarios_vagos", "vagas_ociosas"],
+    area: "agenda",
+    parametros: {
+      data: { tipo: "string", obrigatorio: false, descricao: "Data YYYY-MM-DD" },
+    },
+    retorno: "Lista de horários livres",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProativoAdapter.identificarHorariosVagos",
+    featureFlag: "ai_v2_proactive",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  identificar_clientes_retorno: {
+    nomeInterno: "identificar_clientes_retorno",
+    descricao: "Identifica clientes inativos para reativação",
+    intencoes: ["identificar_clientes_retorno", "clientes_saudade", "reativacao_clientes"],
+    area: "clientes_pets",
+    parametros: {},
+    retorno: "Lista de clientes para retorno",
+    permissoes: ["clientes", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProativoAdapter.identificarClientesParaRetorno",
+    featureFlag: "ai_v2_proactive",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  registrar_envio_whatsapp: {
+    nomeInterno: "registrar_envio_whatsapp",
+    descricao: "Registra auditoria de mensagem enviada via WhatsApp",
+    intencoes: ["registrar_envio_whatsapp", "log_whatsapp"],
+    area: "comunicacao_mensagens",
+    parametros: {
+      destinatario: { tipo: "string", obrigatorio: true, descricao: "Número ou nome" },
+      conteudoAprovado: { tipo: "string", obrigatorio: true, descricao: "Texto da mensagem" },
+      canal: { tipo: "string", obrigatorio: true, descricao: "whatsapp | sms | email" },
+    },
+    retorno: "Log de envio registrado",
+    permissoes: ["clientes", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "MensagensWhatsAppAdapter.registrarEnvioComunicacao",
+    featureFlag: "ai_v2_messages",
+    timeoutMs: 5000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
 };
 
 /**
@@ -520,13 +703,26 @@ export async function despacharFerramentaV2(
         params.data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
       );
 
+    case "consultar_horarios_disponiveis":
+    case "verificar_disponibilidade":
+    case "identificar_encaixes":
+      return await AgendaAdapter.identificarEncaixesDisponiveis(
+        sb,
+        params.data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+        params.porte || "medio"
+      );
+
     case "buscar_clientes_pets":
       return await ClientesPetsAdapter.buscarClientesPets(sb, params.termo || params.termoBusca || "");
 
     case "obter_ficha_pet":
       return await ClientesPetsAdapter.obterFichaPet(sb, params.petId);
 
+    case "obter_ficha_cliente":
+      return await ClientesPetsAdapter.obterFichaClienteCompleta(sb, params.clienteId);
+
     case "consultar_saldo_programas":
+    case "consultar_saldo_creditos":
       return await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, params.clienteId, params.petId);
 
     case "consultar_programas_ativos_geral":
@@ -536,10 +732,30 @@ export async function despacharFerramentaV2(
       return await ProgramasCreditosAdapter.prepararTermoPdf(sb, params.contratoId);
 
     case "consultar_financeiro_consolidado":
+    case "gerar_relatorio_financeiro":
+    case "consultar_faturamento":
       return await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, params.periodo || "mes");
+
+    case "gerar_central_proativa":
+      return await ProativoAdapter.gerarCentralProativa(sb);
+
+    case "identificar_horarios_vagos":
+      return await ProativoAdapter.identificarHorariosVagos(sb, params.data);
+
+    case "identificar_clientes_retorno":
+      return await ProativoAdapter.identificarClientesParaRetorno(sb);
 
     case "gerar_mensagem_whatsapp":
       return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);
+
+    case "registrar_envio_whatsapp":
+      await MensagensWhatsAppAdapter.registrarEnvioComunicacao(sb, params as any);
+      return {
+        success: true,
+        source: "mensagens_whatsapp",
+        summary: "Disparo de comunicação registrado na auditoria com sucesso.",
+        executed_at: new Date().toISOString(),
+      };
 
     case "executar_agendamento":
     case "criar_agendamento":
@@ -548,6 +764,7 @@ export async function despacharFerramentaV2(
     case "executar_remarcacao":
     case "reagendar_agendamento":
     case "remarcar_agendamento":
+    case "reagendar_horario":
       return await AgendaAdapter.executarRemarcacaoConfirmada(sb, params as any, chave);
 
     case "executar_cancelamento":
