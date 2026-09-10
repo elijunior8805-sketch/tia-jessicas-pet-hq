@@ -115,7 +115,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
-    setStatus("interpretando");
+    setStatus("processando");
     setStatusDetalhe("Consultando inteligência e registros...");
 
     try {
@@ -169,7 +169,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const handleConfirmAction = async (pendingAction: JessiPendingAction) => {
     if (isLoading) return;
     setIsLoading(true);
-    setStatus("executando");
+    setStatus("processando");
     setStatusDetalhe("Gravando alteração com validação...");
 
     try {
@@ -267,7 +267,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                       Supervisionada
                     </span>
                   </div>
-                  <JessiStatusIndicator status={status} detalhe={statusDetalhe} />
+                  <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
                 </div>
               </div>
 

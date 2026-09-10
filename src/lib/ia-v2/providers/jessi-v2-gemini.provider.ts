@@ -25,9 +25,10 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   readonly nome = "Gemini-Flash-Jessi-V2";
 
   /**
-   * Obtém a chave de API estritamente do ambiente do servidor sem expor no frontend
+   * Obtém a chave de API estritamente do ambiente do servidor ou Vite env
    */
   private obterApiKeyServidor(): { key: string; isGateway: boolean } | null {
+    // 1. Variáveis do processo (Node.js / TanStack Start Server)
     if (typeof process !== "undefined" && process.env) {
       if (process.env.LOVABLE_API_KEY) {
         return { key: process.env.LOVABLE_API_KEY, isGateway: true };
@@ -35,13 +36,31 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       if (process.env.OPENAI_API_KEY) {
         return { key: process.env.OPENAI_API_KEY, isGateway: true };
       }
-      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) {
+      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
         return {
-          key: (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY)!,
+          key: (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY)!,
           isGateway: false,
         };
       }
     }
+
+    // 2. Variáveis expostas pelo Vite / Frontend bundler
+    if (typeof import.meta !== "undefined" && (import.meta as any).env) {
+      const env = (import.meta as any).env;
+      if (env.VITE_LOVABLE_API_KEY || env.LOVABLE_API_KEY) {
+        return { key: env.VITE_LOVABLE_API_KEY || env.LOVABLE_API_KEY, isGateway: true };
+      }
+      if (env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || env.VITE_GOOGLE_AI_API_KEY || env.GOOGLE_AI_API_KEY) {
+        return {
+          key: env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || env.VITE_GOOGLE_AI_API_KEY || env.GOOGLE_AI_API_KEY,
+          isGateway: false,
+        };
+      }
+      if (env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY) {
+        return { key: env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY, isGateway: true };
+      }
+    }
+
     return null;
   }
 

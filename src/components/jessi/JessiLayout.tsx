@@ -58,6 +58,7 @@ export const JessiLayout: React.FC = () => {
     startListening,
     stopListening,
     cancelListening,
+    resetTranscript,
   } = useJessiVoice((textoFinal) => {
     if (textoFinal.trim()) {
       setInputText(textoFinal);
@@ -110,7 +111,13 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
-    // 1. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
+    // 1. Se o microfone estiver ativo, encerra a escuta e reseta o buffer de voz imediatamente
+    if (isListening) {
+      stopListening();
+    }
+    resetTranscript();
+
+    // 2. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
     if (isLoading) {
       return;
     }
@@ -126,7 +133,7 @@ export const JessiLayout: React.FC = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // 2. Preserva mensagem enviada no histórico
+    // 3. Preserva mensagem enviada no histórico
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
@@ -220,8 +227,17 @@ export const JessiLayout: React.FC = () => {
     }
   };
 
-  const handleConfirmAction = async (pendingAction: JessiPendingAction) => {
-    if (!pendingAction) return;
+  const handleConfirmAction = async (pendingAction?: any) => {
+    const action = pendingAction || contexto?.operacaoPreparada || (messages.slice(-1)[0]?.pendingAction);
+    if (!action) {
+      toast.error("Nenhuma ação pendente localizada para confirmação.");
+      return;
+    }
+
+    const actionId = action.id || `idemp_${Date.now()}`;
+    const actionTitle = action.title || action.motivo || "Operação";
+    const actionTool = action.tool || action.tipo || "criar_agendamento";
+    const actionParams = action.params || action.parametros || action.estadoProposto || {};
 
     setIsLoading(true);
     setStatus("processando");
@@ -229,11 +245,11 @@ export const JessiLayout: React.FC = () => {
     try {
       const res = await processarMensagemFn({
         data: {
-          mensagem: `Confirmar ação: ${pendingAction.title}`,
-          confirmacaoAcaoPendenteId: pendingAction.id,
+          mensagem: `Confirmar ação: ${actionTitle}`,
+          confirmacaoAcaoPendenteId: actionId,
           dadosConfirmacao: {
-            tool: pendingAction.tool,
-            params: pendingAction.params,
+            tool: actionTool,
+            params: actionParams,
           },
         },
       });
@@ -249,8 +265,9 @@ export const JessiLayout: React.FC = () => {
       setMessages((prev) => [...prev, assistantMsg]);
       setStatus("disponivel");
       toast.success("Ação confirmada e registrada com sucesso!");
-    } catch (err) {
-      toast.error("Erro ao executar ação confirmada.");
+    } catch (err: any) {
+      console.error("Erro ao executar ação confirmada:", err);
+      toast.error(err?.message || "Erro ao executar ação confirmada.");
       setStatus("erro");
     } finally {
       setIsLoading(false);

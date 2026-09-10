@@ -340,8 +340,10 @@ export async function processarMensagemJessiV2Core(
         data: {
           proposta,
           acaoPendente: pendingAction,
+          pendingAction,
           requerConfirmacao: true,
           resumoVisual: proposta.resumoVisual,
+          resumo: proposta.resumoVisual?.entendido || proposta.motivo,
           acoesDisponiveis: ["Confirmar operação", "Cancelar"],
         },
       });
