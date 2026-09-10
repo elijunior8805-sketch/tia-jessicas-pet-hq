@@ -323,6 +323,7 @@ export class AgendaAdapter {
         dataAlvo = parsed.data;
         horaAlvo = parsed.hora;
       } catch (dateErr: any) {
+        console.error("[AgendaAdapter] Erro na validação de data/hora:", dateErr);
         return {
           success: false,
           entity_id: null,
@@ -348,6 +349,7 @@ export class AgendaAdapter {
       if (servicoId === "undefined" || servicoId === "null" || !servicoId) servicoId = null;
 
       if (!clienteId || !petId) {
+        console.error("[AgendaAdapter] Identificação do cliente ou pet ausente:", { clienteId, petId });
         return {
           success: false,
           entity_id: null,
@@ -370,6 +372,7 @@ export class AgendaAdapter {
         .maybeSingle();
 
       if (petErr || !petRecord) {
+        console.error("[AgendaAdapter] Pet não localizado no banco:", { petId, petErr });
         return {
           success: false,
           entity_id: null,
@@ -385,6 +388,7 @@ export class AgendaAdapter {
       }
 
       if (petRecord.cliente_id !== clienteId) {
+        console.warn("[AgendaAdapter] Divergência tutor x pet:", { petClienteId: petRecord.cliente_id, clienteId });
         return {
           success: false,
           entity_id: null,
@@ -409,6 +413,7 @@ export class AgendaAdapter {
       );
 
       if (!checagem.disponivel) {
+        console.warn("[AgendaAdapter] Horário indisponível na grade:", checagem);
         return {
           success: false,
           entity_id: null,
@@ -437,13 +442,29 @@ export class AgendaAdapter {
           valor_previsto: valorFinal,
           status: "agendado",
           profissional_id: params.profissionalId || params.profissional_id || null,
-          observacoes: params.observacoes || null,
+          observacoes: params.observacoes || (idempotencyKey ? `Criado via Jessi (idempotency:${idempotencyKey})` : null),
         } as any)
         .select("id, data, hora, status, valor_previsto, cliente_id, pet_id, servico_id")
         .single();
 
       if (insertError || !novoAgendamento) {
+        console.error("[AgendaAdapter] Erro no INSERT de agendamentos:", insertError);
         throw insertError || new Error("Falha na inserção do registro de agendamento.");
+      }
+
+      // 4.1 Inserção em agendamento_servicos se aplicável
+      if (servicoId) {
+        try {
+          await sb.from("agendamento_servicos").insert({
+            agendamento_id: novoAgendamento.id,
+            servico_id: servicoId,
+            nome: params.servicoNome || "Atendimento",
+            valor_unit: valorFinal,
+            ordem: 1,
+          } as any);
+        } catch (srvErr) {
+          console.warn("[AgendaAdapter] Não foi possível vincular agendamento_servicos:", srvErr);
+        }
       }
 
       // 5. Read-Back Verification Completo (Verificação de campos de ponta a ponta)
@@ -463,6 +484,7 @@ export class AgendaAdapter {
         readBack.hora?.slice(0, 5) === horaAlvo.slice(0, 5);
 
       if (!readBackValido) {
+        console.error("[AgendaAdapter] Read-back mismatch:", { novoAgendamento, readBack, readBackError });
         return {
           success: false,
           entity_id: novoAgendamento.id,
@@ -490,6 +512,7 @@ export class AgendaAdapter {
         correlation_id: correlationId,
       };
     } catch (err: any) {
+      console.error("[AgendaAdapter] Falha na execução do agendamento:", err);
       return {
         success: false,
         entity_id: null,
@@ -510,22 +533,39 @@ export class AgendaAdapter {
    */
   static async executarRemarcacaoConfirmada(
     sb: SupabaseClient<Database>,
-    params: { agendamentoId: string; novaDataHoraISO?: string; novaData?: string; novaHora?: string; motivo?: string },
+    params: { agendamentoId?: string; agendamento_id?: string; novaDataHoraISO?: string; novaData?: string; novaHora?: string; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_remarcar_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const agendamentoId = params.agendamentoId || (params as any).agendamento_id;
+
+    if (!agendamentoId) {
+      return {
+        success: false,
+        entity_id: null,
+        source: "tabela_agendamentos",
+        summary: "Identificador do agendamento não informado para reagendamento.",
+        error_code: "AGENDAMENTO_ID_AUSENTE",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+
     try {
       // 1. Ler registro atual (before)
       const { data: anterior, error: erroAnterior } = await sb
         .from("agendamentos")
         .select("id, data, hora, status, valor_previsto, pet_id, cliente_id")
-        .eq("id", params.agendamentoId)
+        .eq("id", agendamentoId)
         .maybeSingle();
 
       if (erroAnterior || !anterior) {
+        console.error("[AgendaAdapter] Agendamento não encontrado para reagendamento:", { agendamentoId, erroAnterior });
         return {
           success: false,
-          entity_id: params.agendamentoId,
+          entity_id: agendamentoId,
           source: "tabela_agendamentos",
           summary: "Agendamento não encontrado para remarcação.",
           error_code: "AGENDAMENTO_NAO_ENCONTRADO",
@@ -550,9 +590,10 @@ export class AgendaAdapter {
       );
 
       if (!checagem.disponivel) {
+        console.warn("[AgendaAdapter] Horário indisponível para remarcação:", checagem);
         return {
           success: false,
-          entity_id: params.agendamentoId,
+          entity_id: agendamentoId,
           source: "tabela_agendamentos",
           summary: `Remarcação não permitida: ${checagem.motivo}`,
           error_code: "HORARIO_INDISPONIVEL",
@@ -577,17 +618,20 @@ export class AgendaAdapter {
           hora: novaHora,
           observacoes: params.motivo ? `Remarcado: ${params.motivo}` : undefined,
         } as any)
-        .eq("id", params.agendamentoId)
+        .eq("id", agendamentoId)
         .select("id, data, hora, status, valor_previsto")
         .single();
 
-      if (updateError || !atualizado) throw updateError || new Error("Falha ao atualizar agendamento.");
+      if (updateError || !atualizado) {
+        console.error("[AgendaAdapter] Erro no UPDATE de remarcação:", updateError);
+        throw updateError || new Error("Falha ao atualizar agendamento.");
+      }
 
       // 4. Read-Back Verification por ID
       const { data: readBack } = await sb
         .from("agendamentos")
         .select("id, data, hora, status")
-        .eq("id", params.agendamentoId)
+        .eq("id", agendamentoId)
         .maybeSingle();
 
       const verificado =
@@ -595,21 +639,22 @@ export class AgendaAdapter {
 
       return {
         success: true,
-        entity_id: params.agendamentoId,
-        affected_record_id: params.agendamentoId,
+        entity_id: agendamentoId,
+        affected_record_id: agendamentoId,
         before: anterior,
         after: atualizado,
         source: "tabela_agendamentos",
-        summary: `Agendamento #${params.agendamentoId.slice(0, 8)} remarcado com sucesso para ${novaData} às ${novaHora}.`,
+        summary: `Agendamento #${agendamentoId.slice(0, 8)} remarcado com sucesso para ${novaData} às ${novaHora}.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
         correlation_id: correlationId,
       };
     } catch (err: any) {
+      console.error("[AgendaAdapter] Erro ao reagendar:", err);
       return {
         success: false,
-        entity_id: params.agendamentoId,
+        entity_id: agendamentoId,
         source: "tabela_agendamentos",
         summary: `Erro ao remarcar agendamento: ${err.message}`,
         error_code: err.code || "ERRO_UPDATE_AGENDAMENTO",
@@ -626,23 +671,40 @@ export class AgendaAdapter {
    */
   static async executarCancelamentoConfirmado(
     sb: SupabaseClient<Database>,
-    params: { agendamentoId: string; motivo?: string },
+    params: { agendamentoId?: string; agendamento_id?: string; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_cancelar_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const agendamentoId = params.agendamentoId || (params as any).agendamento_id;
+
+    if (!agendamentoId) {
+      return {
+        success: false,
+        entity_id: null,
+        source: "tabela_agendamentos",
+        summary: "Identificador do agendamento não informado para cancelamento.",
+        error_code: "AGENDAMENTO_ID_AUSENTE",
+        idempotency_key: idempotencyKey,
+        executed_at: new Date().toISOString(),
+        correlation_id: correlationId,
+        verified: false,
+      };
+    }
+
     try {
-      const { data: anterior } = await sb
+      const { data: anterior, error: erroAnterior } = await sb
         .from("agendamentos")
-        .select("id, data, hora, status, valor_previsto")
-        .eq("id", params.agendamentoId)
+        .select("id, data, hora, status, valor_previsto, pets(nome), clientes(nome)")
+        .eq("id", agendamentoId)
         .maybeSingle();
 
-      if (!anterior) {
+      if (erroAnterior || !anterior) {
+        console.error("[AgendaAdapter] Agendamento não encontrado para cancelamento:", { agendamentoId, erroAnterior });
         return {
           success: false,
-          entity_id: params.agendamentoId,
+          entity_id: agendamentoId,
           source: "tabela_agendamentos",
-          summary: "Agendamento não localizado para cancelamento.",
+          summary: `Agendamento #${agendamentoId} não localizado para cancelamento.`,
           error_code: "AGENDAMENTO_NAO_ENCONTRADO",
           idempotency_key: idempotencyKey,
           executed_at: new Date().toISOString(),
@@ -655,43 +717,47 @@ export class AgendaAdapter {
         .from("agendamentos")
         .update({
           status: "cancelado",
-          observacoes: params.motivo ? `Cancelado pelo operador: ${params.motivo}` : undefined,
+          observacoes: params.motivo ? `Cancelado pelo operador: ${params.motivo}` : "Cancelado via Jessi",
         } as any)
-        .eq("id", params.agendamentoId)
+        .eq("id", agendamentoId)
         .select("id, data, hora, status, valor_previsto")
         .single();
 
-      if (error || !cancelado) throw error || new Error("Falha ao cancelar agendamento.");
+      if (error || !cancelado) {
+        console.error("[AgendaAdapter] Erro ao atualizar status para cancelado:", error);
+        throw error || new Error("Falha ao cancelar agendamento.");
+      }
 
       // Read-back Verification
       const { data: readBack } = await sb
         .from("agendamentos")
         .select("id, status")
-        .eq("id", params.agendamentoId)
+        .eq("id", agendamentoId)
         .maybeSingle();
 
       const verificado = readBack?.status === "cancelado";
 
       return {
         success: true,
-        entity_id: params.agendamentoId,
-        affected_record_id: params.agendamentoId,
+        entity_id: agendamentoId,
+        affected_record_id: agendamentoId,
         before: anterior,
         after: cancelado,
         source: "tabela_agendamentos",
-        summary: `Agendamento #${params.agendamentoId.slice(0, 8)} cancelado e horário liberado na grade com sucesso.`,
+        summary: `Agendamento #${agendamentoId.slice(0, 8)} (${(anterior.pets as any)?.nome || "Pet"} em ${anterior.data} às ${String(anterior.hora).slice(0, 5)}) cancelado com sucesso e grade liberada.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
         correlation_id: correlationId,
       };
     } catch (err: any) {
+      console.error("[AgendaAdapter] Falha ao cancelar agendamento:", err);
       return {
         success: false,
-        entity_id: params.agendamentoId,
+        entity_id: agendamentoId,
         source: "tabela_agendamentos",
         summary: `Erro ao cancelar agendamento: ${err.message}`,
-        error_code: err.code || "ERRO_CANCELAMENTO",
+        error_code: err.code || "ERRO_CANCEL_AGENDAMENTO",
         idempotency_key: idempotencyKey,
         executed_at: new Date().toISOString(),
         correlation_id: correlationId,

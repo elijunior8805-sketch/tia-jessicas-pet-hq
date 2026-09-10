@@ -490,32 +490,65 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("agenda") ||
       textoLower.includes("agendado") ||
       textoLower.includes("agendados") ||
+      textoLower.includes("agendamento") ||
+      textoLower.includes("agendamentos") ||
       textoLower.includes("agendar") ||
       textoLower.includes("marcar") ||
+      textoLower.includes("marque") ||
       textoLower.includes("desmarcar") ||
+      textoLower.includes("desmarque") ||
+      textoLower.includes("cancelar") ||
+      textoLower.includes("cancele") ||
+      textoLower.includes("cancela") ||
       textoLower.includes("reagendar") ||
+      textoLower.includes("remarcar") ||
+      textoLower.includes("remarque") ||
       textoLower.includes("horario") ||
       textoLower.includes("horário") ||
       textoLower.includes("vaga") ||
-      textoLower.includes("atendimento")
+      textoLower.includes("atendimento") ||
+      textoLower.includes("atendimentos")
     ) {
       dominio = "agenda";
-      if (textoLower.includes("agendar") || textoLower.includes("marcar") || textoLower.includes("agenda ele") || textoLower.includes("agenda ela")) {
-        intencao = "preparar_agendamento";
+      if (
+        textoLower.includes("desmarcar") ||
+        textoLower.includes("desmarque") ||
+        textoLower.includes("cancelar") ||
+        textoLower.includes("cancele") ||
+        textoLower.includes("cancela")
+      ) {
+        intencao = "cancelar_agendamento";
         requerConfirmacao = true;
-        ferramentaSugerida = "executar_agendamento";
-        explicacao = `Preparando agendamento para ${petNomeResolvido || "o pet"} na data ${dataResolvida}.`;
-      } else if (textoLower.includes("desmarcar") || textoLower.includes("cancelar")) {
-        intencao = "preparar_cancelamento";
+        ferramentaSugerida = "cancelar_agendamento";
+        explicacao = `Preparando cancelamento de agendamento para ${petNomeResolvido || "o pet informado"}.`;
+      } else if (
+        textoLower.includes("reagendar") ||
+        textoLower.includes("remarcar") ||
+        textoLower.includes("remarque") ||
+        textoLower.includes("mudar horario") ||
+        textoLower.includes("trocar horario")
+      ) {
+        intencao = "reagendar_agendamento";
         requerConfirmacao = true;
-        ferramentaSugerida = "preparar_cancelamento";
-      } else if (textoLower.includes("reagendar") || textoLower.includes("remarcar")) {
-        intencao = "preparar_reagendamento";
+        ferramentaSugerida = "reagendar_agendamento";
+        explicacao = `Preparando reagendamento para ${petNomeResolvido || "o pet informado"}.`;
+      } else if (
+        textoLower.includes("agendar") ||
+        textoLower.includes("marcar") ||
+        textoLower.includes("marque") ||
+        textoLower.includes("agenda ele") ||
+        textoLower.includes("agenda ela") ||
+        textoLower.includes("novo agendamento") ||
+        textoLower.includes("criar agendamento")
+      ) {
+        intencao = "criar_agendamento";
         requerConfirmacao = true;
-        ferramentaSugerida = "preparar_reagendamento";
+        ferramentaSugerida = "criar_agendamento";
+        explicacao = `Preparando agendamento para ${petNomeResolvido || "o pet"} na data ${dataResolvida || "a definir"}.`;
       } else {
         intencao = "consultar_agenda";
         ferramentaSugerida = "consultar_agenda";
+        explicacao = `Consultando agenda para ${dataResolvida || req.contexto.dataReferencia}.`;
       }
     }
     // Financeiro & Faturamento Consolidado & Contas a Receber & Devedores

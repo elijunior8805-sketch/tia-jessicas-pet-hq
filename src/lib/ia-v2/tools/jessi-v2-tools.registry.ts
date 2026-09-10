@@ -193,21 +193,23 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
-  executar_agendamento: {
-    nomeInterno: "executar_agendamento",
+  criar_agendamento: {
+    nomeInterno: "criar_agendamento",
     descricao: "Grava agendamento confirmado no banco de dados com revalidação de grade e verificação",
-    intencoes: ["executar_agendamento", "confirmar_agendamento"],
+    intencoes: ["criar_agendamento", "preparar_agendamento", "executar_agendamento", "confirmar_agendamento"],
     area: "agenda",
     parametros: {
       clienteId: { tipo: "string", obrigatorio: true, descricao: "ID do cliente" },
       petId: { tipo: "string", obrigatorio: true, descricao: "ID do pet" },
-      dataHora: { tipo: "string", obrigatorio: true, descricao: "Data e hora ISO" },
-      valor: { tipo: "number", obrigatorio: true, descricao: "Valor do serviço" },
+      data: { tipo: "string", obrigatorio: false, descricao: "Data YYYY-MM-DD" },
+      hora: { tipo: "string", obrigatorio: false, descricao: "Hora HH:mm" },
+      dataHora: { tipo: "string", obrigatorio: false, descricao: "Data e hora ISO" },
+      valor: { tipo: "number", obrigatorio: false, descricao: "Valor do serviço" },
     },
     retorno: "Registro do agendamento persistido e verificado no banco",
     permissoes: ["agenda", "admin"],
     tipo: "mutacao_supervisionada",
-    nivelRisco: "alto",
+    nivelRisco: "medio",
     confirmacaoNecessaria: true,
     adaptador: "AgendaAdapter.executarAgendamentoConfirmado",
     featureFlag: "ai_v2_scheduling",
@@ -215,6 +217,135 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     politicaRepeticao: "nenhuma",
     idempotencia: true,
     verificacaoPosterior: true,
+  },
+  executar_agendamento: {
+    nomeInterno: "executar_agendamento",
+    descricao: "Grava agendamento confirmado no banco de dados com revalidação de grade e verificação",
+    intencoes: ["executar_agendamento", "confirmar_agendamento", "criar_agendamento"],
+    area: "agenda",
+    parametros: {
+      clienteId: { tipo: "string", obrigatorio: true, descricao: "ID do cliente" },
+      petId: { tipo: "string", obrigatorio: true, descricao: "ID do pet" },
+      dataHora: { tipo: "string", obrigatorio: false, descricao: "Data e hora ISO" },
+      valor: { tipo: "number", obrigatorio: false, descricao: "Valor do serviço" },
+    },
+    retorno: "Registro do agendamento persistido e verificado no banco",
+    permissoes: ["agenda", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "medio",
+    confirmacaoNecessaria: true,
+    adaptador: "AgendaAdapter.executarAgendamentoConfirmado",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  cancelar_agendamento: {
+    nomeInterno: "cancelar_agendamento",
+    descricao: "Cancela agendamento confirmado no banco de dados e libera a grade",
+    intencoes: ["cancelar_agendamento", "preparar_cancelamento", "executar_cancelamento", "desmarcar"],
+    area: "agenda",
+    parametros: {
+      agendamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do agendamento a cancelar" },
+      motivo: { tipo: "string", obrigatorio: false, descricao: "Motivo do cancelamento" },
+    },
+    retorno: "Registro do agendamento cancelado e verificado no banco",
+    permissoes: ["agenda", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "alto",
+    confirmacaoNecessaria: true,
+    adaptador: "AgendaAdapter.executarCancelamentoConfirmado",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  executar_cancelamento: {
+    nomeInterno: "executar_cancelamento",
+    descricao: "Cancela agendamento confirmado no banco de dados e libera a grade",
+    intencoes: ["cancelar_agendamento", "executar_cancelamento"],
+    area: "agenda",
+    parametros: {
+      agendamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do agendamento a cancelar" },
+      motivo: { tipo: "string", obrigatorio: false, descricao: "Motivo do cancelamento" },
+    },
+    retorno: "Registro do agendamento cancelado e verificado no banco",
+    permissoes: ["agenda", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "alto",
+    confirmacaoNecessaria: true,
+    adaptador: "AgendaAdapter.executarCancelamentoConfirmado",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  reagendar_agendamento: {
+    nomeInterno: "reagendar_agendamento",
+    descricao: "Remarca data e horário de um agendamento com revalidação de grade",
+    intencoes: ["reagendar_agendamento", "preparar_reagendamento", "remarcar_agendamento", "executar_remarcacao"],
+    area: "agenda",
+    parametros: {
+      agendamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do agendamento" },
+      novaData: { tipo: "string", obrigatorio: true, descricao: "Nova data YYYY-MM-DD" },
+      novaHora: { tipo: "string", obrigatorio: true, descricao: "Nova hora HH:mm" },
+    },
+    retorno: "Registro atualizado e verificado no banco",
+    permissoes: ["agenda", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "medio",
+    confirmacaoNecessaria: true,
+    adaptador: "AgendaAdapter.executarRemarcacaoConfirmada",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  executar_remarcacao: {
+    nomeInterno: "executar_remarcacao",
+    descricao: "Remarca data e horário de um agendamento com revalidação de grade",
+    intencoes: ["reagendar_agendamento", "executar_remarcacao", "remarcar_agendamento"],
+    area: "agenda",
+    parametros: {
+      agendamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do agendamento" },
+      novaData: { tipo: "string", obrigatorio: true, descricao: "Nova data YYYY-MM-DD" },
+      novaHora: { tipo: "string", obrigatorio: true, descricao: "Nova hora HH:mm" },
+    },
+    retorno: "Registro atualizado e verificado no banco",
+    permissoes: ["agenda", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "medio",
+    confirmacaoNecessaria: true,
+    adaptador: "AgendaAdapter.executarRemarcacaoConfirmada",
+    featureFlag: "ai_v2_scheduling",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  verificar_agendamento_id: {
+    nomeInterno: "verificar_agendamento_id",
+    descricao: "Verifica a integridade e estado de um agendamento por ID",
+    intencoes: ["verificar_agendamento_id"],
+    area: "agenda",
+    parametros: {
+      agendamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do agendamento" },
+    },
+    retorno: "Dados completos do agendamento verificado",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "AgendaAdapter.verificarAgendamentoPorId",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
   },
   executar_cadastro_cliente: {
     nomeInterno: "executar_cadastro_cliente",
@@ -259,6 +390,89 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: true,
     verificacaoPosterior: true,
   },
+  executar_recebimento: {
+    nomeInterno: "executar_recebimento",
+    descricao: "Registra baixa e recebimento financeiro confirmado pelo operador",
+    intencoes: ["executar_recebimento", "confirmar_recebimento"],
+    area: "financeiro_relatorios",
+    parametros: {
+      pagamentoId: { tipo: "string", obrigatorio: true, descricao: "ID da conta/pagamento" },
+      valor: { tipo: "number", obrigatorio: true, descricao: "Valor recebido" },
+      metodo: { tipo: "string", obrigatorio: true, descricao: "Método de pagamento" },
+    },
+    retorno: "Recebimento confirmado e registrado no financeiro",
+    permissoes: ["financeiro", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "alto",
+    confirmacaoNecessaria: true,
+    adaptador: "FinanceiroRelatoriosAdapter.executarRecebimentoConfirmado",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  executar_pagamento_parcial: {
+    nomeInterno: "executar_pagamento_parcial",
+    descricao: "Registra pagamento parcial de conta/fatura",
+    intencoes: ["executar_pagamento_parcial"],
+    area: "financeiro_relatorios",
+    parametros: {
+      pagamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do pagamento" },
+      valorParcial: { tipo: "number", obrigatorio: true, descricao: "Valor parcial" },
+      metodo: { tipo: "string", obrigatorio: true, descricao: "Método" },
+    },
+    retorno: "Pagamento parcial registrado e saldo recalculado",
+    permissoes: ["financeiro", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "alto",
+    confirmacaoNecessaria: true,
+    adaptador: "FinanceiroRelatoriosAdapter.executarPagamentoParcialConfirmado",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  executar_estorno: {
+    nomeInterno: "executar_estorno",
+    descricao: "Registra estorno financeiro supervisionado",
+    intencoes: ["executar_estorno"],
+    area: "financeiro_relatorios",
+    parametros: {
+      pagamentoId: { tipo: "string", obrigatorio: true, descricao: "ID do pagamento" },
+      motivo: { tipo: "string", obrigatorio: true, descricao: "Motivo do estorno" },
+    },
+    retorno: "Estorno concluído",
+    permissoes: ["financeiro", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "alto",
+    confirmacaoNecessaria: true,
+    adaptador: "FinanceiroRelatoriosAdapter.executarEstornoConfirmado",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  executar_conciliacao: {
+    nomeInterno: "executar_conciliacao",
+    descricao: "Executa conciliação de extrato",
+    intencoes: ["executar_conciliacao"],
+    area: "financeiro_relatorios",
+    parametros: {},
+    retorno: "Resultado da conciliação",
+    permissoes: ["financeiro", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "alto",
+    confirmacaoNecessaria: true,
+    adaptador: "FinanceiroRelatoriosAdapter.executarConciliacaoAutorizada",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
 };
 
 /**
@@ -276,7 +490,7 @@ export async function despacharFerramentaV2(
     return {
       success: false,
       source: "tools_registry",
-      summary: "A operação solicitada não está disponível no catálogo de ferramentas autorizadas.",
+      summary: `A operação solicitada "${toolNome}" não está disponível no catálogo de ferramentas autorizadas.`,
       executed_at: new Date().toISOString(),
       error_code: "TOOL_NOT_REGISTERED",
       correlation_id: `tool_not_found_${Date.now()}`,
@@ -318,6 +532,9 @@ export async function despacharFerramentaV2(
     case "consultar_programas_ativos_geral":
       return await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
 
+    case "gerar_termo_programa_pdf":
+      return await ProgramasCreditosAdapter.prepararTermoPdf(sb, params.contratoId);
+
     case "consultar_financeiro_consolidado":
       return await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, params.periodo || "mes");
 
@@ -325,12 +542,16 @@ export async function despacharFerramentaV2(
       return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);
 
     case "executar_agendamento":
+    case "criar_agendamento":
       return await AgendaAdapter.executarAgendamentoConfirmado(sb, params, chave);
 
     case "executar_remarcacao":
+    case "reagendar_agendamento":
+    case "remarcar_agendamento":
       return await AgendaAdapter.executarRemarcacaoConfirmada(sb, params as any, chave);
 
     case "executar_cancelamento":
+    case "cancelar_agendamento":
       return await AgendaAdapter.executarCancelamentoConfirmado(sb, params as any, chave);
 
     case "verificar_agendamento_id":
@@ -358,7 +579,7 @@ export async function despacharFerramentaV2(
       return {
         success: false,
         source: "tools_registry",
-        summary: "Operação não autorizada.",
+        summary: `Operação "${toolNome}" não autorizada.`,
         executed_at: new Date().toISOString(),
         error_code: "TOOL_NOT_REGISTERED",
         correlation_id: `tool_not_found_${Date.now()}`,

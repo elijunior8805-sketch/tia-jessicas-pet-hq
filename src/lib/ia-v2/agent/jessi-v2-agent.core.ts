@@ -419,18 +419,22 @@ export async function processarMensagemJessiV2Core(
 
       // 4.3 Resolução de Serviço e Preço no Catálogo
       if (servicoNome) {
-        const { data: servicoDB } = await sb
+        const { data: servicoDB, error: srvErr } = await sb
           .from("servicos")
-          .select("id, nome, valor_padrao, duracao_minutos")
+          .select("id, nome, valor, duracao_min")
           .ilike("nome", `%${servicoNome}%`)
           .limit(1)
           .maybeSingle();
 
+        if (srvErr) {
+          console.error("[JessiV2] Erro ao consultar serviço no banco:", srvErr);
+        }
+
         if (servicoDB) {
           servicoId = servicoDB.id;
           servicoNome = servicoDB.nome;
-          servicoValor = servicoDB.valor_padrao || 0;
-          duracaoMinutos = servicoDB.duracao_minutos || 60;
+          servicoValor = Number(servicoDB.valor || 0);
+          duracaoMinutos = Number(servicoDB.duracao_min || 60);
         }
       }
 
@@ -557,6 +561,332 @@ export async function processarMensagemJessiV2Core(
             resumoVisual: proposta.resumoVisual,
             resumo: proposta.resumoVisual.entendido,
             acoesDisponiveis: ["Confirmar operação", "Cancelar"],
+          },
+        });
+
+        novoContexto = {
+          ...novoContexto,
+          operacaoPreparada: pendingAction,
+        };
+
+        return {
+          versao: "v2",
+          respostaTexto,
+          cards,
+          pendingAction,
+          novoContexto,
+          intencao,
+          tempoProcessamentoMs: Date.now() - inicioMs,
+          correlationId,
+        };
+      }
+
+      // 4.5 Resolução e Preparação de Cancelamento de Agendamento
+      if (intencao.dominio === "agenda" && (intencao.intencao === "preparar_cancelamento" || intencao.intencao === "cancelar_agendamento")) {
+        let agendamentoIdAlvo = intencao.entidades.agendamentoId || (intencao.entidades as any).agendamento_id || null;
+        let agendamentoAlvo: any = null;
+
+        if (agendamentoIdAlvo) {
+          const { data: agById } = await sb
+            .from("agendamentos")
+            .select("id, data, hora, status, valor_previsto, clientes(id, nome), pets(id, nome), servicos(id, nome)")
+            .eq("id", agendamentoIdAlvo)
+            .maybeSingle();
+          agendamentoAlvo = agById;
+        } else {
+          // Busca agendamentos ativos compatíveis
+          let query = sb
+            .from("agendamentos")
+            .select("id, data, hora, status, valor_previsto, clientes(id, nome), pets(id, nome), servicos(id, nome)")
+            .neq("status", "cancelado");
+
+          if (petId) {
+            query = query.eq("pet_id", petId);
+          } else if (clienteId) {
+            query = query.eq("cliente_id", clienteId);
+          }
+
+          if (intencao.entidades.data) {
+            query = query.eq("data", intencao.entidades.data);
+          } else {
+            const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+            query = query.gte("data", hoje);
+          }
+
+          query = query.order("data", { ascending: true }).order("hora", { ascending: true }).limit(5);
+
+          const { data: agsEncontrados, error: agErr } = await query;
+          if (agErr) {
+            console.error("[JessiV2] Erro ao buscar agendamentos para cancelamento:", agErr);
+          }
+
+          if (!agsEncontrados || agsEncontrados.length === 0) {
+            const petMsg = petNome ? ` para o pet **${petNome}**` : clienteNome ? ` para o tutor **${clienteNome}**` : "";
+            const dataMsg = intencao.entidades.data ? ` na data **${intencao.entidades.data}**` : "";
+            return {
+              versao: "v2",
+              respostaTexto: `Não encontrei nenhum agendamento ativo${petMsg}${dataMsg} para cancelar.`,
+              cards: [],
+              pendingAction: null,
+              novoContexto: { ...contextoAtual, ...novoContexto },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
+
+          if (agsEncontrados.length > 1 && !intencao.entidades.data) {
+            return {
+              versao: "v2",
+              respostaTexto: `Encontrei ${agsEncontrados.length} agendamentos ativos para ${petNome || clienteNome || "o cliente"}. Qual deles você deseja cancelar?`,
+              cards: [
+                {
+                  type: "agenda",
+                  title: "Selecione o Agendamento para Cancelar",
+                  subtitle: `${agsEncontrados.length} agendamento(s) encontrado(s)`,
+                  data: {
+                    exigeDesambiguacao: true,
+                    opcoes: agsEncontrados.map((ag: any) => ({
+                      id: ag.id,
+                      tipo: "agendamento",
+                      nome: `${ag.pets?.nome || "Pet"} • ${ag.servicos?.nome || "Atendimento"}`,
+                      detalhe: `${ag.data} às ${(ag.hora || "").slice(0, 5)} (Status: ${ag.status})`,
+                    })),
+                  },
+                },
+              ],
+              pendingAction: null,
+              novoContexto: { ...contextoAtual, ...novoContexto },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
+
+          agendamentoAlvo = agsEncontrados[0];
+          agendamentoIdAlvo = agendamentoAlvo.id;
+        }
+
+        const dataAg = agendamentoAlvo.data;
+        const horaAg = (agendamentoAlvo.hora || "").slice(0, 5);
+        const petNomeAg = agendamentoAlvo.pets?.nome || petNome || "Pet";
+        const clienteNomeAg = agendamentoAlvo.clientes?.nome || clienteNome || "Tutor";
+        const servicoNomeAg = agendamentoAlvo.servicos?.nome || "Atendimento";
+        const petIdAg = agendamentoAlvo.pets?.id || petId;
+        const clienteIdAg = agendamentoAlvo.clientes?.id || clienteId;
+
+        const dataExtensa = new Intl.DateTimeFormat("pt-BR", {
+          dateStyle: "full",
+          timeZone: "America/Sao_Paulo",
+        }).format(new Date(`${dataAg}T12:00:00`));
+
+        const proposta = JessiV2ConfirmationManager.criarProposta({
+          userId: user?.id || "proprietario_spa",
+          cliente: { id: clienteIdAg || "", nome: clienteNomeAg },
+          pet: { id: petIdAg || "", nome: petNomeAg },
+          acao: "cancelar_agendamento",
+          motivo: `Cancelamento de ${servicoNomeAg} para ${petNomeAg} em ${dataAg} às ${horaAg}`,
+          estadoAtual: { status: agendamentoAlvo.status, agendamentoId: agendamentoIdAlvo },
+          estadoProposto: { status: "cancelado", agendamentoId: agendamentoIdAlvo },
+          valores: { valorBruto: agendamentoAlvo.valor_previsto || 0, valorFinal: 0 },
+          dataHora: `${dataAg}T${horaAg}:00`,
+          riscos: ["A vaga na grade será liberada para novos agendamentos."],
+          resumoVisual: {
+            entendido: `Cancelamento do agendamento de ${servicoNomeAg} para ${petNomeAg} (${clienteNomeAg}) em ${dataExtensa} às ${horaAg}.`,
+            seraAlterado: `Status do agendamento #${agendamentoIdAlvo.slice(0, 8)} será alterado para "cancelado" e o horário será liberado.`,
+            situacaoAtual: `Agendamento ativo com status "${agendamentoAlvo.status}".`,
+            resultadoEsperado: `Agendamento cancelado com sucesso e grade atualizada.`,
+            alertas: ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."],
+          },
+        });
+
+        pendingAction = {
+          id: proposta.id,
+          type: "cancelar_agendamento",
+          tool: "cancelar_agendamento",
+          title: `Confirmação de Cancelamento: ${servicoNomeAg}`,
+          summary: `Pet: ${petNomeAg} • Tutor: ${clienteNomeAg} • Data: ${dataExtensa} às ${horaAg}`,
+          riskLevel: "alto",
+          params: {
+            agendamentoId: agendamentoIdAlvo,
+            agendamento_id: agendamentoIdAlvo,
+            petId: petIdAg,
+            petNome: petNomeAg,
+            clienteId: clienteIdAg,
+            clienteNome: clienteNomeAg,
+            data: dataAg,
+            hora: horaAg,
+            servicoNome: servicoNomeAg,
+            motivo: intencao.entidades.motivo || "Cancelamento solicitado pelo operador",
+          },
+          created_at: proposta.created_at,
+          expires_at: proposta.validade,
+        };
+
+        respostaTexto = `Preparei o cancelamento do agendamento de **${servicoNomeAg}** para **${petNomeAg}** (Tutor: **${clienteNomeAg}**) no dia **${dataExtensa}** às **${horaAg}**. Por favor confirme no cartão abaixo para liberar o horário na grade.`;
+
+        cards.push({
+          type: "confirmacao",
+          title: pendingAction.title,
+          subtitle: `Tutor: ${clienteNomeAg} • Pet: ${petNomeAg}`,
+          data: {
+            proposta,
+            acaoPendente: pendingAction,
+            pendingAction,
+            requerConfirmacao: true,
+            resumoVisual: proposta.resumoVisual,
+            resumo: proposta.resumoVisual.entendido,
+            acoesDisponiveis: ["Confirmar cancelamento", "Manter agendamento"],
+          },
+        });
+
+        novoContexto = {
+          ...novoContexto,
+          operacaoPreparada: pendingAction,
+        };
+
+        return {
+          versao: "v2",
+          respostaTexto,
+          cards,
+          pendingAction,
+          novoContexto,
+          intencao,
+          tempoProcessamentoMs: Date.now() - inicioMs,
+          correlationId,
+        };
+      }
+
+      // 4.6 Resolução e Preparação de Remarcação (Reagendamento)
+      if (intencao.dominio === "agenda" && (intencao.intencao === "preparar_reagendamento" || intencao.intencao === "reagendar_agendamento" || intencao.intencao === "remarcar_agendamento")) {
+        let agendamentoIdAlvo = intencao.entidades.agendamentoId || (intencao.entidades as any).agendamento_id || null;
+        let agendamentoAlvo: any = null;
+
+        if (agendamentoIdAlvo) {
+          const { data: agById } = await sb
+            .from("agendamentos")
+            .select("id, data, hora, status, valor_previsto, clientes(id, nome), pets(id, nome), servicos(id, nome)")
+            .eq("id", agendamentoIdAlvo)
+            .maybeSingle();
+          agendamentoAlvo = agById;
+        } else {
+          let query = sb
+            .from("agendamentos")
+            .select("id, data, hora, status, valor_previsto, clientes(id, nome), pets(id, nome), servicos(id, nome)")
+            .neq("status", "cancelado");
+
+          if (petId) {
+            query = query.eq("pet_id", petId);
+          } else if (clienteId) {
+            query = query.eq("cliente_id", clienteId);
+          }
+
+          const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+          query = query.gte("data", hoje).order("data", { ascending: true }).limit(5);
+
+          const { data: agsEncontrados } = await query;
+          if (agsEncontrados && agsEncontrados.length > 0) {
+            agendamentoAlvo = agsEncontrados[0];
+            agendamentoIdAlvo = agendamentoAlvo.id;
+          }
+        }
+
+        if (!agendamentoAlvo) {
+          return {
+            versao: "v2",
+            respostaTexto: `Não encontrei nenhum agendamento ativo para remarcar.`,
+            cards: [],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+
+        const novaData = intencao.entidades.data;
+        const novaHora = intencao.entidades.hora;
+
+        if (!novaData || !novaHora) {
+          return {
+            versao: "v2",
+            respostaTexto: `Localizei o agendamento de **${agendamentoAlvo.pets?.nome || "Pet"}** (${agendamentoAlvo.data} às ${(agendamentoAlvo.hora || "").slice(0, 5)}). Para qual nova data e horário você deseja reagendar?`,
+            cards: [],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+
+        const novaDataHoraISO = `${novaData}T${novaHora}:00`;
+        const checagemGrade = await AgendaAdapter.verificarDisponibilidade(sb, novaDataHoraISO, null, novaData, novaHora);
+        if (!checagemGrade.disponivel) {
+          return {
+            versao: "v2",
+            respostaTexto: `Atenção: Não é possível remarcar para este horário: ${checagemGrade.motivo}`,
+            cards: [],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+
+        const proposta = JessiV2ConfirmationManager.criarProposta({
+          userId: user?.id || "proprietario_spa",
+          cliente: { id: agendamentoAlvo.clientes?.id || "", nome: agendamentoAlvo.clientes?.nome || "Tutor" },
+          pet: { id: agendamentoAlvo.pets?.id || "", nome: agendamentoAlvo.pets?.nome || "Pet" },
+          acao: "reagendar_agendamento",
+          motivo: `Remarcar de ${agendamentoAlvo.data} às ${(agendamentoAlvo.hora || "").slice(0, 5)} para ${novaData} às ${novaHora}`,
+          estadoAtual: { data: agendamentoAlvo.data, hora: agendamentoAlvo.hora },
+          estadoProposto: { agendamentoId: agendamentoIdAlvo, novaData, novaHora, novaDataHoraISO },
+          valores: { valorBruto: agendamentoAlvo.valor_previsto || 0, valorFinal: agendamentoAlvo.valor_previsto || 0 },
+          dataHora: novaDataHoraISO,
+          riscos: ["A nova vaga será reservada e a anterior liberada."],
+          resumoVisual: {
+            entendido: `Remarcação do agendamento de ${agendamentoAlvo.pets?.nome} para ${novaData} às ${novaHora}.`,
+            seraAlterado: `Data/hora atualizadas no agendamento #${agendamentoIdAlvo.slice(0, 8)}.`,
+            situacaoAtual: `Agendado para ${agendamentoAlvo.data} às ${(agendamentoAlvo.hora || "").slice(0, 5)}.`,
+            resultadoEsperado: `Agendamento remarcado com sucesso na base de dados.`,
+            alertas: ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."],
+          },
+        });
+
+        pendingAction = {
+          id: proposta.id,
+          type: "reagendar_agendamento",
+          tool: "reagendar_agendamento",
+          title: `Confirmação de Remarcação`,
+          summary: `Pet: ${agendamentoAlvo.pets?.nome} • De ${agendamentoAlvo.data} às ${(agendamentoAlvo.hora || "").slice(0, 5)} para ${novaData} às ${novaHora}`,
+          riskLevel: "medio",
+          params: {
+            agendamentoId: agendamentoIdAlvo,
+            agendamento_id: agendamentoIdAlvo,
+            novaData,
+            novaHora,
+            novaDataHoraISO,
+          },
+          created_at: proposta.created_at,
+          expires_at: proposta.validade,
+        };
+
+        respostaTexto = `Preparei a remarcação do atendimento de **${agendamentoAlvo.pets?.nome || "Pet"}** para o dia **${novaData}** às **${novaHora}**. Por favor confirme no cartão abaixo.`;
+
+        cards.push({
+          type: "confirmacao",
+          title: pendingAction.title,
+          subtitle: `Pet: ${agendamentoAlvo.pets?.nome || "Pet"}`,
+          data: {
+            proposta,
+            acaoPendente: pendingAction,
+            pendingAction,
+            requerConfirmacao: true,
+            resumoVisual: proposta.resumoVisual,
+            resumo: proposta.resumoVisual.entendido,
+            acoesDisponiveis: ["Confirmar remarcação", "Cancelar"],
           },
         });
 
