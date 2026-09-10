@@ -23,7 +23,7 @@ export const JessiContextPanel: React.FC<JessiContextPanelProps> = ({
     contexto.servicoSelecionadoNome;
 
   return (
-    <aside className="fixed inset-y-14 right-0 z-30 w-full sm:w-80 md:static md:w-72 border-l border-border/70 bg-card/95 md:bg-card/60 backdrop-blur-md md:backdrop-blur-xs flex flex-col h-auto md:h-full text-xs shadow-lg md:shadow-none">
+    <aside className="fixed inset-y-14 right-0 z-30 w-full sm:w-80 md:static md:w-72 border-l border-border/70 bg-card/95 md:bg-card/60 backdrop-blur-md md:backdrop-blur-xs flex flex-col h-auto md:h-full text-xs shadow-lg md:shadow-none pb-20 md:pb-0">
       <div className="p-3.5 border-b border-border/70 flex items-center justify-between font-semibold text-foreground">
         <span>Painel de Contexto Ativo</span>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6">

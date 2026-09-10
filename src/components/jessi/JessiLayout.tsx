@@ -345,7 +345,7 @@ export const JessiLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex w-full h-[calc(100dvh-3.5rem-4rem)] md:h-[calc(100vh-3.5rem)] bg-[#FAF8F5] overflow-hidden">
+    <div className="flex w-full h-[calc(100dvh-3.5rem)] pb-20 md:pb-0 bg-[#FAF8F5] overflow-hidden">
       {/* Sidebar de Navegação */}
       <JessiSidebar
         onNovaConversa={handleNovaConversa}
