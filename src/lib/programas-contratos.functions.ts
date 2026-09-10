@@ -131,6 +131,17 @@ export const atualizarContrato = createServerFn({ method: "POST" })
     return await carregarContrato(sb, data.contrato_id);
   });
 
+export interface CancelarContratoResult {
+  success: boolean;
+  cancelado: boolean;
+  ja_cancelado?: boolean;
+  contrato_id: string;
+  creditos_consumidos: number;
+  pagamento_estornado: string | null;
+  contrato_depois?: any;
+  saldos_finais?: any;
+}
+
 /** Cancela um pacote comprado preservando todo o histórico e estornando efeitos financeiros/operacionais. */
 export const cancelarContrato = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -139,7 +150,7 @@ export const cancelarContrato = createServerFn({ method: "POST" })
     motivo: z.string().min(3, "Informe o motivo do cancelamento"),
     estornar_financeiro: z.boolean().default(true),
   }).parse(input))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<CancelarContratoResult> => {
     const sb = context.supabase as any;
     const userId = context.userId;
     const nowIso = new Date().toISOString();
@@ -149,10 +160,19 @@ export const cancelarContrato = createServerFn({ method: "POST" })
     const contrato: any = antes.contrato;
 
     if (contrato.status_do_programa === "cancelado") {
-      return { ja_cancelado: true, contrato_id: data.contrato_id };
+      return {
+        success: true,
+        cancelado: true,
+        ja_cancelado: true,
+        contrato_id: data.contrato_id,
+        creditos_consumidos: 0,
+        pagamento_estornado: null,
+        contrato_depois: contrato,
+        saldos_finais: antes.saldos,
+      };
     }
 
-    const consumidos = Object.values(antes.saldos).reduce((acc, s: any) => acc + s.consumido, 0);
+    const consumidos = Object.values(antes.saldos).reduce((acc: number, s: any) => acc + Number(s.consumido || 0), 0);
     const cancelamentosCreditos: any[] = [];
 
     // 1. Zera créditos disponíveis e libera reservas (histórico preservado no livro razão)
@@ -201,7 +221,7 @@ export const cancelarContrato = createServerFn({ method: "POST" })
     if (uErr) throw uErr;
 
     // 3. Estorno e cancelamento no financeiro
-    let pagamentoEstornado = null;
+    let pagamentoEstornado: any = null;
     const { data: pagamentoContrato } = await sb
       .from("pagamentos")
       .select("*")
@@ -257,8 +277,9 @@ export const cancelarContrato = createServerFn({ method: "POST" })
     return {
       success: true,
       cancelado: true,
+      ja_cancelado: false,
       contrato_id: data.contrato_id,
-      creditos_consumidos: consumidos,
+      creditos_consumidos: Number(consumidos || 0),
       pagamento_estornado: pagamentoEstornado?.id ?? null,
       contrato_depois: depois.contrato,
       saldos_finais: depois.saldos,

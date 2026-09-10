@@ -146,12 +146,12 @@ export class ClientesPetsAdapter {
       // 2. Busca ampla de clientes e pets no banco para ranqueamento
       const { data: todosClientes } = await sb
         .from("clientes")
-        .select("id, nome, telefone, email, endereco, pets(id, nome, raca, porte)")
+        .select("id, nome, telefone, email, rua, numero, complemento, bairro, cidade, pets(id, nome, raca, porte)")
         .limit(100);
 
       const { data: todosPets } = await sb
         .from("pets")
-        .select("id, nome, raca, porte, cliente:clientes(id, nome, telefone, email)")
+        .select("id, nome, raca, porte, clientes(id, nome, telefone, email)")
         .limit(100);
 
       const candidatosRanqueados: CandidatoLocalizado[] = [];
@@ -161,6 +161,11 @@ export class ClientesPetsAdapter {
         const nomeNorm = normalizarTexto(cli.nome);
         const telLimpo = (cli.telefone || "").replace(/\D/g, "");
         const partesNome = nomeNorm.split(/\s+/);
+        const endereco = [
+          cli.rua ? `${cli.rua}${cli.numero ? `, ${cli.numero}` : ""}` : "",
+          cli.bairro,
+          cli.cidade,
+        ].filter(Boolean).join(" - ") || null;
 
         let score = 0;
 
@@ -197,7 +202,7 @@ export class ClientesPetsAdapter {
             nomePrincipal: cli.nome,
             detalheSecundario: `Tutor • Tel: ${cli.telefone || "Sem telefone"} • Pets: ${(cli.pets || []).map((p: any) => p.nome).join(", ") || "Nenhum"}`,
             scoreConfianca: score,
-            dadosCompletos: cli,
+            dadosCompletos: { ...cli, endereco },
           });
         }
       });
@@ -205,6 +210,7 @@ export class ClientesPetsAdapter {
       // Avaliação de Pets (Nome do pet, raça, pequeno erro de digitação, vínculo do tutor)
       (todosPets || []).forEach((pet: any) => {
         const nomeNorm = normalizarTexto(pet.nome);
+        const tutorNome = pet.clientes?.nome || pet.cliente?.nome || "Não vinculado";
         let score = 0;
 
         if (nomeNorm === termoNorm) {
@@ -221,7 +227,7 @@ export class ClientesPetsAdapter {
             id: pet.id,
             tipo: "pet",
             nomePrincipal: pet.nome,
-            detalheSecundario: `Pet (${pet.raca || "Raça padrão"}) • Tutor: ${pet.cliente?.nome || "Não vinculado"}`,
+            detalheSecundario: `Pet (${pet.raca || "Raça padrão"}) • Tutor: ${tutorNome}`,
             scoreConfianca: score,
             dadosCompletos: pet,
           });
@@ -302,7 +308,7 @@ export class ClientesPetsAdapter {
           cuidados_saude,
           alergias,
           observacoes,
-          cliente:clientes(id, nome, whatsapp, telefone, email, endereco, bairro, cidade)
+          clientes(id, nome, whatsapp, telefone, email, rua, numero, complemento, bairro, cidade)
         `)
         .eq("id", petId)
         .maybeSingle();
@@ -336,14 +342,24 @@ export class ClientesPetsAdapter {
         .limit(3);
 
       const ultimoAtendimento = atendimentos && atendimentos.length > 0 ? atendimentos[0] : null;
-      const petNome = (pet as any).nome;
-      const raca = (pet as any).raca || "Padrão";
-      const tutor = (pet as any).cliente?.nome || "Tutor não vinculado";
+      const petObj = pet as any;
+      const petNome = petObj.nome;
+      const raca = petObj.raca || "Padrão";
+      const clienteData = petObj.clientes || petObj.cliente || null;
+      const tutor = clienteData?.nome || "Tutor não vinculado";
+      const enderecoCliente = clienteData
+        ? [
+            clienteData.rua ? `${clienteData.rua}${clienteData.numero ? `, ${clienteData.numero}` : ""}` : "",
+            clienteData.complemento,
+            clienteData.bairro,
+            clienteData.cidade,
+          ].filter(Boolean).join(" - ") || null
+        : null;
 
-      let summary = `**Ficha Cadastral de ${petNome}** (${raca})\n• Tutor: ${tutor}\n• Porte: ${(pet as any).porte || "Médio"} | Peso: ${(pet as any).peso ? `${(pet as any).peso}kg` : "Não informado"}`;
+      let summary = `**Ficha Cadastral de ${petNome}** (${raca})\n• Tutor: ${tutor}\n• Porte: ${petObj.porte || "Médio"} | Peso: ${petObj.peso ? `${petObj.peso}kg` : "Não informado"}`;
 
-      if ((pet as any).cuidados_saude || (pet as any).alergias) {
-        summary += `\n• Cuidados/Alergias: ${(pet as any).cuidados_saude || (pet as any).alergias}`;
+      if (petObj.cuidados_saude || petObj.alergias || petObj.observacoes_saude) {
+        summary += `\n• Cuidados/Alergias: ${petObj.observacoes_saude || petObj.cuidados_saude || petObj.alergias}`;
       }
 
       if (ultimoAtendimento) {
@@ -360,7 +376,9 @@ export class ClientesPetsAdapter {
         success: true,
         source: "ficha_pet_consolidada",
         data: {
-          ...(pet as any),
+          ...petObj,
+          observacoes_saude: petObj.observacoes_saude || petObj.cuidados_saude || petObj.alergias || null,
+          cliente: clienteData ? { ...clienteData, endereco: enderecoCliente } : null,
           historicoAtendimentos: atendimentos || [],
           ultimoAtendimento,
           programasAtivos: programas || [],
@@ -397,7 +415,9 @@ export class ClientesPetsAdapter {
           whatsapp,
           email,
           cpf,
-          endereco,
+          rua,
+          numero,
+          complemento,
           bairro,
           cidade,
           observacoes,
@@ -407,6 +427,8 @@ export class ClientesPetsAdapter {
         .maybeSingle();
 
       if (error || !cliente) throw error || new Error("Cliente não encontrado.");
+
+      const clienteObj = cliente as any;
 
       // Consulta situação financeira do cliente (pagamentos pendentes e histórico)
       const { data: pagamentos } = await sb
@@ -430,14 +452,21 @@ export class ClientesPetsAdapter {
         0
       );
 
-      const petsList = (cliente.pets || []).map((p: any) => `${p.nome} (${p.raca || "Padrão"})`).join(", ");
+      const enderecoFormatado = [
+        clienteObj.rua ? `${clienteObj.rua}${clienteObj.numero ? `, ${clienteObj.numero}` : ""}` : "",
+        clienteObj.complemento,
+        clienteObj.bairro,
+        clienteObj.cidade,
+      ].filter(Boolean).join(" - ") || "Não cadastrado";
+
+      const petsList = (clienteObj.pets || []).map((p: any) => `${p.nome} (${p.raca || "Padrão"})`).join(", ");
       const sitFin = totalPendente > 0 ? `Possui R$ ${totalPendente.toFixed(2)} em pendências de pagamento` : "Situação financeira regular (Sem débitos pendentes)";
 
       const summary =
-        `**Ficha Cadastral de ${cliente.nome}**\n` +
-        `• Telefone/WhatsApp: ${cliente.whatsapp || cliente.telefone || "Não informado"}\n` +
-        `• Endereço: ${cliente.endereco || "Não cadastrado"}${cliente.bairro ? ` - ${cliente.bairro}` : ""}${cliente.cidade ? `, ${cliente.cidade}` : ""}\n` +
-        `• Pets Vinculados (${cliente.pets?.length || 0}): ${petsList || "Nenhum"}\n` +
+        `**Ficha Cadastral de ${clienteObj.nome}**\n` +
+        `• Telefone/WhatsApp: ${clienteObj.whatsapp || clienteObj.telefone || "Não informado"}\n` +
+        `• Endereço: ${enderecoFormatado}\n` +
+        `• Pets Vinculados (${clienteObj.pets?.length || 0}): ${petsList || "Nenhum"}\n` +
         `• Programas Ativos: ${programas?.length ? programas.map((pr: any) => pr.nome_snapshot).join(", ") : "Nenhum plano ativo"}\n` +
         `• Situação Financeira: ${sitFin}`;
 
@@ -445,7 +474,8 @@ export class ClientesPetsAdapter {
         success: true,
         source: "ficha_cliente_consolidada",
         data: {
-          ...cliente,
+          ...clienteObj,
+          endereco: enderecoFormatado !== "Não cadastrado" ? enderecoFormatado : null,
           historicoPagamentos: pagamentos || [],
           totalPendente,
           programasAtivos: programas || [],

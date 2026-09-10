@@ -99,7 +99,7 @@ export async function processarMensagemJessiV2Core(
         respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido"}`;
       }
 
-      await registrarAuditoriaV2(sb, {
+      registrarAuditoriaV2({
         userId: user?.id || "anon",
         operadorNome: user?.nome || "Eli Júnior",
         tipoOperacao: "mutacao_supervisionada",
