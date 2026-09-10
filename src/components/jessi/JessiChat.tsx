@@ -105,8 +105,8 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                 </div>
               )}
 
-              {/* Botões de Ações de Continuidade quando houver ação pendente */}
-              {isAssistant && msg.pendingAction && (
+              {/* Botões de Ações de Continuidade quando houver ação pendente e não houver card de confirmação */}
+              {isAssistant && msg.pendingAction && !msg.cards?.some((c) => c.type === "confirmacao") && (
                 <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-300 space-y-2">
                   <span className="font-semibold text-xs text-amber-950 block">
                     Confirmação Necessária: {msg.pendingAction.title}

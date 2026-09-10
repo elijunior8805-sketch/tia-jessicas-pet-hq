@@ -72,31 +72,51 @@ export async function processarMensagemJessiV2Core(
       let mutationResult: any = null;
       let recordIdReal: string | null = null;
 
-      if (toolNome === "criar_agendamento" || toolNome === "preparar_agendamento" || toolNome === "executar_agendamento") {
+      if (
+        toolNome === "criar_agendamento" ||
+        toolNome === "preparar_agendamento" ||
+        toolNome === "executar_agendamento"
+      ) {
         mutationResult = await AgendaAdapter.executarAgendamentoConfirmado(sb, params, idempotencyKey);
+        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
+      } else if (
+        toolNome === "preparar_reagendamento" ||
+        toolNome === "reagendar_agendamento" ||
+        toolNome === "remarcar_agendamento"
+      ) {
+        mutationResult = await AgendaAdapter.executarRemarcacaoConfirmada(sb, params, idempotencyKey);
+        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
+      } else if (
+        toolNome === "preparar_cancelamento" ||
+        toolNome === "cancelar_agendamento"
+      ) {
+        mutationResult = await AgendaAdapter.executarCancelamentoConfirmado(sb, params, idempotencyKey);
         recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
       }
 
-      const sucesso = mutationResult ? mutationResult.success : true;
+      const sucesso = mutationResult ? Boolean(mutationResult.success) : true;
       const idExibicao = recordIdReal ? ` (ID: ${recordIdReal.slice(0, 8)})` : "";
 
       if (sucesso) {
-        respostaTexto = `Agendamento${idExibicao} confirmado e registrado com sucesso no sistema. A gravação foi verificada fisicamente no banco de dados.`;
-        
+        respostaTexto =
+          mutationResult?.summary ||
+          `Operação${idExibicao} confirmada e registrada com sucesso no sistema. A gravação foi verificada fisicamente no banco de dados.`;
+
         cards.push({
           type: "confirmacao",
-          title: "Agendamento Realizado com Sucesso",
+          title: "Operação Realizada com Sucesso",
           subtitle: `Confirmado por ${user?.nome || "Eli Júnior"} às ${new Date().toLocaleTimeString("pt-BR")}`,
           data: {
             executado: true,
             tool: toolNome,
             registroId: recordIdReal,
+            resultado: mutationResult,
             params,
             gravacaoVerificada: true,
           },
         });
       } else {
-        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido"}`;
+        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido na execução da operação."}`;
       }
 
       registrarAuditoriaV2({
@@ -213,12 +233,353 @@ export async function processarMensagemJessiV2Core(
       }
     }
 
-    // 4. Roteamento de Intenção: Consulta vs. Preparação de Ação (FASE 3 — SEM EXECUÇÃO)
+    // 4. Roteamento e Resolução Operacional Segura
     if (intencao.requerConfirmacao) {
       // PREPARAÇÃO DE OPERAÇÃO SUPERVISIONADA (NUNCA EXECUTA DIRETAMENTE NO BANCO)
-      const nomeCliente = novoContexto.cliente?.nome || contextoAtual.cliente?.nome || intencao.entidades.clienteNome || "Cliente";
-      const nomePet = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome || "Pet";
-      const servicoNome = intencao.entidades.servicoNome || contextoAtual.servico?.nome || "Atendimento";
+      let clienteId = novoContexto.cliente?.id || contextoAtual.cliente?.id || intencao.entidades.clienteId || null;
+      let clienteNome = novoContexto.cliente?.nome || contextoAtual.cliente?.nome || intencao.entidades.clienteNome || null;
+      let petId = novoContexto.pet?.id || contextoAtual.pet?.id || intencao.entidades.petId || null;
+      let petNome = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome || null;
+      let servicoId = novoContexto.servico?.id || contextoAtual.servico?.id || intencao.entidades.servicoId || null;
+      let servicoNome = intencao.entidades.servicoNome || contextoAtual.servico?.nome || null;
+      let servicoValor = intencao.entidades.valor || (contextoAtual as any)?.servicoValor || null;
+      let duracaoMinutos = 60;
+
+      // 4.1 Resolução de Cliente no Banco se tiver apenas nome
+      if (!clienteId && clienteNome) {
+        const { data: clientesEncontrados } = await sb
+          .from("clientes")
+          .select("id, nome, whatsapp, telefone")
+          .ilike("nome", `%${clienteNome}%`)
+          .limit(5);
+
+        if (clientesEncontrados && clientesEncontrados.length === 1) {
+          clienteId = clientesEncontrados[0].id;
+          clienteNome = clientesEncontrados[0].nome;
+          novoContexto.cliente = {
+            id: clienteId,
+            nome: clienteNome,
+            telefone: clientesEncontrados[0].telefone || clientesEncontrados[0].whatsapp,
+          };
+        } else if (clientesEncontrados && clientesEncontrados.length > 1) {
+          // Ambiguidade: exige desambiguação humana
+          return {
+            versao: "v2",
+            respostaTexto: `Encontrei mais de um cliente com o nome "${clienteNome}". Qual deles você deseja selecionar?`,
+            cards: [
+              {
+                type: "cliente",
+                title: "Selecione o Cliente / Tutor",
+                subtitle: `Termo pesquisado: "${clienteNome}"`,
+                data: {
+                  exigeDesambiguacao: true,
+                  opcoes: clientesEncontrados.map((c) => ({
+                    id: c.id,
+                    tipo: "cliente",
+                    nome: c.nome,
+                    detalhe: c.telefone || c.whatsapp || "Sem telefone",
+                  })),
+                },
+              },
+            ],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+      }
+
+      // 4.2 Resolução de Pet vinculado ao Cliente
+      if (clienteId) {
+        const { data: petsDoCliente } = await sb
+          .from("pets")
+          .select("id, nome, raca, porte")
+          .eq("cliente_id", clienteId);
+
+        if (petNome && petsDoCliente && petsDoCliente.length > 0) {
+          const matchPet = petsDoCliente.find((p) => p.nome.toLowerCase().includes(petNome!.toLowerCase()));
+          if (matchPet) {
+            petId = matchPet.id;
+            petNome = matchPet.nome;
+            novoContexto.pet = {
+              id: petId,
+              nome: petNome,
+              raca: matchPet.raca,
+              porte: matchPet.porte,
+            };
+          } else {
+            // Pet informado não pertence a este cliente
+            return {
+              versao: "v2",
+              respostaTexto: `O tutor ${clienteNome} não possui nenhum pet com o nome "${petNome}". Os pets cadastrados para este tutor são: ${petsDoCliente.map((p) => p.nome).join(", ")}.`,
+              cards: [
+                {
+                  type: "cliente",
+                  title: `Pets de ${clienteNome}`,
+                  subtitle: "Selecione o pet correto",
+                  data: {
+                    opcoes: petsDoCliente.map((p) => ({
+                      id: p.id,
+                      tipo: "pet",
+                      nome: p.nome,
+                      detalhe: `${p.raca || "Raça não informada"} • ${p.porte || "Porte médio"}`,
+                    })),
+                  },
+                },
+              ],
+              pendingAction: null,
+              novoContexto: { ...contextoAtual, ...novoContexto },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
+        } else if (!petId && petsDoCliente && petsDoCliente.length === 1) {
+          // Cliente possui exatamente 1 pet cadastrado: seleciona com clareza
+          petId = petsDoCliente[0].id;
+          petNome = petsDoCliente[0].nome;
+          novoContexto.pet = {
+            id: petId,
+            nome: petNome,
+            raca: petsDoCliente[0].raca,
+            porte: petsDoCliente[0].porte,
+          };
+        } else if (!petId && petsDoCliente && petsDoCliente.length > 1) {
+          // Cliente possui múltiplos pets e o usuário não especificou qual
+          return {
+            versao: "v2",
+            respostaTexto: `O tutor ${clienteNome} possui ${petsDoCliente.length} pets cadastrados (${petsDoCliente.map((p) => p.nome).join(", ")}). Para qual pet deseja realizar a operação?`,
+            cards: [
+              {
+                type: "cliente",
+                title: `Selecione o Pet de ${clienteNome}`,
+                subtitle: "Múltiplos pets cadastrados",
+                data: {
+                  opcoes: petsDoCliente.map((p) => ({
+                    id: p.id,
+                    tipo: "pet",
+                    nome: p.nome,
+                    detalhe: `${p.raca || "Raça não informada"} • ${p.porte || "Porte médio"}`,
+                  })),
+                },
+              },
+            ],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+      } else if (!petId && petNome) {
+        // Busca pet globalmente para descobrir o tutor
+        const { data: petsGlobais } = await sb
+          .from("pets")
+          .select("id, nome, raca, porte, cliente_id, clientes(id, nome, whatsapp)")
+          .ilike("nome", `%${petNome}%`)
+          .limit(5);
+
+        if (petsGlobais && petsGlobais.length === 1) {
+          petId = petsGlobais[0].id;
+          petNome = petsGlobais[0].nome;
+          clienteId = petsGlobais[0].cliente_id;
+          clienteNome = (petsGlobais[0].clientes as any)?.nome || "Tutor";
+          novoContexto.pet = { id: petId, nome: petNome, raca: petsGlobais[0].raca, porte: petsGlobais[0].porte };
+          novoContexto.cliente = { id: clienteId, nome: clienteNome };
+        } else if (petsGlobais && petsGlobais.length > 1) {
+          return {
+            versao: "v2",
+            respostaTexto: `Encontrei mais de um pet com o nome "${petNome}". De qual tutor é o pet?`,
+            cards: [
+              {
+                type: "cliente",
+                title: `Pets Encontrados ("${petNome}")`,
+                subtitle: "Selecione o pet correspondente",
+                data: {
+                  exigeDesambiguacao: true,
+                  opcoes: petsGlobais.map((p: any) => ({
+                    id: p.id,
+                    tipo: "pet",
+                    nome: `${p.nome} (Tutor: ${p.clientes?.nome || "Não informado"})`,
+                    detalhe: `${p.raca || ""} • Tel: ${p.clientes?.whatsapp || ""}`,
+                  })),
+                },
+              },
+            ],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+      }
+
+      // 4.3 Resolução de Serviço e Preço no Catálogo
+      if (servicoNome) {
+        const { data: servicoDB } = await sb
+          .from("servicos")
+          .select("id, nome, valor_padrao, duracao_minutos")
+          .ilike("nome", `%${servicoNome}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (servicoDB) {
+          servicoId = servicoDB.id;
+          servicoNome = servicoDB.nome;
+          servicoValor = servicoDB.valor_padrao || 0;
+          duracaoMinutos = servicoDB.duracao_minutos || 60;
+        }
+      }
+
+      // 4.4 Validação Estrita de Campos Obrigatórios para Agendamento
+      if (intencao.dominio === "agenda" && (intencao.intencao === "preparar_agendamento" || intencao.intencao === "criar_agendamento")) {
+        const dataAlvo = intencao.entidades.data;
+        const horaAlvo = intencao.entidades.hora;
+
+        const camposFaltantes: string[] = [];
+        if (!clienteId || !clienteNome) camposFaltantes.push("Tutor/Cliente");
+        if (!petId || !petNome) camposFaltantes.push("Pet");
+        if (!servicoNome) camposFaltantes.push("Serviço (ex: Banho, Tosa, Banho e Tosa)");
+        if (!dataAlvo) camposFaltantes.push("Data do atendimento");
+        if (!horaAlvo) camposFaltantes.push("Horário desejado");
+
+        if (camposFaltantes.length > 0) {
+          let textoOrientacao = `Para preparar o agendamento com segurança, ainda preciso das seguintes informações: **${camposFaltantes.join(", ")}**.`;
+          if (clienteNome && petNome && !dataAlvo && !horaAlvo) {
+            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**). Para qual data e horário você deseja agendar o serviço de **${servicoNome || "atendimento"}**?`;
+          } else if (clienteNome && petNome && dataAlvo && !horaAlvo) {
+            textoOrientacao = `Para o atendimento de **${petNome}** no dia **${dataAlvo}**, qual o horário desejado?`;
+          }
+
+          return {
+            versao: "v2",
+            respostaTexto: textoOrientacao,
+            cards,
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+
+        // Se todos os dados obrigatórios estão presentes, checa disponibilidade na grade
+        const dataHoraISO = `${dataAlvo}T${horaAlvo}:00`;
+        const checagemGrade = await AgendaAdapter.verificarDisponibilidade(sb, dataHoraISO, null, dataAlvo, horaAlvo);
+        if (!checagemGrade.disponivel) {
+          return {
+            versao: "v2",
+            respostaTexto: `Atenção: ${checagemGrade.motivo} Deseja escolher outro horário para ${petNome}?`,
+            cards,
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
+
+        const dataExtensa = new Intl.DateTimeFormat("pt-BR", {
+          dateStyle: "full",
+          timeZone: "America/Sao_Paulo",
+        }).format(new Date(`${dataAlvo}T12:00:00`));
+
+        const proposta = JessiV2ConfirmationManager.criarProposta({
+          userId: user?.id || "proprietario_spa",
+          cliente: { id: clienteId!, nome: clienteNome! },
+          pet: { id: petId!, nome: petNome! },
+          acao: "criar_agendamento",
+          motivo: `Agendamento de ${servicoNome} para ${petNome} em ${dataAlvo} às ${horaAlvo}`,
+          estadoAtual: { status: "pendente" },
+          estadoProposto: {
+            clienteId,
+            clienteNome,
+            petId,
+            petNome,
+            servicoId,
+            servicoNome,
+            data: dataAlvo,
+            hora: horaAlvo,
+            dataHora: dataHoraISO,
+            valor: servicoValor || 0,
+            duracaoMinutos,
+          },
+          valores: { valorBruto: servicoValor || 0, valorFinal: servicoValor || 0 },
+          dataHora: dataHoraISO,
+          riscos: ["Alteração no banco sujeita a confirmação explícita com verificação física (read-back)."],
+          resumoVisual: {
+            entendido: `Agendamento de ${servicoNome} para o pet ${petNome} (${clienteNome}) em ${dataExtensa} às ${horaAlvo}.`,
+            seraAlterado: `Reserva na grade de horários para ${dataAlvo} às ${horaAlvo} no valor de R$ ${Number(servicoValor || 0).toFixed(2)}.`,
+            situacaoAtual: "Horário verificado e disponível na grade.",
+            resultadoEsperado: `Agendamento oficial registrado e verificado no banco de dados para ${petNome}.`,
+            alertas: ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."],
+          },
+        });
+
+        pendingAction = {
+          id: proposta.id,
+          type: "criar_agendamento",
+          tool: "criar_agendamento",
+          title: `Confirmação de Agendamento: ${servicoNome}`,
+          summary: `Tutor: ${clienteNome} • Pet: ${petNome} • Data: ${dataExtensa} às ${horaAlvo} • Valor: R$ ${Number(servicoValor || 0).toFixed(2)}`,
+          riskLevel: "medio",
+          params: {
+            clienteId,
+            clienteNome,
+            petId,
+            petNome,
+            servicoId,
+            servicoNome,
+            data: dataAlvo,
+            hora: horaAlvo,
+            dataHora: dataHoraISO,
+            valor: servicoValor || 0,
+            duracaoMinutos,
+          },
+          created_at: proposta.created_at,
+          expires_at: proposta.validade,
+        };
+
+        respostaTexto = `Preparei o agendamento de **${servicoNome}** para **${petNome}** (Tutor: **${clienteNome}**) em **${dataExtensa}** às **${horaAlvo}** (Valor: R$ ${Number(servicoValor || 0).toFixed(2)}). Por favor revise todos os detalhes no cartão abaixo e clique em **Confirmar e Executar**.`;
+
+        cards.push({
+          type: "confirmacao",
+          title: pendingAction.title,
+          subtitle: `Tutor: ${clienteNome} • Pet: ${petNome}`,
+          data: {
+            proposta,
+            acaoPendente: pendingAction,
+            pendingAction,
+            requerConfirmacao: true,
+            resumoVisual: proposta.resumoVisual,
+            resumo: proposta.resumoVisual.entendido,
+            acoesDisponiveis: ["Confirmar operação", "Cancelar"],
+          },
+        });
+
+        novoContexto = {
+          ...novoContexto,
+          operacaoPreparada: pendingAction,
+        };
+
+        return {
+          versao: "v2",
+          respostaTexto,
+          cards,
+          pendingAction,
+          novoContexto,
+          intencao,
+          tempoProcessamentoMs: Date.now() - inicioMs,
+          correlationId,
+        };
+      }
+
+      // Outros domínios com supervisão (programas, financeiro, clientes)
+      const nomeCliente = clienteNome || "Cliente";
+      const nomePet = petNome || "Pet";
       const dataHoraAlvo = intencao.entidades.data ? `${intencao.entidades.data}${intencao.entidades.hora ? ` às ${intencao.entidades.hora}` : ""}` : "Data a definir";
 
       let entendido = `Comando recebido: "${input.mensagem}"`;
@@ -227,12 +588,7 @@ export async function processarMensagemJessiV2Core(
       let resultadoEsperado = `Execução oficial de ${intencao.intencao.replace(/_/g, " ")} após confirmação humana.`;
       const alertas: string[] = ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."];
 
-      if (intencao.dominio === "agenda") {
-        entendido = `Solicitação de agendamento de ${servicoNome} para o pet ${nomePet} em ${dataHoraAlvo}.`;
-        seraAlterado = `Criação de reserva na grade de horários para ${dataHoraAlvo}.`;
-        situacaoAtual = "Horário disponível na grade.";
-        resultadoEsperado = `Agendamento confirmado no sistema para ${nomePet}.`;
-      } else if (intencao.dominio === "programas_creditos") {
+      if (intencao.dominio === "programas_creditos") {
         entendido = `Uso/liberação de 1 crédito do plano do Clubinho para ${nomePet}.`;
         seraAlterado = `Abatimento de 1 sessão no saldo de créditos do cliente ${nomeCliente}.`;
         situacaoAtual = `Cliente possui créditos ativos.`;
@@ -248,23 +604,17 @@ export async function processarMensagemJessiV2Core(
         seraAlterado = `Lançamento de receita no valor de R$ ${Number(intencao.entidades.valor || 0).toFixed(2)}.`;
         situacaoAtual = "Pagamento pendente de registro.";
         resultadoEsperado = `Transação financeira oficial registrada.`;
-      } else if (intencao.dominio === "comunicacao_mensagens") {
-        entendido = `Preparação de mensagem no WhatsApp para ${nomeCliente} (${intencao.entidades.clienteId || "Tutor"}).`;
-        seraAlterado = `Disparo supervisionado de mensagem com link wa.me pronto.`;
-        situacaoAtual = "Mensagem em rascunho.";
-        resultadoEsperado = `Link do WhatsApp gerado para envio pelo operador.`;
       }
 
       const proposta = JessiV2ConfirmationManager.criarProposta({
         userId: user?.id || "proprietario_spa",
-        cliente: novoContexto.cliente || contextoAtual.cliente || { nome: nomeCliente },
-        pet: novoContexto.pet || contextoAtual.pet || { nome: nomePet },
+        cliente: { id: clienteId || "", nome: nomeCliente },
+        pet: { id: petId || "", nome: petNome || nomePet },
         acao: intencao.intencao,
         motivo: `Solicitação: "${input.mensagem}"`,
         estadoAtual: { status: "pendente" },
         estadoProposto: intencao.entidades,
         valores: { valorBruto: intencao.entidades.valor || 0, valorFinal: intencao.entidades.valor || 0 },
-        impactoCreditos: intencao.dominio === "programas_creditos" ? { debitoSessoes: 1, saldoRestanteEsperado: 0, servico: servicoNome } : undefined,
         dataHora: dataHoraAlvo,
         riscos: ["Alteração no banco sujeita a confirmação com verificação física (read-back)."],
         resumoVisual: {
@@ -283,13 +633,21 @@ export async function processarMensagemJessiV2Core(
         title: `Confirmação de ${intencao.intencao.replace(/_/g, " ").toUpperCase()}`,
         summary: proposta.motivo,
         riskLevel: "medio",
-        params: intencao.entidades,
+        params: {
+          ...intencao.entidades,
+          clienteId,
+          clienteNome: nomeCliente,
+          petId,
+          petNome: nomePet,
+          servicoId,
+          servicoNome,
+        },
         created_at: proposta.created_at,
         expires_at: proposta.validade,
       };
 
-      respostaTexto = `Preparei o pedido solicitado no cartão de revisão abaixo. Contudo, nesta etapa consultiva, a gravação e execução direta de agendamentos, remarcações e cancelamentos ainda não está liberada.`;
-      
+      respostaTexto = `Preparei a operação solicitada no cartão de revisão abaixo. Revise os dados e confirme para que eu execute a gravação no sistema.`;
+
       cards.push({
         type: "confirmacao",
         title: pendingAction.title,
@@ -297,8 +655,10 @@ export async function processarMensagemJessiV2Core(
         data: {
           proposta,
           acaoPendente: pendingAction,
+          pendingAction,
           requerConfirmacao: true,
           resumoVisual: proposta.resumoVisual,
+          resumo: proposta.resumoVisual?.entendido || proposta.motivo,
           acoesDisponiveis: ["Confirmar operação", "Cancelar"],
         },
       });

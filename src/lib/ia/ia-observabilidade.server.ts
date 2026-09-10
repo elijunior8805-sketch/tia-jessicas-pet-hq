@@ -50,8 +50,8 @@ export async function getFaseLiberacaoIA(): Promise<FaseLiberacao> {
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return "observacao";
-  return ((data as any).fase as FaseLiberacao) || "observacao";
+  if (error || !data) return "producao";
+  return ((data as any).fase as FaseLiberacao) || "producao";
 }
 
 export async function setFaseLiberacaoIA(fase: FaseLiberacao, userId?: string) {

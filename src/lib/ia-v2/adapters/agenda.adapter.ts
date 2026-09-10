@@ -18,28 +18,67 @@ const SELECT_AGENDA = `
   leva_traz_modalidade,
   clientes(id, nome, whatsapp),
   pets(id, nome, raca, porte),
-  servicos(id, nome, valor_padrao)
+  servicos(id, nome, valor)
 `;
 
-function partirDataHora(dataHoraISO: string): { data: string; hora: string } {
-  const dt = new Date(dataHoraISO);
-  if (isNaN(dt.getTime())) {
-    const [d, h] = String(dataHoraISO).split(/[T ]/);
-    return { data: d, hora: (h || "00:00").slice(0, 5) };
+export function partirDataHora(
+  dataHoraISO?: string | null,
+  fallbackData?: string | null,
+  fallbackHora?: string | null
+): { data: string; hora: string } {
+  let dataResolvida: string | null = null;
+  let horaResolvida: string | null = null;
+
+  if (fallbackData && typeof fallbackData === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fallbackData.trim())) {
+    dataResolvida = fallbackData.trim();
   }
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(dt);
-  const hora = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(dt);
-  return { data: fmt, hora };
+
+  if (fallbackHora && typeof fallbackHora === "string" && /^([01]\d|2[0-3]):[0-5]\d/.test(fallbackHora.trim())) {
+    horaResolvida = fallbackHora.trim().slice(0, 5);
+  }
+
+  if (dataHoraISO && typeof dataHoraISO === "string" && dataHoraISO !== "undefined" && dataHoraISO.trim() !== "") {
+    const str = dataHoraISO.trim();
+
+    // Caso 1: Apenas data "YYYY-MM-DD"
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      dataResolvida = str;
+    } else {
+      // Caso 2: Data e Hora com separador "YYYY-MM-DD[T ]HH:mm"
+      const partes = str.split(/[T ]/);
+      if (partes.length >= 2 && /^\d{4}-\d{2}-\d{2}$/.test(partes[0])) {
+        dataResolvida = partes[0];
+        if (/^([01]\d|2[0-3]):[0-5]\d/.test(partes[1])) {
+          horaResolvida = partes[1].slice(0, 5);
+        }
+      } else {
+        // Caso 3: Parse Date ISO
+        const dt = new Date(str);
+        if (!isNaN(dt.getTime())) {
+          dataResolvida = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "America/Sao_Paulo",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(dt);
+          horaResolvida = new Intl.DateTimeFormat("pt-BR", {
+            timeZone: "America/Sao_Paulo",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).format(dt);
+        }
+      }
+    }
+  }
+
+  if (!dataResolvida || !horaResolvida) {
+    throw new Error(
+      `Data ou horário não especificados de forma válida (Data: ${dataResolvida || "não informada"}, Horário: ${horaResolvida || "não informado"}).`
+    );
+  }
+
+  return { data: dataResolvida, hora: horaResolvida };
 }
 
 export class AgendaAdapter {
@@ -200,13 +239,18 @@ export class AgendaAdapter {
   /**
    * Verifica se há conflito de grade para um determinado horário
    */
+  /**
+   * Verifica se há conflito de grade para um determinado horário
+   */
   static async verificarDisponibilidade(
     sb: SupabaseClient<Database>,
-    dataHoraISO: string,
-    profissionalId?: string
+    dataHoraISO?: string | null,
+    profissionalId?: string | null,
+    fallbackData?: string | null,
+    fallbackHora?: string | null
   ): Promise<{ disponivel: boolean; motivo?: string }> {
     try {
-      const { data, hora } = partirDataHora(dataHoraISO);
+      const { data, hora } = partirDataHora(dataHoraISO, fallbackData, fallbackHora);
 
       let query = sb
         .from("agendamentos")
@@ -224,7 +268,7 @@ export class AgendaAdapter {
       if (existentes && existentes.length > 0) {
         return {
           disponivel: false,
-          motivo: "Já existe agendamento ativo registrado neste exato horário.",
+          motivo: `Já existe agendamento ativo registrado para ${data} às ${hora}.`,
         };
       }
 
@@ -257,7 +301,8 @@ export class AgendaAdapter {
   }
 
   /**
-   * Executa a gravação física após a confirmação humana com Read-Back Verification
+   * Executa a gravação física após a confirmação humana com Read-Back Verification minucioso
+   * BANIDOS: Fallbacks silenciosos, SELECT LIMIT 1 genéricos, substituição de pet/cliente
    */
   static async executarAgendamentoConfirmado(
     sb: SupabaseClient<Database>,
@@ -266,7 +311,103 @@ export class AgendaAdapter {
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_agenda_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
-      const checagem = await this.verificarDisponibilidade(sb, params.dataHora, params.profissionalId);
+      const rawDataHora =
+        params.dataHora ||
+        params.dataHoraISO ||
+        (params.data && params.hora ? `${params.data}T${params.hora}` : params.data);
+
+      let dataAlvo: string;
+      let horaAlvo: string;
+      try {
+        const parsed = partirDataHora(rawDataHora, params.data, params.hora);
+        dataAlvo = parsed.data;
+        horaAlvo = parsed.hora;
+      } catch (dateErr: any) {
+        return {
+          success: false,
+          entity_id: null,
+          affected_record_id: null,
+          source: "tabela_agendamentos",
+          summary: `Falha de validação temporal: ${dateErr.message}`,
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          error_code: "DATA_HORA_INVALIDA",
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      // 1. Validação estrita de identificadores obrigatórios
+      let clienteId = params.clienteId || params.cliente_id;
+      let petId = params.petId || params.pet_id;
+      let servicoId = params.servicoId || params.servico_id || null;
+
+      // Sanitização contra strings 'null' ou 'undefined'
+      if (clienteId === "undefined" || clienteId === "null" || !clienteId) clienteId = null;
+      if (petId === "undefined" || petId === "null" || !petId) petId = null;
+      if (servicoId === "undefined" || servicoId === "null" || !servicoId) servicoId = null;
+
+      if (!clienteId || !petId) {
+        return {
+          success: false,
+          entity_id: null,
+          affected_record_id: null,
+          source: "tabela_agendamentos",
+          summary: "Operação abortada: Identificação do cliente e do pet são obrigatórias antes da execução física.",
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          error_code: "CAMPOS_OBRIGATORIOS_AUSENTES",
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      // 2. Validação relacional: O pet DEVE existir e pertencer exatamente ao cliente informado
+      const { data: petRecord, error: petErr } = await sb
+        .from("pets")
+        .select("id, cliente_id, nome")
+        .eq("id", petId)
+        .maybeSingle();
+
+      if (petErr || !petRecord) {
+        return {
+          success: false,
+          entity_id: null,
+          affected_record_id: null,
+          source: "tabela_agendamentos",
+          summary: `Operação abortada: Pet ID "${petId}" não localizado na base de dados.`,
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          error_code: "PET_NAO_ENCONTRADO",
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      if (petRecord.cliente_id !== clienteId) {
+        return {
+          success: false,
+          entity_id: null,
+          affected_record_id: null,
+          source: "tabela_agendamentos",
+          summary: `Operação abortada por segurança relacional: O pet "${petRecord.nome}" não pertence ao tutor indicado.`,
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          error_code: "VINCULO_PET_CLIENTE_INVALIDO",
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
+
+      // 3. Validação de conflito de grade / disponibilidade
+      const checagem = await this.verificarDisponibilidade(
+        sb,
+        `${dataAlvo}T${horaAlvo}`,
+        params.profissionalId || params.profissional_id,
+        dataAlvo,
+        horaAlvo
+      );
+
       if (!checagem.disponivel) {
         return {
           success: false,
@@ -282,42 +423,69 @@ export class AgendaAdapter {
         };
       }
 
-      const { data: dataAlvo, hora: horaAlvo } = partirDataHora(params.dataHora);
+      const valorFinal = Number(params.valor || params.valor_previsto || 0);
 
-      const { data: novoAgendamento, error } = await sb
+      // 4. Gravação física (INSERT)
+      const { data: novoAgendamento, error: insertError } = await sb
         .from("agendamentos")
         .insert({
-          cliente_id: params.clienteId,
-          pet_id: params.petId,
-          servico_id: params.servicoId || null,
+          cliente_id: clienteId,
+          pet_id: petId,
+          servico_id: servicoId,
           data: dataAlvo,
           hora: horaAlvo,
-          valor_previsto: params.valor || 0,
+          valor_previsto: valorFinal,
           status: "agendado",
-          profissional_id: params.profissionalId || null,
+          profissional_id: params.profissionalId || params.profissional_id || null,
+          observacoes: params.observacoes || null,
         } as any)
-        .select("id, data, hora, status, valor_previsto")
+        .select("id, data, hora, status, valor_previsto, cliente_id, pet_id, servico_id")
         .single();
 
-      if (error || !novoAgendamento) throw error || new Error("Falha na gravação do registro.");
+      if (insertError || !novoAgendamento) {
+        throw insertError || new Error("Falha na inserção do registro de agendamento.");
+      }
 
+      // 5. Read-Back Verification Completo (Verificação de campos de ponta a ponta)
       const { data: readBack, error: readBackError } = await sb
         .from("agendamentos")
-        .select("id, status")
+        .select("id, cliente_id, pet_id, data, hora, status, valor_previsto, servico_id")
         .eq("id", novoAgendamento.id)
         .maybeSingle();
 
-      const verificado = !readBackError && Boolean(readBack?.id);
+      const readBackValido =
+        !readBackError &&
+        readBack &&
+        readBack.id === novoAgendamento.id &&
+        readBack.cliente_id === clienteId &&
+        readBack.pet_id === petId &&
+        readBack.data === dataAlvo &&
+        readBack.hora?.slice(0, 5) === horaAlvo.slice(0, 5);
+
+      if (!readBackValido) {
+        return {
+          success: false,
+          entity_id: novoAgendamento.id,
+          affected_record_id: novoAgendamento.id,
+          source: "tabela_agendamentos",
+          summary: `Alerta crítico: O registro foi inserido mas a conferência pós-gravação (read-back) falhou na correspondência de campos.`,
+          idempotency_key: idempotencyKey,
+          executed_at: new Date().toISOString(),
+          error_code: "READ_BACK_MISMATCH",
+          correlation_id: correlationId,
+          verified: false,
+        };
+      }
 
       return {
         success: true,
         entity_id: novoAgendamento.id,
         affected_record_id: novoAgendamento.id,
         source: "tabela_agendamentos",
-        after: novoAgendamento,
-        summary: `Agendamento #${novoAgendamento.id.slice(0, 8)} criado e verificado com sucesso no banco de dados.`,
+        after: readBack,
+        summary: `Agendamento #${novoAgendamento.id.slice(0, 8)} para ${petRecord.nome} em ${dataAlvo} às ${horaAlvo} gravado e verificado com sucesso no banco de dados.`,
         executed_at: new Date().toISOString(),
-        verified: verificado,
+        verified: true,
         idempotency_key: idempotencyKey,
         correlation_id: correlationId,
       };
@@ -342,7 +510,7 @@ export class AgendaAdapter {
    */
   static async executarRemarcacaoConfirmada(
     sb: SupabaseClient<Database>,
-    params: { agendamentoId: string; novaDataHoraISO: string; motivo?: string },
+    params: { agendamentoId: string; novaDataHoraISO?: string; novaData?: string; novaHora?: string; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_remarcar_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -368,8 +536,19 @@ export class AgendaAdapter {
         };
       }
 
+      const rawNovaDataHora =
+        params.novaDataHoraISO ||
+        (params.novaData && params.novaHora ? `${params.novaData}T${params.novaHora}` : params.novaData);
+
       // 2. Checar disponibilidade da nova data/hora
-      const checagem = await this.verificarDisponibilidade(sb, params.novaDataHoraISO);
+      const checagem = await this.verificarDisponibilidade(
+        sb,
+        rawNovaDataHora,
+        undefined,
+        params.novaData,
+        params.novaHora
+      );
+
       if (!checagem.disponivel) {
         return {
           success: false,
@@ -384,7 +563,11 @@ export class AgendaAdapter {
         };
       }
 
-      const { data: novaData, hora: novaHora } = partirDataHora(params.novaDataHoraISO);
+      const { data: novaData, hora: novaHora } = partirDataHora(
+        rawNovaDataHora,
+        params.novaData,
+        params.novaHora
+      );
 
       // 3. Atualizar data e hora no banco
       const { data: atualizado, error: updateError } = await sb

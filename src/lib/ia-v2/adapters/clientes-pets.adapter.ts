@@ -326,7 +326,7 @@ export class ClientesPetsAdapter {
           valor_previsto,
           observacoes,
           leva_traz_modalidade,
-          servicos(id, nome, valor_padrao)
+          servicos(id, nome, valor)
         `)
         .eq("pet_id", petId)
         .order("data", { ascending: false })

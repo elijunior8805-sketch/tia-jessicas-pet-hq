@@ -25,9 +25,10 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   readonly nome = "Gemini-Flash-Jessi-V2";
 
   /**
-   * Obtém a chave de API estritamente do ambiente do servidor sem expor no frontend
+   * Obtém a chave de API estritamente do ambiente do servidor ou Vite env
    */
   private obterApiKeyServidor(): { key: string; isGateway: boolean } | null {
+    // 1. Variáveis do processo (Node.js / TanStack Start Server)
     if (typeof process !== "undefined" && process.env) {
       if (process.env.LOVABLE_API_KEY) {
         return { key: process.env.LOVABLE_API_KEY, isGateway: true };
@@ -35,26 +36,44 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       if (process.env.OPENAI_API_KEY) {
         return { key: process.env.OPENAI_API_KEY, isGateway: true };
       }
-      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) {
+      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
         return {
-          key: (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY)!,
+          key: (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY)!,
           isGateway: false,
         };
       }
     }
+
+    // 2. Variáveis expostas pelo Vite / Frontend bundler
+    if (typeof import.meta !== "undefined" && (import.meta as any).env) {
+      const env = (import.meta as any).env;
+      if (env.VITE_LOVABLE_API_KEY || env.LOVABLE_API_KEY) {
+        return { key: env.VITE_LOVABLE_API_KEY || env.LOVABLE_API_KEY, isGateway: true };
+      }
+      if (env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || env.VITE_GOOGLE_AI_API_KEY || env.GOOGLE_AI_API_KEY) {
+        return {
+          key: env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || env.VITE_GOOGLE_AI_API_KEY || env.GOOGLE_AI_API_KEY,
+          isGateway: false,
+        };
+      }
+      if (env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY) {
+        return { key: env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY, isGateway: true };
+      }
+    }
+
     return null;
   }
 
   /**
-   * Converte expressões temporais naturais para formato YYYY-MM-DD
+   * Converte expressões temporais naturais para formato YYYY-MM-DD.
+   * Retorna null se nenhuma data for expressa (PROIBIDO assumir data atual silenciosamente).
    */
-  private resolverDataNatural(expressao: string, dataBaseStr: string): string {
+  private resolverDataNatural(expressao: string, dataBaseStr: string): string | null {
     const hoje = new Date(`${dataBaseStr}T12:00:00.000Z`);
     const texto = expressao.toLowerCase().trim();
 
-    if (texto.includes("amanhã") || texto.includes("amanha")) {
-      const amanha = new Date(hoje.getTime() + 24 * 60 * 60 * 1000);
-      return amanha.toISOString().split("T")[0];
+    if (texto.includes("hoje")) {
+      return dataBaseStr;
     }
 
     if (texto.includes("depois de amanhã") || texto.includes("depois de amanha")) {
@@ -62,20 +81,149 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       return depois.toISOString().split("T")[0];
     }
 
-    if (texto.includes("hoje")) {
-      return dataBaseStr;
+    if (texto.includes("amanhã") || texto.includes("amanha")) {
+      const amanha = new Date(hoje.getTime() + 24 * 60 * 60 * 1000);
+      return amanha.toISOString().split("T")[0];
     }
 
-    // Procura padrão DD/MM ou YYYY-MM-DD
-    const matchBr = texto.match(/(\d{1,2})\/(\d{1,2})/);
+    // Dias da semana (segunda a domingo)
+    const diasSemana: Record<string, number> = {
+      domingo: 0,
+      segunda: 1,
+      "segunda-feira": 1,
+      terca: 2,
+      terça: 2,
+      "terca-feira": 2,
+      "terça-feira": 2,
+      quarta: 3,
+      "quarta-feira": 3,
+      quinta: 4,
+      "quinta-feira": 4,
+      sexta: 5,
+      "sexta-feira": 5,
+      sabado: 6,
+      sábado: 6,
+    };
+
+    for (const [diaNome, diaAlvo] of Object.entries(diasSemana)) {
+      if (texto.includes(diaNome)) {
+        const diaAtual = hoje.getUTCDay();
+        let diff = diaAlvo - diaAtual;
+        if (diff <= 0) diff += 7; // Próxima ocorrência
+        const dataAlvo = new Date(hoje.getTime() + diff * 24 * 60 * 60 * 1000);
+        return dataAlvo.toISOString().split("T")[0];
+      }
+    }
+
+    // Procura padrão YYYY-MM-DD
+    const matchIso = texto.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (matchIso) {
+      return matchIso[0];
+    }
+
+    // Procura padrão DD/MM ou DD/MM/YYYY
+    const matchBr = texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
     if (matchBr) {
       const dia = matchBr[1].padStart(2, "0");
       const mes = matchBr[2].padStart(2, "0");
+      let ano = hoje.getFullYear();
+      if (matchBr[3]) {
+        ano = matchBr[3].length === 2 ? 2000 + parseInt(matchBr[3], 10) : parseInt(matchBr[3], 10);
+      }
+      return `${ano}-${mes}-${dia}`;
+    }
+
+    // "dia X" ou "dia X do mês"
+    const matchDia = texto.match(/(?:dia|no dia)\s+(\d{1,2})\b/);
+    if (matchDia) {
+      const dia = matchDia[1].padStart(2, "0");
+      const mes = String(hoje.getUTCMonth() + 1).padStart(2, "0");
       const ano = hoje.getFullYear();
       return `${ano}-${mes}-${dia}`;
     }
 
-    return dataBaseStr;
+    return null;
+  }
+
+  /**
+   * Extrai horário explícito do texto do usuário (ex: "às 14h", "14:30", "09:00", "às 10").
+   * Retorna null se nenhum horário for mencionado (PROIBIDO assumir 09:00 silenciosamente).
+   */
+  private resolverHoraNatural(expressao: string): string | null {
+    const texto = expressao.toLowerCase().trim();
+
+    // Padrão 1: HH:mm (ex: "14:30", "09:00", "9:15")
+    const matchHoraMin = texto.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+    if (matchHoraMin) {
+      return `${matchHoraMin[1].padStart(2, "0")}:${matchHoraMin[2]}`;
+    }
+
+    // Padrão 2: "às 14h", "as 9h", "14h30", "14h"
+    const matchHoraH = texto.match(/(?:às|as|para as|para às|horário|horario|às)?\s*([01]?\d|2[0-3])\s*h(?:oras?)?(?:\s*([0-5]\d))?/);
+    if (matchHoraH && matchHoraH[1]) {
+      const h = matchHoraH[1].padStart(2, "0");
+      const m = matchHoraH[2] ? matchHoraH[2].padStart(2, "0") : "00";
+      return `${h}:${m}`;
+    }
+
+    // Padrão 3: "às 14", "as 9", "para as 10"
+    const matchAs = texto.match(/(?:às|as|para as|para às)\s+([01]?\d|2[0-3])\b/);
+    if (matchAs && matchAs[1]) {
+      const h = matchAs[1].padStart(2, "0");
+      return `${h}:00`;
+    }
+
+    return null;
+  }
+
+  /**
+   * Extrai o nome do serviço solicitado com base no vocabulário oficial
+   * Retorna null se não houver serviço explícito (PROIBIDO assumir "Banho" silenciosamente).
+   */
+  private resolverServicoNatural(expressao: string): string | null {
+    const texto = expressao.toLowerCase().trim();
+
+    if (texto.includes("banho e tosa") || texto.includes("banho com tosa") || texto.includes("tosa e banho")) {
+      return "Banho e Tosa";
+    }
+    if (texto.includes("tosa higiênica") || texto.includes("tosa higienica")) {
+      return "Tosa Higiênica";
+    }
+    if (texto.includes("tosa na tesoura") || texto.includes("tosa tesoura")) {
+      return "Tosa Tesoura";
+    }
+    if (texto.includes("tosa na máquina") || texto.includes("tosa maquina") || texto.includes("tosa geral")) {
+      return "Tosa Máquina";
+    }
+    if (texto.includes("banho simples") || texto.includes("banho basico") || texto.includes("banho básico")) {
+      return "Banho Simples";
+    }
+    if (texto.includes("banho medicamentoso") || texto.includes("banho remédio")) {
+      return "Banho Medicamentoso";
+    }
+    if (texto.includes("hidratação") || texto.includes("hidratacao")) {
+      return "Hidratação";
+    }
+    if (texto.includes("desembolo") || texto.includes("desembolar")) {
+      return "Desembolo";
+    }
+    if (texto.includes("corte de unha") || texto.includes("cortar unha") || texto.includes("unhas")) {
+      return "Corte de Unhas";
+    }
+    if (texto.includes("tosa")) {
+      return "Tosa";
+    }
+    if (texto.includes("banho")) {
+      return "Banho";
+    }
+    if (texto.includes("leva e traz") || texto.includes("transporte") || texto.includes("taxi dog") || texto.includes("táxi dog")) {
+      return "Leva e Traz";
+    }
+    if (texto.includes("consulta") || texto.includes("veterinario") || texto.includes("veterinário") || texto.includes("vacina")) {
+      return "Consulta Veterinária";
+    }
+
+    return null;
   }
 
   /**
@@ -177,23 +325,39 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     let petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || null;
     let clienteNomeResolvido = req.contexto.clienteSelecionadoNome || req.contexto.cliente?.nome || null;
 
+    // Detecta menção explícita a cliente/tutor ("para o cliente Eli Júnior", "tutor Eli")
+    const matchCliente = texto.match(/(?:cliente|tutor|proprietário|proprietario|dono)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+    if (matchCliente && matchCliente[1]) {
+      const possivelCliente = matchCliente[1].trim();
+      if (!["Ele", "Ela", "Hoje", "Amanhã", "Banho", "Tosa"].includes(possivelCliente)) {
+        clienteNomeResolvido = possivelCliente;
+      }
+    }
+
     // Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
     const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
-    if (matchCorrecao && matchCorrecao[1] && !["Ele", "Ela", "Hoje", "Amanhã"].includes(matchCorrecao[1])) {
+    if (matchCorrecao && matchCorrecao[1] && !["Ele", "Ela", "Hoje", "Amanhã", "Banho", "Tosa"].includes(matchCorrecao[1])) {
       petNomeResolvido = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
     } else {
-      // Detecta menção explícita de novo nome de pet ou tutor na mensagem
-      const matchPet = texto.match(/(?:o|a|do|da|para o|para a)\s+([A-ZÀ-Ú][a-zà-ú]+)/);
-      if (matchPet && !["Thor", "Ele", "Ela", "Hoje", "Amanhã", "Amanha"].includes(matchPet[1])) {
-        petNomeResolvido = matchPet[1];
-      } else if (textoLower.includes("thor")) {
-        petNomeResolvido = "Thor";
-      } else if (textoLower.includes("mel")) {
-        petNomeResolvido = "Mel";
-      } else if (textoLower.includes("luna")) {
-        petNomeResolvido = "Luna";
-      } else if (textoLower.includes("bob") || textoLower.includes("bidu")) {
-        petNomeResolvido = textoLower.includes("bob") ? "Bob" : "Bidu";
+      // Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob")
+      const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela)\s+([A-ZÀ-Úa-zà-ú]+)/i);
+      if (matchPetExp && matchPetExp[1] && !["Ele", "Ela", "Hoje", "Amanhã", "Banho", "Tosa", "Pet", "Jade", "Thor"].includes(matchPetExp[1])) {
+        petNomeResolvido = matchPetExp[1];
+      } else {
+        const matchPet = texto.match(/(?:para o pet|para a pet|para o|para a|do pet|da pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/);
+        if (matchPet && !["Thor", "Ele", "Ela", "Hoje", "Amanhã", "Amanha", "Cliente", "Banho", "Tosa"].includes(matchPet[1])) {
+          petNomeResolvido = matchPet[1];
+        } else if (textoLower.includes("thor")) {
+          petNomeResolvido = "Thor";
+        } else if (textoLower.includes("mel")) {
+          petNomeResolvido = "Mel";
+        } else if (textoLower.includes("luna")) {
+          petNomeResolvido = "Luna";
+        } else if (textoLower.includes("bob") || textoLower.includes("bidu")) {
+          petNomeResolvido = textoLower.includes("bob") ? "Bob" : "Bidu";
+        } else if (textoLower.includes("jade")) {
+          petNomeResolvido = "Jade";
+        }
       }
     }
 
@@ -203,8 +367,10 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || petNomeResolvido;
     }
 
-    // 2. Resolução Temporal ("amanhã", "hoje", "sexta")
+    // 2. Resolução Temporal ("amanhã", "hoje", "sexta") e Horários
     const dataResolvida = this.resolverDataNatural(textoLower, req.contexto.dataReferencia);
+    const horaResolvida = this.resolverHoraNatural(textoLower);
+    const servicoResolvido = this.resolverServicoNatural(textoLower) || req.contexto.servicoSelecionadoNome || req.contexto.servico?.nome || null;
 
     // 3. Classificação Determinística de Intenção e Continuidade
     let dominio: any = "geral_conversacional";
@@ -410,15 +576,15 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
     const entidades = {
       clienteNome: clienteNomeResolvido,
-      clienteId: req.contexto.clienteSelecionadoId || null,
+      clienteId: req.contexto.clienteSelecionadoId || req.contexto.cliente?.id || null,
       petNome: petNomeResolvido,
-      petId: req.contexto.petSelecionadoId || null,
+      petId: req.contexto.petSelecionadoId || req.contexto.pet?.id || null,
       data: dataResolvida,
-      hora: null,
-      servicoNome: req.contexto.servicoSelecionadoNome || "Banho",
-      servicoId: req.contexto.servicoSelecionadoId || null,
-      valor: req.contexto.servicoValor || 0,
-      termoBusca: petNomeResolvido || clienteNomeResolvido || texto,
+      hora: horaResolvida,
+      servicoNome: servicoResolvido,
+      servicoId: req.contexto.servicoSelecionadoId || req.contexto.servico?.id || null,
+      valor: req.contexto.servicoValor || null,
+      termoBusca: petNomeResolvido || clienteNomeResolvido || null,
     };
 
     const provedorUtilizado = apiKey ? `${this.nome} (Online)` : `${this.nome} (Simulado/Determinístico)`;
