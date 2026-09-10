@@ -345,7 +345,7 @@ export const JessiLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#FAF8F5] overflow-hidden">
+    <div className="flex w-full h-[calc(100dvh-3.5rem-4rem)] md:h-[calc(100vh-3.5rem)] bg-[#FAF8F5] overflow-hidden">
       {/* Sidebar de Navegação */}
       <JessiSidebar
         onNovaConversa={handleNovaConversa}
@@ -354,7 +354,7 @@ export const JessiLayout: React.FC = () => {
       />
 
       {/* Área Central de Conversação */}
-      <main className="flex-1 flex flex-col h-full bg-background border-r border-border/70 overflow-hidden">
+      <main className="w-full flex-1 flex flex-col h-full bg-background md:border-r border-border/70 overflow-hidden min-w-0">
         {/* Header da Jessi */}
         <header className="h-14 border-b border-border/70 bg-card/70 backdrop-blur-xs px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">

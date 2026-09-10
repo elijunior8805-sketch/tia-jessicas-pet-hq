@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouterState } from '@tanstack/react-router';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AssistenteIaSidebar } from './AssistenteIaSidebar';
@@ -7,11 +8,12 @@ import { useMyAccess } from '@/hooks/use-my-permissions';
 export function AssistenteIaBotao() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: access } = useMyAccess();
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
 
   // Apenas usuários com perfil admin ou proprietário podem ver a assistente
   const canSeeAssistant = access?.isAdmin || access?.isProprietario;
   
-  if (!canSeeAssistant) return null;
+  if (!canSeeAssistant || pathname === "/jessi" || pathname.startsWith("/jessi/")) return null;
 
   return (
     <>
