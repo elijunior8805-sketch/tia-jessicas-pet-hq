@@ -53,18 +53,28 @@ function aperfeicoarTextoSpa(texto: string): string {
   return corrigido;
 }
 
-export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJessiVoiceReturn {
+export function useJessiVoice(
+  onTranscriptFinal?: (texto: string) => void,
+  onAutoSend?: (texto: string) => void
+): UseJessiVoiceReturn {
   const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>("idle");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
+  const onAutoSendRef = useRef(onAutoSend);
   const silenceTimerRef = useRef<any>(null);
+  const ultimoTextoRef = useRef("");
+  const autoSendDisparadoRef = useRef(false);
 
-  // Mantém a ref sempre atualizada sem disparar re-render do useEffect
+  // Mantém refs sempre atualizadas sem disparar re-render
   useEffect(() => {
     onTranscriptFinalRef.current = onTranscriptFinal;
   }, [onTranscriptFinal]);
+
+  useEffect(() => {
+    onAutoSendRef.current = onAutoSend;
+  }, [onAutoSend]);
 
   const limparTimerSilencio = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -73,36 +83,53 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
     }
   }, []);
 
-  const reiniciarTimerSilencio = useCallback((ms = 2200) => {
+  const dispararAutoEnvio = useCallback((texto: string) => {
+    const limpo = texto.trim();
+    if (!limpo || autoSendDisparadoRef.current) return;
+    autoSendDisparadoRef.current = true;
+    limparTimerSilencio();
+    if (onAutoSendRef.current) {
+      onAutoSendRef.current(limpo);
+    }
+  }, [limparTimerSilencio]);
+
+  const reiniciarTimerSilencio = useCallback((ms = 1800) => {
     limparTimerSilencio();
     silenceTimerRef.current = setTimeout(() => {
       if (recognizerRef.current && (recognizerRef.current.getStatus() === "listening" || recognizerRef.current.getStatus() === "requesting_permission")) {
         recognizerRef.current.stop();
+        if (ultimoTextoRef.current.trim() && onAutoSendRef.current) {
+          dispararAutoEnvio(ultimoTextoRef.current);
+        }
       }
     }, ms);
-  }, [limparTimerSilencio]);
+  }, [limparTimerSilencio, dispararAutoEnvio]);
 
   useEffect(() => {
     recognizerRef.current = new VoiceRecognizer({
       onFinal: (texto) => {
         const aperfeicoado = aperfeicoarTextoSpa(texto);
+        ultimoTextoRef.current = aperfeicoado;
         setFinalTranscript(aperfeicoado);
         setInterimTranscript("");
         if (onTranscriptFinalRef.current) {
           onTranscriptFinalRef.current(aperfeicoado);
         }
-        // Quando uma frase final for detectada, aguarda 2s de silêncio para concluir automaticamente
-        reiniciarTimerSilencio(2200);
+        // Quando uma frase final for detectada, aguarda 1.8s de silêncio para enviar automaticamente
+        reiniciarTimerSilencio(1800);
       },
       onInterim: (texto) => {
         setInterimTranscript(texto);
         // Enquanto o usuário está falando, reinicia o contador
-        reiniciarTimerSilencio(3500);
+        reiniciarTimerSilencio(3000);
       },
       onStatusChange: (status) => {
         setVoiceStatus(status);
         if (status === "idle" || status === "error" || status === "reviewing") {
           limparTimerSilencio();
+          if (status === "reviewing" && ultimoTextoRef.current.trim() && onAutoSendRef.current && !autoSendDisparadoRef.current) {
+            dispararAutoEnvio(ultimoTextoRef.current);
+          }
         }
       },
       onError: (erro) => {
@@ -111,7 +138,7 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
         if (erro === "not-allowed" || erro === "permission-denied") {
           toast.error("Permissão de microfone negada. Clique no ícone de cadeado/permissões no navegador e permita o microfone.");
         } else if (erro === "no-speech") {
-          // Apenas silêncio momentâneo, não exibir erro ao usuário
+          // Apenas silêncio momentâneo
         } else if (erro === "network") {
           toast.error("Serviço de voz indisponível na prévia integrada. Abra o sistema em uma aba do Google Chrome ou Edge para usar o microfone.");
         } else if (erro === "audio-capture") {
@@ -128,10 +155,12 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
       limparTimerSilencio();
       recognizerRef.current?.abort();
     };
-  }, [reiniciarTimerSilencio, limparTimerSilencio]);
+  }, [reiniciarTimerSilencio, limparTimerSilencio, dispararAutoEnvio]);
 
   const startListening = useCallback((textoAtual = "") => {
     if (!recognizerRef.current) return;
+    autoSendDisparadoRef.current = false;
+    ultimoTextoRef.current = textoAtual;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
     recognizerRef.current.start(textoAtual);
@@ -143,10 +172,15 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
     limparTimerSilencio();
     if (!recognizerRef.current) return;
     recognizerRef.current.stop();
-  }, [limparTimerSilencio]);
+    if (ultimoTextoRef.current.trim() && onAutoSendRef.current && !autoSendDisparadoRef.current) {
+      dispararAutoEnvio(ultimoTextoRef.current);
+    }
+  }, [limparTimerSilencio, dispararAutoEnvio]);
 
   const cancelListening = useCallback(() => {
     limparTimerSilencio();
+    autoSendDisparadoRef.current = true; // previne disparo
+    ultimoTextoRef.current = "";
     if (!recognizerRef.current) return;
     recognizerRef.current.abort();
     setInterimTranscript("");
@@ -156,6 +190,8 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
 
   const resetTranscript = useCallback(() => {
     limparTimerSilencio();
+    autoSendDisparadoRef.current = false;
+    ultimoTextoRef.current = "";
     recognizerRef.current?.reset();
     setInterimTranscript("");
     setFinalTranscript("");

@@ -49,7 +49,9 @@ export const JessiLayout: React.FC = () => {
     carregarCentral();
   }, []);
 
-  // Hook real de reconhecimento de voz
+  const handleSendMessageRef = React.useRef<((text?: string) => Promise<void>) | null>(null);
+
+  // Hook real de reconhecimento de voz com envio automático após conclusão da fala
   const {
     voiceStatus,
     isListening,
@@ -59,11 +61,18 @@ export const JessiLayout: React.FC = () => {
     stopListening,
     cancelListening,
     resetTranscript,
-  } = useJessiVoice((textoFinal) => {
-    if (textoFinal.trim()) {
-      setInputText(textoFinal);
+  } = useJessiVoice(
+    (textoFinal) => {
+      if (textoFinal.trim()) {
+        setInputText(textoFinal);
+      }
+    },
+    (textoParaEnvio) => {
+      if (textoParaEnvio.trim() && handleSendMessageRef.current) {
+        handleSendMessageRef.current(textoParaEnvio.trim());
+      }
     }
-  });
+  );
 
   // Sincroniza status visual quando estiver gravando voz
   React.useEffect(() => {
@@ -226,6 +235,8 @@ export const JessiLayout: React.FC = () => {
       abortControllerRef.current = null;
     }
   };
+
+  handleSendMessageRef.current = handleSendMessage;
 
   const handleConfirmAction = async (pendingAction?: any) => {
     const action = pendingAction || contexto?.operacaoPreparada || (messages.slice(-1)[0]?.pendingAction);
