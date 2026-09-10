@@ -1,17 +1,32 @@
 import React, { useRef } from "react";
-import { Mic, MicOff, Send, Paperclip, X, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Send,
+  Paperclip,
+  X,
+  Image as ImageIcon,
+  FileText,
+  Volume2,
+  VolumeX,
+  Radio,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
 
 interface JessiInputBarProps {
   inputText: string;
   setInputText: (val: string) => void;
   onSend: () => void;
   isLoading: boolean;
-  voiceStatus: "idle" | "listening" | "reviewing" | "requesting_permission" | "finalizing" | "error" | "processing";
-  onToggleVoice: () => void;
+  voiceStatus: VoiceRecognitionStatus;
+  isContinuousMode: boolean;
+  onToggleContinuousVoice: () => void;
   onCancelVoice: () => void;
   interimTranscript?: string;
+  ttsEnabled: boolean;
+  onToggleTts: () => void;
   selectedFile: File | null;
   onSelectFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveFile: () => void;
@@ -23,15 +38,19 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
   onSend,
   isLoading,
   voiceStatus,
-  onToggleVoice,
+  isContinuousMode,
+  onToggleContinuousVoice,
   onCancelVoice,
   interimTranscript,
+  ttsEnabled,
+  onToggleTts,
   selectedFile,
   onSelectFile,
   onRemoveFile,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isListening = voiceStatus === "listening" || voiceStatus === "requesting_permission";
+  const isListening = voiceStatus === "listening" || voiceStatus === "transcribing" || voiceStatus === "requesting_permission";
+  const isSending = voiceStatus === "sending";
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -44,33 +63,49 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
   return (
     <div className="border-t border-border/70 bg-background/95 backdrop-blur-xs p-3 md:p-4 space-y-2">
-      {/* Visual de gravação de voz em tempo real */}
-      {isListening && (
-        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-red-50 text-red-950 border border-red-200 text-xs animate-pulse">
+      {/* Faixa permanente e dinâmica de Modo de Voz Contínua */}
+      {isContinuousMode && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-emerald-50/90 text-emerald-950 border border-emerald-300 shadow-xs text-xs animate-in fade-in duration-200">
           <div className="flex items-center gap-2 truncate">
-            <span className="h-2 w-2 rounded-full bg-red-600 animate-ping shrink-0" />
-            <span className="font-semibold text-red-900 shrink-0">Ouvindo sua voz:</span>
-            <span className="italic text-red-800 truncate">
-              {interimTranscript || inputText || "Fale seu comando..."}
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isListening ? "bg-red-500" : "bg-emerald-500"}`} />
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isListening ? "bg-red-600" : "bg-emerald-600"}`} />
+            </span>
+            <span className="font-semibold text-emerald-900 shrink-0 flex items-center gap-1">
+              <Radio className="h-3.5 w-3.5 text-emerald-700 animate-pulse" />
+              Modo Voz Contínuo:
+            </span>
+            <span className="italic text-emerald-800 truncate">
+              {isSending
+                ? "Enviando comando..."
+                : interimTranscript
+                ? `"${interimTranscript}"`
+                : isLoading
+                ? "Aguardando resposta da Jessi..."
+                : "Ouvindo... Pode falar qualquer comando"}
             </span>
           </div>
+
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
             <Button
+              type="button"
               size="sm"
-              variant="destructive"
-              onClick={onToggleVoice}
-              className="h-7 px-2.5 text-[11px] font-semibold gap-1 rounded-lg"
+              variant="ghost"
+              onClick={onToggleTts}
+              title={ttsEnabled ? "Resposta por áudio ativada" : "Resposta por áudio desativada"}
+              className="h-7 px-2 text-[11px] text-emerald-800 hover:bg-emerald-100 rounded-lg gap-1"
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Concluir Fala
+              {ttsEnabled ? <Volume2 className="h-3.5 w-3.5 text-emerald-700" /> : <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />}
+              <span className="hidden sm:inline">{ttsEnabled ? "Voz Ativa" : "Mudo"}</span>
             </Button>
             <Button
+              type="button"
               size="sm"
               variant="outline"
-              onClick={onCancelVoice}
-              className="h-7 px-2 text-[11px] border-red-200 text-red-800 hover:bg-red-100 rounded-lg"
+              onClick={onToggleContinuousVoice}
+              className="h-7 px-2 text-[11px] border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-lg"
             >
-              Cancelar
+              Desativar Voz
             </Button>
           </div>
         </div>
@@ -118,17 +153,17 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
         <Button
           type="button"
           size="icon"
-          variant={isListening ? "destructive" : "outline"}
-          onClick={onToggleVoice}
+          variant={isContinuousMode ? "destructive" : "outline"}
+          onClick={onToggleContinuousVoice}
           disabled={isLoading}
-          title={isListening ? "Parar gravação de voz" : "Falar comando por voz"}
+          title={isContinuousMode ? "Desativar modo de conversa contínua" : "Ativar Modo de Conversa por Voz Contínua"}
           className={`h-10 w-10 shrink-0 border-border/80 rounded-xl transition-all ${
-            isListening
-              ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
+            isContinuousMode
+              ? "bg-red-600 hover:bg-red-700 text-white shadow-sm ring-2 ring-red-400 ring-offset-1"
               : "text-muted-foreground hover:text-emerald-700 hover:border-emerald-600/40"
           }`}
         >
-          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {isContinuousMode ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
         </Button>
 
         <div className="flex-1 relative">
@@ -137,8 +172,8 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              isListening
-                ? "Ouvindo sua voz... (fale agora)"
+              isContinuousMode
+                ? "🎙️ Modo Voz Contínuo Ativo: fale ou digite a qualquer momento..."
                 : "Fale com a Jessi: consultar agenda, buscar cliente, verificar saldos, comprovantes..."
             }
             rows={1}
@@ -150,7 +185,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
         <Button
           type="button"
           size="icon"
-          disabled={isListening || (!inputText.trim() && !selectedFile) || isLoading}
+          disabled={(!inputText.trim() && !selectedFile) || isLoading}
           onClick={onSend}
           className="h-10 w-10 shrink-0 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl shadow-xs"
         >

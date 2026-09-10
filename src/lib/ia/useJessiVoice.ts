@@ -1,21 +1,36 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { VoiceRecognizer, VoiceRecognitionStatus, consolidarTranscricao } from "./ia-voz";
+import {
+  VoiceRecognizer,
+  VoiceRecognitionStatus,
+  VoiceUtterance,
+  consolidarTranscricao,
+  ehFalaValida,
+} from "./ia-voz";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
   voiceStatus: VoiceRecognitionStatus;
   isListening: boolean;
+  isContinuousMode: boolean;
   isReviewing: boolean;
   interimTranscript: string;
   finalTranscript: string;
+  ttsEnabled: boolean;
+  setTtsEnabled: (val: boolean) => void;
   startListening: (textoAtual?: string) => void;
   stopListening: () => void;
+  startContinuousMode: () => void;
+  stopContinuousMode: () => void;
+  toggleContinuousMode: () => void;
+  pauseListening: () => void;
+  resumeListening: () => void;
   cancelListening: () => void;
   resetTranscript: () => void;
+  speakResponse: (texto: string, onFinish?: () => void) => void;
 }
 
 /**
- * Vocabulário específico do Spa para melhorar acurácia fonética
+ * Vocabulário específico do Spa para calibrar acurácia fonética em pt-BR
  */
 const DICIONARIO_SPA: Record<string, string> = {
   "banho e tosa": "banho e tosa",
@@ -44,7 +59,7 @@ const DICIONARIO_SPA: Record<string, string> = {
   "faturamento": "faturamento",
 };
 
-function aperfeicoarTextoSpa(texto: string): string {
+export function aperfeicoarTextoSpa(texto: string): string {
   let corrigido = texto;
   for (const [termo, substituicao] of Object.entries(DICIONARIO_SPA)) {
     const regex = new RegExp(`\\b${termo}\\b`, "gi");
@@ -58,16 +73,16 @@ export function useJessiVoice(
   onAutoSend?: (texto: string) => void
 ): UseJessiVoiceReturn {
   const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>("idle");
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
   const onAutoSendRef = useRef(onAutoSend);
-  const silenceTimerRef = useRef<any>(null);
-  const ultimoTextoRef = useRef("");
-  const autoSendDisparadoRef = useRef(false);
+  const isSpeakingRef = useRef(false);
 
-  // Mantém refs sempre atualizadas sem disparar re-render
   useEffect(() => {
     onTranscriptFinalRef.current = onTranscriptFinal;
   }, [onTranscriptFinal]);
@@ -76,136 +91,191 @@ export function useJessiVoice(
     onAutoSendRef.current = onAutoSend;
   }, [onAutoSend]);
 
-  const limparTimerSilencio = useCallback(() => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-  }, []);
-
-  const dispararAutoEnvio = useCallback((texto: string) => {
-    const limpo = texto.trim();
-    if (!limpo || autoSendDisparadoRef.current) return;
-    autoSendDisparadoRef.current = true;
-    limparTimerSilencio();
-    if (onAutoSendRef.current) {
-      onAutoSendRef.current(limpo);
-    }
-  }, [limparTimerSilencio]);
-
-  const reiniciarTimerSilencio = useCallback((ms = 1800) => {
-    limparTimerSilencio();
-    silenceTimerRef.current = setTimeout(() => {
-      if (recognizerRef.current && (recognizerRef.current.getStatus() === "listening" || recognizerRef.current.getStatus() === "requesting_permission")) {
-        recognizerRef.current.stop();
-        if (ultimoTextoRef.current.trim() && onAutoSendRef.current) {
-          dispararAutoEnvio(ultimoTextoRef.current);
-        }
-      }
-    }, ms);
-  }, [limparTimerSilencio, dispararAutoEnvio]);
-
   useEffect(() => {
     recognizerRef.current = new VoiceRecognizer({
+      silenceMs: 1500, // 1.5s de silêncio para envio automático
       onFinal: (texto) => {
         const aperfeicoado = aperfeicoarTextoSpa(texto);
-        ultimoTextoRef.current = aperfeicoado;
         setFinalTranscript(aperfeicoado);
         setInterimTranscript("");
         if (onTranscriptFinalRef.current) {
           onTranscriptFinalRef.current(aperfeicoado);
         }
-        // Quando uma frase final for detectada, aguarda 1.8s de silêncio para enviar automaticamente
-        reiniciarTimerSilencio(1800);
       },
       onInterim: (texto) => {
         setInterimTranscript(texto);
-        // Enquanto o usuário está falando, reinicia o contador
-        reiniciarTimerSilencio(3000);
+      },
+      onUtteranceComplete: (utterance: VoiceUtterance) => {
+        const textoAperfeicoado = aperfeicoarTextoSpa(utterance.text).trim();
+        if (ehFalaValida(textoAperfeicoado) && onAutoSendRef.current) {
+          // Pausa temporariamente o microfone para evitar capturar a própria fala/eco
+          recognizerRef.current?.pauseListening();
+          setInterimTranscript("");
+          setFinalTranscript(textoAperfeicoado);
+          onAutoSendRef.current(textoAperfeicoado);
+        }
       },
       onStatusChange: (status) => {
         setVoiceStatus(status);
-        if (status === "idle" || status === "error" || status === "reviewing") {
-          limparTimerSilencio();
-          if (status === "reviewing" && ultimoTextoRef.current.trim() && onAutoSendRef.current && !autoSendDisparadoRef.current) {
-            dispararAutoEnvio(ultimoTextoRef.current);
-          }
-        }
       },
       onError: (erro) => {
-        limparTimerSilencio();
         console.warn("[Jessi Voice Error]:", erro);
         if (erro === "not-allowed" || erro === "permission-denied") {
-          toast.error("Permissão de microfone negada. Clique no ícone de cadeado/permissões no navegador e permita o microfone.");
+          setIsContinuousMode(false);
+          toast.error("Permissão de microfone negada. Clique no ícone de cadeado do navegador para permitir o microfone.");
         } else if (erro === "no-speech") {
-          // Apenas silêncio momentâneo
+          // Silêncio momentâneo regular
         } else if (erro === "network") {
-          toast.error("Serviço de voz indisponível na prévia integrada. Abra o sistema em uma aba do Google Chrome ou Edge para usar o microfone.");
+          toast.error("Reconhecimento de voz offline ou instável. Verifique sua conexão de rede.");
         } else if (erro === "audio-capture") {
-          toast.error("Nenhum microfone detectado no dispositivo ou ele está em uso.");
+          toast.error("Nenhum microfone detectado ou o dispositivo de áudio está ocupado.");
         } else if (erro === "service-not-allowed") {
-          toast.error("Reconhecimento de voz bloqueado nesta janela. Abra diretamente no navegador Chrome/Edge.");
-        } else {
-          toast.error(`Aviso no microfone: ${erro}`);
+          toast.error("Reconhecimento de voz bloqueado pelo navegador.");
         }
       },
     });
 
     return () => {
-      limparTimerSilencio();
       recognizerRef.current?.abort();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
-  }, [reiniciarTimerSilencio, limparTimerSilencio, dispararAutoEnvio]);
+  }, []);
+
+  const startContinuousMode = useCallback(() => {
+    if (!recognizerRef.current) return;
+    setIsContinuousMode(true);
+    setInterimTranscript("");
+    setFinalTranscript("");
+    recognizerRef.current.startContinuous();
+    toast.success("Modo Voz Contínuo Ativo! Fale seus comandos naturalmente.");
+  }, []);
+
+  const stopContinuousMode = useCallback(() => {
+    setIsContinuousMode(false);
+    recognizerRef.current?.stopContinuous();
+    setInterimTranscript("");
+    setFinalTranscript("");
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    toast.info("Modo Voz Contínuo desativado.");
+  }, []);
+
+  const toggleContinuousMode = useCallback(() => {
+    if (isContinuousMode) {
+      stopContinuousMode();
+    } else {
+      startContinuousMode();
+    }
+  }, [isContinuousMode, startContinuousMode, stopContinuousMode]);
+
+  const pauseListening = useCallback(() => {
+    recognizerRef.current?.pauseListening();
+  }, []);
+
+  const resumeListening = useCallback(() => {
+    if (isContinuousMode && !isSpeakingRef.current) {
+      recognizerRef.current?.resumeListening();
+    }
+  }, [isContinuousMode]);
 
   const startListening = useCallback((textoAtual = "") => {
     if (!recognizerRef.current) return;
-    autoSendDisparadoRef.current = false;
-    ultimoTextoRef.current = textoAtual;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
     recognizerRef.current.start(textoAtual);
-    // Timeout inicial de 8s se não houver nenhuma fala
-    reiniciarTimerSilencio(8000);
-  }, [reiniciarTimerSilencio]);
+  }, []);
 
   const stopListening = useCallback(() => {
-    limparTimerSilencio();
     if (!recognizerRef.current) return;
     recognizerRef.current.stop();
-    if (ultimoTextoRef.current.trim() && onAutoSendRef.current && !autoSendDisparadoRef.current) {
-      dispararAutoEnvio(ultimoTextoRef.current);
-    }
-  }, [limparTimerSilencio, dispararAutoEnvio]);
+  }, []);
 
   const cancelListening = useCallback(() => {
-    limparTimerSilencio();
-    autoSendDisparadoRef.current = true; // previne disparo
-    ultimoTextoRef.current = "";
     if (!recognizerRef.current) return;
     recognizerRef.current.abort();
     setInterimTranscript("");
     setFinalTranscript("");
     setVoiceStatus("idle");
-  }, [limparTimerSilencio]);
+  }, []);
 
   const resetTranscript = useCallback(() => {
-    limparTimerSilencio();
-    autoSendDisparadoRef.current = false;
-    ultimoTextoRef.current = "";
     recognizerRef.current?.reset();
     setInterimTranscript("");
     setFinalTranscript("");
-  }, [limparTimerSilencio]);
+  }, []);
+
+  /** Síntese de voz TTS em português do Brasil */
+  const speakResponse = useCallback(
+    (texto: string, onFinish?: () => void) => {
+      if (typeof window === "undefined" || !window.speechSynthesis || !ttsEnabled) {
+        if (onFinish) onFinish();
+        return;
+      }
+
+      // Remove marcações markdown (**, #, etc.) para síntese de áudio limpa
+      const textoLimpo = texto
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+        .replace(/`{1,3}.*?`{1,3}/g, "")
+        .replace(/[#*•_`]/g, "")
+        .trim();
+
+      if (!textoLimpo) {
+        if (onFinish) onFinish();
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      isSpeakingRef.current = true;
+      pauseListening();
+
+      const utterance = new SpeechSynthesisUtterance(textoLimpo);
+      utterance.lang = "pt-BR";
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+
+      utterance.onend = () => {
+        isSpeakingRef.current = false;
+        if (onFinish) onFinish();
+        if (isContinuousMode) {
+          resumeListening();
+        }
+      };
+
+      utterance.onerror = () => {
+        isSpeakingRef.current = false;
+        if (onFinish) onFinish();
+        if (isContinuousMode) {
+          resumeListening();
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    },
+    [ttsEnabled, isContinuousMode, pauseListening, resumeListening]
+  );
 
   return {
     voiceStatus,
-    isListening: voiceStatus === "listening" || voiceStatus === "requesting_permission",
+    isListening: voiceStatus === "listening" || voiceStatus === "transcribing" || voiceStatus === "requesting_permission",
+    isContinuousMode,
     isReviewing: voiceStatus === "reviewing",
     interimTranscript,
     finalTranscript,
+    ttsEnabled,
+    setTtsEnabled,
     startListening,
     stopListening,
+    startContinuousMode,
+    stopContinuousMode,
+    toggleContinuousMode,
+    pauseListening,
+    resumeListening,
     cancelListening,
     resetTranscript,
+    speakResponse,
   };
 }

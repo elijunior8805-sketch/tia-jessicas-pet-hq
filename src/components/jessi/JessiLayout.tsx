@@ -11,7 +11,7 @@ import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia
 import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
-import { Sparkles, PanelRightOpen, PanelRightClose } from "lucide-react";
+import { Sparkles, PanelRightOpen, PanelRightClose, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const JessiLayout: React.FC = () => {
@@ -51,19 +51,28 @@ export const JessiLayout: React.FC = () => {
 
   const handleSendMessageRef = React.useRef<((text?: string) => Promise<void>) | null>(null);
 
-  // Hook real de reconhecimento de voz com envio automático após conclusão da fala
+  // Hook de reconhecimento de voz contínua com detecção de silêncio de 1.5s e auto-envio
   const {
     voiceStatus,
     isListening,
+    isContinuousMode,
     interimTranscript,
     finalTranscript,
+    ttsEnabled,
+    setTtsEnabled,
     startListening,
     stopListening,
+    startContinuousMode,
+    stopContinuousMode,
+    toggleContinuousMode,
+    pauseListening,
+    resumeListening,
     cancelListening,
     resetTranscript,
+    speakResponse,
   } = useJessiVoice(
     (textoFinal) => {
-      if (textoFinal.trim()) {
+      if (!isContinuousMode && textoFinal.trim()) {
         setInputText(textoFinal);
       }
     },
@@ -74,25 +83,30 @@ export const JessiLayout: React.FC = () => {
     }
   );
 
-  // Sincroniza status visual quando estiver gravando voz
+  // Sincroniza status visual quando estiver gravando voz ou em modo contínuo
   React.useEffect(() => {
-    if (isListening) {
+    if (isLoading) {
+      setStatus("processando");
+      setStatusDetalhe("Consultando sistema e regras operacionais...");
+    } else if (voiceStatus === "sending") {
+      setStatus("enviando");
+      setStatusDetalhe("Enviando comando...");
+    } else if (voiceStatus === "transcribing") {
+      setStatus("transcrevendo");
+      setStatusDetalhe("Transcrevendo fala...");
+    } else if (voiceStatus === "listening") {
       setStatus("ouvindo");
-      setStatusDetalhe("Ouvindo comando de voz...");
-    } else if (status === "ouvindo") {
+      setStatusDetalhe(isContinuousMode ? "Modo Contínuo: Ouvindo..." : "Ouvindo sua voz...");
+    } else if (status === "ouvindo" || status === "transcrevendo" || status === "enviando") {
       setStatus("disponivel");
       setStatusDetalhe(undefined);
     }
-  }, [isListening]);
+  }, [voiceStatus, isListening, isContinuousMode, isLoading]);
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const handleToggleVoice = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening(inputText);
-    }
+    toggleContinuousMode();
   };
 
   const handleCancelProcessing = () => {
@@ -104,6 +118,9 @@ export const JessiLayout: React.FC = () => {
     setStatus("disponivel");
     setStatusDetalhe(undefined);
     toast.info("Processamento cancelado pelo usuário.");
+    if (isContinuousMode) {
+      resumeListening();
+    }
   };
 
   const handleNovaConversa = () => {
@@ -120,10 +137,8 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
-    // 1. Se o microfone estiver ativo, encerra a escuta e reseta o buffer de voz imediatamente
-    if (isListening) {
-      stopListening();
-    }
+    // 1. Pausa o microfone para não capturar a própria fala
+    pauseListening();
     resetTranscript();
 
     // 2. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
@@ -132,7 +147,12 @@ export const JessiLayout: React.FC = () => {
     }
 
     const textToSend = customText || inputText;
-    if (!textToSend.trim() && !selectedFile) return;
+    if (!textToSend.trim() && !selectedFile) {
+      if (isContinuousMode) {
+        resumeListening();
+      }
+      return;
+    }
 
     const userMessageId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const userMsg: JessiMessage = {
@@ -173,6 +193,7 @@ export const JessiLayout: React.FC = () => {
 
       // Se foi cancelado antes do retorno, descarta a resposta
       if (controller.signal.aborted) {
+        if (isContinuousMode) resumeListening();
         return;
       }
 
@@ -199,8 +220,22 @@ export const JessiLayout: React.FC = () => {
         setStatus("disponivel");
         setStatusDetalhe(undefined);
       }
+
+      // 4. Retomada automática da escuta após a resposta da Jessi
+      if (isContinuousMode) {
+        if (ttsEnabled) {
+          speakResponse(res.respostaTexto, () => {
+            resumeListening();
+          });
+        } else {
+          setTimeout(() => {
+            resumeListening();
+          }, 350);
+        }
+      }
     } catch (err: any) {
       if (controller.signal.aborted) {
+        if (isContinuousMode) resumeListening();
         return;
       }
 
@@ -227,8 +262,14 @@ export const JessiLayout: React.FC = () => {
       toast.error("Instabilidade na conexão. Tente novamente.");
       setStatus("erro");
       setStatusDetalhe("Falha temporária de conexão");
+
+      if (isContinuousMode) {
+        setTimeout(() => {
+          resumeListening();
+        }, 1200);
+      }
     } finally {
-      // 3. Retira o indicador de processamento ao concluir ou falhar
+      // 5. Retira o indicador de processamento ao concluir ou falhar
       setIsLoading(false);
       setSelectedFile(null);
       setFilePreview(null);
@@ -373,6 +414,20 @@ export const JessiLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant={isContinuousMode ? "default" : "outline"}
+              size="sm"
+              onClick={toggleContinuousMode}
+              title={isContinuousMode ? "Desativar modo de conversa contínua" : "Ativar Modo de Conversa por Voz Contínua"}
+              className={`h-8 px-2.5 text-xs font-semibold gap-1.5 rounded-lg transition-all ${
+                isContinuousMode
+                  ? "bg-red-600 hover:bg-red-700 text-white shadow-xs animate-pulse"
+                  : "text-emerald-800 border-emerald-300 hover:bg-emerald-50"
+              }`}
+            >
+              <Mic className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isContinuousMode ? "Voz Contínua ON" : "Ativar Voz"}</span>
+            </Button>
             <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
             <Button
               variant="ghost"
@@ -413,9 +468,12 @@ export const JessiLayout: React.FC = () => {
           onSend={() => handleSendMessage()}
           isLoading={isLoading}
           voiceStatus={voiceStatus}
-          onToggleVoice={handleToggleVoice}
+          isContinuousMode={isContinuousMode}
+          onToggleContinuousVoice={toggleContinuousMode}
           onCancelVoice={cancelListening}
           interimTranscript={interimTranscript}
+          ttsEnabled={ttsEnabled}
+          onToggleTts={() => setTtsEnabled(!ttsEnabled)}
           selectedFile={selectedFile}
           onSelectFile={handleFileSelect}
           onRemoveFile={() => {
