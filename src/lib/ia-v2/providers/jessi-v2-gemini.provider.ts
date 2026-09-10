@@ -361,6 +361,30 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       }
     }
 
+    // Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel")
+    const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+    if (matchPrep && matchPrep[1] && !["Ele", "Ela", "Hoje", "Amanhã", "Amanha", "Banho", "Tosa", "Pet", "Cliente"].includes(matchPrep[1].trim())) {
+      const termoPrep = matchPrep[1].trim();
+      if (!clienteNomeResolvido && !petNomeResolvido) {
+        clienteNomeResolvido = termoPrep;
+      }
+    }
+
+    // Extrai termo livre para busca de cliente/pet caso não haja menção explícita com preposições (ex: "agendar eli junio")
+    let termoLivre = texto
+      .replace(/\b(agendar|agenda|marcar|marque|novo agendamento|criar agendamento|desmarcar|desmarque|cancelar|cancele|cancela|reagendar|remarcar|remarque|consultar|ver|buscar)\b/gi, "")
+      .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
+      .replace(/\b(banho e tosa|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
+      .replace(/\b(hoje|amanhã|amanha|depois de amanhã|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)\b/gi, "")
+      .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
+      .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
+      .replace(/[^\w\sÀ-ú]/g, "")
+      .trim();
+
+    if (termoLivre && termoLivre.length >= 2 && !clienteNomeResolvido && !petNomeResolvido) {
+      clienteNomeResolvido = termoLivre;
+    }
+
     // Se o usuário usa anáfora ("ele", "ela", "o mesmo", "desse cliente"), mantém o contexto anterior
     const usaAnafora = /\b(ele|ela|o mesmo|a mesma|nele|nela|desse cliente|deste cliente|dele|dela|o pet|o animal)\b/i.test(textoLower);
     if (usaAnafora && (req.contexto.petSelecionadoNome || req.contexto.pet?.nome)) {
@@ -616,8 +640,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       hora: horaResolvida,
       servicoNome: servicoResolvido,
       servicoId: req.contexto.servicoSelecionadoId || req.contexto.servico?.id || null,
-      valor: req.contexto.servicoValor || null,
-      termoBusca: petNomeResolvido || clienteNomeResolvido || null,
+      termoBusca: petNomeResolvido || clienteNomeResolvido || (termoLivre && termoLivre.length >= 2 ? termoLivre : null),
     };
 
     const provedorUtilizado = apiKey ? `${this.nome} (Online)` : `${this.nome} (Simulado/Determinístico)`;

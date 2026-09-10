@@ -245,49 +245,63 @@ export async function processarMensagemJessiV2Core(
       let servicoValor = intencao.entidades.valor || (contextoAtual as any)?.servicoValor || null;
       let duracaoMinutos = 60;
 
-      // 4.1 Resolução de Cliente no Banco se tiver apenas nome
-      if (!clienteId && clienteNome) {
-        const { data: clientesEncontrados } = await sb
-          .from("clientes")
-          .select("id, nome, whatsapp, telefone")
-          .ilike("nome", `%${clienteNome}%`)
-          .limit(5);
-
-        if (clientesEncontrados && clientesEncontrados.length === 1) {
-          clienteId = clientesEncontrados[0].id;
-          clienteNome = clientesEncontrados[0].nome;
-          novoContexto.cliente = {
-            id: clienteId,
-            nome: clienteNome,
-            telefone: clientesEncontrados[0].telefone || clientesEncontrados[0].whatsapp,
-          };
-        } else if (clientesEncontrados && clientesEncontrados.length > 1) {
-          // Ambiguidade: exige desambiguação humana
-          return {
-            versao: "v2",
-            respostaTexto: `Encontrei mais de um cliente com o nome "${clienteNome}". Qual deles você deseja selecionar?`,
-            cards: [
-              {
-                type: "cliente",
-                title: "Selecione o Cliente / Tutor",
-                subtitle: `Termo pesquisado: "${clienteNome}"`,
-                data: {
-                  exigeDesambiguacao: true,
-                  opcoes: clientesEncontrados.map((c) => ({
-                    id: c.id,
-                    tipo: "cliente",
-                    nome: c.nome,
-                    detalhe: c.telefone || c.whatsapp || "Sem telefone",
-                  })),
+      // 4.1 Resolução Resiliente de Cliente / Pet no Banco de Dados
+      const termoParaPesquisar = clienteNome || petNome || intencao.entidades.termoBusca || null;
+      if ((!clienteId || !petId) && termoParaPesquisar) {
+        const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoParaPesquisar);
+        if (resBusca.success && resBusca.data.candidatos.length > 0) {
+          if (resBusca.data.exigeDesambiguacao) {
+            return {
+              versao: "v2",
+              respostaTexto: resBusca.summary || `Encontrei mais de uma opção para "${termoParaPesquisar}". Qual delas você deseja selecionar?`,
+              cards: [
+                {
+                  type: "cliente",
+                  title: "Selecione a Opção Correspondente",
+                  subtitle: `Termo pesquisado: "${termoParaPesquisar}"`,
+                  data: {
+                    exigeDesambiguacao: true,
+                    opcoes: resBusca.data.candidatos.map((c: any) => ({
+                      id: c.id,
+                      tipo: c.tipo,
+                      nome: c.nomePrincipal,
+                      detalhe: c.detalheSecundario,
+                    })),
+                  },
                 },
-              },
-            ],
-            pendingAction: null,
-            novoContexto: { ...contextoAtual, ...novoContexto },
-            intencao,
-            tempoProcessamentoMs: Date.now() - inicioMs,
-            correlationId,
-          };
+              ],
+              pendingAction: null,
+              novoContexto: { ...contextoAtual, ...novoContexto },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
+
+          const topMatch = resBusca.data.candidatos[0];
+          if (topMatch.tipo === "cliente") {
+            clienteId = topMatch.id;
+            clienteNome = topMatch.nomePrincipal;
+            novoContexto.cliente = {
+              id: clienteId,
+              nome: clienteNome,
+              telefone: topMatch.dadosCompletos?.telefone || topMatch.dadosCompletos?.whatsapp,
+            };
+          } else if (topMatch.tipo === "pet") {
+            petId = topMatch.id;
+            petNome = topMatch.nomePrincipal;
+            novoContexto.pet = {
+              id: petId,
+              nome: petNome,
+              raca: topMatch.dadosCompletos?.raca,
+              porte: topMatch.dadosCompletos?.porte,
+            };
+            if (topMatch.dadosCompletos?.cliente) {
+              clienteId = topMatch.dadosCompletos.cliente.id;
+              clienteNome = topMatch.dadosCompletos.cliente.nome;
+              novoContexto.cliente = { id: clienteId, nome: clienteNome };
+            }
+          }
         }
       }
 
@@ -313,7 +327,7 @@ export async function processarMensagemJessiV2Core(
             // Pet informado não pertence a este cliente
             return {
               versao: "v2",
-              respostaTexto: `O tutor ${clienteNome} não possui nenhum pet com o nome "${petNome}". Os pets cadastrados para este tutor são: ${petsDoCliente.map((p) => p.nome).join(", ")}.`,
+              respostaTexto: `O tutor **${clienteNome}** não possui nenhum pet com o nome "${petNome}". Os pets cadastrados para este tutor são: ${petsDoCliente.map((p) => `**${p.nome}**`).join(", ")}.`,
               cards: [
                 {
                   type: "cliente",
@@ -337,7 +351,7 @@ export async function processarMensagemJessiV2Core(
             };
           }
         } else if (!petId && petsDoCliente && petsDoCliente.length === 1) {
-          // Cliente possui exatamente 1 pet cadastrado: seleciona com clareza
+          // Cliente possui exatamente 1 pet cadastrado: seleciona automaticamente
           petId = petsDoCliente[0].id;
           petNome = petsDoCliente[0].nome;
           novoContexto.pet = {
@@ -350,7 +364,7 @@ export async function processarMensagemJessiV2Core(
           // Cliente possui múltiplos pets e o usuário não especificou qual
           return {
             versao: "v2",
-            respostaTexto: `O tutor ${clienteNome} possui ${petsDoCliente.length} pets cadastrados (${petsDoCliente.map((p) => p.nome).join(", ")}). Para qual pet deseja realizar a operação?`,
+            respostaTexto: `O tutor **${clienteNome}** possui ${petsDoCliente.length} pets cadastrados (${petsDoCliente.map((p) => `**${p.nome}**`).join(", ")}). Para qual pet você deseja agendar o atendimento?`,
             cards: [
               {
                 type: "cliente",
@@ -366,6 +380,17 @@ export async function processarMensagemJessiV2Core(
                 },
               },
             ],
+            pendingAction: null,
+            novoContexto: { ...contextoAtual, ...novoContexto },
+            intencao,
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        } else if (!petId && (!petsDoCliente || petsDoCliente.length === 0)) {
+          return {
+            versao: "v2",
+            respostaTexto: `Identifiquei o cliente **${clienteNome}**, mas não há nenhum pet cadastrado para ele no momento. Deseja realizar o cadastro de um novo pet?`,
+            cards: [],
             pendingAction: null,
             novoContexto: { ...contextoAtual, ...novoContexto },
             intencao,
@@ -451,11 +476,15 @@ export async function processarMensagemJessiV2Core(
         if (!horaAlvo) camposFaltantes.push("Horário desejado");
 
         if (camposFaltantes.length > 0) {
-          let textoOrientacao = `Para preparar o agendamento com segurança, ainda preciso das seguintes informações: **${camposFaltantes.join(", ")}**.`;
-          if (clienteNome && petNome && !dataAlvo && !horaAlvo) {
-            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**). Para qual data e horário você deseja agendar o serviço de **${servicoNome || "atendimento"}**?`;
-          } else if (clienteNome && petNome && dataAlvo && !horaAlvo) {
-            textoOrientacao = `Para o atendimento de **${petNome}** no dia **${dataAlvo}**, qual o horário desejado?`;
+          let textoOrientacao = `Para preparar o agendamento, por favor informe o **serviço desejado** (ex: Banho, Tosa) e a **data e horário**.`;
+          if (clienteNome && petNome && !servicoNome && !dataAlvo && !horaAlvo) {
+            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**). Qual serviço você deseja agendar (ex: Banho, Tosa, Banho e Tosa) e para qual data e horário?`;
+          } else if (clienteNome && petNome && servicoNome && !dataAlvo && !horaAlvo) {
+            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**) para o serviço de **${servicoNome}**. Para qual data e horário você deseja agendar?`;
+          } else if (clienteNome && petNome && servicoNome && dataAlvo && !horaAlvo) {
+            textoOrientacao = `Para o agendamento de **${servicoNome}** de **${petNome}** no dia **${dataAlvo}**, qual o horário desejado?`;
+          } else if (!clienteNome && !petNome) {
+            textoOrientacao = `Para preparar o agendamento com segurança, por favor me informe o nome do **cliente ou pet**, o **serviço** e a **data e horário** desejados.`;
           }
 
           return {
