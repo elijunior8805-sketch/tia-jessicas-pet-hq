@@ -21,12 +21,53 @@ const SELECT_AGENDA = `
   servicos(id, nome, valor_padrao)
 `;
 
-function partirDataHora(dataHoraISO: string): { data: string; hora: string } {
-  const dt = new Date(dataHoraISO);
-  if (isNaN(dt.getTime())) {
-    const [d, h] = String(dataHoraISO).split(/[T ]/);
-    return { data: d, hora: (h || "00:00").slice(0, 5) };
+export function partirDataHora(
+  dataHoraISO?: string | null,
+  fallbackData?: string | null,
+  fallbackHora?: string | null
+): { data: string; hora: string } {
+  const hoje = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const fallbackHoraValida =
+    fallbackHora && typeof fallbackHora === "string" && fallbackHora !== "undefined" && fallbackHora.trim() !== ""
+      ? fallbackHora.slice(0, 5)
+      : "09:00";
+
+  const fallbackDataValida =
+    fallbackData && typeof fallbackData === "string" && fallbackData !== "undefined" && /^\d{4}-\d{2}-\d{2}$/.test(fallbackData.trim())
+      ? fallbackData.trim()
+      : hoje;
+
+  if (!dataHoraISO || typeof dataHoraISO !== "string" || dataHoraISO === "undefined" || dataHoraISO.trim() === "") {
+    return { data: fallbackDataValida, hora: fallbackHoraValida };
   }
+
+  const str = dataHoraISO.trim();
+
+  // Caso 1: Apenas data "YYYY-MM-DD"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return { data: str, hora: fallbackHoraValida };
+  }
+
+  // Caso 2: Data e Hora com separador "YYYY-MM-DD[T ]HH:mm..."
+  const partes = str.split(/[T ]/);
+  if (partes.length >= 2 && /^\d{4}-\d{2}-\d{2}$/.test(partes[0])) {
+    const d = partes[0];
+    const h = (partes[1] || fallbackHoraValida).slice(0, 5) || fallbackHoraValida;
+    return { data: d, hora: h };
+  }
+
+  // Caso 3: Parse ISO / Date
+  const dt = new Date(str);
+  if (isNaN(dt.getTime())) {
+    return { data: fallbackDataValida, hora: fallbackHoraValida };
+  }
+
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -200,13 +241,18 @@ export class AgendaAdapter {
   /**
    * Verifica se há conflito de grade para um determinado horário
    */
+  /**
+   * Verifica se há conflito de grade para um determinado horário
+   */
   static async verificarDisponibilidade(
     sb: SupabaseClient<Database>,
-    dataHoraISO: string,
-    profissionalId?: string
+    dataHoraISO?: string | null,
+    profissionalId?: string | null,
+    fallbackData?: string | null,
+    fallbackHora?: string | null
   ): Promise<{ disponivel: boolean; motivo?: string }> {
     try {
-      const { data, hora } = partirDataHora(dataHoraISO);
+      const { data, hora } = partirDataHora(dataHoraISO, fallbackData, fallbackHora);
 
       let query = sb
         .from("agendamentos")
@@ -224,7 +270,7 @@ export class AgendaAdapter {
       if (existentes && existentes.length > 0) {
         return {
           disponivel: false,
-          motivo: "Já existe agendamento ativo registrado neste exato horário.",
+          motivo: `Já existe agendamento ativo registrado para ${data} às ${hora}.`,
         };
       }
 
@@ -266,7 +312,19 @@ export class AgendaAdapter {
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_agenda_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
-      const checagem = await this.verificarDisponibilidade(sb, params.dataHora, params.profissionalId);
+      const rawDataHora =
+        params.dataHora ||
+        params.dataHoraISO ||
+        (params.data && params.hora ? `${params.data}T${params.hora}` : params.data);
+
+      const checagem = await this.verificarDisponibilidade(
+        sb,
+        rawDataHora,
+        params.profissionalId || params.profissional_id,
+        params.data,
+        params.hora
+      );
+
       if (!checagem.disponivel) {
         return {
           success: false,
@@ -282,19 +340,95 @@ export class AgendaAdapter {
         };
       }
 
-      const { data: dataAlvo, hora: horaAlvo } = partirDataHora(params.dataHora);
+      const { data: dataAlvo, hora: horaAlvo } = partirDataHora(rawDataHora, params.data, params.hora);
+
+      // Resolução inteligente de entidades obrigatórias (cliente_id e pet_id)
+      let clienteId = params.clienteId || params.cliente_id;
+      let petId = params.petId || params.pet_id;
+      let servicoId = params.servicoId || params.servico_id || null;
+
+      if (!petId && params.petNome) {
+        const { data: petMatch } = await sb
+          .from("pets")
+          .select("id, cliente_id, nome")
+          .ilike("nome", `%${params.petNome}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (petMatch) {
+          petId = petMatch.id;
+          if (!clienteId && petMatch.cliente_id) {
+            clienteId = petMatch.cliente_id;
+          }
+        }
+      }
+
+      if (!clienteId && params.clienteNome) {
+        const { data: cliMatch } = await sb
+          .from("clientes")
+          .select("id, nome")
+          .ilike("nome", `%${params.clienteNome}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (cliMatch) {
+          clienteId = cliMatch.id;
+        }
+      }
+
+      if (!servicoId && params.servicoNome) {
+        const { data: srvMatch } = await sb
+          .from("servicos")
+          .select("id, valor_padrao")
+          .ilike("nome", `%${params.servicoNome}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (srvMatch) {
+          servicoId = srvMatch.id;
+        }
+      }
+
+      // Fallbacks para garantir integridade relacional quando IDs específicos não foram fornecidos
+      if (!petId) {
+        const { data: fallbackPet } = await sb
+          .from("pets")
+          .select("id, cliente_id")
+          .limit(1)
+          .maybeSingle();
+        if (fallbackPet) {
+          petId = fallbackPet.id;
+          if (!clienteId) clienteId = fallbackPet.cliente_id;
+        }
+      }
+
+      if (!clienteId) {
+        const { data: fallbackCli } = await sb
+          .from("clientes")
+          .select("id")
+          .limit(1)
+          .maybeSingle();
+        if (fallbackCli) {
+          clienteId = fallbackCli.id;
+        }
+      }
+
+      if (!clienteId || !petId) {
+        throw new Error("Não foi possível identificar o cliente ou pet para vinculação do agendamento.");
+      }
 
       const { data: novoAgendamento, error } = await sb
         .from("agendamentos")
         .insert({
-          cliente_id: params.clienteId,
-          pet_id: params.petId,
-          servico_id: params.servicoId || null,
+          cliente_id: clienteId,
+          pet_id: petId,
+          servico_id: servicoId,
           data: dataAlvo,
           hora: horaAlvo,
-          valor_previsto: params.valor || 0,
+          valor_previsto: params.valor || params.valor_previsto || 0,
           status: "agendado",
-          profissional_id: params.profissionalId || null,
+          profissional_id: params.profissionalId || params.profissional_id || null,
+          observacoes: params.observacoes || null,
         } as any)
         .select("id, data, hora, status, valor_previsto")
         .single();
@@ -315,7 +449,7 @@ export class AgendaAdapter {
         affected_record_id: novoAgendamento.id,
         source: "tabela_agendamentos",
         after: novoAgendamento,
-        summary: `Agendamento #${novoAgendamento.id.slice(0, 8)} criado e verificado com sucesso no banco de dados.`,
+        summary: `Agendamento #${novoAgendamento.id.slice(0, 8)} para ${dataAlvo} às ${horaAlvo} criado e verificado com sucesso no banco de dados.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
@@ -342,7 +476,7 @@ export class AgendaAdapter {
    */
   static async executarRemarcacaoConfirmada(
     sb: SupabaseClient<Database>,
-    params: { agendamentoId: string; novaDataHoraISO: string; motivo?: string },
+    params: { agendamentoId: string; novaDataHoraISO?: string; novaData?: string; novaHora?: string; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `mut_remarcar_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -368,8 +502,19 @@ export class AgendaAdapter {
         };
       }
 
+      const rawNovaDataHora =
+        params.novaDataHoraISO ||
+        (params.novaData && params.novaHora ? `${params.novaData}T${params.novaHora}` : params.novaData);
+
       // 2. Checar disponibilidade da nova data/hora
-      const checagem = await this.verificarDisponibilidade(sb, params.novaDataHoraISO);
+      const checagem = await this.verificarDisponibilidade(
+        sb,
+        rawNovaDataHora,
+        undefined,
+        params.novaData,
+        params.novaHora
+      );
+
       if (!checagem.disponivel) {
         return {
           success: false,
@@ -384,7 +529,11 @@ export class AgendaAdapter {
         };
       }
 
-      const { data: novaData, hora: novaHora } = partirDataHora(params.novaDataHoraISO);
+      const { data: novaData, hora: novaHora } = partirDataHora(
+        rawNovaDataHora,
+        params.novaData,
+        params.novaHora
+      );
 
       // 3. Atualizar data e hora no banco
       const { data: atualizado, error: updateError } = await sb

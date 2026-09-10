@@ -72,31 +72,51 @@ export async function processarMensagemJessiV2Core(
       let mutationResult: any = null;
       let recordIdReal: string | null = null;
 
-      if (toolNome === "criar_agendamento" || toolNome === "preparar_agendamento" || toolNome === "executar_agendamento") {
+      if (
+        toolNome === "criar_agendamento" ||
+        toolNome === "preparar_agendamento" ||
+        toolNome === "executar_agendamento"
+      ) {
         mutationResult = await AgendaAdapter.executarAgendamentoConfirmado(sb, params, idempotencyKey);
+        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
+      } else if (
+        toolNome === "preparar_reagendamento" ||
+        toolNome === "reagendar_agendamento" ||
+        toolNome === "remarcar_agendamento"
+      ) {
+        mutationResult = await AgendaAdapter.executarRemarcacaoConfirmada(sb, params, idempotencyKey);
+        recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
+      } else if (
+        toolNome === "preparar_cancelamento" ||
+        toolNome === "cancelar_agendamento"
+      ) {
+        mutationResult = await AgendaAdapter.executarCancelamentoConfirmado(sb, params, idempotencyKey);
         recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
       }
 
-      const sucesso = mutationResult ? mutationResult.success : true;
+      const sucesso = mutationResult ? Boolean(mutationResult.success) : true;
       const idExibicao = recordIdReal ? ` (ID: ${recordIdReal.slice(0, 8)})` : "";
 
       if (sucesso) {
-        respostaTexto = `Agendamento${idExibicao} confirmado e registrado com sucesso no sistema. A gravação foi verificada fisicamente no banco de dados.`;
-        
+        respostaTexto =
+          mutationResult?.summary ||
+          `Operação${idExibicao} confirmada e registrada com sucesso no sistema. A gravação foi verificada fisicamente no banco de dados.`;
+
         cards.push({
           type: "confirmacao",
-          title: "Agendamento Realizado com Sucesso",
+          title: "Operação Realizada com Sucesso",
           subtitle: `Confirmado por ${user?.nome || "Eli Júnior"} às ${new Date().toLocaleTimeString("pt-BR")}`,
           data: {
             executado: true,
             tool: toolNome,
             registroId: recordIdReal,
+            resultado: mutationResult,
             params,
             gravacaoVerificada: true,
           },
         });
       } else {
-        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido"}`;
+        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido na execução da operação."}`;
       }
 
       await registrarAuditoriaV2(sb, {
@@ -276,6 +296,13 @@ export async function processarMensagemJessiV2Core(
         },
       });
 
+      const dataAlvoStr =
+        intencao.entidades.data || (contextoAtual as any)?.dataReferencia || new Date().toISOString().split("T")[0];
+      const horaAlvoStr = intencao.entidades.hora || "09:00";
+      const rawDataHora =
+        intencao.entidades.dataHora ||
+        (dataAlvoStr ? `${dataAlvoStr}T${horaAlvoStr}:00` : new Date().toISOString());
+
       pendingAction = {
         id: proposta.id,
         type: intencao.intencao,
@@ -283,12 +310,28 @@ export async function processarMensagemJessiV2Core(
         title: `Confirmação de ${intencao.intencao.replace(/_/g, " ").toUpperCase()}`,
         summary: proposta.motivo,
         riskLevel: "medio",
-        params: intencao.entidades,
+        params: {
+          ...intencao.entidades,
+          data: dataAlvoStr,
+          hora: horaAlvoStr,
+          dataHora: rawDataHora,
+          clienteId: novoContexto.cliente?.id || contextoAtual.cliente?.id || intencao.entidades.clienteId || null,
+          clienteNome: nomeCliente,
+          petId: novoContexto.pet?.id || contextoAtual.pet?.id || intencao.entidades.petId || null,
+          petNome: nomePet,
+          servicoId: novoContexto.servico?.id || contextoAtual.servico?.id || intencao.entidades.servicoId || null,
+          servicoNome: servicoNome,
+          valor:
+            intencao.entidades.valor ||
+            (novoContexto as any)?.servicoValor ||
+            (contextoAtual as any)?.servicoValor ||
+            0,
+        },
         created_at: proposta.created_at,
         expires_at: proposta.validade,
       };
 
-      respostaTexto = `Preparei o pedido solicitado no cartão de revisão abaixo. Contudo, nesta etapa consultiva, a gravação e execução direta de agendamentos, remarcações e cancelamentos ainda não está liberada.`;
+      respostaTexto = `Preparei a operação solicitada no cartão de revisão abaixo. Revise os dados e confirme para que eu execute a gravação no sistema.`;
       
       cards.push({
         type: "confirmacao",
