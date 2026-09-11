@@ -37,7 +37,7 @@ export const JessiSidebar: React.FC<JessiSidebarProps> = ({
   ];
 
   return (
-    <aside className="hidden md:flex w-60 border-r border-border/70 bg-card/70 backdrop-blur-xs flex-col h-full text-xs shrink-0">
+    <aside className="hidden lg:flex w-60 border-r border-border/70 bg-card/70 backdrop-blur-xs flex-col h-full text-xs shrink-0">
       <div className="p-3 border-b border-border/70">
         <Button
           onClick={onNovaConversa}
