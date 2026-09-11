@@ -729,7 +729,7 @@ export async function despacharFerramentaV2(
         return await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
 
       case "gerar_termo_programa_pdf":
-        return await ProgramasCreditosAdapter.prepararTermoPdf(sb, params.contratoId);
+        return await (ProgramasCreditosAdapter as any).prepararTermoPdf?.(sb, params.contratoId) ?? { success: false, summary: "Geração de termo em PDF indisponível no momento." };
 
       case "consultar_financeiro_consolidado":
       case "gerar_relatorio_financeiro":

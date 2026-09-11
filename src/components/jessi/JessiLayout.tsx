@@ -204,13 +204,13 @@ export const JessiLayout: React.FC = () => {
         timestamp: new Date().toISOString(),
         cards: res.cards as any,
         pendingAction: res.pendingAction,
-        intent: res.intencao,
+        intent: (res as any).intencao,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      if (res.novoContexto) {
-        setContexto((prev) => ({ ...prev, ...res.novoContexto }));
+      if ((res as any).novoContexto) {
+        setContexto((prev) => ({ ...prev, ...(res as any).novoContexto }));
       }
 
       if (res.pendingAction) {
@@ -318,8 +318,8 @@ export const JessiLayout: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-      if (res.novoContexto) {
-        setContexto((prev) => ({ ...prev, ...res.novoContexto }));
+      if ((res as any).novoContexto) {
+        setContexto((prev) => ({ ...prev, ...(res as any).novoContexto }));
       }
       setStatus("disponivel");
       toast.success("Ação confirmada e registrada com sucesso!");
