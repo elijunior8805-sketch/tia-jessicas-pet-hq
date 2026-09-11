@@ -191,18 +191,18 @@ export class ClientesPetsAdapter {
         else if (partesNome.some((p) => p === termoNorm)) {
           score = 0.94;
         }
-        // 4. Nome Abreviado / Iniciais (ex: "J. Silva", "Jessica S", "M. Santos")
+        // 4. Nome Abreviado / Iniciais (ex: "J. Silva", "Jessica S", "M. Santos") ou Prefixo
         else if (
-          partesNome.some((p) => p.startsWith(termoNorm) || termoNorm.startsWith(p)) ||
+          partesNome.some((p) => p.startsWith(termoNorm) || (termoNorm.length >= 4 && p.includes(termoNorm))) ||
           nomeNorm.startsWith(termoNorm) ||
-          nomeNorm.includes(termoNorm)
+          (termoNorm.length >= 4 && nomeNorm.includes(termoNorm))
         ) {
           score = 0.90;
         }
-        // 5. Correspondência Aproximada / Erro de Digitação (Levenshtein)
-        else {
+        // 5. Correspondência Aproximada / Erro de Digitação (Levenshtein) - apenas para termos com 4+ caracteres
+        else if (termoNorm.length >= 4) {
           const sim = calcularSimilaridade(nomeNorm, termoNorm);
-          if (sim >= 0.70) score = sim * 0.86;
+          if (sim >= 0.75) score = sim * 0.86;
         }
 
         if (score > 0) {
@@ -225,11 +225,14 @@ export class ClientesPetsAdapter {
 
         if (nomeNorm === termoNorm) {
           score = 1.0;
-        } else if (nomeNorm.startsWith(termoNorm) || nomeNorm.includes(termoNorm)) {
+        } else if (
+          nomeNorm.startsWith(termoNorm) ||
+          (termoNorm.length >= 4 && nomeNorm.includes(termoNorm))
+        ) {
           score = 0.92;
-        } else {
+        } else if (termoNorm.length >= 4) {
           const sim = calcularSimilaridade(nomeNorm, termoNorm);
-          if (sim >= 0.70) score = sim * 0.88;
+          if (sim >= 0.75) score = sim * 0.88;
         }
 
         if (score > 0) {

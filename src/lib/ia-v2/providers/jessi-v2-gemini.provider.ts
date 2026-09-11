@@ -322,6 +322,28 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     const apiKey = this.obterApiKeyServidor();
 
     // 1. Resolução Anafórica e Correção de Contexto
+    const STOPWORDS_NAO_NOMES = new Set([
+      "ele", "ela", "eles", "elas", "hoje", "amanha", "amanhã", "ontem", "mes", "mês", "ano", "dia", "dias",
+      "semana", "faturamento", "receita", "caixa", "saldo", "relatorio", "relatório", "pix", "credito", "crédito",
+      "creditos", "créditos", "debito", "débito", "dinheiro", "spa", "pet", "pets", "cliente", "clientes",
+      "tutor", "tutores", "agenda", "horario", "horário", "horarios", "horários", "conta", "contas", "receber",
+      "pagar", "pagamento", "pagamentos", "tudo", "todos", "todas", "meu", "minha", "meus", "minhas", "nosso",
+      "nossa", "nossos", "nossas", "aqui", "agora", "valor", "valores", "indicadores", "qualidade", "ia",
+      "mensagem", "comprovante", "banho", "tosa", "servico", "serviço", "opcao", "opção", "primeiro", "segundo",
+      "terceiro", "quarto", "quinto", "qual", "quais", "quanto", "quantos", "quanto faturou", "para", "pro",
+      "pra", "de", "do", "da", "em", "no", "na", "os", "as", "um", "uma", "uns", "umas", "ola", "olá"
+    ]);
+
+    const ehNomeValido = (nomeStr?: string | null): boolean => {
+      if (!nomeStr) return false;
+      const limpo = nomeStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      if (!limpo || limpo.length < 2) return false;
+      const partes = limpo.split(/\s+/);
+      // Se todas as palavras forem stopwords, não é nome válido
+      if (partes.every((p) => STOPWORDS_NAO_NOMES.has(p))) return false;
+      return !STOPWORDS_NAO_NOMES.has(limpo);
+    };
+
     let petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || null;
     let clienteNomeResolvido = req.contexto.clienteSelecionadoNome || req.contexto.cliente?.nome || null;
 
@@ -329,23 +351,23 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     const matchCliente = texto.match(/(?:cliente|tutor|proprietário|proprietario|dono)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
     if (matchCliente && matchCliente[1]) {
       const possivelCliente = matchCliente[1].trim();
-      if (!["Ele", "Ela", "Hoje", "Amanhã", "Banho", "Tosa"].includes(possivelCliente)) {
+      if (ehNomeValido(possivelCliente)) {
         clienteNomeResolvido = possivelCliente;
       }
     }
 
     // Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
     const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
-    if (matchCorrecao && matchCorrecao[1] && !["Ele", "Ela", "Hoje", "Amanhã", "Banho", "Tosa"].includes(matchCorrecao[1])) {
+    if (matchCorrecao && matchCorrecao[1] && ehNomeValido(matchCorrecao[1])) {
       petNomeResolvido = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
     } else {
       // Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob")
       const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela)\s+([A-ZÀ-Úa-zà-ú]+)/i);
-      if (matchPetExp && matchPetExp[1] && !["Ele", "Ela", "Hoje", "Amanhã", "Banho", "Tosa", "Pet", "Jade", "Thor"].includes(matchPetExp[1])) {
+      if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1])) {
         petNomeResolvido = matchPetExp[1];
       } else {
         const matchPet = texto.match(/(?:para o pet|para a pet|para o|para a|do pet|da pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/);
-        if (matchPet && !["Thor", "Ele", "Ela", "Hoje", "Amanhã", "Amanha", "Cliente", "Banho", "Tosa"].includes(matchPet[1])) {
+        if (matchPet && ehNomeValido(matchPet[1])) {
           petNomeResolvido = matchPet[1];
         } else if (textoLower.includes("thor")) {
           petNomeResolvido = "Thor";
@@ -363,25 +385,26 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
     // Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel")
     const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-    if (matchPrep && matchPrep[1] && !["Ele", "Ela", "Hoje", "Amanhã", "Amanha", "Banho", "Tosa", "Pet", "Cliente"].includes(matchPrep[1].trim())) {
+    if (matchPrep && matchPrep[1]) {
       const termoPrep = matchPrep[1].trim();
-      if (!clienteNomeResolvido && !petNomeResolvido) {
-        clienteNomeResolvido = termoPrep;
+      if (ehNomeValido(termoPrep)) {
+        if (!clienteNomeResolvido && !petNomeResolvido) {
+          clienteNomeResolvido = termoPrep;
+        }
       }
     }
 
-    // Extrai termo livre para busca de cliente/pet caso não haja menção explícita com preposições (ex: "agendar eli junio")
+    // Extrai termo livre para busca de cliente/pet caso não haja menção explícita com preposições
     let termoLivre = texto
-      .replace(/\b(agendar|agenda|marcar|marque|novo agendamento|criar agendamento|desmarcar|desmarque|cancelar|cancele|cancela|reagendar|remarcar|remarque|consultar|ver|buscar)\b/gi, "")
+      .replace(/\b(agendar|agenda|marcar|marque|novo agendamento|criar agendamento|desmarcar|desmarque|cancelar|cancele|cancela|reagendar|remarcar|remarque|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão)\b/gi, "")
       .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
       .replace(/\b(banho e tosa|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
-      .replace(/\b(hoje|amanhã|amanha|depois de amanhã|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)\b/gi, "")
       .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
       .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
       .replace(/[^\w\sÀ-ú]/g, "")
       .trim();
 
-    if (termoLivre && termoLivre.length >= 2 && !clienteNomeResolvido && !petNomeResolvido) {
+    if (termoLivre && ehNomeValido(termoLivre) && !clienteNomeResolvido && !petNomeResolvido) {
       clienteNomeResolvido = termoLivre;
     }
 
@@ -640,7 +663,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       hora: horaResolvida,
       servicoNome: servicoResolvido,
       servicoId: req.contexto.servicoSelecionadoId || req.contexto.servico?.id || null,
-      termoBusca: petNomeResolvido || clienteNomeResolvido || (termoLivre && termoLivre.length >= 2 ? termoLivre : null),
+      termoBusca: (dominio === "clientes_pets" || intencao === "criar_agendamento" || intencao === "cancelar_agendamento" || intencao === "reagendar_agendamento" || intencao === "consultar_ultimo_atendimento")
+        ? (petNomeResolvido || clienteNomeResolvido || null)
+        : null,
     };
 
     const provedorUtilizado = apiKey ? `${this.nome} (Online)` : `${this.nome} (Simulado/Determinístico)`;

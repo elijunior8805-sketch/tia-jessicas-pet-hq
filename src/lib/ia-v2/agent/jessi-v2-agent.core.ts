@@ -380,8 +380,18 @@ export async function processarMensagemJessiV2Core(
     const intencao = nluResult.intencao;
 
     // 3. Busca Inteligente e Resolução de Ambiguidade (Clientes & Pets)
-    if (intencao.dominio === "clientes_pets" || intencao.entidades.termoBusca) {
-      const termoParaBusca = intencao.entidades.termoBusca || textoLimpo;
+    const intencoesQuePrecisamBusca =
+      intencao.dominio === "clientes_pets" ||
+      intencao.intencao === "criar_agendamento" ||
+      intencao.intencao === "preparar_agendamento" ||
+      intencao.intencao === "cancelar_agendamento" ||
+      intencao.intencao === "preparar_cancelamento" ||
+      intencao.intencao === "reagendar_agendamento" ||
+      intencao.intencao === "preparar_reagendamento" ||
+      intencao.intencao === "consultar_ultimo_atendimento";
+
+    if (intencoesQuePrecisamBusca && intencao.entidades.termoBusca) {
+      const termoParaBusca = intencao.entidades.termoBusca;
       const resultadoBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoParaBusca);
 
       if (resultadoBusca.success && resultadoBusca.data.candidatos.length > 0) {
