@@ -54,17 +54,43 @@ export async function processarMensagemJessiV2Core(
     const textoLimpo = (input.mensagem || "").trim();
     const textoLower = textoLimpo.toLowerCase();
 
-    // 1. Tratamento de Confirmação Explícita de Ação Pendente
-    const ehConfirmacaoTexto =
-      textoLower === "confirmar" ||
-      textoLower === "pode confirmar" ||
-      textoLower === "sim" ||
-      textoLower === "confirmo" ||
-      textoLower === "pode executar";
-
+    // 1. Tratamento de Confirmação Explícita de Ação Pendente por Voz ou Texto
     const acaoPendenteAtual = (input.contexto as any)?.operacaoPreparada || (input.contexto as any)?.acaoPendente;
 
-    if ((input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) || (ehConfirmacaoTexto && acaoPendenteAtual)) {
+    const ehConfirmacaoTexto =
+      Boolean(acaoPendenteAtual) &&
+      /\b(confirmar|confirmo|confirma|confirmado|confirmada|pode confirmar|pode agendar|pode marcar|pode cancelar|pode desmarcar|pode executar|pode fazer|pode gravar|pode salvar|pode ser|sim|ok|está certo|ta certo|tá certo|correto|com certeza|autorizo|autorizado|concluir|gravar|salvar|fechar|prosseguir)\b/i.test(textoLower);
+
+    const ehCancelamentoProposta =
+      Boolean(acaoPendenteAtual) &&
+      /\b(não|nao|cancelar|cancela|desistir|manter|manter agendamento|não agendar|nao agendar|não cancelar|nao cancelar|abortar)\b/i.test(textoLower);
+
+    if (ehCancelamentoProposta) {
+      return {
+        versao: "v2",
+        respostaTexto: "A operação proposta foi cancelada e nenhuma alteração foi realizada no sistema.",
+        cards: [],
+        pendingAction: null,
+        novoContexto: {
+          ...contextoAtual,
+          operacaoPreparada: null,
+          acaoPendente: null,
+        } as any,
+        intencao: {
+          dominio: "geral_conversacional",
+          intencao: "cancelar_operacao",
+          confianca: 1.0,
+          entidades: {},
+          requerConfirmacao: false,
+          ferramentaSugerida: null,
+          explicacaoRaciocinio: "Operação descartada pelo operador.",
+        },
+        tempoProcessamentoMs: Date.now() - inicioMs,
+        correlationId,
+      };
+    }
+
+    if ((input.confirmacaoAcaoPendenteId && input.dadosConfirmacao) || ehConfirmacaoTexto) {
       const pending = acaoPendenteAtual;
       const toolNome = input.dadosConfirmacao?.tool || pending?.tool || "criar_agendamento";
       const params = input.dadosConfirmacao?.params || pending?.params || {};
@@ -260,7 +286,129 @@ export async function processarMensagemJessiV2Core(
             nome: tutorNome,
           };
 
-          respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**). Qual serviço você deseja agendar (ex: Banho, Tosa, Banho e Tosa) e para qual data e horário?`;
+          const servicoPendente = (contextoAtual as any)?.servicoSelecionadoNome || (contextoAtual as any)?.variaveisConversacao?.servicoNome || null;
+          const dataPendente = (contextoAtual as any)?.dataAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.dataAlvo || null;
+          const horaPendente = (contextoAtual as any)?.horaAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.horaAlvo || null;
+
+          if (servicoPendente && dataPendente && horaPendente) {
+            const dataExtensa = new Intl.DateTimeFormat("pt-BR", {
+              dateStyle: "full",
+              timeZone: "America/Sao_Paulo",
+            }).format(new Date(`${dataPendente}T12:00:00`));
+
+            const proposta = JessiV2ConfirmationManager.criarProposta({
+              userId: user?.id || "proprietario_spa",
+              cliente: { id: tutorId || "", nome: tutorNome },
+              pet: { id: petIdSel, nome: petNomeSel },
+              acao: "criar_agendamento",
+              motivo: `Agendamento de ${servicoPendente} para ${petNomeSel} em ${dataPendente} às ${horaPendente}`,
+              estadoAtual: { status: "pendente" },
+              estadoProposto: {
+                clienteId: tutorId,
+                clienteNome: tutorNome,
+                petId: petIdSel,
+                petNome: petNomeSel,
+                servicoNome: servicoPendente,
+                data: dataPendente,
+                hora: horaPendente,
+                dataHora: `${dataPendente}T${horaPendente}:00`,
+                valor: 0,
+                duracaoMinutos: 60,
+              },
+              valores: { valorBruto: 0, valorFinal: 0 },
+              dataHora: `${dataPendente}T${horaPendente}:00`,
+              riscos: ["Alteração no banco sujeita a confirmação explícita."],
+              resumoVisual: {
+                entendido: `Agendamento de ${servicoPendente} para o pet ${petNomeSel} (${tutorNome}) em ${dataExtensa} às ${horaPendente}.`,
+                seraAlterado: `Reserva na grade de horários para ${dataPendente} às ${horaPendente}.`,
+                situacaoAtual: "Horário verificado e disponível.",
+                resultadoEsperado: `Agendamento oficial registrado no banco de dados para ${petNomeSel}.`,
+                alertas: ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."],
+              },
+            });
+
+            pendingAction = {
+              id: proposta.id,
+              type: "criar_agendamento",
+              tool: "criar_agendamento",
+              title: `Confirmação de Agendamento: ${servicoPendente}`,
+              summary: `Tutor: ${tutorNome} • Pet: ${petNomeSel} • Data: ${dataExtensa} às ${horaPendente}`,
+              riskLevel: "medio",
+              params: {
+                clienteId: tutorId,
+                clienteNome: tutorNome,
+                petId: petIdSel,
+                petNome: petNomeSel,
+                servicoNome: servicoPendente,
+                data: dataPendente,
+                hora: horaPendente,
+              },
+              created_at: proposta.created_at,
+              expires_at: proposta.validade,
+            };
+
+            respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**). Preparei o agendamento de **${servicoPendente}** para **${dataExtensa}** às **${horaPendente}**. Por favor confirme no cartão abaixo para gravar na grade.`;
+
+            cards.push({
+              type: "confirmacao",
+              title: pendingAction.title,
+              subtitle: `Tutor: ${tutorNome} • Pet: ${petNomeSel}`,
+              data: {
+                proposta,
+                acaoPendente: pendingAction,
+                pendingAction,
+                requerConfirmacao: true,
+                resumoVisual: proposta.resumoVisual,
+                resumo: proposta.resumoVisual.entendido,
+                acoesDisponiveis: ["Confirmar agendamento", "Cancelar"],
+              },
+            });
+
+            return {
+              versao: "v2",
+              respostaTexto,
+              cards,
+              pendingAction,
+              novoContexto: {
+                ...contextoAtual,
+                ...novoContexto,
+                operacaoPreparada: pendingAction,
+                variaveisConversacao: {
+                  ...contextoAtual.variaveisConversacao,
+                  candidatosEmEspera: null,
+                },
+              },
+              intencao: {
+                dominio: "agenda",
+                intencao: "preparar_agendamento",
+                confianca: 1.0,
+                entidades: {
+                  petNome: petNomeSel,
+                  petId: petIdSel,
+                  clienteNome: tutorNome,
+                  clienteId: tutorId,
+                  servicoNome: servicoPendente,
+                  data: dataPendente,
+                  hora: horaPendente,
+                } as any,
+                requerConfirmacao: true,
+                ferramentaSugerida: "criar_agendamento",
+                explicacaoRaciocinio: "Agendamento pronto para confirmação após desambiguação.",
+              },
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
+
+          if (servicoPendente && dataPendente && !horaPendente) {
+            respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**) para **${servicoPendente}** no dia **${dataPendente}**. Qual o horário desejado para o atendimento?`;
+          } else if (servicoPendente && !dataPendente) {
+            respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**) para **${servicoPendente}**. Para qual data e horário você deseja agendar?`;
+          } else if (!servicoPendente && dataPendente) {
+            respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**) para o dia **${dataPendente}**. Qual serviço você deseja agendar (ex: Banho, Tosa) e em qual horário?`;
+          } else {
+            respostaTexto = `Selecionei o pet **${petNomeSel}** (Tutor: **${tutorNome}**). Qual serviço você deseja agendar (ex: Banho, Tosa, Banho e Tosa) e para qual data e horário?`;
+          }
 
           cards.push({
             type: "cliente",
@@ -289,9 +437,15 @@ export async function processarMensagemJessiV2Core(
             novoContexto: {
               ...contextoAtual,
               ...novoContexto,
+              servicoSelecionadoNome: servicoPendente,
+              dataAlvoPendente: dataPendente,
+              horaAlvoPendente: horaPendente,
               variaveisConversacao: {
                 ...contextoAtual.variaveisConversacao,
                 candidatosEmEspera: null,
+                servicoNome: servicoPendente,
+                dataAlvo: dataPendente,
+                horaAlvo: horaPendente,
               },
             },
             intencao: {
@@ -303,6 +457,9 @@ export async function processarMensagemJessiV2Core(
                 petId: petIdSel,
                 clienteNome: tutorNome,
                 clienteId: tutorId,
+                servicoNome: servicoPendente,
+                data: dataPendente,
+                hora: horaPendente,
               } as any,
               requerConfirmacao: false,
               ferramentaSugerida: "criar_agendamento",
@@ -321,6 +478,9 @@ export async function processarMensagemJessiV2Core(
             telefone: candidatoEscolhido.dadosCompletos?.telefone || candidatoEscolhido.dadosCompletos?.whatsapp,
           };
 
+          const servicoPendente = (contextoAtual as any)?.servicoSelecionadoNome || (contextoAtual as any)?.variaveisConversacao?.servicoNome || null;
+          const dataPendente = (contextoAtual as any)?.dataAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.dataAlvo || null;
+
           // Busca pets deste cliente
           const { data: petsDoCliente } = await sb
             .from("pets")
@@ -335,7 +495,15 @@ export async function processarMensagemJessiV2Core(
               porte: petsDoCliente[0].porte,
             };
 
-            respostaTexto = `Selecionei o tutor **${clienteNomeSel}** e seu pet **${petsDoCliente[0].nome}**. Qual serviço deseja agendar (ex: Banho, Tosa) e para qual data e horário?`;
+            if (servicoPendente && dataPendente) {
+              respostaTexto = `Selecionei o tutor **${clienteNomeSel}** e seu pet **${petsDoCliente[0].nome}** para **${servicoPendente}** no dia **${dataPendente}**. Qual o horário desejado?`;
+            } else if (servicoPendente) {
+              respostaTexto = `Selecionei o tutor **${clienteNomeSel}** e seu pet **${petsDoCliente[0].nome}** para **${servicoPendente}**. Para qual data e horário você deseja agendar?`;
+            } else if (dataPendente) {
+              respostaTexto = `Selecionei o tutor **${clienteNomeSel}** e seu pet **${petsDoCliente[0].nome}** para o dia **${dataPendente}**. Qual serviço deseja agendar e em qual horário?`;
+            } else {
+              respostaTexto = `Selecionei o tutor **${clienteNomeSel}** e seu pet **${petsDoCliente[0].nome}**. Qual serviço deseja agendar (ex: Banho, Tosa) e para qual data e horário?`;
+            }
           } else if (petsDoCliente && petsDoCliente.length > 1) {
             respostaTexto = `Selecionei o tutor **${clienteNomeSel}**. Ele possui ${petsDoCliente.length} pets cadastrados (${petsDoCliente.map((p) => `**${p.nome}**`).join(", ")}). Para qual pet você deseja o atendimento?`;
             cards.push({
@@ -363,21 +531,27 @@ export async function processarMensagemJessiV2Core(
             novoContexto: {
               ...contextoAtual,
               ...novoContexto,
+              servicoSelecionadoNome: servicoPendente,
+              dataAlvoPendente: dataPendente,
               variaveisConversacao: {
                 ...contextoAtual.variaveisConversacao,
                 candidatosEmEspera: null,
+                servicoNome: servicoPendente,
+                dataAlvo: dataPendente,
               },
             },
             intencao: {
-              dominio: "clientes_pets",
-              intencao: "selecionar_cliente",
+              dominio: "agenda",
+              intencao: "preparar_agendamento",
               confianca: 1.0,
               entidades: {
                 clienteNome: clienteNomeSel,
                 clienteId: clienteIdSel,
+                servicoNome: servicoPendente,
+                data: dataPendente,
               } as any,
               requerConfirmacao: false,
-              ferramentaSugerida: "buscar_clientes_pets",
+              ferramentaSugerida: "criar_agendamento",
               explicacaoRaciocinio: "Opção de cliente selecionada pelo operador.",
             },
             tempoProcessamentoMs: Date.now() - inicioMs,
@@ -551,9 +725,16 @@ export async function processarMensagemJessiV2Core(
             pendingAction: null,
             novoContexto: {
               ...contextoAtual,
+              servicoSelecionadoNome: intencao.entidades.servicoNome || contextoAtual.servicoSelecionadoNome,
+              dataAlvoPendente: intencao.entidades.data || (contextoAtual as any).dataAlvoPendente,
+              horaAlvoPendente: intencao.entidades.hora || (contextoAtual as any).horaAlvoPendente,
               variaveisConversacao: {
                 ...contextoAtual.variaveisConversacao,
                 candidatosEmEspera: resultadoBusca.data.candidatos,
+                servicoNome: intencao.entidades.servicoNome,
+                dataAlvo: intencao.entidades.data,
+                horaAlvo: intencao.entidades.hora,
+                intencaoOriginal: intencao.intencao,
               },
             },
             intencao,

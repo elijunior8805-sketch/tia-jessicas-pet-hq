@@ -554,8 +554,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     }
     // Agenda / Agendamento
     else if (
-      /\b(agenda|agendar|agende|agendo|agendem|agendamento|agendamentos|agendado|agendados|marcar|marque|marca|marco|marquem|marcando|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|horario|horarios|horário|horários|vaga|vagas|atendimento|atendimentos)\b/i.test(textoLower) ||
-      (servicoResolvido !== null && (dataResolvida !== null || horaResolvida !== null || petNomeResolvido !== null))
+      /\b(agenda|agendar|agende|agendo|agendem|agendando|agendamento|agendamentos|agendado|agendados|marcar|marque|marca|marco|marquem|marcando|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|horario|horarios|horário|horários|vaga|vagas|atendimento|atendimentos)\b/i.test(textoLower) ||
+      (servicoResolvido !== null && (dataResolvida !== null || horaResolvida !== null || petNomeResolvido !== null)) ||
+      /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower)
     ) {
       dominio = "agenda";
       if (
@@ -573,13 +574,17 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida = "reagendar_agendamento";
         explicacao = `Preparando reagendamento para ${petNomeResolvido || "o pet informado"}.`;
       } else if (
-        /\b(agendar|agende|agendo|agendem|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|agenda ele|agenda ela)\b/i.test(textoLower) ||
-        (servicoResolvido !== null && (dataResolvida !== null || petNomeResolvido !== null))
+        /\b(agendar|agende|agendo|agendem|agendando|marcar|marque|marca|marco|marquem|marcando|agenda ele|agenda ela|novo agendamento|nova vaga|novo horário|novo horario)\b/i.test(textoLower) ||
+        /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower) ||
+        /\b(quero|gostaria de|preciso|vamos|pode)\s+(?:de\s+)?(?:um\s+)?(?:agendar|marcar|fazer um agendamento|fazer agendamento|criar agendamento|criar um agendamento)/i.test(textoLower) ||
+        /\bagendamento\s+(?:para|pro|pra|de|do|da|no dia|dia)\b/i.test(textoLower) ||
+        (servicoResolvido !== null && (dataResolvida !== null || petNomeResolvido !== null || clienteNomeResolvido !== null)) ||
+        ((clienteNomeResolvido !== null || petNomeResolvido !== null) && (dataResolvida !== null || horaResolvida !== null) && !/\b(ver|consultar|listar|como está|como ta|quais|quanto|qual|tem vaga|livre)\b/i.test(textoLower))
       ) {
         intencao = "criar_agendamento";
         requerConfirmacao = true;
         ferramentaSugerida = "criar_agendamento";
-        explicacao = `Preparando agendamento para ${petNomeResolvido || "o pet"} na data ${dataResolvida || "a definir"}.`;
+        explicacao = `Preparando agendamento para ${petNomeResolvido || clienteNomeResolvido || "o pet/cliente"} na data ${dataResolvida || "a definir"}.`;
       } else {
         intencao = "consultar_agenda";
         ferramentaSugerida = "consultar_agenda";
