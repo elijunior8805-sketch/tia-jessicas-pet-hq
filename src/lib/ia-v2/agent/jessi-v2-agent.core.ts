@@ -1371,9 +1371,12 @@ export async function processarMensagemJessiV2Core(
           });
         }
       } else if (intencao.dominio === "clientes_pets") {
-        if (novoContexto.pet?.id || contextoAtual.pet?.id) {
-          const petId = novoContexto.pet?.id || contextoAtual.pet?.id || "";
-          const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petId);
+        const petIdCtx = novoContexto.pet?.id || contextoAtual.pet?.id;
+        const clienteIdCtx = novoContexto.cliente?.id || contextoAtual.cliente?.id;
+        const perguntaSobrePets = /\bpets?\b|\bcachorr|\bbichin|\banimais?\b/i.test(textoLimpo);
+
+        if (petIdCtx && !(perguntaSobrePets && clienteIdCtx)) {
+          const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petIdCtx);
           respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do pet.`;
           cards.push({
             type: "cliente",
@@ -1381,6 +1384,33 @@ export async function processarMensagemJessiV2Core(
             subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
             data: resFicha.data,
           });
+        } else if (clienteIdCtx) {
+          const resCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteIdCtx);
+          const dadosCli: any = resCli.data || {};
+          const nomeCli = dadosCli.nome || novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "O cliente";
+          const petsCli: any[] = Array.isArray(dadosCli.pets) ? dadosCli.pets : [];
+
+          if (petsCli.length === 0) {
+            respostaTexto = `**${nomeCli}** ainda não possui nenhum pet cadastrado no sistema.`;
+          } else {
+            const nomes = petsCli.map((p: any) => `**${p.nome}**`);
+            const listaNomes =
+              nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+            respostaTexto = `**${nomeCli}** possui ${petsCli.length} pet(s) cadastrado(s): ${listaNomes}.`;
+          }
+
+          if (petsCli.length === 1) {
+            novoContexto.pet = { id: petsCli[0].id, nome: petsCli[0].nome, raca: petsCli[0].raca };
+          }
+
+          cards.push({
+            type: "cliente",
+            title: `Ficha do Cliente`,
+            subtitle: nomeCli,
+            data: resCli.data,
+          });
+        } else {
+          respostaTexto = `Não localizei esse cliente no cadastro. Pode confirmar o nome completo ou o telefone?`;
         }
       } else {
         // Conversação Natural / Saudação Generativa via Gemini com Fallback
