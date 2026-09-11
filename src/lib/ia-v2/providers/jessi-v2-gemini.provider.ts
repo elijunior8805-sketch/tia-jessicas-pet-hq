@@ -396,7 +396,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
     // Extrai termo livre para busca de cliente/pet caso não haja menção explícita com preposições
     let termoLivre = texto
-      .replace(/\b(agendar|agenda|marcar|marque|novo agendamento|criar agendamento|desmarcar|desmarque|cancelar|cancele|cancela|reagendar|remarcar|remarque|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão)\b/gi, "")
+      .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão)\b/gi, "")
       .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
       .replace(/\b(banho e tosa|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
       .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
@@ -534,59 +534,27 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     }
     // Agenda / Agendamento
     else if (
-      textoLower.includes("agenda") ||
-      textoLower.includes("agendado") ||
-      textoLower.includes("agendados") ||
-      textoLower.includes("agendamento") ||
-      textoLower.includes("agendamentos") ||
-      textoLower.includes("agendar") ||
-      textoLower.includes("marcar") ||
-      textoLower.includes("marque") ||
-      textoLower.includes("desmarcar") ||
-      textoLower.includes("desmarque") ||
-      textoLower.includes("cancelar") ||
-      textoLower.includes("cancele") ||
-      textoLower.includes("cancela") ||
-      textoLower.includes("reagendar") ||
-      textoLower.includes("remarcar") ||
-      textoLower.includes("remarque") ||
-      textoLower.includes("horario") ||
-      textoLower.includes("horário") ||
-      textoLower.includes("vaga") ||
-      textoLower.includes("atendimento") ||
-      textoLower.includes("atendimentos")
+      /\b(agenda|agendar|agende|agendo|agendem|agendamento|agendamentos|agendado|agendados|marcar|marque|marca|marco|marquem|marcando|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|horario|horarios|horário|horários|vaga|vagas|atendimento|atendimentos)\b/i.test(textoLower) ||
+      (servicoResolvido !== null && (dataResolvida !== null || horaResolvida !== null || petNomeResolvido !== null))
     ) {
       dominio = "agenda";
       if (
-        textoLower.includes("desmarcar") ||
-        textoLower.includes("desmarque") ||
-        textoLower.includes("cancelar") ||
-        textoLower.includes("cancele") ||
-        textoLower.includes("cancela")
+        /\b(desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento)\b/i.test(textoLower)
       ) {
         intencao = "cancelar_agendamento";
         requerConfirmacao = true;
         ferramentaSugerida = "cancelar_agendamento";
         explicacao = `Preparando cancelamento de agendamento para ${petNomeResolvido || "o pet informado"}.`;
       } else if (
-        textoLower.includes("reagendar") ||
-        textoLower.includes("remarcar") ||
-        textoLower.includes("remarque") ||
-        textoLower.includes("mudar horario") ||
-        textoLower.includes("trocar horario")
+        /\b(reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|mudar horario|trocar horario|mudar data|trocar data)\b/i.test(textoLower)
       ) {
         intencao = "reagendar_agendamento";
         requerConfirmacao = true;
         ferramentaSugerida = "reagendar_agendamento";
         explicacao = `Preparando reagendamento para ${petNomeResolvido || "o pet informado"}.`;
       } else if (
-        textoLower.includes("agendar") ||
-        textoLower.includes("marcar") ||
-        textoLower.includes("marque") ||
-        textoLower.includes("agenda ele") ||
-        textoLower.includes("agenda ela") ||
-        textoLower.includes("novo agendamento") ||
-        textoLower.includes("criar agendamento")
+        /\b(agendar|agende|agendo|agendem|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|agenda ele|agenda ela)\b/i.test(textoLower) ||
+        (servicoResolvido !== null && (dataResolvida !== null || petNomeResolvido !== null))
       ) {
         intencao = "criar_agendamento";
         requerConfirmacao = true;
@@ -717,6 +685,12 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       fallbackText = `Consultei o panorama financeiro com base nos lançamentos oficiais.`;
     } else if (dados.agenda) {
       fallbackText = `Consultei a agenda conforme os agendamentos cadastrados.`;
+    } else if (dados.contexto?.pet?.nome) {
+      fallbackText = `Estou com o pet **${dados.contexto.pet.nome}** em foco. O que deseja fazer (consultar créditos, agendar atendimento ou ver histórico)?`;
+    } else if (dados.contexto?.cliente?.nome) {
+      fallbackText = `Estou com o cliente **${dados.contexto.cliente.nome}** em foco. O que deseja fazer (consultar saldo de planos, agendar ou ver pets)?`;
+    } else {
+      fallbackText = `Olá! Sou a Jessi, assistente do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com agendamentos, clientes, pets ou financeiro?`;
     }
 
     return {
