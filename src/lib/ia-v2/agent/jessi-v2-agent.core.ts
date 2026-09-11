@@ -384,7 +384,7 @@ export async function processarMensagemJessiV2Core(
             type: "financeiro",
             title: "Clientes com Pagamentos Pendentes",
             subtitle: `${devedores.length} cliente(s) listado(s)`,
-            data: { devedores, totalVencido: dadosFin?.valoresVencidosDevedores },
+            data: dadosFin,
           });
         } else {
           respostaTexto = resFin.summary || `Consultei o resumo financeiro consolidado oficial do Spa.`;

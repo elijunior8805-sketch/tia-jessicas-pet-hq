@@ -14,13 +14,82 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
   const vencidos = Number(data?.valoresVencidosDevedores ?? 0);
   const ticketMedio = Number(data?.ticketMedio ?? 0);
   const formas = data?.formasPagamento || {};
-  const itensPendentes = Array.isArray(data?.devedores)
+  const itensPendentesRaw = Array.isArray(data?.devedores)
     ? data.devedores
     : Array.isArray(data?.itens_pendentes)
     ? data.itens_pendentes
+    : Array.isArray(data?.pendencias)
+    ? data.pendencias
+    : Array.isArray(data?.registros)
+    ? data.registros
     : Array.isArray(data)
     ? data
     : [];
+
+  // Deduplicação por identificador único para prevenir duplicidade caso o relacionamento traga múltiplos itens/serviços
+  const itensPendentes = React.useMemo(() => {
+    const mapa = new Map<string, any>();
+    itensPendentesRaw.forEach((item: any, idx: number) => {
+      const key = item.id || `item_${idx}`;
+      if (!mapa.has(key)) {
+        mapa.set(key, item);
+      }
+    });
+    return Array.from(mapa.values());
+  }, [itensPendentesRaw]);
+
+  // 1. Extração do nome real do cliente a partir dos relacionamentos existentes
+  const getNomeCliente = (p: any): string => {
+    const clienteObj = p.clientes || p.cliente || (Array.isArray(p.clientes) ? p.clientes[0] : null);
+    const atendCliente = p.atendimentos?.clientes || p.atendimento?.cliente || p.atendimento?.clientes;
+    const atendClienteObj = Array.isArray(atendCliente) ? atendCliente[0] : atendCliente;
+
+    return (
+      p.clienteNome ||
+      p.cliente_nome ||
+      clienteObj?.nome ||
+      atendClienteObj?.nome ||
+      p.nome ||
+      "Cliente"
+    );
+  };
+
+  // 2. Extração do valor real em aberto da pendência
+  const getValorPendente = (p: any): number => {
+    if (typeof p.saldo === "number" && !isNaN(p.saldo) && p.saldo > 0) {
+      return p.saldo;
+    }
+    if (typeof p.valor === "number" && !isNaN(p.valor) && p.valor > 0 && p.valor_total === undefined && p.saldo === undefined) {
+      return p.valor;
+    }
+    const total = Number(p.valor_total ?? p.valor_original ?? p.valor ?? 0);
+    const pago = Number(p.valor_pago ?? 0);
+    return Math.max(0, total - pago);
+  };
+
+  // 3. Formatação da data de vencimento real sem distorção de fuso horário
+  const formatVencimento = (vencimento?: string | null): string => {
+    if (!vencimento) return "Não informado";
+    if (typeof vencimento === "string" && /^\d{4}-\d{2}-\d{2}$/.test(vencimento)) {
+      const [ano, mes, dia] = vencimento.split("-");
+      return `${dia}/${mes}/${ano}`;
+    }
+    try {
+      const d = new Date(vencimento);
+      if (isNaN(d.getTime())) return "Não informado";
+      return d.toLocaleDateString("pt-BR");
+    } catch {
+      return "Não informado";
+    }
+  };
+
+  // 4. Soma apresentada em "Valores em Aberto" calculada exclusivamente pela soma das pendências únicas da lista
+  const totalValoresEmAberto = React.useMemo(() => {
+    if (itensPendentes.length > 0) {
+      return itensPendentes.reduce((acc: number, p: any) => acc + getValorPendente(p), 0);
+    }
+    return pendente + vencidos;
+  }, [itensPendentes, pendente, vencidos]);
 
   return (
     <div className="rounded-2xl border border-emerald-800/20 bg-card p-4 space-y-3 text-xs shadow-xs my-2">
@@ -49,7 +118,7 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
           <span className="text-[11px] text-amber-900 block mb-0.5">Valores em Aberto</span>
           <span className="text-base font-bold text-amber-800 flex items-center gap-1">
             <AlertCircle className="h-4 w-4 text-amber-600" />
-            R$ {(pendente + vencidos).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R$ {totalValoresEmAberto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </span>
           {vencidos > 0 && (
             <span className="text-[10px] text-red-600 font-medium block mt-0.5">
@@ -74,8 +143,9 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
           </span>
           <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
             {itensPendentes.slice(0, 5).map((p: any, idx: number) => {
-              const nome = p.clientes?.nome || p.cliente_nome || "Cliente";
-              const val = Number(p.valor_total || p.saldo || 0) - Number(p.valor_pago || 0);
+              const nome = getNomeCliente(p);
+              const val = getValorPendente(p);
+              const venc = formatVencimento(p.vencimento);
 
               return (
                 <div
@@ -85,7 +155,7 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
                   <div>
                     <span className="font-medium text-foreground block">{nome}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      Venc: {p.vencimento ? new Date(p.vencimento).toLocaleDateString("pt-BR") : "Não informado"}
+                      Venc: {venc}
                     </span>
                   </div>
                   <div className="text-right">
@@ -95,7 +165,12 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
                     {onActionClick && (
                       <button
                         type="button"
-                        onClick={() => onActionClick(`Gerar mensagem de cobrança para ${nome}`)}
+                        onClick={() => {
+                          const comando = nome && nome !== "Cliente"
+                            ? `Gerar mensagem de cobrança para ${nome}`
+                            : `Gerar mensagem de cobrança para a pendência de R$ ${val.toFixed(2)}`;
+                          onActionClick(comando);
+                        }}
                         className="text-[10px] text-emerald-800 hover:underline font-semibold"
                       >
                         Cobrar WhatsApp
