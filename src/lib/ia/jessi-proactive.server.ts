@@ -67,7 +67,9 @@ export async function gerarCentralOperacionalJessi(
   amanhaDt.setDate(amanhaDt.getDate() + 1);
   const amanhaStr = new Intl.DateTimeFormat("en-CA", { timeZone: fusoSP, year: "numeric", month: "2-digit", day: "2-digit" }).format(amanhaDt);
 
-  const horaAtual = agora.getHours();
+  const horaAtual = Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone: fusoSP, hour: "2-digit", hour12: false }).format(agora)
+  );
   const cumprimento = horaAtual < 12 ? "Bom dia" : horaAtual < 18 ? "Boa tarde" : "Boa noite";
   const nomeUsuario = user?.nome || "Eli";
 
