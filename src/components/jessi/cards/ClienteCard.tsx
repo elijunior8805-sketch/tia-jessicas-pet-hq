@@ -49,7 +49,28 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
     );
   }
 
-  const clientes = Array.isArray(data) ? data : data?.clientes || (data?.id || data?.nome ? [data] : []);
+  const clientes = React.useMemo(() => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.clientes)) return data.clientes;
+    if (data?.cliente && typeof data.cliente === "object") {
+      const cli = { ...data.cliente };
+      if (!cli.pets && (data.nome || data.id)) {
+        cli.pets = [{ id: data.id, nome: data.nome, raca: data.raca, porte: data.porte }];
+      }
+      return [cli];
+    }
+    if (data?.clientes && typeof data.clientes === "object") {
+      const cli = { ...data.clientes };
+      if (!cli.pets && (data.nome || data.id)) {
+        cli.pets = [{ id: data.id, nome: data.nome, raca: data.raca, porte: data.porte }];
+      }
+      return [cli];
+    }
+    if (data?.id && (data?.nome || data?.nomePrincipal)) {
+      return [data];
+    }
+    return [];
+  }, [data]);
 
   if (!clientes.length) {
     return (

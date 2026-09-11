@@ -251,7 +251,19 @@ export async function processarMensagemJessiV2Core(
             type: "cliente",
             title: `Pet Selecionado: ${petNomeSel}`,
             subtitle: `Tutor: ${tutorNome}`,
-            data: candidatoEscolhido.dadosCompletos || candidatoEscolhido,
+            data: {
+              id: tutorId,
+              nome: tutorNome,
+              telefone: candidatoEscolhido.dadosCompletos?.cliente?.telefone || candidatoEscolhido.dadosCompletos?.clientes?.telefone,
+              pets: [
+                {
+                  id: petIdSel,
+                  nome: petNomeSel,
+                  raca: candidatoEscolhido.dadosCompletos?.raca,
+                  porte: candidatoEscolhido.dadosCompletos?.porte,
+                },
+              ],
+            },
           });
 
           return {
