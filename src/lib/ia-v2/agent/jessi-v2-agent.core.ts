@@ -197,6 +197,21 @@ export async function processarMensagemJessiV2Core(
               nomePrincipal: clienteAlvo.nome,
               dadosCompletos: clienteAlvo,
             };
+          } else {
+            const { data: agAlvo } = await sb
+              .from("agendamentos")
+              .select("id, data, hora, status, valor_previsto, clientes(id, nome, whatsapp), pets(id, nome, raca, porte), servicos(id, nome, valor)")
+              .eq("id", idAlvo)
+              .maybeSingle();
+
+            if (agAlvo) {
+              candidatoEscolhido = {
+                id: agAlvo.id,
+                tipo: "agendamento",
+                nomePrincipal: `${(agAlvo.pets as any)?.nome || "Pet"} • ${(agAlvo.servicos as any)?.nome || "Atendimento"}`,
+                dadosCompletos: agAlvo,
+              };
+            }
           }
         }
       } else {
@@ -364,6 +379,109 @@ export async function processarMensagemJessiV2Core(
               requerConfirmacao: false,
               ferramentaSugerida: "buscar_clientes_pets",
               explicacaoRaciocinio: "Opção de cliente selecionada pelo operador.",
+            },
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        } else if (candidatoEscolhido.tipo === "agendamento") {
+          const agData = candidatoEscolhido.dadosCompletos;
+          const dataAg = agData.data;
+          const horaAg = (agData.hora || "").slice(0, 5);
+          const petNomeAg = agData.pets?.nome || "Pet";
+          const clienteNomeAg = agData.clientes?.nome || "Tutor";
+          const servicoNomeAg = agData.servicos?.nome || "Atendimento";
+
+          const dataExtensa = new Intl.DateTimeFormat("pt-BR", {
+            dateStyle: "full",
+            timeZone: "America/Sao_Paulo",
+          }).format(new Date(`${dataAg}T12:00:00`));
+
+          const proposta = JessiV2ConfirmationManager.criarProposta({
+            userId: user?.id || "proprietario_spa",
+            cliente: { id: agData.clientes?.id || "", nome: clienteNomeAg },
+            pet: { id: agData.pets?.id || "", nome: petNomeAg },
+            acao: "cancelar_agendamento",
+            motivo: `Cancelamento de ${servicoNomeAg} para ${petNomeAg} em ${dataAg} às ${horaAg}`,
+            estadoAtual: { status: agData.status, agendamentoId: agData.id },
+            estadoProposto: { status: "cancelado", agendamentoId: agData.id },
+            valores: { valorBruto: agData.valor_previsto || 0, valorFinal: 0 },
+            dataHora: `${dataAg}T${horaAg}:00`,
+            riscos: ["A vaga na grade será liberada para novos agendamentos."],
+            resumoVisual: {
+              entendido: `Cancelamento do agendamento de ${servicoNomeAg} para ${petNomeAg} (${clienteNomeAg}) em ${dataExtensa} às ${horaAg}.`,
+              seraAlterado: `Status do agendamento #${agData.id.slice(0, 8)} será alterado para "cancelado" e o horário será liberado.`,
+              situacaoAtual: `Agendamento ativo com status "${agData.status}".`,
+              resultadoEsperado: `Agendamento cancelado com sucesso e grade atualizada.`,
+              alertas: ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."],
+            },
+          });
+
+          pendingAction = {
+            id: proposta.id,
+            type: "cancelar_agendamento",
+            tool: "cancelar_agendamento",
+            title: `Confirmação de Cancelamento: ${servicoNomeAg}`,
+            summary: `Pet: ${petNomeAg} • Tutor: ${clienteNomeAg} • Data: ${dataExtensa} às ${horaAg}`,
+            riskLevel: "alto",
+            params: {
+              agendamentoId: agData.id,
+              agendamento_id: agData.id,
+              petId: agData.pets?.id,
+              petNome: petNomeAg,
+              clienteId: agData.clientes?.id,
+              clienteNome: clienteNomeAg,
+              data: dataAg,
+              hora: horaAg,
+              servicoNome: servicoNomeAg,
+              motivo: "Cancelamento solicitado pelo operador",
+            },
+            created_at: proposta.created_at,
+            expires_at: proposta.validade,
+          };
+
+          respostaTexto = `Preparei o cancelamento do agendamento de **${servicoNomeAg}** para **${petNomeAg}** (Tutor: **${clienteNomeAg}**) no dia **${dataExtensa}** às **${horaAg}**. Por favor confirme no cartão abaixo para liberar o horário na grade.`;
+
+          cards.push({
+            type: "confirmacao",
+            title: pendingAction.title,
+            subtitle: `Tutor: ${clienteNomeAg} • Pet: ${petNomeAg}`,
+            data: {
+              proposta,
+              acaoPendente: pendingAction,
+              pendingAction,
+              requerConfirmacao: true,
+              resumoVisual: proposta.resumoVisual,
+              resumo: proposta.resumoVisual.entendido,
+              acoesDisponiveis: ["Confirmar cancelamento", "Manter agendamento"],
+            },
+          });
+
+          return {
+            versao: "v2",
+            respostaTexto,
+            cards,
+            pendingAction,
+            novoContexto: {
+              ...contextoAtual,
+              ...novoContexto,
+              operacaoPreparada: pendingAction,
+              variaveisConversacao: {
+                ...contextoAtual.variaveisConversacao,
+                candidatosEmEspera: null,
+              },
+            },
+            intencao: {
+              dominio: "agenda",
+              intencao: "cancelar_agendamento",
+              confianca: 1.0,
+              entidades: {
+                agendamentoId: agData.id,
+                petNome: petNomeAg,
+                clienteNome: clienteNomeAg,
+              } as any,
+              requerConfirmacao: true,
+              ferramentaSugerida: "cancelar_agendamento",
+              explicacaoRaciocinio: "Agendamento selecionado pelo operador para cancelamento.",
             },
             tempoProcessamentoMs: Date.now() - inicioMs,
             correlationId,
@@ -970,14 +1088,26 @@ export async function processarMensagemJessiV2Core(
                     opcoes: agsEncontrados.map((ag: any) => ({
                       id: ag.id,
                       tipo: "agendamento",
-                      nome: `${ag.pets?.nome || "Pet"} • ${ag.servicos?.nome || "Atendimento"}`,
-                      detalhe: `${ag.data} às ${(ag.hora || "").slice(0, 5)} (Status: ${ag.status})`,
+                      nome: `${(ag.pets as any)?.nome || "Pet"} (Tutor: ${(ag.clientes as any)?.nome || "Não informado"}) • ${(ag.servicos as any)?.nome || "Atendimento"}`,
+                      detalhe: `${ag.data} às ${(ag.hora || "").slice(0, 5)} (Valor: R$ ${Number(ag.valor_previsto || 0).toFixed(2)})`,
                     })),
                   },
                 },
               ],
               pendingAction: null,
-              novoContexto: { ...contextoAtual, ...novoContexto },
+              novoContexto: {
+                ...contextoAtual,
+                ...novoContexto,
+                variaveisConversacao: {
+                  ...contextoAtual.variaveisConversacao,
+                  candidatosEmEspera: agsEncontrados.map((ag: any) => ({
+                    id: ag.id,
+                    tipo: "agendamento",
+                    nomePrincipal: `${(ag.pets as any)?.nome || "Pet"} • ${(ag.servicos as any)?.nome || "Atendimento"}`,
+                    dadosCompletos: ag,
+                  })),
+                },
+              },
               intencao,
               tempoProcessamentoMs: Date.now() - inicioMs,
               correlationId,

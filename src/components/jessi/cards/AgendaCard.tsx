@@ -38,7 +38,9 @@ export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) =
                 <Button
                   size="sm"
                   onClick={() => {
-                    const comando = `Agendar ${opcao.nome} para ${data.petNome || "o pet"}${data.dataHoraTexto ? ` ${data.dataHoraTexto}` : ""}`;
+                    const comando = opcao.tipo === "agendamento"
+                      ? `Selecionar opção ${idx + 1}: ${opcao.nome}${opcao.id ? ` [id:${opcao.id}]` : ""}`
+                      : `Agendar ${opcao.nome} para ${data.petNome || "o pet"}${data.dataHoraTexto ? ` ${data.dataHoraTexto}` : ""}`;
                     onActionClick(comando);
                   }}
                   className="h-7 px-3 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-semibold shrink-0 ml-2"
