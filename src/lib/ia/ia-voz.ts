@@ -139,6 +139,7 @@ export class VoiceRecognizer {
         }
 
         if (final.trim()) {
+          this.reconnectAttempts = 0;
           this.acumulado = consolidarTranscricao(`${this.acumulado} ${final}`);
           this.interimAtual = "";
           this.options.onFinal(this.acumulado);
@@ -146,6 +147,7 @@ export class VoiceRecognizer {
         }
 
         if (interim.trim()) {
+          this.reconnectAttempts = 0;
           this.interimAtual = interim.trim();
           this.setStatus("transcribing");
           this.options.onInterim(this.interimAtual);
@@ -159,12 +161,12 @@ export class VoiceRecognizer {
         this.iniciando = false;
         const err = event?.error;
 
-        // Silêncio e abortos intencionais não quebram o ciclo
+        // Silêncio e abortos intencionais não são erros fatais
         if (err === "no-speech" || err === "aborted") {
           return;
         }
 
-        console.warn("[VoiceRecognizer] Erro no microfone:", err);
+        console.warn("[VoiceRecognizer] Aviso no microfone:", err);
         if (err === "not-allowed" || err === "service-not-allowed") {
           this.isContinuous = false;
           this.setStatus("error");
@@ -172,18 +174,15 @@ export class VoiceRecognizer {
           return;
         }
 
-        this.setStatus("error");
-        this.options.onError(err || "Erro no reconhecimento de voz.");
-
-        setTimeout(() => {
-          if (this.status === "error") {
-            if (this.isContinuous && !this.pararSolicitado && !this.isPaused) {
-              this.tentarReconectar();
-            } else {
-              this.setStatus("idle");
-            }
-          }
-        }, 1200);
+        // Erro não fatal transitório (ex: network glitch temporário)
+        if (this.isContinuous && !this.pararSolicitado && !this.isPaused) {
+          setTimeout(() => {
+            this.tentarReconectar();
+          }, 600);
+        } else {
+          this.setStatus("error");
+          this.options.onError(err || "Erro no reconhecimento de voz.");
+        }
       };
 
       this.recognition.onend = () => {

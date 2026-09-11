@@ -221,17 +221,17 @@ export const JessiLayout: React.FC = () => {
         setStatusDetalhe(undefined);
       }
 
-      // 4. Retomada automática da escuta após a resposta da Jessi
-      if (isContinuousMode) {
-        if (ttsEnabled) {
-          speakResponse(res.respostaTexto, () => {
+      // 4. Retomada automática da escuta e fala da resposta da Jessi
+      if (ttsEnabled) {
+        speakResponse(res.respostaTexto, () => {
+          if (isContinuousMode) {
             resumeListening();
-          });
-        } else {
-          setTimeout(() => {
-            resumeListening();
-          }, 350);
-        }
+          }
+        });
+      } else if (isContinuousMode) {
+        setTimeout(() => {
+          resumeListening();
+        }, 350);
       }
     } catch (err: any) {
       if (controller.signal.aborted) {
@@ -323,6 +323,14 @@ export const JessiLayout: React.FC = () => {
       }
       setStatus("disponivel");
       toast.success("Ação confirmada e registrada com sucesso!");
+
+      if (ttsEnabled) {
+        speakResponse(res.respostaTexto, () => {
+          if (isContinuousMode) {
+            resumeListening();
+          }
+        });
+      }
     } catch (err: any) {
       console.error("Erro ao executar ação confirmada:", err);
       toast.error(err?.message || "Erro ao executar ação confirmada.");

@@ -76,7 +76,7 @@ export function useJessiVoice(
   const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
-  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
 
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
@@ -144,8 +144,22 @@ export function useJessiVoice(
   }, []);
 
   const startContinuousMode = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        toast.error("Seu navegador não suporta reconhecimento de voz. Recomendamos o Google Chrome ou Microsoft Edge.");
+        return;
+      }
+      // Desbloqueia contexto de áudio em navegadores móveis (iOS/Android)
+      if (window.speechSynthesis) {
+        window.speechSynthesis.resume();
+      }
+    }
+
     if (!recognizerRef.current) return;
     setIsContinuousMode(true);
+    setTtsEnabled(true);
     setInterimTranscript("");
     setFinalTranscript("");
     recognizerRef.current.startContinuous();
@@ -229,6 +243,7 @@ export function useJessiVoice(
       }
 
       window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
       isSpeakingRef.current = true;
       pauseListening();
 
@@ -237,7 +252,23 @@ export function useJessiVoice(
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
 
-      utterance.onend = () => {
+      // Seleciona voz em português do Brasil quando disponível no sistema operacional
+      try {
+        const voices = window.speechSynthesis.getVoices();
+        const ptVoice = voices.find(
+          (v) => v.lang === "pt-BR" || v.lang === "pt_BR" || v.lang.toLowerCase().includes("brazil")
+        ) || voices.find((v) => v.lang.startsWith("pt"));
+        if (ptVoice) {
+          utterance.voice = ptVoice;
+        }
+      } catch {
+        /* ignore */
+      }
+
+      let finalizado = false;
+      const concluirFala = () => {
+        if (finalizado) return;
+        finalizado = true;
         isSpeakingRef.current = false;
         if (onFinish) onFinish();
         if (isContinuousMode) {
@@ -245,12 +276,24 @@ export function useJessiVoice(
         }
       };
 
+      utterance.onend = () => {
+        concluirFala();
+      };
+
       utterance.onerror = () => {
-        isSpeakingRef.current = false;
-        if (onFinish) onFinish();
-        if (isContinuousMode) {
-          resumeListening();
-        }
+        concluirFala();
+      };
+
+      // Timer de segurança caso o navegador silencie eventos de áudio
+      const tempoEstimadoMs = Math.max(2500, textoLimpo.length * 85 + 1200);
+      const timerSeguranca = setTimeout(() => {
+        concluirFala();
+      }, tempoEstimadoMs);
+
+      const originalOnEnd = utterance.onend;
+      utterance.onend = (e) => {
+        clearTimeout(timerSeguranca);
+        if (typeof originalOnEnd === "function") originalOnEnd.call(utterance, e);
       };
 
       window.speechSynthesis.speak(utterance);
