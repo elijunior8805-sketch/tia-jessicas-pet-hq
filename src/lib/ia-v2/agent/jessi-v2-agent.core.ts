@@ -452,6 +452,7 @@ export async function processarMensagemJessiV2Core(
               telefone: selecionado.dadosCompletos?.telefone,
               endereco: selecionado.dadosCompletos?.endereco,
             };
+            novoContexto.pet = undefined;
           } else if (selecionado.tipo === "pet") {
             novoContexto.pet = {
               id: selecionado.id,

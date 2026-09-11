@@ -344,77 +344,97 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       return !STOPWORDS_NAO_NOMES.has(limpo);
     };
 
-    let petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || null;
-    let clienteNomeResolvido = req.contexto.clienteSelecionadoNome || req.contexto.cliente?.nome || null;
+    let petNomeDaMensagem: string | null = null;
+    let clienteNomeDaMensagem: string | null = null;
 
-    // Detecta menção explícita a cliente/tutor ("para o cliente Eli Júnior", "tutor Eli")
-    const matchCliente = texto.match(/(?:cliente|tutor|proprietário|proprietario|dono)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-    if (matchCliente && matchCliente[1]) {
-      const possivelCliente = matchCliente[1].trim();
-      if (ehNomeValido(possivelCliente)) {
-        clienteNomeResolvido = possivelCliente;
+    // 1. Detecta menção a "pets do [Tutor]" ou "animais de [Tutor]"
+    const matchPetsDoTutor = texto.match(/(?:pets?|cachorros?|cães|caes|gatos?|animais)\s+(?:do|da|de|dos|das)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+    if (matchPetsDoTutor && matchPetsDoTutor[1] && ehNomeValido(matchPetsDoTutor[1])) {
+      clienteNomeDaMensagem = matchPetsDoTutor[1].trim();
+    }
+
+    // 2. Detecta menção explícita a cliente/tutor ("para o cliente Eli Júnior", "tutor Eli", "dono Carlos")
+    if (!clienteNomeDaMensagem) {
+      const matchCliente = texto.match(/(?:cliente|tutor|proprietário|proprietario|dono)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+      if (matchCliente && matchCliente[1] && ehNomeValido(matchCliente[1])) {
+        clienteNomeDaMensagem = matchCliente[1].trim();
       }
     }
 
-    // Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
+    // 3. Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
     const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
     if (matchCorrecao && matchCorrecao[1] && ehNomeValido(matchCorrecao[1])) {
-      petNomeResolvido = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
+      petNomeDaMensagem = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
     } else {
-      // Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob")
+      // 4. Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob")
       const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela)\s+([A-ZÀ-Úa-zà-ú]+)/i);
-      if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1])) {
-        petNomeResolvido = matchPetExp[1];
+      if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1]) && !clienteNomeDaMensagem) {
+        petNomeDaMensagem = matchPetExp[1];
       } else {
-        const matchPet = texto.match(/(?:para o pet|para a pet|para o|para a|do pet|da pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/);
+        const matchPet = texto.match(/(?:para o pet|para a pet|do pet|da pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
         if (matchPet && ehNomeValido(matchPet[1])) {
-          petNomeResolvido = matchPet[1];
-        } else if (textoLower.includes("thor")) {
-          petNomeResolvido = "Thor";
-        } else if (textoLower.includes("mel")) {
-          petNomeResolvido = "Mel";
-        } else if (textoLower.includes("luna")) {
-          petNomeResolvido = "Luna";
-        } else if (textoLower.includes("bob") || textoLower.includes("bidu")) {
-          petNomeResolvido = textoLower.includes("bob") ? "Bob" : "Bidu";
-        } else if (textoLower.includes("jade")) {
-          petNomeResolvido = "Jade";
+          petNomeDaMensagem = matchPet[1];
+        } else if (texto.match(/(?:para o|para a|pro|pra)\s+([A-ZÀ-Ú][a-zà-ú]+)/i)) {
+          const m = texto.match(/(?:para o|para a|pro|pra)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
+          if (m && ehNomeValido(m[1]) && !clienteNomeDaMensagem) {
+            petNomeDaMensagem = m[1];
+          }
         }
       }
     }
 
-    // Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel")
-    const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-    if (matchPrep && matchPrep[1]) {
-      const termoPrep = matchPrep[1].trim();
-      if (ehNomeValido(termoPrep)) {
-        if (!clienteNomeResolvido && !petNomeResolvido) {
-          clienteNomeResolvido = termoPrep;
-        }
+    // 5. Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel") se ainda não definiu
+    if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
+      const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+      if (matchPrep && matchPrep[1] && ehNomeValido(matchPrep[1])) {
+        clienteNomeDaMensagem = matchPrep[1].trim();
       }
     }
 
-    // Extrai termo livre para busca de cliente/pet caso não haja menção explícita com preposições
-    let termoLivre = texto
-      .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão)\b/gi, "")
-      .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
-      .replace(/\b(banho e tosa|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
-      .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
-      .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
-      .replace(/[^\w\sÀ-ú]/g, "")
-      .trim();
-
-    if (termoLivre && ehNomeValido(termoLivre) && !clienteNomeResolvido && !petNomeResolvido) {
-      clienteNomeResolvido = termoLivre;
+    // 6. Nomes conhecidos de pet caso nenhuma entidade tenha sido extraída
+    if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
+      if (textoLower.includes("thor")) petNomeDaMensagem = "Thor";
+      else if (textoLower.includes("mel")) petNomeDaMensagem = "Mel";
+      else if (textoLower.includes("luna")) petNomeDaMensagem = "Luna";
+      else if (textoLower.includes("bob")) petNomeDaMensagem = "Bob";
+      else if (textoLower.includes("bidu")) petNomeDaMensagem = "Bidu";
+      else if (textoLower.includes("jade")) petNomeDaMensagem = "Jade";
     }
 
-    // Se o usuário usa anáfora ("ele", "ela", "o mesmo", "desse cliente"), mantém o contexto anterior
-    const usaAnafora = /\b(ele|ela|o mesmo|a mesma|nele|nela|desse cliente|deste cliente|dele|dela|o pet|o animal)\b/i.test(textoLower);
-    if (usaAnafora && (req.contexto.petSelecionadoNome || req.contexto.pet?.nome)) {
-      petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || petNomeResolvido;
+    // 7. Extrai termo livre para busca caso ainda não haja
+    if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
+      let termoLivre = texto
+        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?)\b/gi, "")
+        .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
+        .replace(/\b(banho e tosa|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
+        .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
+        .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
+        .replace(/[^\w\sÀ-ú]/g, "")
+        .trim();
+
+      if (termoLivre && ehNomeValido(termoLivre)) {
+        clienteNomeDaMensagem = termoLivre;
+      }
     }
 
-    // 2. Resolução Temporal ("amanhã", "hoje", "sexta") e Horários
+    // 8. Resolução contextual de pet vs cliente
+    let petNomeResolvido: string | null = null;
+    let clienteNomeResolvido: string | null = null;
+
+    if (petNomeDaMensagem) {
+      petNomeResolvido = petNomeDaMensagem;
+      clienteNomeResolvido = clienteNomeDaMensagem || null;
+    } else if (clienteNomeDaMensagem) {
+      clienteNomeResolvido = clienteNomeDaMensagem;
+      petNomeResolvido = null; // Foco explícito no tutor/cliente mencionado
+    } else {
+      // Se não há nova menção, herda contexto
+      const usaAnafora = /\b(ele|ela|o mesmo|a mesma|nele|nela|desse cliente|deste cliente|dele|dela|o pet|o animal)\b/i.test(textoLower);
+      petNomeResolvido = req.contexto.petSelecionadoNome || req.contexto.pet?.nome || null;
+      clienteNomeResolvido = req.contexto.clienteSelecionadoNome || req.contexto.cliente?.nome || null;
+    }
+
+    // 9. Resolução Temporal ("amanhã", "hoje", "sexta") e Horários
     const dataResolvida = this.resolverDataNatural(textoLower, req.contexto.dataReferencia);
     const horaResolvida = this.resolverHoraNatural(textoLower);
     const servicoResolvido = this.resolverServicoNatural(textoLower) || req.contexto.servicoSelecionadoNome || req.contexto.servico?.nome || null;
@@ -622,18 +642,24 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       ferramentaSugerida = "gerar_mensagem_whatsapp";
     }
 
+    const termoBuscaEfetivo = clienteNomeDaMensagem
+      ? clienteNomeDaMensagem
+      : petNomeDaMensagem
+      ? petNomeDaMensagem
+      : (dominio === "clientes_pets" || intencao === "criar_agendamento" || intencao === "cancelar_agendamento" || intencao === "reagendar_agendamento" || intencao === "consultar_ultimo_atendimento")
+      ? (clienteNomeResolvido || petNomeResolvido || null)
+      : null;
+
     const entidades = {
       clienteNome: clienteNomeResolvido,
-      clienteId: req.contexto.clienteSelecionadoId || req.contexto.cliente?.id || null,
+      clienteId: clienteNomeDaMensagem ? null : (req.contexto.clienteSelecionadoId || req.contexto.cliente?.id || null),
       petNome: petNomeResolvido,
-      petId: req.contexto.petSelecionadoId || req.contexto.pet?.id || null,
+      petId: (clienteNomeDaMensagem || petNomeDaMensagem) ? null : (req.contexto.petSelecionadoId || req.contexto.pet?.id || null),
       data: dataResolvida,
       hora: horaResolvida,
       servicoNome: servicoResolvido,
       servicoId: req.contexto.servicoSelecionadoId || req.contexto.servico?.id || null,
-      termoBusca: (dominio === "clientes_pets" || intencao === "criar_agendamento" || intencao === "cancelar_agendamento" || intencao === "reagendar_agendamento" || intencao === "consultar_ultimo_atendimento")
-        ? (petNomeResolvido || clienteNomeResolvido || null)
-        : null,
+      termoBusca: termoBuscaEfetivo,
     };
 
     const provedorUtilizado = apiKey ? `${this.nome} (Online)` : `${this.nome} (Simulado/Determinístico)`;
