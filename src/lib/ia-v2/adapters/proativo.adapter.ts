@@ -207,18 +207,61 @@ export class ProativoAdapter {
   }
 
   /**
-   * Vetor 5: Clientes para Retorno (Reativação e Saudade)
+   * Vetor 5: Clientes para Retorno (Reativação e Saudade com view pets_reativacao)
    */
   static async identificarClientesParaRetorno(sb: SupabaseClient<Database>): Promise<JessiV2QueryResult> {
+    try {
+      const { data: reativacoes } = await sb
+        .from("pets_reativacao")
+        .select("cliente_id, cliente_nome, cliente_telefone, cliente_whatsapp, pet_id, pet_nome, dias_inativo, faixa, ticket_medio, ultimo_atendimento_em")
+        .order("dias_inativo", { ascending: false })
+        .limit(10);
+
+      if (reativacoes && reativacoes.length > 0) {
+        const sugestoes = reativacoes.map((r: any) => ({
+          cliente: {
+            id: r.cliente_id,
+            nome: r.cliente_nome,
+            telefone: r.cliente_whatsapp || r.cliente_telefone,
+          },
+          pet: {
+            id: r.pet_id,
+            nome: r.pet_nome,
+          },
+          diasInativo: r.dias_inativo,
+          faixaRisco: r.faixa,
+          ultimoAtendimento: r.ultimo_atendimento_em,
+          mensagemSugerida: MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+            telefoneDestino: r.cliente_whatsapp || r.cliente_telefone || "",
+            nomeCliente: r.cliente_nome || "Cliente",
+            nomePet: r.pet_nome || "seu pet",
+            tipoMensagem: "reativacao_carinho",
+          }),
+        }));
+
+        return {
+          success: true,
+          source: "pets_reativacao",
+          data: sugestoes,
+          total_count: sugestoes.length,
+          summary: `Identificados ${sugestoes.length} cliente(s) e pet(s) inativos com alto potencial de reativação (VIEW pets_reativacao).`,
+          executed_at: new Date().toISOString(),
+        };
+      }
+    } catch (err) {
+      console.warn("Aviso: fallback na busca de reativação de clientes:", err);
+    }
+
+    // Fallback caso a view esteja sem dados
     const { data: clientes } = await sb
       .from("clientes")
-      .select("id, nome, telefone, pets(id, nome, raca)")
+      .select("id, nome, telefone, whatsapp, pets(id, nome, raca)")
       .limit(10);
 
     const sugestoes = (clientes || []).map((c: any) => ({
       cliente: c,
       mensagemSugerida: MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
-        telefoneDestino: c.telefone || "",
+        telefoneDestino: c.whatsapp || c.telefone || "",
         nomeCliente: c.nome,
         nomePet: c.pets?.[0]?.nome || "seu pet",
         tipoMensagem: "reativacao_carinho",

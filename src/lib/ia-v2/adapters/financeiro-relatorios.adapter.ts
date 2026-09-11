@@ -251,7 +251,7 @@ export class FinanceiroRelatoriosAdapter {
       const { data: novoPagamento, error } = await sb
         .from("pagamentos")
         .insert({
-          agendamento_id: params.agendamentoId || null,
+          atendimento_id: params.agendamentoId || null,
           cliente_id: params.clienteId || null,
           valor_total: params.valorTotal,
           valor_pago: params.valorTotal,
@@ -260,6 +260,7 @@ export class FinanceiroRelatoriosAdapter {
           data_pagamento: agora,
           observacoes: params.observacoes || "Recebimento confirmado pelo operador",
           is_teste: false,
+          idempotency_key: idempotencyKey,
         } as any)
         .select("id, valor_total, valor_pago, status, forma, data_pagamento")
         .single();

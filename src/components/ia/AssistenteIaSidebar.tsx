@@ -45,7 +45,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Hook de reconhecimento de voz
+  const handleSendMessageRef = useRef<((text?: string) => Promise<void>) | null>(null);
+
+  // Hook de reconhecimento de voz com auto-envio imediato
   const {
     voiceStatus,
     isListening,
@@ -53,11 +55,18 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     startListening,
     stopListening,
     cancelListening,
-  } = useJessiVoice((textoFinal) => {
-    if (textoFinal.trim()) {
-      setInputText(textoFinal);
+  } = useJessiVoice(
+    (textoFinal) => {
+      if (textoFinal.trim()) {
+        setInputText(textoFinal);
+      }
+    },
+    (textoParaEnvio) => {
+      if (textoParaEnvio.trim() && handleSendMessageRef.current) {
+        handleSendMessageRef.current(textoParaEnvio.trim());
+      }
     }
-  });
+  );
 
   React.useEffect(() => {
     if (isListening) {
@@ -115,7 +124,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
-    setStatus("interpretando");
+    setStatus("processando");
     setStatusDetalhe("Consultando inteligência e registros...");
 
     try {
@@ -166,10 +175,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
+  handleSendMessageRef.current = handleSendMessage;
+
   const handleConfirmAction = async (pendingAction: JessiPendingAction) => {
     if (isLoading) return;
     setIsLoading(true);
-    setStatus("executando");
+    setStatus("processando");
     setStatusDetalhe("Gravando alteração com validação...");
 
     try {
@@ -267,7 +278,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                       Supervisionada
                     </span>
                   </div>
-                  <JessiStatusIndicator status={status} detalhe={statusDetalhe} />
+                  <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
                 </div>
               </div>
 
@@ -319,7 +330,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               onSend={() => handleSendMessage()}
               isLoading={isLoading}
               voiceStatus={voiceStatus}
-              onToggleVoice={handleToggleVoice}
+              isContinuousMode={false}
+              onToggleContinuousVoice={handleToggleVoice}
+              ttsEnabled={false}
+              onToggleTts={() => {}}
               onCancelVoice={cancelListening}
               interimTranscript={interimTranscript}
               selectedFile={selectedFile}

@@ -42,7 +42,9 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 type Period = "hoje" | "semana" | "mes" | "30dias" | "personalizado";
 
 function greeting(d = new Date()) {
-  const h = d.getHours();
+  const h = Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(d)
+  );
   if (h < 12) return "Bom dia";
   if (h < 18) return "Boa tarde";
   return "Boa noite";

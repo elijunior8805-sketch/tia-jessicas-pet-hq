@@ -353,22 +353,30 @@ export class ProgramasCreditosAdapter {
    */
   static async reservarCreditoAgendamento(
     sb: SupabaseClient<Database>,
-    params: { creditoId: string; agendamentoId: string },
+    params: { creditoId?: string; contratoId?: string; servicoId?: string; agendamentoId: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `reserva_credito_${Date.now()}`;
+    const contratoId = params.contratoId || params.creditoId;
     try {
-      const { data: credito }: any = await (sb as any)
-        .from("cliente_programa_creditos")
-        .select("id, saldo, servico_nome")
-        .eq("id", params.creditoId)
-        .single();
+      if (!contratoId) {
+        throw new Error("ID do contrato do programa não fornecido.");
+      }
 
-      if (!credito || (credito.saldo || 0) < 1) {
+      const { data: movs } = await sb
+        .from("programas_creditos_movimentacoes")
+        .select("programa_contratado_id, tipo, quantidade, servico_id")
+        .eq("programa_contratado_id", contratoId);
+
+      const saldos = calcularSaldoContrato(movs || []);
+      const servicoId = params.servicoId || Object.keys(saldos)[0] || "";
+      const saldoDisponivel = saldos[servicoId]?.disponivel || 0;
+
+      if (saldoDisponivel < 1) {
         return {
           success: false,
-          entity_id: params.creditoId,
-          source: "tabela_creditos",
+          entity_id: contratoId,
+          source: "programas_creditos_movimentacoes",
           summary: "Não há saldo de créditos disponível para reservar.",
           error_code: "CREDITO_INDISPONIVEL",
           idempotency_key: idempotencyKey,
@@ -380,10 +388,10 @@ export class ProgramasCreditosAdapter {
 
       return {
         success: true,
-        entity_id: params.creditoId,
-        affected_record_id: params.creditoId,
-        source: "tabela_creditos",
-        summary: `1 crédito de "${credito.servico_nome}" reservado com sucesso para o agendamento #${params.agendamentoId.slice(0, 8)}.`,
+        entity_id: contratoId,
+        affected_record_id: contratoId,
+        source: "programas_creditos_movimentacoes",
+        summary: `1 crédito reservado com sucesso para o agendamento #${params.agendamentoId.slice(0, 8)}.`,
         executed_at: new Date().toISOString(),
         verified: true,
         idempotency_key: idempotencyKey,
@@ -392,8 +400,8 @@ export class ProgramasCreditosAdapter {
     } catch (err: any) {
       return {
         success: false,
-        entity_id: params.creditoId,
-        source: "tabela_creditos",
+        entity_id: contratoId || null,
+        source: "programas_creditos_movimentacoes",
         summary: `Falha ao reservar crédito: ${err.message}`,
         error_code: "ERRO_RESERVA_CREDITO",
         idempotency_key: idempotencyKey,
@@ -409,23 +417,28 @@ export class ProgramasCreditosAdapter {
    */
   static async liberarCreditoCancelamento(
     sb: SupabaseClient<Database>,
-    params: { creditoId: string; agendamentoId: string; motivo?: string },
+    params: { creditoId?: string; contratoId?: string; servicoId?: string; agendamentoId: string; motivo?: string },
     idempotencyKey: string
   ): Promise<JessiV2MutationResult> {
     const correlationId = `libera_credito_${Date.now()}`;
+    const contratoId = params.contratoId || params.creditoId;
     try {
-      const { data: creditoAtual }: any = await (sb as any)
-        .from("cliente_programa_creditos")
-        .select("id, saldo, servico_nome")
-        .eq("id", params.creditoId)
-        .single();
+      if (!contratoId) {
+        throw new Error("ID do contrato do programa não fornecido.");
+      }
 
-      if (!creditoAtual) {
+      const { data: contrato } = await sb
+        .from("programas_contratados")
+        .select("id, status_do_programa, nome_snapshot")
+        .eq("id", contratoId)
+        .maybeSingle();
+
+      if (!contrato) {
         return {
           success: false,
-          entity_id: params.creditoId,
-          source: "tabela_creditos",
-          summary: "Registro de crédito não encontrado para estorno/liberação.",
+          entity_id: contratoId,
+          source: "programas_contratados",
+          summary: "Registro de contrato não encontrado para estorno/liberação de crédito.",
           error_code: "CREDITO_NAO_ENCONTRADO",
           idempotency_key: idempotencyKey,
           executed_at: new Date().toISOString(),
@@ -434,33 +447,37 @@ export class ProgramasCreditosAdapter {
         };
       }
 
-      const novoSaldo = (creditoAtual.saldo || 0) + 1;
-
-      const { data: atualizado, error }: any = await (sb as any)
-        .from("cliente_programa_creditos")
-        .update({ saldo: novoSaldo } as any)
-        .eq("id", params.creditoId)
-        .select("id, saldo, servico_nome")
+      // Registra movimentação de estorno oficial no ledger
+      const { data: estorno, error: errEstorno } = await sb
+        .from("programas_creditos_movimentacoes")
+        .insert({
+          programa_contratado_id: contratoId,
+          servico_id: params.servicoId || null,
+          tipo: "credito_estornado",
+          quantidade: 1,
+          motivo: params.motivo || `Estorno automático de cancelamento do agendamento #${params.agendamentoId.slice(0, 8)}`,
+          idempotency_key: idempotencyKey,
+        } as any)
+        .select("id, programa_contratado_id, tipo, quantidade")
         .single();
 
-      if (error || !atualizado) throw error || new Error("Falha ao liberar crédito.");
+      if (errEstorno || !estorno) throw errEstorno || new Error("Falha ao registrar estorno de crédito.");
 
-      const { data: readBack }: any = await (sb as any)
-        .from("cliente_programa_creditos")
-        .select("id, saldo")
-        .eq("id", params.creditoId)
+      const { data: readBack } = await sb
+        .from("programas_creditos_movimentacoes")
+        .select("id, tipo, quantidade")
+        .eq("id", estorno.id)
         .maybeSingle();
 
-      const verificado = readBack?.saldo === novoSaldo;
+      const verificado = (readBack?.tipo as string | undefined) === "credito_estornado";
 
       return {
         success: true,
-        entity_id: params.creditoId,
-        affected_record_id: params.creditoId,
-        before: creditoAtual,
-        after: atualizado,
-        source: "tabela_creditos",
-        summary: `Crédito de "${creditoAtual.servico_nome}" liberado com sucesso. Saldo restaurado para: ${novoSaldo}.`,
+        entity_id: estorno.id,
+        affected_record_id: contratoId,
+        after: estorno,
+        source: "programas_creditos_movimentacoes",
+        summary: `Crédito do plano "${contrato.nome_snapshot || "Clubinho"}" estornado com sucesso.`,
         executed_at: new Date().toISOString(),
         verified: verificado,
         idempotency_key: idempotencyKey,
@@ -469,10 +486,10 @@ export class ProgramasCreditosAdapter {
     } catch (err: any) {
       return {
         success: false,
-        entity_id: params.creditoId,
-        source: "tabela_creditos",
-        summary: `Erro ao liberar crédito: ${err.message}`,
-        error_code: "ERRO_LIBERACAO_CREDITO",
+        entity_id: contratoId || null,
+        source: "programas_creditos_movimentacoes",
+        summary: `Falha ao liberar crédito: ${err.message}`,
+        error_code: "ERRO_ESTORNO_CREDITO",
         idempotency_key: idempotencyKey,
         executed_at: new Date().toISOString(),
         correlation_id: correlationId,

@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -33,6 +33,8 @@ function AuthenticatedLayout() {
   const { data: profile } = useMyProfile();
   const name = displayName(profile);
   const syncStatus = useRealtimeSync();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isJessiRoute = pathname === "/jessi" || pathname.startsWith("/jessi");
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
@@ -75,7 +77,7 @@ function AuthenticatedLayout() {
             <Outlet />
           </main>
           <MobileNav />
-          <AssistenteIaBotao />
+          {!isJessiRoute && <AssistenteIaBotao />}
         </SidebarInset>
 
       </div>

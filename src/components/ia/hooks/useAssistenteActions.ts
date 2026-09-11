@@ -76,14 +76,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [canRetry, setCanRetry] = useState(false);
   const [faseLiberacao, setFaseLiberacao] = useState<
     "observacao" | "teste_controlado" | "piloto" | "producao"
-  >("observacao");
+  >("producao");
 
   // Fase de liberação controlada (Parte 4)
   useEffect(() => {
     if (!isOpen) return;
     getFaseLiberacao()
-      .then((r: any) => setFaseLiberacao(r?.fase || "observacao"))
-      .catch(() => setFaseLiberacao("observacao"));
+      .then((r: any) => setFaseLiberacao(r?.fase || "producao"))
+      .catch(() => setFaseLiberacao("producao"));
   }, [isOpen]);
 
 
@@ -119,8 +119,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             setIsReviewingVoice(true);
           } else if (status === "requesting_permission") {
             setIaStatus("requesting_permission");
-          } else if (status === "finalizing") {
-            setIaStatus("processing");
           } else if (status === "idle") {
             setIaStatus("idle");
             setInterimTranscript("");
@@ -148,7 +146,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
     return () => {
       if (recognizerRef.current) {
-        recognizerRef.current.stop();
+        recognizerRef.current.abort();
         recognizerRef.current = null;
       }
     };

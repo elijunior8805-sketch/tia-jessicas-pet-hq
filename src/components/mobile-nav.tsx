@@ -23,6 +23,7 @@ import {
   PawPrint,
   Cake,
   PackageCheck,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -40,6 +41,7 @@ type Item = { title: string; url: string; icon: LucideIcon };
 const primary: Item[] = [
   { title: "Painel", url: "/dashboard", icon: LayoutDashboard },
   { title: "Agenda", url: "/agenda", icon: Calendar },
+  { title: "Jessi IA", url: "/jessi", icon: Sparkles },
   { title: "Clientes", url: "/clientes", icon: Users },
 ];
 
@@ -47,6 +49,7 @@ const groups: { label: string; items: Item[] }[] = [
   {
     label: "Operação",
     items: [
+      { title: "Jessi IA", url: "/jessi", icon: Sparkles },
       { title: "Painel", url: "/dashboard", icon: LayoutDashboard },
       { title: "Agenda", url: "/agenda", icon: Calendar },
       { title: "Atendimentos", url: "/atendimentos", icon: ClipboardList },
