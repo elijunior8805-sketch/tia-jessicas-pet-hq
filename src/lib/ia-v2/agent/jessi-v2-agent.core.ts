@@ -13,6 +13,8 @@ import { ClientesPetsAdapter, normalizarTexto } from "../adapters/clientes-pets.
 import { AgendaAdapter } from "../adapters/agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
 import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
+import { MensagensWhatsAppAdapter } from "../adapters/mensagens-whatsapp.adapter";
+import { ProativoAdapter } from "../adapters/proativo.adapter";
 import { JessiV2ConfirmationManager } from "../confirmation/jessi-v2-confirmation.manager";
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
@@ -1880,47 +1882,130 @@ export async function processarMensagemJessiV2Core(
           });
         }
       } else if (intencao.dominio === "clientes_pets") {
-        const petIdCtx = novoContexto.pet?.id || contextoAtual.pet?.id;
-        const clienteIdCtx = novoContexto.cliente?.id || contextoAtual.cliente?.id;
-        const perguntaSobrePets = /\bpets?\b|\bcachorr|\bbichin|\banimais?\b/i.test(textoLimpo);
+        if (intencao.intencao === "identificar_clientes_retorno") {
+          const resRetorno = await ProativoAdapter.identificarClientesParaRetorno(sb);
+          const lista = (resRetorno.data as any[]) || [];
 
-        if (petIdCtx && !(perguntaSobrePets && clienteIdCtx)) {
-          const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petIdCtx);
-          respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do pet.`;
-          cards.push({
-            type: "cliente",
-            title: `Ficha Cadastral & Histórico`,
-            subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
-            data: resFicha.data,
-          });
-        } else if (clienteIdCtx) {
-          const resCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteIdCtx);
-          const dadosCli: any = resCli.data || {};
-          const nomeCli = dadosCli.nome || novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "O cliente";
-          const petsCli: any[] = Array.isArray(dadosCli.pets) ? dadosCli.pets : [];
+          if (lista.length > 0) {
+            const itensTexto = lista.slice(0, 5).map((r) => {
+              const petStr = r.pet?.nome ? ` (Pet: **${r.pet.nome}**)` : "";
+              const msgLink = r.mensagemSugerida?.urlWhatsApp
+                ? ` [📲 Enviar WhatsApp](${r.mensagemSugerida.urlWhatsApp})`
+                : "";
+              return `• **${r.cliente?.nome || "Cliente"}**${petStr} — inativo há **${r.diasInativo || 0} dias**${msgLink}`;
+            });
 
-          if (petsCli.length === 0) {
-            respostaTexto = `**${nomeCli}** ainda não possui nenhum pet cadastrado no sistema.`;
+            respostaTexto = `Identifiquei ${lista.length} cliente(s) inativo(s) com alto potencial de retorno:\n\n${itensTexto.join("\n")}\n\nVocê pode clicar no link para abrir a mensagem de carinho personalizada no WhatsApp!`;
           } else {
-            const nomes = petsCli.map((p: any) => `**${p.nome}**`);
-            const listaNomes =
-              nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
-            respostaTexto = `**${nomeCli}** possui ${petsCli.length} pet(s) cadastrado(s): ${listaNomes}.`;
-          }
-
-          if (petsCli.length === 1) {
-            novoContexto.pet = { id: petsCli[0].id, nome: petsCli[0].nome, raca: petsCli[0].raca };
+            respostaTexto = `Não encontrei clientes inativos elegíveis para reativação no momento. Todos os clientes ativos têm agendamentos recentes!`;
           }
 
           cards.push({
-            type: "cliente",
-            title: `Ficha do Cliente`,
-            subtitle: nomeCli,
-            data: resCli.data,
+            type: "proativo",
+            title: "Reativação de Clientes (Saudade)",
+            subtitle: `${lista.length} cliente(s) sugerido(s)`,
+            data: resRetorno.data,
           });
         } else {
-          respostaTexto = `Não localizei esse cliente no cadastro. Pode confirmar o nome completo ou o telefone?`;
+          const petIdCtx = novoContexto.pet?.id || contextoAtual.pet?.id;
+          const clienteIdCtx = novoContexto.cliente?.id || contextoAtual.cliente?.id;
+          const perguntaSobrePets = /\bpets?\b|\bcachorr|\bbichin|\banimais?\b/i.test(textoLimpo);
+
+          if (petIdCtx && !(perguntaSobrePets && clienteIdCtx)) {
+            const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petIdCtx);
+            respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do pet.`;
+            cards.push({
+              type: "cliente",
+              title: `Ficha Cadastral & Histórico`,
+              subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
+              data: resFicha.data,
+            });
+          } else if (clienteIdCtx) {
+            const resCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteIdCtx);
+            const dadosCli: any = resCli.data || {};
+            const nomeCli = dadosCli.nome || novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "O cliente";
+            const petsCli: any[] = Array.isArray(dadosCli.pets) ? dadosCli.pets : [];
+
+            if (petsCli.length === 0) {
+              respostaTexto = `**${nomeCli}** ainda não possui nenhum pet cadastrado no sistema.`;
+            } else {
+              const nomes = petsCli.map((p: any) => `**${p.nome}**`);
+              const listaNomes =
+                nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+              respostaTexto = `**${nomeCli}** possui ${petsCli.length} pet(s) cadastrado(s): ${listaNomes}.`;
+            }
+
+            if (petsCli.length === 1) {
+              novoContexto.pet = { id: petsCli[0].id, nome: petsCli[0].nome, raca: petsCli[0].raca };
+            }
+
+            cards.push({
+              type: "cliente",
+              title: `Ficha do Cliente`,
+              subtitle: nomeCli,
+              data: resCli.data,
+            });
+          } else {
+            respostaTexto = `Não localizei esse cliente no cadastro. Pode confirmar o nome completo ou o telefone?`;
+          }
         }
+      } else if (intencao.dominio === "comunicacao_mensagens") {
+        const clienteCtx = novoContexto.cliente || contextoAtual.cliente;
+        const petCtx = novoContexto.pet || contextoAtual.pet;
+        const nomeCliente = clienteCtx?.nome || intencao.entidades.clienteNome || "Cliente";
+        const nomePet = petCtx?.nome || intencao.entidades.petNome || undefined;
+
+        let telefoneCliente = "";
+        if (clienteCtx?.id) {
+          try {
+            const fichaCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteCtx.id);
+            const dados = fichaCli.data as any;
+            telefoneCliente = dados?.whatsapp || dados?.telefone || "";
+          } catch {
+            // Segue sem telefone
+          }
+        }
+
+        // Determina tipo de mensagem baseado no texto
+        let tipoMensagem: "lembrete_agenda" | "pet_pronto" | "confirmacao_pix" | "reativacao_carinho" | "cobranca" = "lembrete_agenda";
+        if (textoLimpo.toLowerCase().includes("pronto") || textoLimpo.toLowerCase().includes("terminou") || textoLimpo.toLowerCase().includes("acabou")) {
+          tipoMensagem = "pet_pronto";
+        } else if (textoLimpo.toLowerCase().includes("pix") || textoLimpo.toLowerCase().includes("comprovante")) {
+          tipoMensagem = "confirmacao_pix";
+        } else if (textoLimpo.toLowerCase().includes("saudade") || textoLimpo.toLowerCase().includes("sumido") || textoLimpo.toLowerCase().includes("reativação")) {
+          tipoMensagem = "reativacao_carinho";
+        } else if (textoLimpo.toLowerCase().includes("cobrança") || textoLimpo.toLowerCase().includes("cobranca") || textoLimpo.toLowerCase().includes("devendo") || textoLimpo.toLowerCase().includes("pendência")) {
+          tipoMensagem = "cobranca";
+        }
+
+        const msgGerada = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+          telefoneDestino: telefoneCliente,
+          nomeCliente,
+          nomePet,
+          tipoMensagem,
+          detalhes: {
+            horario: intencao.entidades.hora ? `às ${intencao.entidades.hora}` : "no horário agendado",
+            valor: intencao.entidades.valor || 0,
+          },
+        });
+
+        if (telefoneCliente) {
+          respostaTexto = `Preparei a mensagem para **${nomeCliente}**:\n\n> "${msgGerada.mensagemFormatada}"\n\n📲 **[Clique aqui para abrir no WhatsApp](${msgGerada.urlWhatsApp})**`;
+        } else {
+          respostaTexto = `Preparei o modelo de mensagem para **${nomeCliente}**:\n\n> "${msgGerada.mensagemFormatada}"\n\n*(Observação: ${nomeCliente} não tem telefone cadastrado para gerar o link direto do WhatsApp).*`;
+        }
+
+        cards.push({
+          type: "comunicacao",
+          title: `Mensagem WhatsApp — ${nomeCliente}`,
+          subtitle: `Tipo: ${tipoMensagem.replace(/_/g, " ").toUpperCase()}`,
+          data: {
+            ...msgGerada,
+            cliente: nomeCliente,
+            pet: nomePet,
+            tipoMensagem,
+          },
+        });
       } else {
         // Conversação Natural / Saudação Generativa via Gemini com Fallback
         try {

@@ -247,43 +247,46 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   private resolverServicoNatural(expressao: string): string | null {
     const texto = expressao.toLowerCase().trim();
 
-    if (texto.includes("banho e tosa") || texto.includes("banho com tosa") || texto.includes("tosa e banho")) {
+    if (texto.includes("banho e tosa") || texto.includes("banho com tosa") || texto.includes("tosa e banho") || texto.includes("tosa com banho") || texto.includes("combo banho e tosa") || texto.includes("pacote banho e tosa")) {
       return "Banho e Tosa";
     }
-    if (texto.includes("tosa higiênica") || texto.includes("tosa higienica")) {
+    if (texto.includes("tosa higiênica") || texto.includes("tosa higienica") || texto.includes("tosinha higiênica") || texto.includes("tosinha higienica") || texto.includes("higienica") || texto.includes("higiênica")) {
       return "Tosa Higiênica";
     }
-    if (texto.includes("tosa na tesoura") || texto.includes("tosa tesoura")) {
+    if (texto.includes("tosa na tesoura") || texto.includes("tosa tesoura") || texto.includes("tosar na tesoura") || texto.includes("na tesoura")) {
       return "Tosa Tesoura";
     }
-    if (texto.includes("tosa na máquina") || texto.includes("tosa maquina") || texto.includes("tosa geral")) {
+    if (texto.includes("tosa na máquina") || texto.includes("tosa maquina") || texto.includes("tosa geral") || texto.includes("na máquina") || texto.includes("na maquina")) {
       return "Tosa Máquina";
     }
-    if (texto.includes("banho simples") || texto.includes("banho basico") || texto.includes("banho básico")) {
+    if (texto.includes("banho simples") || texto.includes("banho basico") || texto.includes("banho básico") || texto.includes("banho padrão") || texto.includes("banho comum")) {
       return "Banho Simples";
     }
-    if (texto.includes("banho medicamentoso") || texto.includes("banho remédio")) {
+    if (texto.includes("banho premium") || texto.includes("banho especial") || texto.includes("banho vip") || texto.includes("banho completo") || texto.includes("spa completo")) {
+      return "Banho Premium";
+    }
+    if (texto.includes("banho medicamentoso") || texto.includes("banho remédio") || texto.includes("banho remedio") || texto.includes("banho medicinal")) {
       return "Banho Medicamentoso";
     }
-    if (texto.includes("hidratação") || texto.includes("hidratacao")) {
+    if (texto.includes("hidratação") || texto.includes("hidratacao") || texto.includes("hidratar")) {
       return "Hidratação";
     }
-    if (texto.includes("desembolo") || texto.includes("desembolar")) {
+    if (texto.includes("desembolo") || texto.includes("desembolar") || texto.includes("tirar nós") || texto.includes("tirar nos") || texto.includes("tirar nó") || texto.includes("tirar no")) {
       return "Desembolo";
     }
-    if (texto.includes("corte de unha") || texto.includes("cortar unha") || texto.includes("unhas")) {
+    if (texto.includes("corte de unha") || texto.includes("cortar unha") || texto.includes("cortar unhas") || texto.includes("unhas") || texto.includes("unha") || texto.includes("limpar unha") || texto.includes("limpar unhas") || texto.includes("aparar unha") || texto.includes("aparar unhas")) {
       return "Corte de Unhas";
     }
-    if (texto.includes("tosa")) {
+    if (texto.includes("tosa") || texto.includes("tosinha") || texto.includes("tosar") || texto.includes("toza") || texto.includes("tozar") || texto.includes("aparar pelo") || texto.includes("aparar pelos") || texto.includes("aparar a pelagem")) {
       return "Tosa";
     }
-    if (texto.includes("banho")) {
+    if (texto.includes("banho") || texto.includes("dar um banho") || texto.includes("banhozinho") || texto.includes("banha") || texto.includes("bãio") || texto.includes("lavar")) {
       return "Banho";
     }
-    if (texto.includes("leva e traz") || texto.includes("transporte") || texto.includes("taxi dog") || texto.includes("táxi dog")) {
+    if (texto.includes("leva e traz") || texto.includes("transporte") || texto.includes("taxi dog") || texto.includes("táxi dog") || texto.includes("buscar em casa") || texto.includes("levar em casa")) {
       return "Leva e Traz";
     }
-    if (texto.includes("consulta") || texto.includes("veterinario") || texto.includes("veterinário") || texto.includes("vacina")) {
+    if (texto.includes("consulta") || texto.includes("veterinario") || texto.includes("veterinário") || texto.includes("vacina") || texto.includes("vacinação") || texto.includes("vacinacao")) {
       return "Consulta Veterinária";
     }
 
@@ -430,16 +433,16 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     if (matchCorrecao && matchCorrecao[1] && ehNomeValido(matchCorrecao[1])) {
       petNomeDaMensagem = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
     } else {
-      // 4. Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob")
-      const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela)\s+([A-ZÀ-Úa-zà-ú]+)/i);
+      // 4. Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob", "bichinho Thor", "o dog Bob")
+      const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela|bicho|bichinho|dog|animal|filhote)\s+([A-ZÀ-Úa-zà-ú]+)/i);
       if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1]) && !clienteNomeDaMensagem) {
         petNomeDaMensagem = matchPetExp[1];
       } else {
-        const matchPet = texto.match(/(?:para o pet|para a pet|do pet|da pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
+        const matchPet = texto.match(/(?:para o pet|para a pet|do pet|da pet|pro pet|pra pet|o bichinho do pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
         if (matchPet && ehNomeValido(matchPet[1])) {
           petNomeDaMensagem = matchPet[1];
-        } else if (texto.match(/(?:para o|para a|pro|pra)\s+([A-ZÀ-Ú][a-zà-ú]+)/i)) {
-          const m = texto.match(/(?:para o|para a|pro|pra)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
+        } else if (texto.match(/(?:para o|para a|pro|pra|ao|à)\s+([A-ZÀ-Ú][a-zà-ú]+)/i)) {
+          const m = texto.match(/(?:para o|para a|pro|pra|ao|à)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
           if (m && ehNomeValido(m[1]) && !clienteNomeDaMensagem) {
             petNomeDaMensagem = m[1];
           }
@@ -447,9 +450,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       }
     }
 
-    // 5. Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel") se ainda não definiu
+    // 5. Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel", "lá do Eli", "aquele da Irani") se ainda não definiu
     if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
-      const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+      const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de|lá do|la do|lá da|la da|aquele do|aquela da|o bichinho do|a bichinha da|o cachorrinho do|a cachorrinha da|o dog do|o cão do|o cao do|a cadela da)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
       if (matchPrep && matchPrep[1] && ehNomeValido(matchPrep[1])) {
         clienteNomeDaMensagem = matchPrep[1].trim();
       }
@@ -463,6 +466,11 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       else if (textoLower.includes("bob")) petNomeDaMensagem = "Bob";
       else if (textoLower.includes("bidu")) petNomeDaMensagem = "Bidu";
       else if (textoLower.includes("jade")) petNomeDaMensagem = "Jade";
+      else if (textoLower.includes("amora")) petNomeDaMensagem = "Amora";
+      else if (textoLower.includes("theo") || textoLower.includes("théo")) petNomeDaMensagem = "Theo";
+      else if (textoLower.includes("nina")) petNomeDaMensagem = "Nina";
+      else if (textoLower.includes("belinha")) petNomeDaMensagem = "Belinha";
+      else if (textoLower.includes("cacau")) petNomeDaMensagem = "Cacau";
     }
 
     // 7. Extrai termo livre para busca caso ainda não haja
@@ -595,7 +603,17 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("plano") ||
       textoLower.includes("pacote") ||
       textoLower.includes("contrato") ||
-      textoLower.includes("contratos")
+      textoLower.includes("contratos") ||
+      textoLower.includes("fidelidade") ||
+      textoLower.includes("assinatura") ||
+      textoLower.includes("mensalidade") ||
+      textoLower.includes("quantos banhos tem") ||
+      textoLower.includes("quantas sessões") ||
+      textoLower.includes("quantas sessoes") ||
+      textoLower.includes("sessões restantes") ||
+      textoLower.includes("sessoes restantes") ||
+      textoLower.includes("acabou o plano") ||
+      textoLower.includes("renovar plano")
     ) {
       dominio = "programas_creditos";
       if (textoLower.includes("debitar") || textoLower.includes("usar credito") || textoLower.includes("baixar")) {
@@ -616,29 +634,87 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         explicacao = `Consultando créditos/validade do plano para ${petNomeResolvido || "o pet/cliente ativo no contexto"}.`;
       }
     }
-    // Agenda / Agendamento
+    // Reativação de Clientes & Clientes Inativos / Sumidos
+    else if (
+      textoLower.includes("reativar") ||
+      textoLower.includes("reativação") ||
+      textoLower.includes("reativacao") ||
+      textoLower.includes("cliente sumido") ||
+      textoLower.includes("clientes sumidos") ||
+      textoLower.includes("cliente inativo") ||
+      textoLower.includes("clientes inativos") ||
+      textoLower.includes("quem sumiu") ||
+      textoLower.includes("quem tá sumido") ||
+      textoLower.includes("quem ta sumido") ||
+      textoLower.includes("quem esta sumido") ||
+      textoLower.includes("quem está sumido") ||
+      textoLower.includes("quem não vem") ||
+      textoLower.includes("quem nao vem") ||
+      textoLower.includes("faz tempo que não vem") ||
+      textoLower.includes("faz tempo que nao vem") ||
+      textoLower.includes("saudade") ||
+      textoLower.includes("retorno de cliente") ||
+      textoLower.includes("retorno de clientes") ||
+      textoLower.includes("clientes perdidos") ||
+      textoLower.includes("recuperar cliente") ||
+      textoLower.includes("recuperar clientes")
+    ) {
+      dominio = "clientes_pets";
+      intencao = "identificar_clientes_retorno";
+      ferramentaSugerida = "identificar_clientes_retorno";
+      explicacao = "Consultando clientes e pets inativos com alto potencial de reativação.";
+    }
+    // Comunicação / WhatsApp & Mensagens
+    else if (
+      textoLower.includes("whatsapp") ||
+      textoLower.includes("whats") ||
+      textoLower.includes("zap") ||
+      textoLower.includes("lembrete") ||
+      textoLower.includes("mensagem") ||
+      textoLower.includes("mandar mensagem") ||
+      textoLower.includes("manda mensagem") ||
+      textoLower.includes("manda uma mensagem") ||
+      textoLower.includes("enviar mensagem") ||
+      textoLower.includes("envia mensagem") ||
+      textoLower.includes("avisar cliente") ||
+      textoLower.includes("avisa o cliente") ||
+      textoLower.includes("avisa a cliente") ||
+      textoLower.includes("falar com") ||
+      textoLower.includes("notificar") ||
+      textoLower.includes("notifica") ||
+      textoLower.includes("pet pronto") ||
+      textoLower.includes("está pronto") ||
+      textoLower.includes("ta pronto") ||
+      textoLower.includes("tá pronto")
+    ) {
+      dominio = "comunicacao_mensagens";
+      intencao = "gerar_mensagem_whatsapp";
+      ferramentaSugerida = "gerar_mensagem_whatsapp";
+      explicacao = `Preparando mensagem WhatsApp para ${clienteNomeResolvido || petNomeResolvido || "o cliente"}.`;
+    }
+    // Agenda / Agendamento (com suporte a gírias e expressões por voz)
     else if (
       /\b(agenda|agendar|agende|agendo|agendem|agendando|agendamento|agendamentos|agendado|agendados|marcar|marque|marca|marco|marquem|marcando|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|horario|horarios|horário|horários|vaga|vagas|atendimento|atendimentos)\b/i.test(textoLower) ||
       (servicoResolvido !== null && (dataResolvida !== null || horaResolvida !== null || petNomeResolvido !== null)) ||
-      /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower)
+      /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova|encaixa|encaixar|jogar na grade|joga na grade|bota na agenda|coloca na agenda)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower)
     ) {
       dominio = "agenda";
       if (
-        /\b(desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento)\b/i.test(textoLower)
+        /\b(desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|tira da agenda|tira o agendamento|tira ele|tira ela|tira o horário|apagar agendamento|remover agendamento|não vai mais|nao vai mais|não vem mais|nao vem mais|desistiu|dispensar)\b/i.test(textoLower)
       ) {
         intencao = "cancelar_agendamento";
         requerConfirmacao = true;
         ferramentaSugerida = "cancelar_agendamento";
         explicacao = `Preparando cancelamento de agendamento para ${petNomeResolvido || "o pet informado"}.`;
       } else if (
-        /\b(reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|mudar horario|trocar horario|mudar data|trocar data)\b/i.test(textoLower)
+        /\b(reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|mudar horario|mudar horário|trocar horario|trocar horário|mudar data|trocar data|mudar o dia|troca o dia|troca pra|trocar para|passa pra|passar para|empurrar pra|adiar|adia|antecipar|antecipa)\b/i.test(textoLower)
       ) {
         intencao = "reagendar_agendamento";
         requerConfirmacao = true;
         ferramentaSugerida = "reagendar_agendamento";
         explicacao = `Preparando reagendamento para ${petNomeResolvido || "o pet informado"}.`;
       } else if (
-        /\b(agendar|agende|agendo|agendem|agendando|marcar|marque|marca|marco|marquem|marcando|agenda ele|agenda ela|novo agendamento|nova vaga|novo horário|novo horario)\b/i.test(textoLower) ||
+        /\b(agendar|agende|agendo|agendem|agendando|marcar|marque|marca|marco|marquem|marcando|agenda ele|agenda ela|agenda aí|agenda ai|bota na agenda|coloca na agenda|joga na grade|coloca na grade|encaixa|encaixar|bota pra|coloca pra|novo agendamento|nova vaga|novo horário|novo horario)\b/i.test(textoLower) ||
         /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower) ||
         /\b(quero|gostaria de|preciso|vamos|pode)\s+(?:de\s+)?(?:um\s+)?(?:agendar|marcar|fazer um agendamento|fazer agendamento|criar agendamento|criar um agendamento)/i.test(textoLower) ||
         /\bagendamento\s+(?:para|pro|pra|de|do|da|no dia|dia)\b/i.test(textoLower) ||
@@ -655,12 +731,22 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         explicacao = `Consultando agenda para ${dataResolvida || req.contexto.dataReferencia}.`;
       }
     }
-    // Financeiro & Faturamento Consolidado & Contas a Receber & Devedores
+    // Financeiro & Faturamento Consolidado & Contas a Receber & Devedores (com expressões coloquiais)
     else if (
       textoLower.includes("faturamento") ||
       textoLower.includes("quanto faturou") ||
       textoLower.includes("quanto foi o faturamento") ||
+      textoLower.includes("quanto entrou") ||
+      textoLower.includes("quanto fez") ||
+      textoLower.includes("quanto rendeu") ||
+      textoLower.includes("ganhou quanto") ||
+      textoLower.includes("caixa de hoje") ||
+      textoLower.includes("fechamento de caixa") ||
+      textoLower.includes("fechamento") ||
       textoLower.includes("recebemos hoje") ||
+      textoLower.includes("receita") ||
+      textoLower.includes("lucro") ||
+      textoLower.includes("resultado financeiro") ||
       textoLower.includes("para receber") ||
       textoLower.includes("a receber") ||
       textoLower.includes("devendo") ||
@@ -672,12 +758,14 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("inadimplentes") ||
       textoLower.includes("financeiro") ||
       textoLower.includes("ticket") ||
-      textoLower.includes("pix")
+      textoLower.includes("pix") ||
+      textoLower.includes("cobrança") ||
+      textoLower.includes("cobranca")
     ) {
       dominio = "financeiro_relatorios";
       if (textoLower.includes("para receber") || textoLower.includes("a receber")) {
         intencao = "consultar_contas_a_receber";
-      } else if (textoLower.includes("pendente") || textoLower.includes("devendo") || textoLower.includes("devedor") || textoLower.includes("inadimplente")) {
+      } else if (textoLower.includes("pendente") || textoLower.includes("devendo") || textoLower.includes("devedor") || textoLower.includes("inadimplente") || textoLower.includes("cobrança") || textoLower.includes("cobranca")) {
         intencao = "consultar_inadimplencia_devedores";
       } else {
         intencao = "consultar_faturamento";
@@ -703,12 +791,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         intencao = "buscar_clientes_pets";
         ferramentaSugerida = "buscar_clientes_pets";
       }
-    }
-    // Comunicação / WhatsApp
-    else if (textoLower.includes("whatsapp") || textoLower.includes("lembrete") || textoLower.includes("mensagem")) {
-      dominio = "comunicacao_mensagens";
-      intencao = "gerar_mensagem_whatsapp";
-      ferramentaSugerida = "gerar_mensagem_whatsapp";
     }
 
     const jaTemPetEClienteNoContexto = Boolean(
