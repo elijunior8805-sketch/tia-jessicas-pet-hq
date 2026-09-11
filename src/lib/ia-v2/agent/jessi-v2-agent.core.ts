@@ -668,24 +668,77 @@ export async function processarMensagemJessiV2Core(
         }
       }
 
-      // 4.3 Resolução de Serviço e Preço no Catálogo
+      // 4.3 Resolução de Serviço e Preço no Catálogo com Desambiguação Inteligente
       if (servicoNome) {
-        const { data: servicoDB, error: srvErr } = await sb
+        const { data: servicosDB, error: srvErr } = await sb
           .from("servicos")
           .select("id, nome, valor, duracao_min")
+          .eq("ativo", true)
           .ilike("nome", `%${servicoNome}%`)
-          .limit(1)
-          .maybeSingle();
+          .limit(10);
 
         if (srvErr) {
           console.error("[JessiV2] Erro ao consultar serviço no banco:", srvErr);
         }
 
-        if (servicoDB) {
-          servicoId = servicoDB.id;
-          servicoNome = servicoDB.nome;
-          servicoValor = Number(servicoDB.valor || 0);
-          duracaoMinutos = Number(servicoDB.duracao_min || 60);
+        if (servicosDB && servicosDB.length === 1) {
+          servicoId = servicosDB[0].id;
+          servicoNome = servicosDB[0].nome;
+          servicoValor = Number(servicosDB[0].valor || 0);
+          duracaoMinutos = Number(servicosDB[0].duracao_min || 60);
+        } else if (servicosDB && servicosDB.length > 1) {
+          // Verifica correspondência exata
+          const matchExato = servicosDB.find(
+            (s) => s.nome.trim().toLowerCase() === servicoNome.trim().toLowerCase()
+          );
+
+          if (matchExato) {
+            servicoId = matchExato.id;
+            servicoNome = matchExato.nome;
+            servicoValor = Number(matchExato.valor || 0);
+            duracaoMinutos = Number(matchExato.duracao_min || 60);
+          } else if (intencao.dominio === "agenda" && (intencao.intencao === "preparar_agendamento" || intencao.intencao === "criar_agendamento")) {
+            // Múltiplas opções encontradas (ex: Banho Simples vs Banho Premium): Desambiguação proativa
+            const opcoesTexto = servicosDB
+              .map((s) => `• **${s.nome}**: R$ ${Number(s.valor || 0).toFixed(2)} (${s.duracao_min || 60} min)`)
+              .join("\n");
+
+            const petInfo = petNome ? ` para o pet **${petNome}**` : "";
+            const dataHoraInfo = intencao.entidades.data && intencao.entidades.hora
+              ? ` em ${intencao.entidades.data} às ${intencao.entidades.hora}`
+              : "";
+
+            return {
+              versao: "v2",
+              respostaTexto: `Identifiquei mais de uma modalidade de **${servicoNome}** no catálogo do Spa:\n\n${opcoesTexto}\n\nQual delas você deseja agendar${petInfo}${dataHoraInfo}?`,
+              cards: [
+                {
+                  type: "agenda",
+                  title: `Modalidades de ${servicoNome} Disponíveis`,
+                  subtitle: "Selecione o serviço desejado com 1 clique:",
+                  data: {
+                    exigeDesambiguacao: true,
+                    title: `Modalidades de ${servicoNome}`,
+                    subtitle: "Selecione o serviço desejado com 1 clique:",
+                    petNome: petNome || "o pet",
+                    dataHoraTexto: intencao.entidades.data && intencao.entidades.hora ? `em ${intencao.entidades.data} às ${intencao.entidades.hora}` : "",
+                    opcoes: servicosDB.map((s) => ({
+                      id: s.id,
+                      nome: s.nome,
+                      valor: s.valor,
+                      valorFmt: `R$ ${Number(s.valor || 0).toFixed(2)}`,
+                      detalhe: `Duração: ${s.duracao_min || 60} min • R$ ${Number(s.valor || 0).toFixed(2)}`,
+                    })),
+                  },
+                },
+              ],
+              pendingAction: null,
+              novoContexto: { ...contextoAtual, ...novoContexto },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
         }
       }
 

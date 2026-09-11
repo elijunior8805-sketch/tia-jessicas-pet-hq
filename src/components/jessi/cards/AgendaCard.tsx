@@ -9,6 +9,50 @@ interface AgendaCardProps {
 }
 
 export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) => {
+  // Tratamento de Desambiguação de Serviços ou Agendamentos
+  if (data?.exigeDesambiguacao && Array.isArray(data?.opcoes)) {
+    return (
+      <div className="rounded-2xl border border-emerald-300 bg-emerald-50/70 p-4 space-y-3 text-xs shadow-xs my-2">
+        <div className="font-semibold text-emerald-950 flex items-center gap-1.5">
+          <Scissors className="h-4 w-4 text-emerald-700" />
+          <span>{data.title || "Opções de Serviços no Catálogo:"}</span>
+        </div>
+        <p className="text-[11px] text-emerald-900/90 font-medium">
+          {data.subtitle || "Identifiquei mais de uma opção disponível. Selecione a modalidade desejada:"}
+        </p>
+        <div className="space-y-2">
+          {data.opcoes.map((opcao: any, idx: number) => (
+            <div
+              key={opcao.id || idx}
+              className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-emerald-200 text-xs shadow-2xs hover:border-emerald-600 transition-colors"
+            >
+              <div>
+                <span className="font-bold text-foreground block">
+                  {opcao.nome}
+                </span>
+                <span className="text-[11px] text-muted-foreground block">
+                  {opcao.detalhe}
+                </span>
+              </div>
+              {onActionClick && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const comando = `Agendar ${opcao.nome} para ${data.petNome || "o pet"}${data.dataHoraTexto ? ` ${data.dataHoraTexto}` : ""}`;
+                    onActionClick(comando);
+                  }}
+                  className="h-7 px-3 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-semibold shrink-0 ml-2"
+                >
+                  Selecionar {opcao.valorFmt || ""}
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const agendamentos = Array.isArray(data) ? data : data?.agendamentos || [];
 
   if (!agendamentos.length) {
