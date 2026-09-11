@@ -125,6 +125,8 @@ export const JessiV2IntentSchema = z.object({
     profissionalId: z.string().optional().nullable(),
     termoBusca: z.string().optional().nullable(),
     periodo: z.enum(["hoje", "amanha", "semana", "mes", "personalizado"]).optional().nullable(),
+    agendamentoId: z.string().optional().nullable(),
+    motivo: z.string().optional().nullable(),
   }),
   requerConfirmacao: z.boolean(),
   ferramentaSugerida: z.string().optional().nullable(),

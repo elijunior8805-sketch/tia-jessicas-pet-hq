@@ -1381,6 +1381,7 @@ export async function processarMensagemJessiV2Core(
             subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
             data: resFicha.data,
           });
+        }
       } else {
         // Conversação Natural / Saudação Generativa via Gemini com Fallback
         try {
