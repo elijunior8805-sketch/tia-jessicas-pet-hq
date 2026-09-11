@@ -221,18 +221,39 @@ export class ClientesPetsAdapter {
       (todosPets || []).forEach((pet: any) => {
         const nomeNorm = normalizarTexto(pet.nome);
         const tutorNome = pet.clientes?.nome || pet.cliente?.nome || "Não vinculado";
+        const tutorNorm = normalizarTexto(tutorNome);
+        const partesTutor = tutorNorm.split(/\s+/).filter((p: string) => p.length >= 2);
         let score = 0;
 
-        if (nomeNorm === termoNorm) {
+        // Caso especial: termo busca contém o nome do pet E o nome do tutor (ex: "thor do eli", "thor eli junior", "thor irani")
+        const termoTemNomePet = termoNorm.includes(nomeNorm) || nomeNorm.includes(termoNorm);
+        const termoTemTutor = partesTutor.some((p: string) => termoNorm.includes(p));
+
+        if (termoTemNomePet && termoTemTutor) {
+          // Combinação perfeita Pet + Tutor: Confiança máxima sem ambiguidade!
           score = 1.0;
+        } else if (nomeNorm === termoNorm) {
+          score = 0.95;
         } else if (
           nomeNorm.startsWith(termoNorm) ||
           (termoNorm.length >= 4 && nomeNorm.includes(termoNorm))
         ) {
-          score = 0.92;
+          score = 0.90;
         } else if (termoNorm.length >= 4) {
           const sim = calcularSimilaridade(nomeNorm, termoNorm);
-          if (sim >= 0.75) score = sim * 0.88;
+          if (sim >= 0.75) score = sim * 0.85;
+        }
+
+        // Se o termo busca mencionou tutor explicitamente e este pet NÃO pertence ao tutor mencionado, reduz o score
+        if (score > 0 && !termoTemTutor && partesTutor.length > 0) {
+          // Se o termo tem 2+ palavras e uma delas parece um nome de tutor concorrente
+          const palavrasTermo = termoNorm.split(/\s+/).filter((p: string) => p.length >= 3);
+          const mencionaOutroTutor = palavrasTermo.some((palavra: string) => 
+            !nomeNorm.includes(palavra) && !["para", "com", "pro", "pra", "pet", "cachorro", "gato", "banho", "tosa"].includes(palavra) && !partesTutor.some((t: string) => t.includes(palavra))
+          );
+          if (mencionaOutroTutor) {
+            score = Math.max(0.1, score - 0.4);
+          }
         }
 
         if (score > 0) {

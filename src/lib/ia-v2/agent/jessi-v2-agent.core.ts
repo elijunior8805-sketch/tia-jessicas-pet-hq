@@ -9,7 +9,7 @@ import {
 import { JessiV2ContextState, criarSessaoV2 } from "../session/jessi-v2-session";
 import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
 import { JessiV2FallbackProvider } from "../providers/jessi-v2-fallback.provider";
-import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
+import { ClientesPetsAdapter, normalizarTexto } from "../adapters/clientes-pets.adapter";
 import { AgendaAdapter } from "../adapters/agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
 import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
@@ -173,9 +173,35 @@ export async function processarMensagemJessiV2Core(
     }
 
     // 1.1 Tratamento Imediato de Seleção de Opção / Desambiguação
+    const candidatosEmEspera =
+      (input.contexto as any)?.variaveisConversacao?.candidatosEmEspera ||
+      (contextoAtual as any)?.variaveisConversacao?.candidatosEmEspera ||
+      (contextoAtual as any)?.candidatosEmEspera;
+
+    // Se temos candidatos em espera por desambiguação, verifica se a mensagem do usuário referencia algum deles diretamente (por voz ou texto)
+    let candidatoPorNomeEmEspera: any = null;
+    if (Array.isArray(candidatosEmEspera) && candidatosEmEspera.length > 0) {
+      const textoNorm = normalizarTexto(textoLimpo);
+      for (const cand of candidatosEmEspera) {
+        const candNome = normalizarTexto(cand.nomePrincipal || cand.nome);
+        const tutorNome = normalizarTexto(cand.dadosCompletos?.cliente?.nome || cand.dadosCompletos?.clientes?.nome || cand.detalheSecundario || "");
+        const partesTutor = tutorNome.split(/\s+/).filter((p: string) => p.length >= 2);
+        
+        // Se o usuário falou o nome do tutor (ex: "Eli", "Irani", "do Eli", "Thor do Eli", "o do Eli")
+        const falouTutor = partesTutor.some((p: string) => textoNorm.includes(p));
+        const falouPetETutor = (textoNorm.includes(candNome) || candNome.includes(textoNorm)) && falouTutor;
+
+        if (falouPetETutor || falouTutor) {
+          candidatoPorNomeEmEspera = cand;
+          break;
+        }
+      }
+    }
+
     const matchIdDireto = textoLimpo.match(/\[id:([a-f0-9-]+)\]/i);
     const ehSelecaoOpcao =
       Boolean(matchIdDireto) ||
+      Boolean(candidatoPorNomeEmEspera) ||
       textoLower.startsWith("selecionar opção") ||
       textoLower.startsWith("selecionar opcao") ||
       textoLower.startsWith("opção ") ||
@@ -183,15 +209,10 @@ export async function processarMensagemJessiV2Core(
       /^(1|2|3|4|5)$/.test(textoLower) ||
       /\b(primeiro|primeira|segundo|segunda|terceiro|terceira)\b/i.test(textoLower);
 
-    const candidatosEmEspera =
-      (input.contexto as any)?.variaveisConversacao?.candidatosEmEspera ||
-      (contextoAtual as any)?.variaveisConversacao?.candidatosEmEspera ||
-      (contextoAtual as any)?.candidatosEmEspera;
-
     if (ehSelecaoOpcao) {
-      let candidatoEscolhido: any = null;
+      let candidatoEscolhido: any = candidatoPorNomeEmEspera || null;
 
-      if (matchIdDireto && matchIdDireto[1]) {
+      if (!candidatoEscolhido && matchIdDireto && matchIdDireto[1]) {
         const idAlvo = matchIdDireto[1];
         const { data: petAlvo } = await sb
           .from("pets")
@@ -240,7 +261,7 @@ export async function processarMensagemJessiV2Core(
             }
           }
         }
-      } else {
+      } else if (!candidatoEscolhido) {
         let index = 0;
         const matchNum = textoLower.match(/\b([1-5])\b/);
         if (matchNum) {
@@ -286,11 +307,34 @@ export async function processarMensagemJessiV2Core(
             nome: tutorNome,
           };
 
-          const servicoPendente = (contextoAtual as any)?.servicoSelecionadoNome || (contextoAtual as any)?.variaveisConversacao?.servicoNome || null;
-          const dataPendente = (contextoAtual as any)?.dataAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.dataAlvo || null;
-          const horaPendente = (contextoAtual as any)?.horaAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.horaAlvo || null;
+          // Extrai eventuais parâmetros contidos na mesma mensagem de seleção (ex: "Thor do Eli amanhã às 14h")
+          const servicoExtraido = (geminiProvider as any).resolverServicoNatural?.(textoLimpo) || null;
+          const dataExtraida = (geminiProvider as any).resolverDataNatural?.(textoLimpo, contextoAtual.dataReferencia) || null;
+          const horaExtraida = (geminiProvider as any).resolverHoraNatural?.(textoLimpo) || null;
+
+          const servicoPendente = servicoExtraido || (contextoAtual as any)?.servicoSelecionadoNome || (contextoAtual as any)?.variaveisConversacao?.servicoNome || null;
+          const dataPendente = dataExtraida || (contextoAtual as any)?.dataAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.dataAlvo || null;
+          const horaPendente = horaExtraida || (contextoAtual as any)?.horaAlvoPendente || (contextoAtual as any)?.variaveisConversacao?.horaAlvo || null;
 
           if (servicoPendente && dataPendente && horaPendente) {
+            // Consulta valor e duração do serviço no catálogo
+            let servicoValor = 0;
+            let duracaoMinutos = 60;
+            let servicoIdSel = null;
+            const { data: srvData } = await sb
+              .from("servicos")
+              .select("id, nome, valor, duracao_min")
+              .eq("ativo", true)
+              .ilike("nome", `%${servicoPendente}%`)
+              .maybeSingle();
+
+            if (srvData) {
+              servicoValor = Number(srvData.valor || 0);
+              duracaoMinutos = Number(srvData.duracao_min || 60);
+              servicoIdSel = srvData.id;
+            }
+
+            const dataHoraISO = `${dataPendente}T${horaPendente}:00`;
             const dataExtensa = new Intl.DateTimeFormat("pt-BR", {
               dateStyle: "full",
               timeZone: "America/Sao_Paulo",
@@ -694,53 +738,110 @@ export async function processarMensagemJessiV2Core(
       intencao.intencao === "preparar_reagendamento" ||
       intencao.intencao === "consultar_ultimo_atendimento";
 
-    if (intencoesQuePrecisamBusca && intencao.entidades.termoBusca) {
-      const termoParaBusca = intencao.entidades.termoBusca;
+    // Verifica se já temos pet e cliente com IDs válidos no contexto ativo
+    const jaTemPetResolvido = Boolean(novoContexto.pet?.id || contextoAtual.pet?.id || intencao.entidades.petId);
+    const jaTemClienteResolvido = Boolean(novoContexto.cliente?.id || contextoAtual.cliente?.id || intencao.entidades.clienteId);
+    const petCtxNome = normalizarTexto(novoContexto.pet?.nome || contextoAtual.pet?.nome || "");
+    const cliCtxNome = normalizarTexto(novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "");
+    const termoBuscaNorm = normalizarTexto(intencao.entidades.termoBusca || "");
+
+    // Se o termo pesquisado apenas repete o pet/cliente já ativo no contexto, não refaz a busca
+    const termoEhMesmoPetOuCliente =
+      (jaTemPetResolvido && (termoBuscaNorm === petCtxNome || petCtxNome.includes(termoBuscaNorm))) ||
+      (jaTemClienteResolvido && (termoBuscaNorm === cliCtxNome || cliCtxNome.includes(termoBuscaNorm)));
+
+    const deveBuscar = intencoesQuePrecisamBusca && Boolean(intencao.entidades.termoBusca) && !(jaTemPetResolvido && termoEhMesmoPetOuCliente);
+
+    if (deveBuscar) {
+      const termoParaBusca = intencao.entidades.termoBusca!;
       const resultadoBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoParaBusca);
 
       if (resultadoBusca.success && resultadoBusca.data.candidatos.length > 0) {
         if (resultadoBusca.data.exigeDesambiguacao) {
-          // Ambiguidade detectada: Apresenta opções progressivas sem escolha silenciosa
-          respostaTexto = resultadoBusca.summary || "Encontrei mais de uma opção.";
-          
-          cards.push({
-            type: "cliente",
-            title: "Opções Encontradas (Escolha uma)",
-            subtitle: `Termo pesquisado: "${termoParaBusca}"`,
-            data: {
-              exigeDesambiguacao: true,
-              opcoes: resultadoBusca.data.candidatos.map((c: any) => ({
-                id: c.id,
-                tipo: c.tipo,
-                nome: c.nomePrincipal,
-                detalhe: c.detalheSecundario,
-              })),
-            },
-          });
+          // Se temos clienteNome e petNome na intenção, tenta filtrar os candidatos antes de exigir desambiguação
+          let candidatoFiltrado: any = null;
+          if (intencao.entidades.clienteNome || intencao.entidades.petNome) {
+            const cliNorm = normalizarTexto(intencao.entidades.clienteNome || "");
+            const petNorm = normalizarTexto(intencao.entidades.petNome || "");
+            const match = resultadoBusca.data.candidatos.filter((c: any) => {
+              const cNome = normalizarTexto(c.nomePrincipal);
+              const tNome = normalizarTexto(c.dadosCompletos?.cliente?.nome || c.dadosCompletos?.clientes?.nome || c.detalheSecundario || "");
+              const petMatch = petNorm ? (cNome.includes(petNorm) || petNorm.includes(cNome)) : true;
+              const tutorMatch = cliNorm ? (tNome.includes(cliNorm) || cliNorm.includes(tNome)) : true;
+              return petMatch && tutorMatch;
+            });
+            if (match.length === 1) {
+              candidatoFiltrado = match[0];
+            }
+          }
 
-          return {
-            versao: "v2",
-            respostaTexto,
-            cards,
-            pendingAction: null,
-            novoContexto: {
-              ...contextoAtual,
-              servicoSelecionadoNome: intencao.entidades.servicoNome || contextoAtual.servicoSelecionadoNome,
-              dataAlvoPendente: intencao.entidades.data || (contextoAtual as any).dataAlvoPendente,
-              horaAlvoPendente: intencao.entidades.hora || (contextoAtual as any).horaAlvoPendente,
-              variaveisConversacao: {
-                ...contextoAtual.variaveisConversacao,
-                candidatosEmEspera: resultadoBusca.data.candidatos,
-                servicoNome: intencao.entidades.servicoNome,
-                dataAlvo: intencao.entidades.data,
-                horaAlvo: intencao.entidades.hora,
-                intencaoOriginal: intencao.intencao,
+          if (!candidatoFiltrado) {
+            // Ambiguidade real detectada: Apresenta opções progressivas sem escolha silenciosa
+            respostaTexto = resultadoBusca.summary || "Encontrei mais de uma opção.";
+            
+            cards.push({
+              type: "cliente",
+              title: "Opções Encontradas (Escolha uma)",
+              subtitle: `Termo pesquisado: "${termoParaBusca}"`,
+              data: {
+                exigeDesambiguacao: true,
+                opcoes: resultadoBusca.data.candidatos.map((c: any) => ({
+                  id: c.id,
+                  tipo: c.tipo,
+                  nome: c.nomePrincipal,
+                  detalhe: c.detalheSecundario,
+                })),
               },
-            },
-            intencao,
-            tempoProcessamentoMs: Date.now() - inicioMs,
-            correlationId,
-          };
+            });
+
+            return {
+              versao: "v2",
+              respostaTexto,
+              cards,
+              pendingAction: null,
+              novoContexto: {
+                ...contextoAtual,
+                servicoSelecionadoNome: intencao.entidades.servicoNome || contextoAtual.servicoSelecionadoNome,
+                dataAlvoPendente: intencao.entidades.data || (contextoAtual as any).dataAlvoPendente,
+                horaAlvoPendente: intencao.entidades.hora || (contextoAtual as any).horaAlvoPendente,
+                variaveisConversacao: {
+                  ...contextoAtual.variaveisConversacao,
+                  candidatosEmEspera: resultadoBusca.data.candidatos,
+                  servicoNome: intencao.entidades.servicoNome,
+                  dataAlvo: intencao.entidades.data,
+                  horaAlvo: intencao.entidades.hora,
+                  intencaoOriginal: intencao.intencao,
+                },
+              },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          } else {
+            // Candidato filtrado com precisão com base no vínculo tutor + pet!
+            const selecionado = candidatoFiltrado;
+            if (selecionado.tipo === "pet") {
+              novoContexto.pet = {
+                id: selecionado.id,
+                nome: selecionado.nomePrincipal,
+                raca: selecionado.dadosCompletos?.raca,
+                porte: selecionado.dadosCompletos?.porte,
+              };
+              if (selecionado.dadosCompletos?.cliente) {
+                novoContexto.cliente = {
+                  id: selecionado.dadosCompletos.cliente.id,
+                  nome: selecionado.dadosCompletos.cliente.nome,
+                  telefone: selecionado.dadosCompletos.cliente.telefone,
+                };
+              }
+            } else if (selecionado.tipo === "cliente") {
+              novoContexto.cliente = {
+                id: selecionado.id,
+                nome: selecionado.nomePrincipal,
+                telefone: selecionado.dadosCompletos?.telefone,
+              };
+            }
+          }
         } else {
           // Encontrado com alta confiança: atualiza memória contextual
           const selecionado = resultadoBusca.data.candidatos[0];
@@ -1056,8 +1157,24 @@ export async function processarMensagemJessiV2Core(
 
       // 4.4 Validação Estrita de Campos Obrigatórios para Agendamento
       if (intencao.dominio === "agenda" && (intencao.intencao === "preparar_agendamento" || intencao.intencao === "criar_agendamento")) {
-        const dataAlvo = intencao.entidades.data;
-        const horaAlvo = intencao.entidades.hora;
+        const dataAlvo =
+          intencao.entidades.data ||
+          (novoContexto as any)?.dataAlvoPendente ||
+          (contextoAtual as any)?.dataAlvoPendente ||
+          (contextoAtual as any)?.variaveisConversacao?.dataAlvo ||
+          null;
+        const horaAlvo =
+          intencao.entidades.hora ||
+          (novoContexto as any)?.horaAlvoPendente ||
+          (contextoAtual as any)?.horaAlvoPendente ||
+          (contextoAtual as any)?.variaveisConversacao?.horaAlvo ||
+          null;
+        servicoNome =
+          servicoNome ||
+          (novoContexto as any)?.servicoSelecionadoNome ||
+          (contextoAtual as any)?.servicoSelecionadoNome ||
+          (contextoAtual as any)?.variaveisConversacao?.servicoNome ||
+          null;
 
         const camposFaltantes: string[] = [];
         if (!clienteId || !clienteNome) camposFaltantes.push("Tutor/Cliente");
@@ -1073,7 +1190,8 @@ export async function processarMensagemJessiV2Core(
           } else if (clienteNome && petNome && servicoNome && !dataAlvo && !horaAlvo) {
             textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**) para o serviço de **${servicoNome}**. Para qual data e horário você deseja agendar?`;
           } else if (clienteNome && petNome && servicoNome && dataAlvo && !horaAlvo) {
-            textoOrientacao = `Para o agendamento de **${servicoNome}** de **${petNome}** no dia **${dataAlvo}**, qual o horário desejado?`;
+            const dataFmt = dataAlvo.includes("-") ? dataAlvo.split("-").reverse().join("/") : dataAlvo;
+            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**) para **${servicoNome}** no dia **${dataFmt}**. Qual o horário desejado (ex: 14:00)?`;
           } else if (!clienteNome && !petNome) {
             textoOrientacao = `Para preparar o agendamento com segurança, por favor me informe o nome do **cliente ou pet**, o **serviço** e a **data e horário** desejados.`;
           }
@@ -1083,7 +1201,21 @@ export async function processarMensagemJessiV2Core(
             respostaTexto: textoOrientacao,
             cards,
             pendingAction: null,
-            novoContexto: { ...contextoAtual, ...novoContexto },
+            novoContexto: {
+              ...contextoAtual,
+              ...novoContexto,
+              servicoSelecionadoNome: servicoNome,
+              dataAlvoPendente: dataAlvo,
+              horaAlvoPendente: horaAlvo,
+              cliente: clienteId && clienteNome ? { id: clienteId, nome: clienteNome } : (novoContexto.cliente || contextoAtual.cliente),
+              pet: petId && petNome ? { id: petId, nome: petNome } : (novoContexto.pet || contextoAtual.pet),
+              variaveisConversacao: {
+                ...contextoAtual.variaveisConversacao,
+                servicoNome,
+                dataAlvo,
+                horaAlvo,
+              },
+            },
             intencao,
             tempoProcessamentoMs: Date.now() - inicioMs,
             correlationId,

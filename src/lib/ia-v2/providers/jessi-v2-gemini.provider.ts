@@ -146,7 +146,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   }
 
   /**
-   * Extrai horário explícito do texto do usuário (ex: "às 14h", "14:30", "09:00", "às 10").
+   * Extrai horário explícito do texto do usuário (ex: "às 14h", "14:30", "09:00", "às 10", "às quatorze", "duas da tarde").
    * Retorna null se nenhum horário for mencionado (PROIBIDO assumir 09:00 silenciosamente).
    */
   private resolverHoraNatural(expressao: string): string | null {
@@ -158,19 +158,83 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       return `${matchHoraMin[1].padStart(2, "0")}:${matchHoraMin[2]}`;
     }
 
-    // Padrão 2: "às 14h", "as 9h", "14h30", "14h"
-    const matchHoraH = texto.match(/(?:às|as|para as|para às|horário|horario|às)?\s*([01]?\d|2[0-3])\s*h(?:oras?)?(?:\s*([0-5]\d))?/);
+    // Padrão 2: "às 14h", "as 9h", "14h30", "14h", "14 horas"
+    const matchHoraH = texto.match(/(?:às|as|para as|para às|horário|horario|às)?\s*([01]?\d|2[0-3])\s*(?:h|hrs?|horas?)(?:\s*([0-5]\d))?/i);
     if (matchHoraH && matchHoraH[1]) {
       const h = matchHoraH[1].padStart(2, "0");
       const m = matchHoraH[2] ? matchHoraH[2].padStart(2, "0") : "00";
       return `${h}:${m}`;
     }
 
-    // Padrão 3: "às 14", "as 9", "para as 10"
+    // Padrão 3: "às 14", "as 9", "para as 10", "para as 15"
     const matchAs = texto.match(/(?:às|as|para as|para às)\s+([01]?\d|2[0-3])\b/);
     if (matchAs && matchAs[1]) {
       const h = matchAs[1].padStart(2, "0");
       return `${h}:00`;
+    }
+
+    // Padrão 4: Horários falados por voz em texto (ex: "quatorze horas", "duas da tarde", "nove da manhã")
+    const mapaHorasVoz: Record<string, string> = {
+      "meio dia": "12:00",
+      "meia noite": "00:00",
+      "uma da tarde": "13:00",
+      "duas da tarde": "14:00",
+      "tres da tarde": "15:00",
+      "três da tarde": "15:00",
+      "quatro da tarde": "16:00",
+      "cinco da tarde": "17:00",
+      "seis da tarde": "18:00",
+      "sete da noite": "19:00",
+      "oito da noite": "20:00",
+      "oito da manha": "08:00",
+      "oito da manhã": "08:00",
+      "nove da manha": "09:00",
+      "nove da manhã": "09:00",
+      "dez da manha": "10:00",
+      "dez da manhã": "10:00",
+      "onze da manha": "11:00",
+      "onze da manhã": "11:00",
+      "oito horas": "08:00",
+      "nove horas": "09:00",
+      "dez horas": "10:00",
+      "onze horas": "11:00",
+      "doze horas": "12:00",
+      "treze horas": "13:00",
+      "quatorze horas": "14:00",
+      "catorze horas": "14:00",
+      "quinze horas": "15:00",
+      "dezesseis horas": "16:00",
+      "dezessete horas": "17:00",
+      "dezoito horas": "18:00",
+      "às quatorze": "14:00",
+      "as quatorze": "14:00",
+      "às quinze": "15:00",
+      "as quinze": "15:00",
+      "às dezesseis": "16:00",
+      "as dezesseis": "16:00",
+      "às nove": "09:00",
+      "as nove": "09:00",
+      "às dez": "10:00",
+      "as dez": "10:00",
+      "às onze": "11:00",
+      "as onze": "11:00",
+      "às oito": "08:00",
+      "as oito": "08:00",
+    };
+
+    for (const [expressaoVoz, horaFormatada] of Object.entries(mapaHorasVoz)) {
+      if (texto.includes(expressaoVoz)) {
+        return horaFormatada;
+      }
+    }
+
+    // Padrão 5: Mensagem direta contendo apenas o número do horário (ex: "14", "15", "10", "14h")
+    const matchNumeroIsolado = texto.match(/^([01]?\d|2[0-3])$/);
+    if (matchNumeroIsolado) {
+      const num = parseInt(matchNumeroIsolado[1], 10);
+      if (num >= 7 && num <= 19) {
+        return `${String(num).padStart(2, "0")}:00`;
+      }
     }
 
     return null;
@@ -647,19 +711,47 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       ferramentaSugerida = "gerar_mensagem_whatsapp";
     }
 
-    const termoBuscaEfetivo = clienteNomeDaMensagem
+    const jaTemPetEClienteNoContexto = Boolean(
+      (req.contexto.petSelecionadoId || req.contexto.pet?.id) &&
+      (req.contexto.clienteSelecionadoId || req.contexto.cliente?.id)
+    );
+
+    const termoBuscaEfetivo = clienteNomeDaMensagem && petNomeDaMensagem
+      ? `${petNomeDaMensagem} ${clienteNomeDaMensagem}`
+      : clienteNomeDaMensagem
       ? clienteNomeDaMensagem
       : petNomeDaMensagem
       ? petNomeDaMensagem
-      : (dominio === "clientes_pets" || intencao === "criar_agendamento" || intencao === "cancelar_agendamento" || intencao === "reagendar_agendamento" || intencao === "consultar_ultimo_atendimento")
+      : (dominio === "clientes_pets" || intencao === "consultar_ultimo_atendimento")
+      ? (clienteNomeResolvido || petNomeResolvido || null)
+      : (!jaTemPetEClienteNoContexto && (intencao === "criar_agendamento" || intencao === "cancelar_agendamento" || intencao === "reagendar_agendamento"))
       ? (clienteNomeResolvido || petNomeResolvido || null)
       : null;
 
+    // Preserva IDs de cliente e pet caso os nomes coincidam com os já presentes no contexto
+    let resolvedClienteId = req.contexto.clienteSelecionadoId || req.contexto.cliente?.id || null;
+    if (clienteNomeDaMensagem) {
+      const nomeCtxNorm = (req.contexto.cliente?.nome || "").toLowerCase().trim();
+      const nomeMsgNorm = clienteNomeDaMensagem.toLowerCase().trim();
+      if (!nomeCtxNorm.includes(nomeMsgNorm) && !nomeMsgNorm.includes(nomeCtxNorm)) {
+        resolvedClienteId = null;
+      }
+    }
+
+    let resolvedPetId = req.contexto.petSelecionadoId || req.contexto.pet?.id || null;
+    if (petNomeDaMensagem) {
+      const petCtxNorm = (req.contexto.pet?.nome || "").toLowerCase().trim();
+      const petMsgNorm = petNomeDaMensagem.toLowerCase().trim();
+      if (!petCtxNorm.includes(petMsgNorm) && !petMsgNorm.includes(petCtxNorm)) {
+        resolvedPetId = null;
+      }
+    }
+
     const entidades = {
       clienteNome: clienteNomeResolvido,
-      clienteId: clienteNomeDaMensagem ? null : (req.contexto.clienteSelecionadoId || req.contexto.cliente?.id || null),
+      clienteId: resolvedClienteId,
       petNome: petNomeResolvido,
-      petId: (clienteNomeDaMensagem || petNomeDaMensagem) ? null : (req.contexto.petSelecionadoId || req.contexto.pet?.id || null),
+      petId: resolvedPetId,
       data: dataResolvida,
       hora: horaResolvida,
       servicoNome: servicoResolvido,
