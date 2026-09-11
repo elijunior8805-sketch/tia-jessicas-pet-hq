@@ -469,7 +469,7 @@ export class ProgramasCreditosAdapter {
         .eq("id", estorno.id)
         .maybeSingle();
 
-      const verificado = readBack?.tipo === "credito_estornado";
+      const verificado = (readBack?.tipo as string | undefined) === "credito_estornado";
 
       return {
         success: true,

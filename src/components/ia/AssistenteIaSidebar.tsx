@@ -330,7 +330,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               onSend={() => handleSendMessage()}
               isLoading={isLoading}
               voiceStatus={voiceStatus}
-              onToggleVoice={handleToggleVoice}
+              isContinuousMode={false}
+              onToggleContinuousVoice={handleToggleVoice}
+              ttsEnabled={false}
+              onToggleTts={() => {}}
               onCancelVoice={cancelListening}
               interimTranscript={interimTranscript}
               selectedFile={selectedFile}

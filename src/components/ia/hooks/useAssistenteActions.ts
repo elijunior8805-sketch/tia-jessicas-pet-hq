@@ -119,8 +119,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             setIsReviewingVoice(true);
           } else if (status === "requesting_permission") {
             setIaStatus("requesting_permission");
-          } else if (status === "finalizing") {
-            setIaStatus("processing");
           } else if (status === "idle") {
             setIaStatus("idle");
             setInterimTranscript("");
