@@ -298,11 +298,14 @@ export const JessiLayout: React.FC = () => {
       const res = await processarMensagemFn({
         data: {
           mensagem: `Confirmar ação: ${actionTitle}`,
+          contexto: contexto as any,
+          historico: messages.slice(-10) as any,
           confirmacaoAcaoPendenteId: actionId,
           dadosConfirmacao: {
             tool: actionTool,
             params: actionParams,
           },
+          correlationId: `req_conf_${Date.now()}`,
         },
       });
 
@@ -315,6 +318,9 @@ export const JessiLayout: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+      if (res.novoContexto) {
+        setContexto((prev) => ({ ...prev, ...res.novoContexto }));
+      }
       setStatus("disponivel");
       toast.success("Ação confirmada e registrada com sucesso!");
     } catch (err: any) {

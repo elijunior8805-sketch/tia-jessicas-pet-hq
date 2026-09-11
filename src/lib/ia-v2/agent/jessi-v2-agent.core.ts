@@ -1371,12 +1371,31 @@ export async function processarMensagemJessiV2Core(
             subtitle: `Pet: ${novoContexto.pet?.nome || contextoAtual.pet?.nome}`,
             data: resFicha.data,
           });
-        } else if (!respostaTexto) {
-          respostaTexto = `Aqui estão os dados cadastrais solicitados.`;
-        }
       } else {
-        // Conversação Natural / Saudação
-        respostaTexto = `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com a agenda, clientes, pets, planos ou financeiro?`;
+        // Conversação Natural / Saudação Generativa via Gemini com Fallback
+        try {
+          const genResp = await geminiProvider.gerarResposta({
+            promptSistema: "",
+            mensagemUsuario: textoLimpo,
+            dadosOperacionais: {
+              operador: user?.nome || "Eli Júnior",
+              cargo: user?.cargo || "Administrador",
+              contexto: {
+                cliente: novoContexto.cliente || contextoAtual.cliente,
+                pet: novoContexto.pet || contextoAtual.pet,
+                dataReferencia: contextoAtual.dataReferencia,
+              },
+            },
+            historico: (input.historico || []) as any,
+          });
+          if (genResp?.texto && genResp.texto.length > 5) {
+            respostaTexto = genResp.texto;
+          } else {
+            respostaTexto = `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com a agenda, clientes, pets, planos ou financeiro?`;
+          }
+        } catch {
+          respostaTexto = `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com a agenda, clientes, pets, planos ou financeiro?`;
+        }
       }
     }
 

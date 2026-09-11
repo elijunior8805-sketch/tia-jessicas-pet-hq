@@ -144,15 +144,25 @@ export class ClientesPetsAdapter {
       }
 
       // 2. Busca ampla de clientes e pets no banco para ranqueamento
-      const { data: todosClientes } = await sb
+      const { data: todosClientes, error: errClientes } = await sb
         .from("clientes")
         .select("id, nome, telefone, email, rua, numero, complemento, bairro, cidade, pets(id, nome, raca, porte)")
         .limit(100);
 
-      const { data: todosPets } = await sb
+      if (errClientes) {
+        console.error("[ClientesPetsAdapter] Erro ao buscar clientes:", errClientes);
+        throw errClientes;
+      }
+
+      const { data: todosPets, error: errPets } = await sb
         .from("pets")
         .select("id, nome, raca, porte, clientes(id, nome, telefone, email)")
         .limit(100);
+
+      if (errPets) {
+        console.error("[ClientesPetsAdapter] Erro ao buscar pets:", errPets);
+        throw errPets;
+      }
 
       const candidatosRanqueados: CandidatoLocalizado[] = [];
 
@@ -358,8 +368,8 @@ export class ClientesPetsAdapter {
 
       let summary = `**Ficha Cadastral de ${petNome}** (${raca})\n• Tutor: ${tutor}\n• Porte: ${petObj.porte || "Médio"} | Peso: ${petObj.peso ? `${petObj.peso}kg` : "Não informado"}`;
 
-      if (petObj.cuidados_saude || petObj.alergias || petObj.observacoes_saude) {
-        summary += `\n• Cuidados/Alergias: ${petObj.observacoes_saude || petObj.cuidados_saude || petObj.alergias}`;
+      if (petObj.cuidados_saude || petObj.alergias) {
+        summary += `\n• Cuidados/Alergias: ${[petObj.cuidados_saude, petObj.alergias].filter(Boolean).join(" • ")}`;
       }
 
       if (ultimoAtendimento) {
@@ -377,7 +387,8 @@ export class ClientesPetsAdapter {
         source: "ficha_pet_consolidada",
         data: {
           ...petObj,
-          observacoes_saude: petObj.observacoes_saude || petObj.cuidados_saude || petObj.alergias || null,
+          cuidados_saude: petObj.cuidados_saude || null,
+          alergias: petObj.alergias || null,
           cliente: clienteData ? { ...clienteData, endereco: enderecoCliente } : null,
           historicoAtendimentos: atendimentos || [],
           ultimoAtendimento,
@@ -523,11 +534,14 @@ export class ClientesPetsAdapter {
         .maybeSingle();
 
       return {
-        success: true,
+        success: Boolean(readBack?.id),
+        entity_id: novoCliente.id,
         source: "tabela_clientes",
         affected_record_id: novoCliente.id,
         after: novoCliente,
-        summary: `Cliente ${novoCliente.nome} cadastrado e verificado com sucesso no banco de dados.`,
+        summary: Boolean(readBack?.id)
+          ? `Cliente ${novoCliente.nome} cadastrado e verificado com sucesso no banco de dados.`
+          : `Aviso: Falha ao verificar o registro físico do cliente no banco de dados.`,
         executed_at: new Date().toISOString(),
         verified: Boolean(readBack?.id),
         idempotency_key: idempotencyKey,

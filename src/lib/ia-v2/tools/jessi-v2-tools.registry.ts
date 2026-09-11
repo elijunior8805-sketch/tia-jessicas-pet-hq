@@ -696,110 +696,123 @@ export async function despacharFerramentaV2(
 
   const chave = idempotencyKey || `v2_exec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-  switch (toolNome) {
-    case "consultar_agenda":
-      return await AgendaAdapter.consultarAgendaPorData(
-        sb,
-        params.data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
-      );
+  try {
+    switch (toolNome) {
+      case "consultar_agenda":
+        return await AgendaAdapter.consultarAgendaPorData(
+          sb,
+          params.data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
+        );
 
-    case "consultar_horarios_disponiveis":
-    case "verificar_disponibilidade":
-    case "identificar_encaixes":
-      return await AgendaAdapter.identificarEncaixesDisponiveis(
-        sb,
-        params.data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
-        params.porte || "medio"
-      );
+      case "consultar_horarios_disponiveis":
+      case "verificar_disponibilidade":
+      case "identificar_encaixes":
+        return await AgendaAdapter.identificarEncaixesDisponiveis(
+          sb,
+          params.data || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
+        );
 
-    case "buscar_clientes_pets":
-      return await ClientesPetsAdapter.buscarClientesPets(sb, params.termo || params.termoBusca || "");
+      case "buscar_clientes_pets":
+        return await ClientesPetsAdapter.buscarClientesPets(sb, params.termo || params.termoBusca || "");
 
-    case "obter_ficha_pet":
-      return await ClientesPetsAdapter.obterFichaPet(sb, params.petId);
+      case "obter_ficha_pet":
+        return await ClientesPetsAdapter.obterFichaPet(sb, params.petId);
 
-    case "obter_ficha_cliente":
-      return await ClientesPetsAdapter.obterFichaClienteCompleta(sb, params.clienteId);
+      case "obter_ficha_cliente":
+        return await ClientesPetsAdapter.obterFichaClienteCompleta(sb, params.clienteId);
 
-    case "consultar_saldo_programas":
-    case "consultar_saldo_creditos":
-      return await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, params.clienteId, params.petId);
+      case "consultar_saldo_programas":
+      case "consultar_saldo_creditos":
+        return await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, params.clienteId, params.petId);
 
-    case "consultar_programas_ativos_geral":
-      return await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
+      case "consultar_programas_ativos_geral":
+        return await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
 
-    case "gerar_termo_programa_pdf":
-      return await ProgramasCreditosAdapter.prepararTermoPdf(sb, params.contratoId);
+      case "gerar_termo_programa_pdf":
+        return await ProgramasCreditosAdapter.prepararTermoPdf(sb, params.contratoId);
 
-    case "consultar_financeiro_consolidado":
-    case "gerar_relatorio_financeiro":
-    case "consultar_faturamento":
-      return await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, params.periodo || "mes");
+      case "consultar_financeiro_consolidado":
+      case "gerar_relatorio_financeiro":
+      case "consultar_faturamento":
+        return await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, params.periodo || "mes");
 
-    case "gerar_central_proativa":
-      return await ProativoAdapter.gerarCentralProativa(sb);
+      case "gerar_central_proativa":
+        return await ProativoAdapter.gerarCentralProativa(sb);
 
-    case "identificar_horarios_vagos":
-      return await ProativoAdapter.identificarHorariosVagos(sb, params.data);
+      case "identificar_horarios_vagos":
+        return await ProativoAdapter.identificarHorariosVagos(sb, params.data);
 
-    case "identificar_clientes_retorno":
-      return await ProativoAdapter.identificarClientesParaRetorno(sb);
+      case "identificar_clientes_retorno":
+        return await ProativoAdapter.identificarClientesParaRetorno(sb);
 
-    case "gerar_mensagem_whatsapp":
-      return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);
+      case "gerar_mensagem_whatsapp":
+        return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);
 
-    case "registrar_envio_whatsapp":
-      await MensagensWhatsAppAdapter.registrarEnvioComunicacao(sb, params as any);
-      return {
-        success: true,
-        source: "mensagens_whatsapp",
-        summary: "Disparo de comunicação registrado na auditoria com sucesso.",
-        executed_at: new Date().toISOString(),
-      };
+      case "registrar_envio_whatsapp":
+        await MensagensWhatsAppAdapter.registrarEnvioComunicacao(sb, params as any);
+        return {
+          success: true,
+          source: "mensagens_whatsapp",
+          summary: "Disparo de comunicação registrado na auditoria com sucesso.",
+          executed_at: new Date().toISOString(),
+        };
 
-    case "executar_agendamento":
-    case "criar_agendamento":
-      return await AgendaAdapter.executarAgendamentoConfirmado(sb, params, chave);
+      case "executar_agendamento":
+      case "criar_agendamento":
+        return await AgendaAdapter.executarAgendamentoConfirmado(sb, params, chave);
 
-    case "executar_remarcacao":
-    case "reagendar_agendamento":
-    case "remarcar_agendamento":
-    case "reagendar_horario":
-      return await AgendaAdapter.executarRemarcacaoConfirmada(sb, params as any, chave);
+      case "executar_remarcacao":
+      case "reagendar_agendamento":
+      case "remarcar_agendamento":
+      case "reagendar_horario":
+        return await AgendaAdapter.executarRemarcacaoConfirmada(sb, params as any, chave);
 
-    case "executar_cancelamento":
-    case "cancelar_agendamento":
-      return await AgendaAdapter.executarCancelamentoConfirmado(sb, params as any, chave);
+      case "executar_cancelamento":
+      case "cancelar_agendamento":
+        return await AgendaAdapter.executarCancelamentoConfirmado(sb, params as any, chave);
 
-    case "verificar_agendamento_id":
-      return await AgendaAdapter.verificarAgendamentoPorId(sb, params.agendamentoId);
+      case "verificar_agendamento_id":
+        return await AgendaAdapter.verificarAgendamentoPorId(sb, params.agendamentoId);
 
-    case "executar_cadastro_cliente":
-      return await ClientesPetsAdapter.executarCadastroClienteConfirmado(sb, params as any, chave);
+      case "executar_cadastro_cliente":
+        return await ClientesPetsAdapter.executarCadastroClienteConfirmado(sb, params as any, chave);
 
-    case "executar_consumo_credito":
-      return await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(sb, params as any, chave);
+      case "executar_consumo_credito":
+        return await ProgramasCreditosAdapter.executarConsumoCreditoConfirmado(sb, params as any, chave);
 
-    case "executar_recebimento":
-      return await FinanceiroRelatoriosAdapter.executarRecebimentoConfirmado(sb, params as any, chave);
+      case "executar_recebimento":
+      case "executar_registro_pagamento":
+        return await FinanceiroRelatoriosAdapter.executarRecebimentoConfirmado(sb, params as any, chave);
 
-    case "executar_pagamento_parcial":
-      return await FinanceiroRelatoriosAdapter.executarPagamentoParcialConfirmado(sb, params as any, chave);
+      case "executar_pagamento_parcial":
+        return await FinanceiroRelatoriosAdapter.executarPagamentoParcialConfirmado(sb, params as any, chave);
 
-    case "executar_estorno":
-      return await FinanceiroRelatoriosAdapter.executarEstornoConfirmado(sb, params as any, chave);
+      case "executar_estorno":
+      case "executar_estorno_pagamento":
+        return await FinanceiroRelatoriosAdapter.executarEstornoConfirmado(sb, params as any, chave);
 
-    case "executar_conciliacao":
-      return await FinanceiroRelatoriosAdapter.executarConciliacaoAutorizada(sb, params as any, chave);
+      case "executar_conciliacao":
+        return await FinanceiroRelatoriosAdapter.executarConciliacaoAutorizada(sb, params as any, chave);
 
-    default:
-      return {
-        success: false,
-        source: "tools_registry",
-        summary: `Operação "${toolNome}" não autorizada.`,
-        executed_at: new Date().toISOString(),
-        error_code: "TOOL_NOT_REGISTERED",
-        correlation_id: `tool_not_found_${Date.now()}`,
-      };
+      default:
+        return {
+          success: false,
+          source: "tools_registry",
+          summary: `Operação "${toolNome}" não autorizada.`,
+          executed_at: new Date().toISOString(),
+          error_code: "TOOL_NOT_REGISTERED",
+          correlation_id: `tool_not_found_${Date.now()}`,
+        };
+    }
+  } catch (err: any) {
+    console.error(`[despacharFerramentaV2] Erro inesperado ao despachar "${toolNome}":`, err);
+    return {
+      success: false,
+      source: "tools_registry_exception",
+      summary: `Falha ao processar a ferramenta "${toolNome}": ${err?.message || "Erro interno"}`,
+      executed_at: new Date().toISOString(),
+      error_code: err?.code || "TOOL_EXECUTION_ERROR",
+      correlation_id: `tool_err_${Date.now()}`,
+    };
   }
 }
