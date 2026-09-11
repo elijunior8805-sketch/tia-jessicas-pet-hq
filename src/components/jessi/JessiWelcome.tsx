@@ -199,11 +199,11 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
             </div>
           </div>
 
-          {centralData?.amanha.naoConfirmados ? (
+          {Boolean(centralData?.amanha.naoConfirmados) && (
             <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/80 border border-amber-200 flex items-center justify-between gap-2 text-xs">
               <div className="min-w-0">
                 <span className="font-bold text-amber-900 block truncate text-xs sm:text-sm">
-                  {centralData.amanha.naoConfirmados} agendamento(s) sem confirmação
+                  {centralData?.amanha.naoConfirmados} agendamento(s) sem confirmação
                 </span>
                 <span className="text-[10px] sm:text-[11px] text-amber-800/80 block truncate">
                   Dispare lembretes para garantir presença.
