@@ -6,7 +6,7 @@ import {
   consolidarTranscricao,
   ehFalaValida,
 } from "./ia-voz";
-import { reproduzirFalaHumana, ControladorFala } from "./ia-voz-tts";
+import { reproduzirFalaHumana, humanizarTextoParaVoz, ControladorFala } from "./ia-voz-tts";
 import { desbloquearAudioMobile } from "./ia-voz-unlock";
 import { toast } from "sonner";
 
@@ -291,7 +291,6 @@ export function useJessiVoice(
       }
 
       // Desbloqueia contexto de áudio em mobile
-      const { desbloquearAudioMobile } = await import("./ia-voz-unlock");
       desbloquearAudioMobile();
 
       const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
