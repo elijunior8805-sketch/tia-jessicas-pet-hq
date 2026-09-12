@@ -39,9 +39,11 @@ export class MensagensWhatsAppAdapter {
     let texto = "";
 
     switch (payload.tipoMensagem) {
-      case "lembrete_agenda":
-        texto = `Olá, ${payload.nomeCliente}! 🐾 Passando para lembrar do agendamento do(a) ${payload.nomePet || "seu pet"} no Spa de Pet Tia Jéssica marcado para ${payload.detalhes?.horario || "hoje"}. Estamos ansiosos para recebê-lo!`;
+      case "lembrete_agenda": {
+        const infoHorario = payload.detalhes?.horario ? payload.detalhes.horario : "no horário agendado";
+        texto = `Olá, ${payload.nomeCliente}! 🐾 Passando para lembrar do agendamento do(a) ${payload.nomePet || "seu pet"} no Spa de Pet Tia Jéssica ${infoHorario.startsWith("para") || infoHorario.startsWith("no") || infoHorario.startsWith("às") ? infoHorario : `para ${infoHorario}`}. Estamos ansiosos para recebê-lo!`;
         break;
+      }
 
       case "pet_pronto":
         texto = `Oi, ${payload.nomeCliente}! ✨ O(A) ${payload.nomePet || "seu pet"} já finalizou o banho e tosa e está cheiroso(a) e pronto(a) para voltar para casa! Pode vir buscá-lo(a). 🐶🚿`;

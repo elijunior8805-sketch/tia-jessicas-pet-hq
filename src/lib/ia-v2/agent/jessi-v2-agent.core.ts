@@ -2009,9 +2009,9 @@ export async function processarMensagemJessiV2Core(
         });
 
         if (telefoneCliente) {
-          respostaTexto = `Preparei a mensagem para **${nomeCliente}**:\n\n> "${msgGerada.mensagemFormatada}"\n\n📲 **[Clique aqui para abrir no WhatsApp](${msgGerada.urlWhatsApp})**`;
+          respostaTexto = `Preparei a mensagem para **${nomeCliente}**! Você pode enviar diretamente no WhatsApp ou copiar o texto pelo card abaixo:`;
         } else {
-          respostaTexto = `Preparei o modelo de mensagem para **${nomeCliente}**:\n\n> "${msgGerada.mensagemFormatada}"\n\n*(Observação: ${nomeCliente} não tem telefone cadastrado para gerar o link direto do WhatsApp).*`;
+          respostaTexto = `Preparei a mensagem para **${nomeCliente}** no card abaixo. *(Observação: cliente sem telefone cadastrado para abertura direta).*`;
         }
 
         cards.push({

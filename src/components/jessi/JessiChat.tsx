@@ -7,6 +7,7 @@ import { ProgramaCard } from "./cards/ProgramaCard";
 import { ComprovanteCard } from "./cards/ComprovanteCard";
 import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
 import { AlertaCard } from "./cards/AlertaCard";
+import { ComunicacaoCard } from "./cards/ComunicacaoCard";
 import { Sparkles, User, ArrowRight } from "lucide-react";
 
 interface JessiChatProps {
@@ -73,6 +74,8 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                         return <ProgramaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "comprovante":
                         return <ComprovanteCard key={cIdx} data={card.data} />;
+                      case "comunicacao":
+                        return <ComunicacaoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "confirmacao":
                         return (
                           <ConfirmacaoCard
