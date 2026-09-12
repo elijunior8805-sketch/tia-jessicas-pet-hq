@@ -22,20 +22,25 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\[id:[^\]]+\]/gi, "");
   t = t.replace(/\[(.*?)\]\([^)]+\)/g, "$1"); // Links markdown -> apenas o texto
 
-  // 2. Remove tags HTML e IDs técnicos
+  // 2. Remove tags HTML, IDs técnicos e observações entre parênteses
   t = t.replace(/<[^>]*>/g, "");
   t = t.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "");
+  t = t.replace(/\*?\s*\(Observação:.*?\)\s*\*?/gi, "");
+  t = t.replace(/\*?\s*\(Obs:.*?\)\s*\*?/gi, "");
 
   // 3. Remove todos os Emojis (para não serem soletrados ou causarem pausas estranhas)
   t = t.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{FE0F}]/gu, "");
 
-  // 4. Remove símbolos markdown de formatação
+  // 4. Remove símbolos markdown de formatação, quotes e marcadores de lista
+  t = t.replace(/^>\s*/gm, "");
   t = t.replace(/\*\*(.*?)\*\*/g, "$1");
   t = t.replace(/\*(.*?)\*/g, "$1");
   t = t.replace(/_{1,2}(.*?)_{1,2}/g, "$1");
   t = t.replace(/^#{1,6}\s+/gm, "");
   t = t.replace(/^[•*\-–—]\s+/gm, "");
+  t = t.replace(/^\d+\.\s+/gm, "");
   t = t.replace(/\n[•*\-–—]\s+/g, ", ");
+  t = t.replace(/\n\d+\.\s+/g, ", ");
 
   // 5. Normalização de Moeda (R$ 75,00 -> 75 reais)
   t = t.replace(/R\$\s*(\d+(?:\.\d{3})*),(\d{2})/gi, (_, inteiros, centavos) => {

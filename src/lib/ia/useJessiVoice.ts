@@ -278,14 +278,31 @@ export function useJessiVoice(
         }
       };
 
+      const textoParaFalar = humanizarTextoParaVoz(texto);
+      if (!textoParaFalar) {
+        finalizarFala();
+        return;
+      }
+
       // 1. Tenta carregar áudio neural de altíssima definição (estúdio/humano)
       try {
-        const textoCacheKey = texto.trim().slice(0, 300);
+        const textoCacheKey = textoParaFalar.slice(0, 300);
         let audioDataUrl = audioPreCarregado || audioCacheRef.current.get(textoCacheKey);
 
+        // Se não veio pré-carregado pelo servidor, sintetiza direto no cliente via Edge Speech HD
+        if (!audioDataUrl) {
+          const { sintetizarEdgeNeuralCliente } = await import("./ia-voz-edge-client");
+          const urlGerada = await sintetizarEdgeNeuralCliente(textoParaFalar);
+          if (urlGerada) {
+            audioDataUrl = urlGerada;
+            audioCacheRef.current.set(textoCacheKey, audioDataUrl);
+          }
+        }
+
+        // Se ainda não obteve, tenta o endpoint do servidor como fallback adicional
         if (!audioDataUrl) {
           const { gerarAudioNeuralJessiFn } = await import("./ia-voz.functions");
-          const res = await gerarAudioNeuralJessiFn({ data: { texto } });
+          const res = await gerarAudioNeuralJessiFn({ data: { texto: textoParaFalar } });
           if (res?.audioDataUrl) {
             audioDataUrl = res.audioDataUrl;
             audioCacheRef.current.set(textoCacheKey, audioDataUrl);
@@ -303,7 +320,7 @@ export function useJessiVoice(
 
           audio.onerror = () => {
             console.warn("[Neural Audio Player]: Falha ao tocar áudio, usando fallback");
-            executarFallbackSintese(texto, finalizarFala);
+            executarFallbackSintese(textoParaFalar, finalizarFala);
           };
 
           await audio.play();
@@ -314,7 +331,7 @@ export function useJessiVoice(
       }
 
       // 2. Fallback fluído para o sintetizador neural do navegador
-      executarFallbackSintese(texto, finalizarFala);
+      executarFallbackSintese(textoParaFalar, finalizarFala);
     },
     [ttsEnabled, isContinuousMode, pauseListening, resumeListening]
   );

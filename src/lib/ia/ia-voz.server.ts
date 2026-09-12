@@ -35,14 +35,16 @@ async function sintetizarEdgeNeural(texto: string): Promise<string | null> {
 
       ws.onopen = () => {
         // 1. Configuração do formato de áudio (MP3 24kHz Mono 48kbps)
+        const timestampConfig = new Date().toISOString();
         const configMsg =
-          `Content-Type:application/json; charset=utf-8\r\n` +
-          `Path:speech.config\r\n\r\n` +
+          `Path:speech.config\r\n` +
+          `X-Timestamp:${timestampConfig}\r\n` +
+          `Content-Type:application/json; charset=utf-8\r\n\r\n` +
           JSON.stringify({
             context: {
               synthesis: {
                 audio: {
-                  metadataoptions: { sentenceBoundaryEnabled: false, wordBoundaryEnabled: false },
+                  metadataoptions: { sentenceBoundaryEnabled: "false", wordBoundaryEnabled: "false" },
                   outputFormat: "audio-24khz-48kbitrate-mono-mp3",
                 },
               },
@@ -50,19 +52,21 @@ async function sintetizarEdgeNeural(texto: string): Promise<string | null> {
           });
         ws.send(configMsg);
 
-        // 2. Envio do SSML com a melhor voz feminina neural brasileira (Francisca)
-        const requestId = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        // 2. Envio do SSML com a voz feminina neural brasileira (Francisca)
+        const requestId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+        const timestampSSML = new Date().toISOString();
         const textoEscapado = texto.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
         const ssml =
           `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='pt-BR'>` +
           `<voice name='pt-BR-FranciscaNeural'>` +
-          `<prosody rate='+0%' pitch='+0Hz'>${textoEscapado}</prosody>` +
+          `<prosody pitch='+1Hz' rate='+2%' volume='+0%'>${textoEscapado}</prosody>` +
           `</voice></speak>`;
 
         const ssmlMsg =
+          `Path:ssml\r\n` +
           `X-RequestId:${requestId}\r\n` +
-          `Content-Type:application/ssml+xml\r\n` +
-          `Path:ssml\r\n\r\n` +
+          `X-Timestamp:${timestampSSML}\r\n` +
+          `Content-Type:application/ssml+xml\r\n\r\n` +
           ssml;
         ws.send(ssmlMsg);
       };

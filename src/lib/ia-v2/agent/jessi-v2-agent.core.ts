@@ -2025,6 +2025,22 @@ export async function processarMensagemJessiV2Core(
             tipoMensagem,
           },
         });
+      } else if (intencao.intencao === "agradecimento_despedida") {
+        const nomeOp = user?.nome ? user.nome.split(" ")[0] : "Eli";
+        const respostasCarinhosas = [
+          `Por nada, ${nomeOp}! Sempre que precisar de mim para consultar agenda, clientes, pets ou finanças, estou por aqui. Bom trabalho e um abraço para os pets! 🐾✨`,
+          `Imagina, estou sempre às ordens! Se precisar de mais qualquer coisa, é só me chamar. Tenha um ótimo dia e bom trabalho! 🐶💚`,
+          `Disponha, ${nomeOp}! Qualquer dúvida ou novo agendamento, estarei pronta para ajudar. Até logo! ✨`,
+          `Perfeito! Fico feliz em ajudar. Conte comigo sempre que precisar! Tenha um excelente dia! 🐾`,
+        ];
+        respostaTexto = respostasCarinhosas[Math.floor(Math.random() * respostasCarinhosas.length)];
+        // Limpa o contexto de seleção ativa para concluir o fluxo com elegância
+        novoContexto.cliente = null;
+        novoContexto.clienteSelecionadoId = null;
+        novoContexto.clienteSelecionadoNome = null;
+        novoContexto.pet = null;
+        novoContexto.petSelecionadoId = null;
+        novoContexto.petSelecionadoNome = null;
       } else {
         // Conversação Natural / Saudação Generativa via Gemini com Fallback
         try {

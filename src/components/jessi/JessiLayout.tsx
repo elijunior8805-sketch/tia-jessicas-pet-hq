@@ -222,6 +222,9 @@ export const JessiLayout: React.FC = () => {
       }
 
       // 4. Retomada automática da escuta e fala da resposta da Jessi
+      const ehEncerramento = (res as any).intencao?.intencao === "agradecimento_despedida" ||
+                             (res as any).intent?.intencao === "agradecimento_despedida";
+
       if (ttsEnabled) {
         const payloadFala = (res as any).audioDataUrl
           ? { texto: res.respostaTexto, audioDataUrl: (res as any).audioDataUrl }
@@ -229,13 +232,25 @@ export const JessiLayout: React.FC = () => {
 
         speakResponse(payloadFala, () => {
           if (isContinuousMode) {
-            resumeListening();
+            if (ehEncerramento) {
+              stopContinuousMode();
+              setStatus("disponivel");
+              setStatusDetalhe(undefined);
+            } else {
+              resumeListening();
+            }
           }
         });
       } else if (isContinuousMode) {
-        setTimeout(() => {
-          resumeListening();
-        }, 350);
+        if (ehEncerramento) {
+          stopContinuousMode();
+          setStatus("disponivel");
+          setStatusDetalhe(undefined);
+        } else {
+          setTimeout(() => {
+            resumeListening();
+          }, 350);
+        }
       }
     } catch (err: any) {
       if (controller.signal.aborted) {

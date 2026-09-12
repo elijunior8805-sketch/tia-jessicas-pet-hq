@@ -585,7 +585,28 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("tem horario") ||
       textoLower.includes("encaixe");
 
-    if (matchOrdinal) {
+    // Encerramento / Agradecimento / Despedida ("OK obrigado", "Obrigado", "Valeu", "Pode encerrar", "Tudo certo", "Só isso")
+    const textoLimpoPont = textoLower.replace(/[!.,?]/g, "").trim();
+    const ehAgradecimentoDespedida =
+      /^(ok\s*,?\s*)?(obrigad[oa]|valeu|muito obrigad[oa]|valeu jessi|obrigad[oa] jessi|perfeito\s*,?\s*obrigad[oa]|perfeito\s*,?\s*valeu|show\s*,?\s*obrigad[oa]|pode encerrar|encerrar|fechar|concluir|so isso|só isso|era so isso|era só isso|por enquanto e so|por enquanto é só|por hoje e so|por hoje é só|tudo certo|tudo ok|tudo resolvido|tchau|ate logo|até logo|ate mais|até mais)(\s*jessi)?$/i.test(textoLimpoPont) ||
+      textoLimpoPont === "ok obrigado" ||
+      textoLimpoPont === "ok obrigada" ||
+      textoLimpoPont === "obrigado" ||
+      textoLimpoPont === "obrigada" ||
+      textoLimpoPont === "valeu" ||
+      textoLimpoPont === "valeu jessi" ||
+      textoLimpoPont === "pode encerrar" ||
+      textoLimpoPont === "encerrar" ||
+      textoLimpoPont === "só isso" ||
+      textoLimpoPont === "so isso" ||
+      textoLimpoPont === "tudo certo";
+
+    if (ehAgradecimentoDespedida) {
+      dominio = "geral_conversacional";
+      intencao = "agradecimento_despedida";
+      ferramentaSugerida = null;
+      explicacao = "Agradecimento e encerramento amigável de conversa/atendimento.";
+    } else if (matchOrdinal) {
       dominio = "clientes_pets";
       intencao = "selecionar_candidato_ordinal";
       ferramentaSugerida = "buscar_clientes_pets";
