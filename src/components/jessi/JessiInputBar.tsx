@@ -153,13 +153,15 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
         <Button
           type="button"
           size="icon"
-          variant={isContinuousMode ? "destructive" : "outline"}
+          variant={isContinuousMode ? "destructive" : isListening ? "default" : "outline"}
           onClick={onToggleContinuousVoice}
           disabled={isLoading}
-          title={isContinuousMode ? "Desativar modo de conversa contínua" : "Ativar Modo de Conversa por Voz Contínua"}
+          title={isContinuousMode ? "Desativar modo de conversa contínua" : isListening ? "Ouvindo sua voz..." : "Ativar Modo de Conversa por Voz Contínua"}
           className={`h-10 w-10 shrink-0 border-border/80 rounded-xl transition-all ${
             isContinuousMode
-              ? "bg-red-600 hover:bg-red-700 text-white shadow-sm ring-2 ring-red-400 ring-offset-1"
+              ? "bg-red-600 hover:bg-red-700 text-white shadow-sm ring-2 ring-red-400 ring-offset-1 animate-pulse"
+              : isListening
+              ? "bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm ring-2 ring-emerald-400 ring-offset-1 animate-pulse"
               : "text-muted-foreground hover:text-emerald-700 hover:border-emerald-600/40"
           }`}
         >

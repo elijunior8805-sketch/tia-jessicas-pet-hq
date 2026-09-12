@@ -1,5 +1,5 @@
 import React from "react";
-import { User, Phone, MapPin, PawPrint, CalendarPlus, Gift, ArrowRight } from "lucide-react";
+import { User, Phone, MapPin, PawPrint, CalendarPlus, Gift, ArrowRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ClienteCardProps {
@@ -147,9 +147,17 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
                       onClick={() => onActionClick(`E os créditos do ${primeiroPet}?`)}
                       className="h-6 px-2 text-[10px] text-[#8C6D1F] border-[#C8A951]/50 hover:bg-amber-50 rounded-md font-medium"
                     >
-                      <Gift className="h-2.5 w-2.5 mr-1" /> Créditos do {primeiroPet}
+                      <Gift className="h-2.5 w-2.5 mr-1" /> Créditos
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onActionClick(`Preparar mensagem de WhatsApp para ${c.nome}`)}
+                    className="h-6 px-2 text-[10px] text-emerald-800 border-emerald-300 hover:bg-emerald-50 rounded-md font-medium"
+                  >
+                    <MessageSquare className="h-2.5 w-2.5 mr-1" /> Mensagem
+                  </Button>
                   <Button
                     size="sm"
                     onClick={() => onActionClick(`Agende um banho para o ${primeiroPet || c.nome} amanhã`)}

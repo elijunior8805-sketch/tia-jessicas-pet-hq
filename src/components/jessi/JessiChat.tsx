@@ -170,6 +170,59 @@ export const JessiChat: React.FC<JessiChatProps> = ({
         </div>
       )}
 
+      {/* Chips de Ações Rápidas de 1-Clique para Continuidade Fluida */}
+      {onSendMessage && !isLoading && (
+        <div className="pt-2 pb-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none no-scrollbar">
+            <span className="text-[10px] font-semibold text-muted-foreground shrink-0 uppercase tracking-wider pl-1">
+              Sugestões:
+            </span>
+            <button
+              type="button"
+              onClick={() => onSendMessage("consultar agenda de hoje")}
+              className="px-2.5 py-1 rounded-full bg-background border border-emerald-300/80 hover:bg-emerald-50 text-emerald-900 text-xs font-medium shrink-0 transition-colors shadow-2xs hover:border-emerald-500"
+            >
+              📅 Agenda de hoje
+            </button>
+            <button
+              type="button"
+              onClick={() => onSendMessage("consultar faturamento do mês")}
+              className="px-2.5 py-1 rounded-full bg-background border border-emerald-300/80 hover:bg-emerald-50 text-emerald-900 text-xs font-medium shrink-0 transition-colors shadow-2xs hover:border-emerald-500"
+            >
+              💰 Caixa & Finanças
+            </button>
+            <button
+              type="button"
+              onClick={() => onSendMessage("quais os horários livres de hoje?")}
+              className="px-2.5 py-1 rounded-full bg-background border border-border/80 hover:bg-muted text-foreground text-xs font-medium shrink-0 transition-colors shadow-2xs"
+            >
+              ⏰ Horários livres
+            </button>
+            <button
+              type="button"
+              onClick={() => onSendMessage("buscar clientes")}
+              className="px-2.5 py-1 rounded-full bg-background border border-border/80 hover:bg-muted text-foreground text-xs font-medium shrink-0 transition-colors shadow-2xs"
+            >
+              🐾 Clientes & Pets
+            </button>
+            <button
+              type="button"
+              onClick={() => onSendMessage("consultar catalogo de programas")}
+              className="px-2.5 py-1 rounded-full bg-background border border-[#C8A951]/60 hover:bg-amber-50 text-[#8C6D1F] text-xs font-medium shrink-0 transition-colors shadow-2xs"
+            >
+              ⭐ Clubinho
+            </button>
+            <button
+              type="button"
+              onClick={() => onSendMessage("quais clientes não vêm há mais de 30 dias?")}
+              className="px-2.5 py-1 rounded-full bg-background border border-purple-300/80 hover:bg-purple-50 text-purple-900 text-xs font-medium shrink-0 transition-colors shadow-2xs"
+            >
+              📢 Reativar clientes
+            </button>
+          </div>
+        </div>
+      )}
+
       <div ref={bottomRef} />
     </div>
   );
