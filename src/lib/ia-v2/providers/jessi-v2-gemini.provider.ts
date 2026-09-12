@@ -286,9 +286,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     if (texto.includes("leva e traz") || texto.includes("transporte") || texto.includes("taxi dog") || texto.includes("táxi dog") || texto.includes("buscar em casa") || texto.includes("levar em casa")) {
       return "Leva e Traz";
     }
-    if (texto.includes("consulta") || texto.includes("veterinario") || texto.includes("veterinário") || texto.includes("vacina") || texto.includes("vacinação") || texto.includes("vacinacao")) {
-      return "Consulta Veterinária";
-    }
 
     return null;
   }

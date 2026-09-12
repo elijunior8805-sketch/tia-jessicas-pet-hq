@@ -1200,16 +1200,16 @@ export async function processarMensagemJessiV2Core(
         if (!horaAlvo) camposFaltantes.push("Horário desejado");
 
         if (camposFaltantes.length > 0) {
-          let textoOrientacao = `Para preparar o agendamento, por favor informe o **serviço desejado** (ex: Banho, Tosa) e a **data e horário**.`;
+          let textoOrientacao = `Para agendar, por favor me informe o **serviço desejado** (ex: Banho, Tosa) e a **data e horário**.`;
           if (clienteNome && petNome && !servicoNome && !dataAlvo && !horaAlvo) {
-            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**). Qual serviço você deseja agendar (ex: Banho, Tosa, Banho e Tosa) e para qual data e horário?`;
+            textoOrientacao = `Combinado! Estou com o **${petNome}** (${clienteNome}) selecionado. Qual serviço você gostaria de agendar (ex: Banho, Tosa, Banho e Tosa) e para qual dia e horário?`;
           } else if (clienteNome && petNome && servicoNome && !dataAlvo && !horaAlvo) {
-            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**) para o serviço de **${servicoNome}**. Para qual data e horário você deseja agendar?`;
+            textoOrientacao = `Perfeito! Vamos marcar o **${servicoNome}** do **${petNome}** (${clienteNome}). Para qual dia e horário você prefere?`;
           } else if (clienteNome && petNome && servicoNome && dataAlvo && !horaAlvo) {
             const dataFmt = dataAlvo.includes("-") ? dataAlvo.split("-").reverse().join("/") : dataAlvo;
-            textoOrientacao = `Identifiquei o pet **${petNome}** (Tutor: **${clienteNome}**) para **${servicoNome}** no dia **${dataFmt}**. Qual o horário desejado (ex: 14:00)?`;
+            textoOrientacao = `Ótimo! **${servicoNome}** para o **${petNome}** no dia **${dataFmt}**. Qual horário você prefere agendar (ex: 14:00)?`;
           } else if (!clienteNome && !petNome) {
-            textoOrientacao = `Para preparar o agendamento com segurança, por favor me informe o nome do **cliente ou pet**, o **serviço** e a **data e horário** desejados.`;
+            textoOrientacao = `Com certeza! Por favor, me informe o nome do **cliente ou pet**, o **serviço** e a **data e horário** desejados para eu preparar o agendamento.`;
           }
 
           return {
