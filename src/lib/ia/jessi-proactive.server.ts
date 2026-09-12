@@ -194,7 +194,7 @@ export async function gerarCentralOperacionalJessi(
   oportunidades.push({
     id: "op_programas_renovacao",
     titulo: "Equivalência de Banhos Ativa",
-    descricao: "1 crédito de banho cobre tanto Banho Simples quanto Banho Premium sem custo adicional.",
+    descricao: "1 crédito de banho cobre tanto Banho Essencial quanto Banho Premium sem custo adicional.",
     acaoSugerida: "Oferecer upgrade para clientes de planos ativos.",
     comando: "consultar catalogo de programas",
   });

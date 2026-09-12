@@ -365,7 +365,7 @@ export function ProgramaFormDialog({ open, onOpenChange, initial }: ProgramaForm
             <Input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar serviço do catálogo (ex: banho simples, hidratação, tosa)..."
+              placeholder="Buscar serviço do catálogo (ex: banho essencial, hidratação, tosa)..."
               className="text-xs h-8"
             />
             <ScrollArea className="h-40 rounded-lg border border-sidebar-border/50 bg-card">

@@ -16,8 +16,8 @@ export const REGRAS_CATEGORIAS_PADRAO: Record<CategoriaCreditoTipo, RegraEquival
   banho: {
     categoria_credito: "banho",
     nome_categoria: "Banho",
-    descricao_cobertura: "Válido para Banho Simples ou Banho Premium",
-    servicos_elegiveis_nomes: ["Banho Simples", "Banho Premium", "Banho", "Banho e Secagem"],
+    descricao_cobertura: "Válido para Banho Essencial ou Banho Premium",
+    servicos_elegiveis_nomes: ["Banho Essencial", "Banho Simples", "Banho Premium", "Banho", "Banho e Secagem"],
   },
   hidratacao: {
     categoria_credito: "hidratacao",
@@ -66,7 +66,7 @@ export function identificarCategoriaCredito(servico: { id?: string; nome?: strin
   const cat = normalizarTexto(servico.categoria || "");
   const nome = normalizarTexto(servico.nome || "");
 
-  // Banho (Banho Simples, Banho Premium, Banho Terapêutico, etc.)
+  // Banho (Banho Essencial, Banho Simples, Banho Premium, Banho Terapêutico, etc.)
   if (
     cat.includes("banho") ||
     cat === "banhos" ||

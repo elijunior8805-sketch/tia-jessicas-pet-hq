@@ -1132,7 +1132,7 @@ export async function processarMensagemJessiV2Core(
             servicoValor = Number(matchExato.valor || 0);
             duracaoMinutos = Number(matchExato.duracao_min || 60);
           } else if (intencao.dominio === "agenda" && (intencao.intencao === "preparar_agendamento" || intencao.intencao === "criar_agendamento")) {
-            // Múltiplas opções encontradas (ex: Banho Simples vs Banho Premium): Desambiguação proativa
+            // Múltiplas opções encontradas (ex: Banho Essencial vs Banho Premium): Desambiguação proativa
             const opcoesTexto = servicosDB
               .map((s) => `• **${s.nome}**: R$ ${Number(s.valor || 0).toFixed(2)} (${s.duracao_min || 60} min)`)
               .join("\n");

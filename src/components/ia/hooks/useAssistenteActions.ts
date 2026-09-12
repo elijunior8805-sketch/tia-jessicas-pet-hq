@@ -462,7 +462,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         
         if (progs && progs.length > 0) {
           respostaFinal = `### 🎁 Planos do Clubinho\n\n` +
-            `Equivalência de Banho: **1 crédito de banho do Clubinho cobre Banho Simples ou Banho Premium**.\n\n` +
+            `Equivalência de Banho: **1 crédito de banho do Clubinho cobre Banho Essencial ou Banho Premium**.\n\n` +
             progs.map((p: any) => `- **${p.nome}**: R$ ${Number(p.preco || 0).toFixed(2)}`).join("\n");
         } else {
           respostaFinal = "Não encontrei planos do Clubinho ativos no catálogo.";

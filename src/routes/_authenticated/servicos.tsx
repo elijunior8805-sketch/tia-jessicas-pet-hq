@@ -96,7 +96,27 @@ function ServicosPage() {
         expurgarFn({ data: { termo: "BANHO SPA" } }).catch(() => {});
       }
 
-      return limpos;
+      // Auto-migração: renomear 'Banho Simples' para 'Banho Essencial' no banco de dados
+      const banhoSimples = (data as Servico[]).find(
+        (s) => s.nome.trim().toUpperCase() === "BANHO SIMPLES"
+      );
+      if (banhoSimples) {
+        supabase
+          .from("servicos")
+          .update({ nome: "Banho Essencial" })
+          .eq("id", banhoSimples.id)
+          .then(() => {
+            qc.invalidateQueries({ queryKey: ["servicos"] });
+            qc.invalidateQueries({ queryKey: ["servicos-ativos"] });
+          })
+          .catch(() => {});
+      }
+
+      return limpos.map((s) =>
+        s.nome.trim().toUpperCase() === "BANHO SIMPLES"
+          ? { ...s, nome: "Banho Essencial" }
+          : s
+      );
     },
   });
 

@@ -127,7 +127,7 @@ import { humanizarTextoParaVoz, obterMelhorVozPtBr, segmentarEmFrases } from "./
 
 describe("Síntese de Voz Humanizada (TTS)", () => {
   it("converte valores monetários para pronúncia falada natural", () => {
-    expect(humanizarTextoParaVoz("O banho simples custa R$ 75,00")).toBe("O banho simples custa 75 reais.");
+    expect(humanizarTextoParaVoz("O banho essencial custa R$ 75,00")).toBe("O banho essencial custa 75 reais.");
     expect(humanizarTextoParaVoz("Total de R$ 120,50 a receber")).toBe("Total de 120 reais e 50 centavos a receber.");
     expect(humanizarTextoParaVoz("Faturamento de R$ 1.500")).toBe("Faturamento de 1500 reais.");
   });

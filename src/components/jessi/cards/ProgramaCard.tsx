@@ -24,7 +24,7 @@ export const ProgramaCard: React.FC<ProgramaCardProps> = ({ data, onActionClick 
 
       <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/70 text-[11px] text-amber-900">
         <span className="font-semibold block mb-0.5">⭐ Regra de Equivalência de Banho:</span>
-        1 crédito de banho do Clubinho pode ser utilizado tanto para <strong>Banho Simples</strong> quanto para <strong>Banho Premium</strong> sem cobrança extra.
+        1 crédito de banho do Clubinho pode ser utilizado tanto para <strong>Banho Essencial</strong> quanto para <strong>Banho Premium</strong> sem cobrança extra.
       </div>
 
       {!contratos.length ? (

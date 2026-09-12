@@ -1591,7 +1591,13 @@ function NovoAgendamentoDialog({
         .select("id, nome, valor, duracao_min, categoria")
         .eq("ativo", true)
         .order("nome");
-      return (data ?? []).filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"));
+      return (data ?? [])
+        .filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"))
+        .map((s: any) =>
+          s.nome?.trim().toUpperCase() === "BANHO SIMPLES"
+            ? { ...s, nome: "Banho Essencial" }
+            : s
+        );
     },
   });
 
@@ -2165,7 +2171,13 @@ function EditarServicosDialog({
         .select("id, nome, valor, duracao_min, categoria")
         .eq("ativo", true)
         .order("nome");
-      return (data ?? []).filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"));
+      return (data ?? [])
+        .filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"))
+        .map((s: any) =>
+          s.nome?.trim().toUpperCase() === "BANHO SIMPLES"
+            ? { ...s, nome: "Banho Essencial" }
+            : s
+        );
     },
   });
 

@@ -1412,7 +1412,7 @@ function ProgramasCuidadoPage() {
                     Equivalência de Banhos
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Créditos da categoria <strong>Banho</strong> cobrem tanto <em>Banho Simples</em> quanto <em>Banho Premium</em> sem diferença financeira.
+                    Créditos da categoria <strong>Banho</strong> cobrem tanto <em>Banho Essencial</em> quanto <em>Banho Premium</em> sem diferença financeira.
                   </p>
                 </Card>
 

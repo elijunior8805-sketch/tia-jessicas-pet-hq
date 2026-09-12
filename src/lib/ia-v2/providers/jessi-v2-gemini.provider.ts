@@ -259,8 +259,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     if (texto.includes("tosa na máquina") || texto.includes("tosa maquina") || texto.includes("tosa geral") || texto.includes("na máquina") || texto.includes("na maquina")) {
       return "Tosa Máquina";
     }
-    if (texto.includes("banho simples") || texto.includes("banho basico") || texto.includes("banho básico") || texto.includes("banho padrão") || texto.includes("banho comum")) {
-      return "Banho Simples";
+    if (texto.includes("banho essencial") || texto.includes("banho simples") || texto.includes("banho basico") || texto.includes("banho básico") || texto.includes("banho padrão") || texto.includes("banho comum")) {
+      return "Banho Essencial";
     }
     if (texto.includes("banho premium") || texto.includes("banho especial") || texto.includes("banho vip") || texto.includes("banho completo") || texto.includes("spa completo")) {
       return "Banho Premium";
@@ -493,7 +493,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       let termoLivre = texto
         .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?)\b/gi, "")
         .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
-        .replace(/\b(banho e tosa|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
+        .replace(/\b(banho e tosa|banho essencial|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
         .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
         .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
         .replace(/[^\w\sÀ-ú]/g, "")
