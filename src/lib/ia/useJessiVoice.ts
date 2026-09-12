@@ -7,7 +7,6 @@ import {
   ehFalaValida,
 } from "./ia-voz";
 import { reproduzirFalaHumana, humanizarTextoParaVoz, ControladorFala } from "./ia-voz-tts";
-import { desbloquearAudioMobile } from "./ia-voz-unlock";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
@@ -28,7 +27,7 @@ export interface UseJessiVoiceReturn {
   resumeListening: () => void;
   cancelListening: () => void;
   resetTranscript: () => void;
-  speakResponse: (entrada: string | { texto: string; audioDataUrl?: string }, onFinish?: () => void) => void;
+  speakResponse: (entrada: string | { texto: string }, onFinish?: () => void) => void;
 }
 
 /**
@@ -86,16 +85,10 @@ export function useJessiVoice(
   const onAutoSendRef = useRef(onAutoSend);
   const isSpeakingRef = useRef(false);
   const controladorFalaRef = useRef<ControladorFala | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
-  const audioCacheRef = useRef<Map<string, string>>(new Map());
 
   const pararTodoAudio = useCallback(() => {
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      audioElementRef.current.currentTime = 0;
-      audioElementRef.current = null;
-    }
     controladorFalaRef.current?.cancelar();
+    controladorFalaRef.current = null;
     isSpeakingRef.current = false;
   }, []);
 
@@ -110,10 +103,14 @@ export function useJessiVoice(
   useEffect(() => {
     // Pré-carrega vozes do navegador para disponibilidade imediata
     if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
+      try {
         window.speechSynthesis.getVoices();
-      };
+        window.speechSynthesis.onvoiceschanged = () => {
+          try {
+            window.speechSynthesis.getVoices();
+          } catch {}
+        };
+      } catch {}
     }
 
     recognizerRef.current = new VoiceRecognizer({
@@ -132,7 +129,6 @@ export function useJessiVoice(
       onUtteranceComplete: (utterance: VoiceUtterance) => {
         const textoAperfeicoado = aperfeicoarTextoSpa(utterance.text).trim();
         if (ehFalaValida(textoAperfeicoado) && onAutoSendRef.current) {
-          // Pausa temporariamente o microfone e interrompe qualquer áudio/fala anterior
           pararTodoAudio();
           recognizerRef.current?.pauseListening();
           setInterimTranscript("");
@@ -164,13 +160,14 @@ export function useJessiVoice(
       pararTodoAudio();
       recognizerRef.current?.abort();
       if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
       }
     };
   }, [pararTodoAudio]);
 
   const startContinuousMode = useCallback(() => {
-    desbloquearAudioMobile();
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -178,9 +175,10 @@ export function useJessiVoice(
         toast.error("Seu navegador não suporta reconhecimento de voz. Recomendamos o Google Chrome ou Microsoft Edge.");
         return;
       }
-      // Desbloqueia contexto de áudio em navegadores móveis (iOS/Android)
       if (window.speechSynthesis) {
-        window.speechSynthesis.resume();
+        try {
+          window.speechSynthesis.resume();
+        } catch {}
       }
     }
 
@@ -221,7 +219,6 @@ export function useJessiVoice(
   }, [isContinuousMode]);
 
   const startListening = useCallback((textoAtual = "") => {
-    desbloquearAudioMobile();
     if (!recognizerRef.current) return;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
@@ -248,23 +245,17 @@ export function useJessiVoice(
     setFinalTranscript("");
   }, []);
 
-  /** Síntese de voz TTS ultra-humanizada e natural (Neural Cloud + Fallback Nativo) */
+  /** Síntese de voz TTS humanizada, fluida e natural em português do Brasil */
   const speakResponse = useCallback(
-    async (entrada: string | { texto: string; audioDataUrl?: string }, onFinish?: () => void) => {
+    (entrada: string | { texto: string }, onFinish?: () => void) => {
       if (typeof window === "undefined" || !ttsEnabled) {
         onFinish?.();
         return;
       }
 
       const texto = typeof entrada === "string" ? entrada : entrada.texto;
-      const audioPreCarregado = typeof entrada === "object" ? entrada.audioDataUrl : undefined;
 
-      // Cancela qualquer reprodução de áudio anterior imediatamente
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-        audioElementRef.current.currentTime = 0;
-        audioElementRef.current = null;
-      }
+      // Cancela fala anterior se ainda estiver em andamento
       controladorFalaRef.current?.cancelar();
       isSpeakingRef.current = true;
       pauseListening();
@@ -272,115 +263,23 @@ export function useJessiVoice(
       const finalizarFala = () => {
         isSpeakingRef.current = false;
         controladorFalaRef.current = null;
-        if (audioElementRef.current) {
-          try {
-            audioElementRef.current.pause();
-          } catch {}
-          audioElementRef.current = null;
-        }
         onFinish?.();
         if (isContinuousMode) {
           resumeListening();
         }
       };
 
-      const textoParaFalar = humanizarTextoParaVoz(texto);
-      if (!textoParaFalar) {
-        finalizarFala();
-        return;
-      }
-
-      // Desbloqueia contexto de áudio em mobile
-      desbloquearAudioMobile();
-
-      const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
-
-      // 1. Se já veio áudio neural pré-gerado pelo servidor, toca diretamente
-      if (audioPreCarregado && isSpeakingRef.current) {
-        try {
-          const audio = new Audio(audioPreCarregado);
-          audioElementRef.current = audio;
-          audio.playbackRate = 1.0;
-
-          audio.onended = () => {
-            finalizarFala();
-          };
-
-          audio.onerror = () => {
-            console.warn("[Neural Audio Player]: Erro ao tocar áudio, usando fallback");
-            executarFallbackSintese(textoParaFalar, finalizarFala);
-          };
-
-          const playPromise = audio.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((err) => {
-              console.warn("[Neural Audio Player]: Autoplay bloqueado, usando fallback de voz:", err);
-              executarFallbackSintese(textoParaFalar, finalizarFala);
-            });
-          }
-          return;
-        } catch (err) {
-          console.warn("[Neural Audio Player]: Falha ao instanciar áudio:", err);
-        }
-      }
-
-      // 2. Em dispositivos desktop, tenta síntese neural Edge HD via WebSocket rápida
-      if (!isMobile) {
-        try {
-          const textoCacheKey = textoParaFalar.slice(0, 300);
-          let audioDataUrl = audioCacheRef.current.get(textoCacheKey);
-
-          if (!audioDataUrl) {
-            const { sintetizarEdgeNeuralCliente } = await import("./ia-voz-edge-client");
-            const urlGerada = await sintetizarEdgeNeuralCliente(textoParaFalar, { timeoutMs: 2200 });
-            if (urlGerada) {
-              audioDataUrl = urlGerada;
-              audioCacheRef.current.set(textoCacheKey, audioDataUrl);
-            }
-          }
-
-          if (audioDataUrl && isSpeakingRef.current) {
-            const audio = new Audio(audioDataUrl);
-            audioElementRef.current = audio;
-            audio.playbackRate = 1.0;
-
-            audio.onended = () => {
-              finalizarFala();
-            };
-
-            audio.onerror = () => {
-              executarFallbackSintese(textoParaFalar, finalizarFala);
-            };
-
-            const p = audio.play();
-            if (p !== undefined) {
-              p.catch(() => {
-                executarFallbackSintese(textoParaFalar, finalizarFala);
-              });
-            }
-            return;
-          }
-        } catch (err) {
-          console.warn("[Neural Desktop TTS]: Fallback para sintetizador nativo:", err);
-        }
-      }
-
-      // 3. Fallback imediato de alta fidelidade para o sintetizador nativo (Siri / Google Pt-Br Neural)
-      executarFallbackSintese(textoParaFalar, finalizarFala);
+      controladorFalaRef.current = reproduzirFalaHumana(texto, {
+        ttsEnabled,
+        onStart: () => {
+          isSpeakingRef.current = true;
+        },
+        onFinish: finalizarFala,
+        onError: finalizarFala,
+      });
     },
     [ttsEnabled, isContinuousMode, pauseListening, resumeListening]
   );
-
-  const executarFallbackSintese = (texto: string, onConcluir: () => void) => {
-    controladorFalaRef.current = reproduzirFalaHumana(texto, {
-      ttsEnabled,
-      onStart: () => {
-        isSpeakingRef.current = true;
-      },
-      onFinish: onConcluir,
-      onError: onConcluir,
-    });
-  };
 
   return {
     voiceStatus,

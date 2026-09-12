@@ -40,19 +40,6 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
         }
       );
 
-      // Pré-sintetiza áudio neural em alta definição para execução instantânea no navegador
-      try {
-        if (resultado?.respostaTexto) {
-          const { sintetizarAudioNeural } = await import("./ia-voz.server");
-          const audioDataUrl = await sintetizarAudioNeural(resultado.respostaTexto);
-          if (audioDataUrl) {
-            (resultado as any).audioDataUrl = audioDataUrl;
-          }
-        }
-      } catch (audioErr) {
-        console.warn("[TTS Auto-Synthesis] Falha suave ao gerar áudio:", audioErr);
-      }
-
       return resultado;
     } catch (err: any) {
       console.error("[processarMensagemJessi] Erro no handler:", err);

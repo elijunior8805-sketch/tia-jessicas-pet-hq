@@ -11,7 +11,6 @@ import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia
 import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
-import { desbloquearAudioMobile } from "@/lib/ia/ia-voz-unlock";
 import { Sparkles, PanelRightOpen, PanelRightClose, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -229,12 +228,8 @@ export const JessiLayout: React.FC = () => {
       const ehEncerramento = (res as any).intencao?.intencao === "agradecimento_despedida" ||
                              (res as any).intent?.intencao === "agradecimento_despedida";
 
-      if (ttsEnabled) {
-        const payloadFala = (res as any).audioDataUrl
-          ? { texto: res.respostaTexto, audioDataUrl: (res as any).audioDataUrl }
-          : res.respostaTexto;
-
-        speakResponse(payloadFala, () => {
+      if (ttsEnabled && res.respostaTexto) {
+        speakResponse(res.respostaTexto, () => {
           if (isContinuousMode) {
             if (ehEncerramento) {
               stopContinuousMode();
@@ -347,12 +342,8 @@ export const JessiLayout: React.FC = () => {
       setStatus("disponivel");
       toast.success("Ação confirmada e registrada com sucesso!");
 
-      if (ttsEnabled) {
-        const payloadFala = (res as any).audioDataUrl
-          ? { texto: res.respostaTexto, audioDataUrl: (res as any).audioDataUrl }
-          : res.respostaTexto;
-
-        speakResponse(payloadFala, () => {
+      if (ttsEnabled && res.respostaTexto) {
+        speakResponse(res.respostaTexto, () => {
           if (isContinuousMode) {
             resumeListening();
           }
