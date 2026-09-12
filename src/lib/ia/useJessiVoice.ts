@@ -84,6 +84,18 @@ export function useJessiVoice(
   const onAutoSendRef = useRef(onAutoSend);
   const isSpeakingRef = useRef(false);
   const controladorFalaRef = useRef<ControladorFala | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const audioCacheRef = useRef<Map<string, string>>(new Map());
+
+  const pararTodoAudio = useCallback(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+      audioElementRef.current = null;
+    }
+    controladorFalaRef.current?.cancelar();
+    isSpeakingRef.current = false;
+  }, []);
 
   useEffect(() => {
     onTranscriptFinalRef.current = onTranscriptFinal;
@@ -118,8 +130,8 @@ export function useJessiVoice(
       onUtteranceComplete: (utterance: VoiceUtterance) => {
         const textoAperfeicoado = aperfeicoarTextoSpa(utterance.text).trim();
         if (ehFalaValida(textoAperfeicoado) && onAutoSendRef.current) {
-          // Pausa temporariamente o microfone e interrompe qualquer fala anterior
-          controladorFalaRef.current?.cancelar();
+          // Pausa temporariamente o microfone e interrompe qualquer áudio/fala anterior
+          pararTodoAudio();
           recognizerRef.current?.pauseListening();
           setInterimTranscript("");
           setFinalTranscript(textoAperfeicoado);
@@ -147,13 +159,13 @@ export function useJessiVoice(
     });
 
     return () => {
-      controladorFalaRef.current?.cancelar();
+      pararTodoAudio();
       recognizerRef.current?.abort();
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [pararTodoAudio]);
 
   const startContinuousMode = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -180,15 +192,12 @@ export function useJessiVoice(
 
   const stopContinuousMode = useCallback(() => {
     setIsContinuousMode(false);
-    controladorFalaRef.current?.cancelar();
+    pararTodoAudio();
     recognizerRef.current?.stopContinuous();
     setInterimTranscript("");
     setFinalTranscript("");
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
     toast.info("Modo Voz Contínuo desativado.");
-  }, []);
+  }, [pararTodoAudio]);
 
   const toggleContinuousMode = useCallback(() => {
     if (isContinuousMode) {
@@ -221,13 +230,13 @@ export function useJessiVoice(
   }, []);
 
   const cancelListening = useCallback(() => {
-    controladorFalaRef.current?.cancelar();
+    pararTodoAudio();
     if (!recognizerRef.current) return;
     recognizerRef.current.abort();
     setInterimTranscript("");
     setFinalTranscript("");
     setVoiceStatus("idle");
-  }, []);
+  }, [pararTodoAudio]);
 
   const resetTranscript = useCallback(() => {
     recognizerRef.current?.reset();
@@ -235,44 +244,87 @@ export function useJessiVoice(
     setFinalTranscript("");
   }, []);
 
-  /** Síntese de voz TTS humanizada, expressiva e natural em português do Brasil */
+  /** Síntese de voz TTS ultra-humanizada e natural (Neural Cloud + Fallback Nativo) */
   const speakResponse = useCallback(
-    (texto: string, onFinish?: () => void) => {
+    async (texto: string, onFinish?: () => void) => {
       if (typeof window === "undefined" || !ttsEnabled) {
         onFinish?.();
         return;
       }
 
-      // Cancela fala anterior se ainda estiver em andamento
+      // Cancela qualquer reprodução de áudio anterior imediatamente
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.currentTime = 0;
+        audioElementRef.current = null;
+      }
       controladorFalaRef.current?.cancelar();
       isSpeakingRef.current = true;
       pauseListening();
 
-      controladorFalaRef.current = reproduzirFalaHumana(texto, {
-        ttsEnabled,
-        onStart: () => {
-          isSpeakingRef.current = true;
-        },
-        onFinish: () => {
-          isSpeakingRef.current = false;
-          controladorFalaRef.current = null;
-          onFinish?.();
-          if (isContinuousMode) {
-            resumeListening();
+      const finalizarFala = () => {
+        isSpeakingRef.current = false;
+        controladorFalaRef.current = null;
+        if (audioElementRef.current) {
+          audioElementRef.current = null;
+        }
+        onFinish?.();
+        if (isContinuousMode) {
+          resumeListening();
+        }
+      };
+
+      // 1. Tenta carregar áudio neural de altíssima definição (estúdio/humano)
+      try {
+        const textoCacheKey = texto.trim().slice(0, 300);
+        let audioDataUrl = audioCacheRef.current.get(textoCacheKey);
+
+        if (!audioDataUrl) {
+          const { gerarAudioNeuralJessiFn } = await import("./ia-voz.functions");
+          const res = await gerarAudioNeuralJessiFn({ data: { texto } });
+          if (res?.audioDataUrl) {
+            audioDataUrl = res.audioDataUrl;
+            audioCacheRef.current.set(textoCacheKey, audioDataUrl);
           }
-        },
-        onError: () => {
-          isSpeakingRef.current = false;
-          controladorFalaRef.current = null;
-          onFinish?.();
-          if (isContinuousMode) {
-            resumeListening();
-          }
-        },
-      });
+        }
+
+        if (audioDataUrl && isSpeakingRef.current) {
+          const audio = new Audio(audioDataUrl);
+          audioElementRef.current = audio;
+          audio.playbackRate = 1.0;
+
+          audio.onended = () => {
+            finalizarFala();
+          };
+
+          audio.onerror = () => {
+            console.warn("[Neural Audio Player]: Falha ao tocar áudio, usando fallback");
+            executarFallbackSintese(texto, finalizarFala);
+          };
+
+          await audio.play();
+          return;
+        }
+      } catch (err) {
+        console.warn("[Neural TTS]: Fallback para sintetizador local:", err);
+      }
+
+      // 2. Fallback fluído para o sintetizador neural do navegador
+      executarFallbackSintese(texto, finalizarFala);
     },
     [ttsEnabled, isContinuousMode, pauseListening, resumeListening]
   );
+
+  const executarFallbackSintese = (texto: string, onConcluir: () => void) => {
+    controladorFalaRef.current = reproduzirFalaHumana(texto, {
+      ttsEnabled,
+      onStart: () => {
+        isSpeakingRef.current = true;
+      },
+      onFinish: onConcluir,
+      onError: onConcluir,
+    });
+  };
 
   return {
     voiceStatus,

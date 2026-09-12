@@ -36,4 +36,21 @@ export const salvarTranscricaoIA = createServerFn({ method: "POST" })
     return { success: true, id: (result as any).id };
   });
 
+/**
+ * Server Function para gerar áudio neural ultra-humanizado da Jessi sob demanda
+ */
+export const gerarAudioNeuralJessiFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: any) =>
+    z.object({
+      texto: z.string(),
+    }).parse(input || {})
+  )
+  .handler(async ({ data }) => {
+    const { sintetizarAudioNeural } = await import("./ia-voz.server");
+    const audioDataUrl = await sintetizarAudioNeural(data.texto);
+    return { audioDataUrl };
+  });
+
+
 
