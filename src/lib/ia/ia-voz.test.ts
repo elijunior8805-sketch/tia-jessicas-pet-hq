@@ -122,3 +122,47 @@ describe("VoiceRecognizer", () => {
     expect(recognizer.getStatus()).toBe("listening");
   });
 });
+
+import { humanizarTextoParaVoz, obterMelhorVozPtBr, segmentarEmFrases } from "./ia-voz-tts";
+
+describe("Síntese de Voz Humanizada (TTS)", () => {
+  it("converte valores monetários para pronúncia falada natural", () => {
+    expect(humanizarTextoParaVoz("O banho simples custa R$ 75,00")).toBe("O banho simples custa 75 reais.");
+    expect(humanizarTextoParaVoz("Total de R$ 120,50 a receber")).toBe("Total de 120 reais e 50 centavos a receber.");
+    expect(humanizarTextoParaVoz("Faturamento de R$ 1.500")).toBe("Faturamento de 1500 reais.");
+  });
+
+  it("converte horários e datas para prosódia fluida", () => {
+    expect(humanizarTextoParaVoz("Agendado para 14:30")).toBe("Agendado para 14 e meia.");
+    expect(humanizarTextoParaVoz("Próximo cliente às 09:00")).toBe("Próximo cliente às 09 horas.");
+    expect(humanizarTextoParaVoz("Data do atendimento: 12/09")).toBe("Data do atendimento: 12 de setembro.");
+  });
+
+  it("remove emojis e formatações markdown para não engasgar a leitura", () => {
+    const markdownComEmoji = "🐶 Olá, Eli! ✨ Temos **3 agendamentos** para hoje: \n- Banho do Rex às 10h\n- Tosa do Thor às 14h";
+    const textoFalado = humanizarTextoParaVoz(markdownComEmoji);
+    expect(textoFalado).not.toContain("🐶");
+    expect(textoFalado).not.toContain("✨");
+    expect(textoFalado).not.toContain("**");
+    expect(textoFalado).toContain("3 agendamentos");
+  });
+
+  it("seleciona a voz neural/natural mais expressiva do navegador", () => {
+    const mockVoices = [
+      { name: "Microsoft Maria Desktop - Portuguese(Brazil)", lang: "pt-BR" } as SpeechSynthesisVoice,
+      { name: "Microsoft Francisca Online (Natural) - Portuguese (Brazil)", lang: "pt-BR" } as SpeechSynthesisVoice,
+      { name: "English Voice", lang: "en-US" } as SpeechSynthesisVoice,
+    ];
+
+    const melhorVoz = obterMelhorVozPtBr(mockVoices);
+    expect(melhorVoz?.name).toContain("Francisca");
+  });
+
+  it("segmenta textos em frases para cadência de respiração", () => {
+    const frases = segmentarEmFrases("Olá, Eli! Preparei a sua agenda. Temos 4 atendimentos hoje.");
+    expect(frases.length).toBe(3);
+    expect(frases[0]).toBe("Olá, Eli!");
+    expect(frases[1]).toBe("Preparei a sua agenda.");
+    expect(frases[2]).toBe("Temos 4 atendimentos hoje.");
+  });
+});

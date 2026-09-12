@@ -6,6 +6,7 @@ import {
   consolidarTranscricao,
   ehFalaValida,
 } from "./ia-voz";
+import { reproduzirFalaHumana, ControladorFala } from "./ia-voz-tts";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
@@ -82,6 +83,7 @@ export function useJessiVoice(
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
   const onAutoSendRef = useRef(onAutoSend);
   const isSpeakingRef = useRef(false);
+  const controladorFalaRef = useRef<ControladorFala | null>(null);
 
   useEffect(() => {
     onTranscriptFinalRef.current = onTranscriptFinal;
@@ -92,6 +94,14 @@ export function useJessiVoice(
   }, [onAutoSend]);
 
   useEffect(() => {
+    // Pré-carrega vozes do navegador para disponibilidade imediata
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+
     recognizerRef.current = new VoiceRecognizer({
       silenceMs: 1500, // 1.5s de silêncio para envio automático
       onFinal: (texto) => {
@@ -108,7 +118,8 @@ export function useJessiVoice(
       onUtteranceComplete: (utterance: VoiceUtterance) => {
         const textoAperfeicoado = aperfeicoarTextoSpa(utterance.text).trim();
         if (ehFalaValida(textoAperfeicoado) && onAutoSendRef.current) {
-          // Pausa temporariamente o microfone para evitar capturar a própria fala/eco
+          // Pausa temporariamente o microfone e interrompe qualquer fala anterior
+          controladorFalaRef.current?.cancelar();
           recognizerRef.current?.pauseListening();
           setInterimTranscript("");
           setFinalTranscript(textoAperfeicoado);
@@ -136,6 +147,7 @@ export function useJessiVoice(
     });
 
     return () => {
+      controladorFalaRef.current?.cancelar();
       recognizerRef.current?.abort();
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
@@ -168,6 +180,7 @@ export function useJessiVoice(
 
   const stopContinuousMode = useCallback(() => {
     setIsContinuousMode(false);
+    controladorFalaRef.current?.cancelar();
     recognizerRef.current?.stopContinuous();
     setInterimTranscript("");
     setFinalTranscript("");
@@ -208,6 +221,7 @@ export function useJessiVoice(
   }, []);
 
   const cancelListening = useCallback(() => {
+    controladorFalaRef.current?.cancelar();
     if (!recognizerRef.current) return;
     recognizerRef.current.abort();
     setInterimTranscript("");
@@ -221,82 +235,41 @@ export function useJessiVoice(
     setFinalTranscript("");
   }, []);
 
-  /** Síntese de voz TTS em português do Brasil */
+  /** Síntese de voz TTS humanizada, expressiva e natural em português do Brasil */
   const speakResponse = useCallback(
     (texto: string, onFinish?: () => void) => {
-      if (typeof window === "undefined" || !window.speechSynthesis || !ttsEnabled) {
-        if (onFinish) onFinish();
+      if (typeof window === "undefined" || !ttsEnabled) {
+        onFinish?.();
         return;
       }
 
-      // Remove marcações markdown (**, #, etc.) para síntese de áudio limpa
-      const textoLimpo = texto
-        .replace(/\*\*(.*?)\*\*/g, "$1")
-        .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-        .replace(/`{1,3}.*?`{1,3}/g, "")
-        .replace(/[#*•_`]/g, "")
-        .trim();
-
-      if (!textoLimpo) {
-        if (onFinish) onFinish();
-        return;
-      }
-
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume();
+      // Cancela fala anterior se ainda estiver em andamento
+      controladorFalaRef.current?.cancelar();
       isSpeakingRef.current = true;
       pauseListening();
 
-      const utterance = new SpeechSynthesisUtterance(textoLimpo);
-      utterance.lang = "pt-BR";
-      utterance.rate = 1.05;
-      utterance.pitch = 1.0;
-
-      // Seleciona voz em português do Brasil quando disponível no sistema operacional
-      try {
-        const voices = window.speechSynthesis.getVoices();
-        const ptVoice = voices.find(
-          (v) => v.lang === "pt-BR" || v.lang === "pt_BR" || v.lang.toLowerCase().includes("brazil")
-        ) || voices.find((v) => v.lang.startsWith("pt"));
-        if (ptVoice) {
-          utterance.voice = ptVoice;
-        }
-      } catch {
-        /* ignore */
-      }
-
-      let finalizado = false;
-      const concluirFala = () => {
-        if (finalizado) return;
-        finalizado = true;
-        isSpeakingRef.current = false;
-        if (onFinish) onFinish();
-        if (isContinuousMode) {
-          resumeListening();
-        }
-      };
-
-      utterance.onend = () => {
-        concluirFala();
-      };
-
-      utterance.onerror = () => {
-        concluirFala();
-      };
-
-      // Timer de segurança caso o navegador silencie eventos de áudio
-      const tempoEstimadoMs = Math.max(2500, textoLimpo.length * 85 + 1200);
-      const timerSeguranca = setTimeout(() => {
-        concluirFala();
-      }, tempoEstimadoMs);
-
-      const originalOnEnd = utterance.onend;
-      utterance.onend = (e) => {
-        clearTimeout(timerSeguranca);
-        if (typeof originalOnEnd === "function") originalOnEnd.call(utterance, e);
-      };
-
-      window.speechSynthesis.speak(utterance);
+      controladorFalaRef.current = reproduzirFalaHumana(texto, {
+        ttsEnabled,
+        onStart: () => {
+          isSpeakingRef.current = true;
+        },
+        onFinish: () => {
+          isSpeakingRef.current = false;
+          controladorFalaRef.current = null;
+          onFinish?.();
+          if (isContinuousMode) {
+            resumeListening();
+          }
+        },
+        onError: () => {
+          isSpeakingRef.current = false;
+          controladorFalaRef.current = null;
+          onFinish?.();
+          if (isContinuousMode) {
+            resumeListening();
+          }
+        },
+      });
     },
     [ttsEnabled, isContinuousMode, pauseListening, resumeListening]
   );
