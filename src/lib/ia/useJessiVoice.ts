@@ -7,6 +7,7 @@ import {
   ehFalaValida,
 } from "./ia-voz";
 import { reproduzirFalaHumana, ControladorFala } from "./ia-voz-tts";
+import { desbloquearAudioMobile } from "./ia-voz-unlock";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
@@ -169,6 +170,7 @@ export function useJessiVoice(
   }, [pararTodoAudio]);
 
   const startContinuousMode = useCallback(() => {
+    desbloquearAudioMobile();
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -219,6 +221,7 @@ export function useJessiVoice(
   }, [isContinuousMode]);
 
   const startListening = useCallback((textoAtual = "") => {
+    desbloquearAudioMobile();
     if (!recognizerRef.current) return;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
@@ -270,6 +273,9 @@ export function useJessiVoice(
         isSpeakingRef.current = false;
         controladorFalaRef.current = null;
         if (audioElementRef.current) {
+          try {
+            audioElementRef.current.pause();
+          } catch {}
           audioElementRef.current = null;
         }
         onFinish?.();
@@ -284,33 +290,16 @@ export function useJessiVoice(
         return;
       }
 
-      // 1. Tenta carregar áudio neural de altíssima definição (estúdio/humano)
-      try {
-        const textoCacheKey = textoParaFalar.slice(0, 300);
-        let audioDataUrl = audioPreCarregado || audioCacheRef.current.get(textoCacheKey);
+      // Desbloqueia contexto de áudio em mobile
+      const { desbloquearAudioMobile } = await import("./ia-voz-unlock");
+      desbloquearAudioMobile();
 
-        // Se não veio pré-carregado pelo servidor, sintetiza direto no cliente via Edge Speech HD
-        if (!audioDataUrl) {
-          const { sintetizarEdgeNeuralCliente } = await import("./ia-voz-edge-client");
-          const urlGerada = await sintetizarEdgeNeuralCliente(textoParaFalar);
-          if (urlGerada) {
-            audioDataUrl = urlGerada;
-            audioCacheRef.current.set(textoCacheKey, audioDataUrl);
-          }
-        }
+      const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
 
-        // Se ainda não obteve, tenta o endpoint do servidor como fallback adicional
-        if (!audioDataUrl) {
-          const { gerarAudioNeuralJessiFn } = await import("./ia-voz.functions");
-          const res = await gerarAudioNeuralJessiFn({ data: { texto: textoParaFalar } });
-          if (res?.audioDataUrl) {
-            audioDataUrl = res.audioDataUrl;
-            audioCacheRef.current.set(textoCacheKey, audioDataUrl);
-          }
-        }
-
-        if (audioDataUrl && isSpeakingRef.current) {
-          const audio = new Audio(audioDataUrl);
+      // 1. Se já veio áudio neural pré-gerado pelo servidor, toca diretamente
+      if (audioPreCarregado && isSpeakingRef.current) {
+        try {
+          const audio = new Audio(audioPreCarregado);
           audioElementRef.current = audio;
           audio.playbackRate = 1.0;
 
@@ -319,18 +308,65 @@ export function useJessiVoice(
           };
 
           audio.onerror = () => {
-            console.warn("[Neural Audio Player]: Falha ao tocar áudio, usando fallback");
+            console.warn("[Neural Audio Player]: Erro ao tocar áudio, usando fallback");
             executarFallbackSintese(textoParaFalar, finalizarFala);
           };
 
-          await audio.play();
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn("[Neural Audio Player]: Autoplay bloqueado, usando fallback de voz:", err);
+              executarFallbackSintese(textoParaFalar, finalizarFala);
+            });
+          }
           return;
+        } catch (err) {
+          console.warn("[Neural Audio Player]: Falha ao instanciar áudio:", err);
         }
-      } catch (err) {
-        console.warn("[Neural TTS]: Fallback para sintetizador local:", err);
       }
 
-      // 2. Fallback fluído para o sintetizador neural do navegador
+      // 2. Em dispositivos desktop, tenta síntese neural Edge HD via WebSocket rápida
+      if (!isMobile) {
+        try {
+          const textoCacheKey = textoParaFalar.slice(0, 300);
+          let audioDataUrl = audioCacheRef.current.get(textoCacheKey);
+
+          if (!audioDataUrl) {
+            const { sintetizarEdgeNeuralCliente } = await import("./ia-voz-edge-client");
+            const urlGerada = await sintetizarEdgeNeuralCliente(textoParaFalar, { timeoutMs: 2200 });
+            if (urlGerada) {
+              audioDataUrl = urlGerada;
+              audioCacheRef.current.set(textoCacheKey, audioDataUrl);
+            }
+          }
+
+          if (audioDataUrl && isSpeakingRef.current) {
+            const audio = new Audio(audioDataUrl);
+            audioElementRef.current = audio;
+            audio.playbackRate = 1.0;
+
+            audio.onended = () => {
+              finalizarFala();
+            };
+
+            audio.onerror = () => {
+              executarFallbackSintese(textoParaFalar, finalizarFala);
+            };
+
+            const p = audio.play();
+            if (p !== undefined) {
+              p.catch(() => {
+                executarFallbackSintese(textoParaFalar, finalizarFala);
+              });
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn("[Neural Desktop TTS]: Fallback para sintetizador nativo:", err);
+        }
+      }
+
+      // 3. Fallback imediato de alta fidelidade para o sintetizador nativo (Siri / Google Pt-Br Neural)
       executarFallbackSintese(textoParaFalar, finalizarFala);
     },
     [ttsEnabled, isContinuousMode, pauseListening, resumeListening]

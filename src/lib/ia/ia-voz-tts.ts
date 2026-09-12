@@ -109,14 +109,31 @@ export function humanizarTextoParaVoz(texto: string): string {
   return t;
 }
 
+// Cache global de vozes do navegador
+let vozesDisponiveisCache: SpeechSynthesisVoice[] = [];
+
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  const carregarVozes = () => {
+    try {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) {
+        vozesDisponiveisCache = v;
+      }
+    } catch {}
+  };
+  carregarVozes();
+  window.speechSynthesis.onvoiceschanged = carregarVozes;
+}
+
 /**
  * Seleciona a melhor voz natural disponível no sistema/navegador em Português do Brasil.
- * Dá prioridade absoluta a vozes neurais e expressivas (Microsoft Online/Natural, Google Cloud, Apple Enhanced).
+ * Dá prioridade absoluta a vozes neurais e expressivas (Apple Siri/Enhanced, Google Cloud, Microsoft Natural).
  */
-export function obterMelhorVozPtBr(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  if (!voices || voices.length === 0) return null;
+export function obterMelhorVozPtBr(voices?: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const listaVozes = (voices && voices.length > 0) ? voices : (vozesDisponiveisCache.length > 0 ? vozesDisponiveisCache : (typeof window !== "undefined" && window.speechSynthesis ? window.speechSynthesis.getVoices() : []));
+  if (!listaVozes || listaVozes.length === 0) return null;
 
-  const vozesPtBr = voices.filter(
+  const vozesPtBr = listaVozes.filter(
     (v) =>
       v.lang === "pt-BR" ||
       v.lang === "pt_BR" ||
@@ -136,24 +153,24 @@ export function obterMelhorVozPtBr(voices: SpeechSynthesisVoice[]): SpeechSynthe
     if (lang === "pt-br" || lang === "pt_br") score += 50;
 
     // 1. Vozes Neurais / Online / Naturais de altíssima qualidade
-    if (nome.includes("natural")) score += 120;
-    if (nome.includes("neural")) score += 110;
+    if (nome.includes("natural")) score += 130;
+    if (nome.includes("neural")) score += 120;
     if (nome.includes("online")) score += 80;
 
-    // 2. Vozes femininas favoritas da Jessi (Microsoft Edge & Windows Natural)
-    if (nome.includes("francisca")) score += 100;
-    if (nome.includes("thalita") || nome.includes("leticia") || nome.includes("camila") || nome.includes("vitoria") || nome.includes("yara")) score += 90;
-    if (nome.includes("maria") && nome.includes("natural")) score += 95;
+    // 2. Vozes da Apple Siri e Enhanced (iOS Safari / macOS / iPad) - Ultra realistas no celular
+    if (nome.includes("siri") || nome.includes("enhanced") || nome.includes("premium")) score += 125;
+    if (nome.includes("luciana") || nome.includes("joana") || nome.includes("helena")) score += 115;
 
-    // 3. Vozes do Google Chrome de alta qualidade
-    if (nome.includes("google") && (nome.includes("português") || nome.includes("brasil") || nome.includes("pt-br"))) score += 85;
+    // 3. Vozes do Google (Android Chrome / Chrome Desktop)
+    if (nome.includes("google") && (nome.includes("português") || nome.includes("brasil") || nome.includes("pt-br"))) score += 110;
 
-    // 4. Vozes da Apple (iOS / macOS Siri & Enhanced)
-    if (nome.includes("enhanced") || nome.includes("premium")) score += 75;
-    if (nome.includes("luciana") || nome.includes("joana") || nome.includes("siri")) score += 70;
+    // 4. Vozes femininas favoritas da Jessi (Microsoft Edge & Windows Natural)
+    if (nome.includes("francisca")) score += 105;
+    if (nome.includes("thalita") || nome.includes("leticia") || nome.includes("camila") || nome.includes("vitoria") || nome.includes("yara")) score += 95;
+    if (nome.includes("maria") && nome.includes("natural")) score += 100;
 
     // 5. Penalização para vozes robóticas antigas do Windows Desktop (SAPI5 de 2006)
-    if (nome.includes("desktop") && !nome.includes("natural")) score -= 60;
+    if (nome.includes("desktop") && !nome.includes("natural")) score -= 70;
 
     return score;
   };
@@ -205,7 +222,7 @@ export interface ControladorFala {
 }
 
 /**
- * Reproduz o texto com síntese de voz fluida, humana e natural.
+ * Reproduz o texto com síntese de voz fluida, humana e natural no navegador (Mobile e Desktop).
  */
 export function reproduzirFalaHumana(
   textoOriginal: string,
@@ -226,22 +243,37 @@ export function reproduzirFalaHumana(
 
   let cancelado = false;
   let timerSafety: any = null;
+  let keepAliveTimer: any = null;
 
-  // Limpa sintetizador anterior e desbloqueia áudio
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.resume();
+  try {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+    }
+    window.speechSynthesis.resume();
+  } catch {}
 
-  const voices = window.speechSynthesis.getVoices();
-  const melhorVoz = obterMelhorVozPtBr(voices);
-
+  const melhorVoz = obterMelhorVozPtBr();
   const frases = segmentarEmFrases(textoHumanizado);
   let indexFrase = 0;
+
+  // Keep-alive para evitar congelamento de áudio no iOS Safari / Android Chrome
+  keepAliveTimer = setInterval(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis && window.speechSynthesis.speaking) {
+      try {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      } catch {}
+    } else {
+      clearInterval(keepAliveTimer);
+    }
+  }, 4000);
 
   const falarProximaFrase = () => {
     if (cancelado) return;
 
     if (indexFrase >= frases.length) {
       if (timerSafety) clearTimeout(timerSafety);
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
       onFinish?.();
       return;
     }
@@ -249,44 +281,50 @@ export function reproduzirFalaHumana(
     const fraseAtual = frases[indexFrase];
     indexFrase++;
 
-    const utterance = new SpeechSynthesisUtterance(fraseAtual);
-    utterance.lang = "pt-BR";
-    utterance.rate = 1.0; // Velocidade perfeitamente natural e clara
-    utterance.pitch = 1.04; // Tom amigável, receptivo e caloroso
-    utterance.volume = 1.0;
+    try {
+      const utterance = new SpeechSynthesisUtterance(fraseAtual);
+      utterance.lang = "pt-BR";
+      utterance.rate = 1.0; // Velocidade perfeitamente natural e clara
+      utterance.pitch = 1.03; // Tom amigável, receptivo e caloroso
+      utterance.volume = 1.0;
 
-    if (melhorVoz) {
-      utterance.voice = melhorVoz;
-    }
-
-    utterance.onstart = () => {
-      if (indexFrase === 1) {
-        onStart?.();
+      if (melhorVoz) {
+        utterance.voice = melhorVoz;
       }
-    };
 
-    utterance.onend = () => {
-      if (cancelado) return;
-      // Pequena pausa natural de 90ms entre frases para respiração fluida
-      setTimeout(() => {
+      utterance.onstart = () => {
+        if (indexFrase === 1) {
+          onStart?.();
+        }
+      };
+
+      utterance.onend = () => {
+        if (cancelado) return;
+        // Pequena pausa natural de 80ms entre frases para respiração fluida
+        setTimeout(() => {
+          falarProximaFrase();
+        }, 80);
+      };
+
+      utterance.onerror = (e) => {
+        if (cancelado) return;
+        console.warn("[TTS Warning]:", e);
+        onError?.(e);
         falarProximaFrase();
-      }, 90);
-    };
+      };
 
-    utterance.onerror = (e) => {
-      if (cancelado) return;
-      console.warn("[TTS Warning]:", e);
-      onError?.(e);
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn("[TTS Exception]:", err);
       falarProximaFrase();
-    };
-
-    window.speechSynthesis.speak(utterance);
+    }
   };
 
   // Timer de segurança geral contra congelamentos do navegador
-  const tempoTotalEstimado = Math.max(3000, textoHumanizado.length * 80 + 2000);
+  const tempoTotalEstimado = Math.max(3000, textoHumanizado.length * 80 + 3000);
   timerSafety = setTimeout(() => {
     if (!cancelado) {
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
       onFinish?.();
     }
   }, tempoTotalEstimado);
@@ -297,8 +335,11 @@ export function reproduzirFalaHumana(
     cancelar: () => {
       cancelado = true;
       if (timerSafety) clearTimeout(timerSafety);
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
       if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
       }
     },
   };

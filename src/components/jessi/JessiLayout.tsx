@@ -11,6 +11,7 @@ import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia
 import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
+import { desbloquearAudioMobile } from "@/lib/ia/ia-voz-unlock";
 import { Sparkles, PanelRightOpen, PanelRightClose, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -137,6 +138,9 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
+    // 0. Desbloqueia contexto de áudio em mobile durante a interação do usuário
+    desbloquearAudioMobile();
+
     // 1. Pausa o microfone para não capturar a própria fala
     pauseListening();
     resetTranscript();
