@@ -414,37 +414,47 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     let petNomeDaMensagem: string | null = null;
     let clienteNomeDaMensagem: string | null = null;
 
-    // 1. Detecta menção a "pets do [Tutor]" ou "animais de [Tutor]"
-    const matchPetsDoTutor = texto.match(/(?:pets?|cachorros?|cães|caes|gatos?|animais)\s+(?:do|da|de|dos|das)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-    if (matchPetsDoTutor && matchPetsDoTutor[1] && ehNomeValido(matchPetsDoTutor[1])) {
-      clienteNomeDaMensagem = matchPetsDoTutor[1].trim();
+    // 1. Detecta combinação explícita "Pet do Tutor" (ex: "Thor do Eli", "Toddy da Jaqueline", "Mel da Irani")
+    const matchPetDoTutor = texto.match(/(?:o|a|pro|pra|para o|para a|do|da|pet)?\s*([A-ZÀ-Úa-zà-ú]+)\s+(?:do|da|de|dos|das|lá do|la do|lá da|la da)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+    if (matchPetDoTutor && ehNomeValido(matchPetDoTutor[1]) && ehNomeValido(matchPetDoTutor[2])) {
+      const parte1 = matchPetDoTutor[1].trim();
+      const parte2 = matchPetDoTutor[2].trim();
+      if (!["banho", "tosa", "agenda", "horario", "amanha", "hoje", "sexta", "segunda", "terca", "quarta", "quinta", "sabado"].includes(parte1.toLowerCase())) {
+        petNomeDaMensagem = parte1;
+        clienteNomeDaMensagem = parte2;
+      }
     }
 
-    // 2. Detecta menção explícita a cliente/tutor ("para o cliente Eli Júnior", "tutor Eli", "dono Carlos")
+    // 2. Detecta menção a "pets do [Tutor]" ou "animais de [Tutor]"
     if (!clienteNomeDaMensagem) {
-      const matchCliente = texto.match(/(?:cliente|tutor|proprietário|proprietario|dono)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+      const matchPetsDoTutor = texto.match(/(?:pets?|cachorros?|cães|caes|gatos?|animais)\s+(?:do|da|de|dos|das)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+      if (matchPetsDoTutor && matchPetsDoTutor[1] && ehNomeValido(matchPetsDoTutor[1])) {
+        clienteNomeDaMensagem = matchPetsDoTutor[1].trim();
+      }
+    }
+
+    // 3. Detecta menção explícita a cliente/tutor ("para o cliente Eli Júnior", "tutor Eli", "dono Carlos")
+    if (!clienteNomeDaMensagem) {
+      const matchCliente = texto.match(/(?:cliente|tutor|tutora|proprietário|proprietario|dono|dona)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
       if (matchCliente && matchCliente[1] && ehNomeValido(matchCliente[1])) {
         clienteNomeDaMensagem = matchCliente[1].trim();
       }
     }
 
-    // 3. Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
-    const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
-    if (matchCorrecao && matchCorrecao[1] && ehNomeValido(matchCorrecao[1])) {
-      petNomeDaMensagem = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
-    } else {
-      // 4. Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob", "bichinho Thor", "o dog Bob")
-      const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela|bicho|bichinho|dog|animal|filhote)\s+([A-ZÀ-Úa-zà-ú]+)/i);
-      if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1]) && !clienteNomeDaMensagem) {
-        petNomeDaMensagem = matchPetExp[1];
+    // 4. Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
+    if (!petNomeDaMensagem) {
+      const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
+      if (matchCorrecao && matchCorrecao[1] && ehNomeValido(matchCorrecao[1])) {
+        petNomeDaMensagem = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
       } else {
-        const matchPet = texto.match(/(?:para o pet|para a pet|do pet|da pet|pro pet|pra pet|o bichinho do pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
-        if (matchPet && ehNomeValido(matchPet[1])) {
-          petNomeDaMensagem = matchPet[1];
-        } else if (texto.match(/(?:para o|para a|pro|pra|ao|à)\s+([A-ZÀ-Ú][a-zà-ú]+)/i)) {
-          const m = texto.match(/(?:para o|para a|pro|pra|ao|à)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
-          if (m && ehNomeValido(m[1]) && !clienteNomeDaMensagem) {
-            petNomeDaMensagem = m[1];
+        // Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob", "bichinho Thor", "o dog Bob")
+        const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela|bicho|bichinho|dog|animal|filhote)\s+([A-ZÀ-Úa-zà-ú]+)/i);
+        if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1]) && !clienteNomeDaMensagem) {
+          petNomeDaMensagem = matchPetExp[1];
+        } else {
+          const matchPet = texto.match(/(?:para o pet|para a pet|do pet|da pet|pro pet|pra pet|o bichinho do pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
+          if (matchPet && ehNomeValido(matchPet[1])) {
+            petNomeDaMensagem = matchPet[1];
           }
         }
       }
@@ -452,9 +462,17 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
     // 5. Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel", "lá do Eli", "aquele da Irani") se ainda não definiu
     if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
-      const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|do|da|de|lá do|la do|lá da|la da|aquele do|aquela da|o bichinho do|a bichinha da|o cachorrinho do|a cachorrinha da|o dog do|o cão do|o cao do|a cadela da)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
+      const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|ao|à|do|da|de|lá do|la do|lá da|la da|aquele do|aquela da|o bichinho do|a bichinha da|o cachorrinho do|a cachorrinha da|o dog do|o cão do|o cao do|a cadela da)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
       if (matchPrep && matchPrep[1] && ehNomeValido(matchPrep[1])) {
-        clienteNomeDaMensagem = matchPrep[1].trim();
+        const nomeCapturado = matchPrep[1].trim();
+        const nomeNorm = nomeCapturado.toLowerCase();
+        // Se for um nome comum de pet conhecido, define como pet; senão define como cliente ou termo livre
+        const NOMES_PETS_COMUNS = ["thor", "mel", "luna", "bob", "bidu", "jade", "amora", "theo", "théo", "nina", "belinha", "cacau", "toddy", "marley", "simba", "fred", "zeus", "pipoca", "paçoca"];
+        if (NOMES_PETS_COMUNS.includes(nomeNorm)) {
+          petNomeDaMensagem = nomeCapturado;
+        } else {
+          clienteNomeDaMensagem = nomeCapturado;
+        }
       }
     }
 

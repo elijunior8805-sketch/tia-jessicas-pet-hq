@@ -143,31 +143,43 @@ export class ClientesPetsAdapter {
         }
       }
 
-      // 2. Busca ampla de clientes e pets no banco para ranqueamento
-      const { data: todosClientes, error: errClientes } = await sb
-        .from("clientes")
-        .select("id, nome, telefone, email, rua, numero, complemento, bairro, cidade, pets(id, nome, raca, porte)")
-        .limit(100);
+      // 2. Busca ampla e direta de clientes e pets no banco para ranqueamento
+      const [
+        { data: todosClientes, error: errClientes },
+        { data: todosPets, error: errPets },
+        { data: clientesPorNome },
+        { data: petsPorNome }
+      ] = await Promise.all([
+        sb.from("clientes").select("id, nome, telefone, email, rua, numero, complemento, bairro, cidade, pets(id, nome, raca, porte)").limit(300),
+        sb.from("pets").select("id, nome, raca, porte, clientes(id, nome, telefone, email)").limit(300),
+        sb.from("clientes").select("id, nome, telefone, email, rua, numero, complemento, bairro, cidade, pets(id, nome, raca, porte)").ilike("nome", `%${termoOriginal}%`).limit(20),
+        sb.from("pets").select("id, nome, raca, porte, clientes(id, nome, telefone, email)").ilike("nome", `%${termoOriginal}%`).limit(20)
+      ]);
 
       if (errClientes) {
         console.error("[ClientesPetsAdapter] Erro ao buscar clientes:", errClientes);
-        throw errClientes;
       }
-
-      const { data: todosPets, error: errPets } = await sb
-        .from("pets")
-        .select("id, nome, raca, porte, clientes(id, nome, telefone, email)")
-        .limit(100);
-
       if (errPets) {
         console.error("[ClientesPetsAdapter] Erro ao buscar pets:", errPets);
-        throw errPets;
       }
+
+      // Mescla resultados sem duplicatas
+      const clientesMap = new Map<string, any>();
+      [...(todosClientes || []), ...(clientesPorNome || [])].forEach((c) => {
+        if (c?.id) clientesMap.set(c.id, c);
+      });
+      const listaClientes = Array.from(clientesMap.values());
+
+      const petsMap = new Map<string, any>();
+      [...(todosPets || []), ...(petsPorNome || [])].forEach((p) => {
+        if (p?.id) petsMap.set(p.id, p);
+      });
+      const listaPets = Array.from(petsMap.values());
 
       const candidatosRanqueados: CandidatoLocalizado[] = [];
 
       // Avaliação de Clientes (Nome completo, primeiro nome, sobrenome, abreviado, sem acento, telefone, erros de digitação)
-      (todosClientes || []).forEach((cli: any) => {
+      listaClientes.forEach((cli: any) => {
         const nomeNorm = normalizarTexto(cli.nome);
         const telLimpo = (cli.telefone || "").replace(/\D/g, "");
         const partesNome = nomeNorm.split(/\s+/);
@@ -218,7 +230,7 @@ export class ClientesPetsAdapter {
       });
 
       // Avaliação de Pets (Nome do pet, raça, pequeno erro de digitação, vínculo do tutor)
-      (todosPets || []).forEach((pet: any) => {
+      listaPets.forEach((pet: any) => {
         const nomeNorm = normalizarTexto(pet.nome);
         const tutorNome = pet.clientes?.nome || pet.cliente?.nome || "Não vinculado";
         const tutorNorm = normalizarTexto(tutorNome);

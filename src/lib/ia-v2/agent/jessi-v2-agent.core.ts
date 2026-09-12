@@ -928,6 +928,12 @@ export async function processarMensagemJessiV2Core(
               nome: clienteNome,
               telefone: topMatch.dadosCompletos?.telefone || topMatch.dadosCompletos?.whatsapp,
             };
+            // Se o petNome era idêntico ao nome do cliente, limpa
+            if (petNome && normalizarTexto(petNome) === normalizarTexto(clienteNome)) {
+              petNome = null;
+              petId = null;
+              novoContexto.pet = undefined;
+            }
           } else if (topMatch.tipo === "pet") {
             petId = topMatch.id;
             petNome = topMatch.nomePrincipal;
@@ -937,10 +943,11 @@ export async function processarMensagemJessiV2Core(
               raca: topMatch.dadosCompletos?.raca,
               porte: topMatch.dadosCompletos?.porte,
             };
-            if (topMatch.dadosCompletos?.cliente) {
-              clienteId = topMatch.dadosCompletos.cliente.id;
-              clienteNome = topMatch.dadosCompletos.cliente.nome;
-              novoContexto.cliente = { id: clienteId, nome: clienteNome };
+            const tutorObj = topMatch.dadosCompletos?.clientes || topMatch.dadosCompletos?.cliente;
+            if (tutorObj) {
+              clienteId = tutorObj.id;
+              clienteNome = tutorObj.nome;
+              novoContexto.cliente = { id: clienteId, nome: clienteNome, telefone: tutorObj.telefone };
             }
           }
         }
@@ -952,6 +959,13 @@ export async function processarMensagemJessiV2Core(
           .from("pets")
           .select("id, nome, raca, porte")
           .eq("cliente_id", clienteId);
+
+        // Se o petNome coincide com o próprio nome do cliente, descarta
+        if (petNome && clienteNome && normalizarTexto(petNome) === normalizarTexto(clienteNome)) {
+          petNome = null;
+          petId = null;
+          novoContexto.pet = undefined;
+        }
 
         if (petNome && petsDoCliente && petsDoCliente.length > 0) {
           const matchPet = petsDoCliente.find((p) => p.nome.toLowerCase().includes(petNome!.toLowerCase()));
