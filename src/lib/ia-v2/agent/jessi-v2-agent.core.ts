@@ -70,7 +70,7 @@ export async function processarMensagemJessiV2Core(
     if (ehCancelamentoProposta) {
       return {
         versao: "v2",
-        respostaTexto: "A operação proposta foi cancelada e nenhuma alteração foi realizada no sistema.",
+        respostaTexto: "Operação cancelada! Nada foi alterado na grade.",
         cards: [],
         pendingAction: null,
         novoContexto: {
@@ -125,12 +125,17 @@ export async function processarMensagemJessiV2Core(
       recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
 
       const sucesso = mutationResult ? Boolean(mutationResult.success) : true;
-      const idExibicao = recordIdReal ? ` (ID: ${recordIdReal.slice(0, 8)})` : "";
 
       if (sucesso) {
-        respostaTexto =
-          mutationResult?.summary ||
-          `Operação${idExibicao} confirmada e registrada com sucesso no sistema. A gravação foi verificada fisicamente no banco de dados.`;
+        if (toolNome === "criar_agendamento" || toolNome === "preparar_agendamento") {
+          respostaTexto = `Prontinho! O agendamento foi confirmado e o horário já está garantido na grade!`;
+        } else if (toolNome === "cancelar_agendamento" || toolNome === "preparar_cancelamento") {
+          respostaTexto = `Cancelamento realizado com sucesso! O horário já foi liberado na grade de atendimentos.`;
+        } else if (toolNome === "reagendar_agendamento" || toolNome === "preparar_reagendamento") {
+          respostaTexto = `Horário remarcado com sucesso! A grade já foi atualizada.`;
+        } else {
+          respostaTexto = mutationResult?.summary || `Operação realizada com sucesso!`;
+        }
 
         cards.push({
           type: "confirmacao",
@@ -1756,7 +1761,7 @@ export async function processarMensagemJessiV2Core(
         expires_at: proposta.validade,
       };
 
-      respostaTexto = `Preparei a operação solicitada no cartão de revisão abaixo. Revise os dados e confirme para que eu execute a gravação no sistema.`;
+      respostaTexto = `Tudo pronto! Dá uma olhada no resumo aqui embaixo e confirme se posso concluir:`;
 
       cards.push({
         type: "confirmacao",
@@ -1786,11 +1791,11 @@ export async function processarMensagemJessiV2Core(
 
         if (intencao.intencao === "consultar_ultimo_atendimento" && petAlvoId) {
           const resUltimo = await AgendaAdapter.consultarUltimoAtendimentoPet(sb, petAlvoId, petAlvoNome || undefined);
-          respostaTexto = resUltimo.summary || `Consultei o histórico de atendimentos do pet.`;
+          respostaTexto = resUltimo.summary || `Aqui está o histórico do último atendimento do pet:`;
           cards.push({
             type: "agenda",
             title: `Último Atendimento — ${petAlvoNome || "Pet"}`,
-            subtitle: "Histórico Oficial do Sistema",
+            subtitle: "Histórico do Spa",
             data: resUltimo.data,
           });
         } else if (intencao.intencao === "consultar_horarios_livres") {
@@ -1801,7 +1806,7 @@ export async function processarMensagemJessiV2Core(
           if (livres.length > 0) {
             respostaTexto = `O primeiro horário livre para **${dataAlvo}** é às **${primeiro}**.\n\nHorários disponíveis na grade:\n${livres.map((h: string) => `• ${h}`).join("\n")}`;
           } else {
-            respostaTexto = `Não há horários livres disponíveis na grade para a data **${dataAlvo}**. Todos os horários estão ocupados.`;
+            respostaTexto = `Não encontrei horários livres na grade para **${dataAlvo}**. Todos os horários estão preenchidos.`;
           }
 
           cards.push({
@@ -1812,7 +1817,7 @@ export async function processarMensagemJessiV2Core(
           });
         } else {
           const resAgenda = await AgendaAdapter.consultarAgendaPorData(sb, dataAlvo);
-          respostaTexto = resAgenda.summary || `Consultei a agenda para ${dataAlvo}.`;
+          respostaTexto = resAgenda.summary || `Aqui está a grade de agendamentos para ${dataAlvo}:`;
           cards.push({
             type: "agenda",
             title: `Agenda de Atendimentos — ${dataAlvo}`,
@@ -1830,12 +1835,12 @@ export async function processarMensagemJessiV2Core(
           const totalPendente = aReceber + vencidos;
 
           respostaTexto =
-            `Atualmente temos **R$ ${aReceber.toFixed(2)}** a receber dentro do prazo` +
-            (vencidos > 0 ? ` e **R$ ${vencidos.toFixed(2)}** em faturas vencidas/inadimplentes.\n\nTotal geral a receber: **R$ ${totalPendente.toFixed(2)}**.` : ".");
+            `Temos **R$ ${aReceber.toFixed(2)}** a receber no prazo` +
+            (vencidos > 0 ? ` e **R$ ${vencidos.toFixed(2)}** em pagamentos pendentes.\n\nTotal em aberto: **R$ ${totalPendente.toFixed(2)}**.` : ".");
 
           cards.push({
             type: "financeiro",
-            title: "Contas a Receber (Oficial)",
+            title: "Contas a Receber",
             subtitle: `Total pendente: R$ ${totalPendente.toFixed(2)}`,
             data: dadosFin,
           });
@@ -1845,9 +1850,9 @@ export async function processarMensagemJessiV2Core(
             const itens = devedores.map(
               (d) => `• **${d.clienteNome}**: R$ ${Number(d.valor).toFixed(2)} (Vencimento: ${new Date(`${d.vencimento}T12:00:00`).toLocaleDateString("pt-BR")})`
             );
-            respostaTexto = `Encontrei ${devedores.length} cliente(s) com pagamentos pendentes/vencidos:\n\n${itens.join("\n")}\n\nTotal em aberto: **R$ ${dadosFin.valoresVencidosDevedores.toFixed(2)}**.`;
+            respostaTexto = `Encontrei ${devedores.length} cliente(s) com pagamentos em aberto:\n\n${itens.join("\n")}\n\nTotal pendente: **R$ ${dadosFin.valoresVencidosDevedores.toFixed(2)}**.`;
           } else {
-            respostaTexto = `Não há clientes com pagamentos em atraso registrados no momento. A inadimplência está zerada.`;
+            respostaTexto = `Ótima notícia! Não há nenhum cliente com pagamentos em atraso no momento.`;
           }
 
           cards.push({
@@ -1857,7 +1862,7 @@ export async function processarMensagemJessiV2Core(
             data: dadosFin,
           });
         } else {
-          respostaTexto = resFin.summary || `Consultei o resumo financeiro consolidado oficial do Spa.`;
+          respostaTexto = resFin.summary || `Aqui está o resumo financeiro do Spa:`;
           cards.push({
             type: "financeiro",
             title: "Resumo Financeiro Consolidado (Oficial)",
@@ -1872,7 +1877,7 @@ export async function processarMensagemJessiV2Core(
 
         if (intencao.intencao === "consultar_programas_ativos" || (!cliId && !petId)) {
           const resProgGeral = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
-          respostaTexto = resProgGeral.summary || `Consultei os contratos de programas ativos no Spa.`;
+          respostaTexto = resProgGeral.summary || `Encontrei os seguintes contratos ativos no Clubinho:`;
           cards.push({
             type: "programa",
             title: "Contratos Ativos do Clubinho",
@@ -1883,9 +1888,9 @@ export async function processarMensagemJessiV2Core(
           const resCred = await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, cliId || "", petId || undefined);
           
           if (intencao.intencao === "consultar_validade_programa" && (resCred.data as any)?.validade) {
-            respostaTexto = `O programa de cuidados de **${petNome || "o pet"}** possui validade até **${(resCred.data as any).validade}**. ${(resCred.data as any).totalSessaoRestantes || 0} crédito(s) restante(s).`;
+            respostaTexto = `O plano de cuidados do **${petNome || "pet"}** é válido até **${(resCred.data as any).validade}** e restam **${(resCred.data as any).totalSessaoRestantes || 0}** sessão(ões).`;
           } else {
-            respostaTexto = resCred.summary || `Consultei o saldo de créditos do plano.`;
+            respostaTexto = resCred.summary || `Aqui está o saldo de créditos do plano:`;
           }
 
           cards.push({
@@ -1911,7 +1916,7 @@ export async function processarMensagemJessiV2Core(
 
             respostaTexto = `Identifiquei ${lista.length} cliente(s) inativo(s) com alto potencial de retorno:\n\n${itensTexto.join("\n")}\n\nVocê pode clicar no link para abrir a mensagem de carinho personalizada no WhatsApp!`;
           } else {
-            respostaTexto = `Não encontrei clientes inativos elegíveis para reativação no momento. Todos os clientes ativos têm agendamentos recentes!`;
+            respostaTexto = `Ótima notícia! Todos os clientes ativos têm agendamentos recentes e estão em dia com os cuidados.`;
           }
 
           cards.push({
@@ -1927,7 +1932,7 @@ export async function processarMensagemJessiV2Core(
 
           if (petIdCtx && !(perguntaSobrePets && clienteIdCtx)) {
             const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petIdCtx);
-            respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do pet.`;
+            respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do **${novoContexto.pet?.nome || contextoAtual.pet?.nome || "pet"}**:`;
             cards.push({
               type: "cliente",
               title: `Ficha Cadastral & Histórico`,
@@ -1960,7 +1965,7 @@ export async function processarMensagemJessiV2Core(
               data: resCli.data,
             });
           } else {
-            respostaTexto = `Não localizei esse cliente no cadastro. Pode confirmar o nome completo ou o telefone?`;
+            respostaTexto = `Não encontrei esse cliente no cadastro. Pode me passar o nome completo ou o WhatsApp dele para eu localizar?`;
           }
         }
       } else if (intencao.dominio === "comunicacao_mensagens") {

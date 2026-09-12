@@ -875,7 +875,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
   async gerarResposta(req: JessiV2GenerativeRequest): Promise<JessiV2GenerativeResponse> {
     try {
-      const systemMsg = `${JESSI_V2_SYSTEM_PROMPT}\n\nVocê é a Jessi, assistente de IA do Spa de Pet Tia Jéssica. Responda de forma calorosa, clara e direta em português do Brasil.\nRegras absolutas:\n- NUNCA mencione termos técnicos (JSON, SQL, snake_case, nomes de funções ou ferramentas).\n- Use os dados operacionais fornecidos abaixo para responder precisamente ao usuário.\n- Se houver valores monetários, formate em R$ (ex: R$ 80,00).\n- Se houver datas, formate em português (ex: 10 de setembro).\n\nDados Reais do Banco de Dados:\n${JSON.stringify(req.dadosOperacionais, null, 2)}`;
+      const systemMsg = `${JESSI_V2_SYSTEM_PROMPT}\n\nResponda sempre como a Jessi, de forma humana, calorosa, ágil e em português brasileiro.\nDiretrizes de resposta:\n- NUNCA use termos de programação ou banco de dados.\n- Seja direta e acolhedora, como quem trabalha com carinho pelos pets no Spa.\n- Formate valores em R$ (ex: R$ 80,00) e datas de forma amigável.\n\nDados Reais do Spa:\n${JSON.stringify(req.dadosOperacionais, null, 2)}`;
 
       const messages = [
         { role: "system", content: systemMsg },
@@ -895,22 +895,22 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       console.warn("[JessiV2 Provider] Chamada ao modelo falhou, ativando síntese assistida:", err);
     }
 
-    // Síntese assistida com base estrita nos dados reais obtidos
+    // Síntese assistida calorosa e natural
     const dados = req.dadosOperacionais || {};
-    let fallbackText = "Consultei os registros do sistema para você.";
+    let fallbackText = "Consultei as informações aqui para você.";
 
     if (dados.programas) {
-      fallbackText = `Encontrei os programas e créditos solicitados nos registros oficiais do Spa de Pet.`;
+      fallbackText = `Aqui estão as informações dos planos e créditos do Clubinho!`;
     } else if (dados.financeiro) {
-      fallbackText = `Consultei o panorama financeiro com base nos lançamentos oficiais.`;
+      fallbackText = `Aqui está o resumo financeiro atualizado do Spa:`;
     } else if (dados.agenda) {
-      fallbackText = `Consultei a agenda conforme os agendamentos cadastrados.`;
+      fallbackText = `Aqui está a grade de agendamentos:`;
     } else if (dados.contexto?.pet?.nome) {
-      fallbackText = `Estou com o pet **${dados.contexto.pet.nome}** em foco. O que deseja fazer (consultar créditos, agendar atendimento ou ver histórico)?`;
+      fallbackText = `Estou com o **${dados.contexto.pet.nome}** selecionado. O que você gostaria de fazer (agendar banho, ver saldo do plano ou histórico)?`;
     } else if (dados.contexto?.cliente?.nome) {
-      fallbackText = `Estou com o cliente **${dados.contexto.cliente.nome}** em foco. O que deseja fazer (consultar saldo de planos, agendar ou ver pets)?`;
+      fallbackText = `Estou com o cliente **${dados.contexto.cliente.nome}** em foco. Deseja agendar um atendimento para o pet dele ou ver os planos?`;
     } else {
-      fallbackText = `Olá! Sou a Jessi, assistente do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com agendamentos, clientes, pets ou financeiro?`;
+      fallbackText = `Oi, Eli! Como posso te ajudar agora? Pode me pedir para agendar um pet, consultar a grade, ver clientes ou o financeiro!`;
     }
 
     return {
