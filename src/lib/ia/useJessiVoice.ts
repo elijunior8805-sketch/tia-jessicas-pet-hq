@@ -27,7 +27,7 @@ export interface UseJessiVoiceReturn {
   resumeListening: () => void;
   cancelListening: () => void;
   resetTranscript: () => void;
-  speakResponse: (texto: string, onFinish?: () => void) => void;
+  speakResponse: (entrada: string | { texto: string; audioDataUrl?: string }, onFinish?: () => void) => void;
 }
 
 /**
@@ -246,11 +246,14 @@ export function useJessiVoice(
 
   /** Síntese de voz TTS ultra-humanizada e natural (Neural Cloud + Fallback Nativo) */
   const speakResponse = useCallback(
-    async (texto: string, onFinish?: () => void) => {
+    async (entrada: string | { texto: string; audioDataUrl?: string }, onFinish?: () => void) => {
       if (typeof window === "undefined" || !ttsEnabled) {
         onFinish?.();
         return;
       }
+
+      const texto = typeof entrada === "string" ? entrada : entrada.texto;
+      const audioPreCarregado = typeof entrada === "object" ? entrada.audioDataUrl : undefined;
 
       // Cancela qualquer reprodução de áudio anterior imediatamente
       if (audioElementRef.current) {
@@ -277,7 +280,7 @@ export function useJessiVoice(
       // 1. Tenta carregar áudio neural de altíssima definição (estúdio/humano)
       try {
         const textoCacheKey = texto.trim().slice(0, 300);
-        let audioDataUrl = audioCacheRef.current.get(textoCacheKey);
+        let audioDataUrl = audioPreCarregado || audioCacheRef.current.get(textoCacheKey);
 
         if (!audioDataUrl) {
           const { gerarAudioNeuralJessiFn } = await import("./ia-voz.functions");

@@ -30,7 +30,7 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
         .eq("id", userId)
         .maybeSingle();
 
-      return await despacharMensagemJessi(
+      const resultado = await despacharMensagemJessi(
         supabase,
         data as any,
         {
@@ -39,6 +39,21 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
           cargo: (profile as any)?.cargo || "Administrador",
         }
       );
+
+      // Pré-sintetiza áudio neural em alta definição para execução instantânea no navegador
+      try {
+        if (resultado?.respostaTexto) {
+          const { sintetizarAudioNeural } = await import("./ia-voz.server");
+          const audioDataUrl = await sintetizarAudioNeural(resultado.respostaTexto);
+          if (audioDataUrl) {
+            (resultado as any).audioDataUrl = audioDataUrl;
+          }
+        }
+      } catch (audioErr) {
+        console.warn("[TTS Auto-Synthesis] Falha suave ao gerar áudio:", audioErr);
+      }
+
+      return resultado;
     } catch (err: any) {
       console.error("[processarMensagemJessi] Erro no handler:", err);
       return {

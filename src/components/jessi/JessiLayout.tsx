@@ -223,7 +223,11 @@ export const JessiLayout: React.FC = () => {
 
       // 4. Retomada automática da escuta e fala da resposta da Jessi
       if (ttsEnabled) {
-        speakResponse(res.respostaTexto, () => {
+        const payloadFala = (res as any).audioDataUrl
+          ? { texto: res.respostaTexto, audioDataUrl: (res as any).audioDataUrl }
+          : res.respostaTexto;
+
+        speakResponse(payloadFala, () => {
           if (isContinuousMode) {
             resumeListening();
           }
@@ -325,7 +329,11 @@ export const JessiLayout: React.FC = () => {
       toast.success("Ação confirmada e registrada com sucesso!");
 
       if (ttsEnabled) {
-        speakResponse(res.respostaTexto, () => {
+        const payloadFala = (res as any).audioDataUrl
+          ? { texto: res.respostaTexto, audioDataUrl: (res as any).audioDataUrl }
+          : res.respostaTexto;
+
+        speakResponse(payloadFala, () => {
           if (isContinuousMode) {
             resumeListening();
           }
