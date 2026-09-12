@@ -137,8 +137,12 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
-    // 0. Desbloqueia contexto de áudio em mobile durante a interação do usuário
-    desbloquearAudioMobile();
+    // 0. Desbloqueia contexto de áudio se suportado pelo navegador
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }
 
     // 1. Pausa o microfone para não capturar a própria fala
     pauseListening();
