@@ -1942,16 +1942,21 @@ export async function processarMensagemJessiV2Core(
           } else if (clienteIdCtx) {
             const resCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteIdCtx);
             const dadosCli: any = resCli.data || {};
-            const nomeCli = dadosCli.nome || novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "O cliente";
-            const petsCli: any[] = Array.isArray(dadosCli.pets) ? dadosCli.pets : [];
-
-            if (petsCli.length === 0) {
-              respostaTexto = `**${nomeCli}** ainda não possui nenhum pet cadastrado no sistema.`;
+            const telCli = dadosCli.whatsapp || dadosCli.telefone ? `Telefone: ${dadosCli.whatsapp || dadosCli.telefone}.` : "";
+            if (perguntaSobrePets) {
+              if (petsCli.length === 0) {
+                respostaTexto = `**${nomeCli}** ainda não possui nenhum pet cadastrado no sistema.`;
+              } else {
+                const nomes = petsCli.map((p: any) => `**${p.nome}**${p.raca ? ` (${p.raca})` : ""}`);
+                const listaNomes =
+                  nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+                respostaTexto = `**${nomeCli}** possui ${petsCli.length} pet(s) cadastrado(s): ${listaNomes}.`;
+              }
             } else {
-              const nomes = petsCli.map((p: any) => `**${p.nome}**`);
-              const listaNomes =
-                nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
-              respostaTexto = `**${nomeCli}** possui ${petsCli.length} pet(s) cadastrado(s): ${listaNomes}.`;
+              const petsResumo = petsCli.length > 0
+                ? ` Pets vinculados: ${petsCli.map((p: any) => p.nome).join(", ")}.`
+                : " Nenhum pet vinculado ainda.";
+              respostaTexto = `Localizei o cadastro do cliente **${nomeCli}**! ${telCli}${petsResumo}`;
             }
 
             if (petsCli.length === 1) {

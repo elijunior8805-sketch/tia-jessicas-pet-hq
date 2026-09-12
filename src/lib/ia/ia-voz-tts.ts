@@ -77,7 +77,9 @@ export function humanizarTextoParaVoz(texto: string): string {
     return `${diaNum} de ${nomeMes}`;
   });
 
-  // 8. Normalização de Abreviações Comuns
+  // 8. Normalização de Abreviações Comuns e Termos
+  t = t.replace(/\bbanho simples\b/gi, "banho essencial");
+  t = t.replace(/(\d+)%/g, "$1 por cento");
   t = t.replace(/\bDr\.\s*/gi, "Doutor ");
   t = t.replace(/\bDra\.\s*/gi, "Doutora ");
   t = t.replace(/\bSr\.\s*/gi, "Senhor ");
@@ -335,7 +337,12 @@ export function reproduzirFalaHumana(
     }
   }, tempoTotalEstimado);
 
-  falarProximaFrase();
+  // Inicia a reprodução com micro-delay após cancelamento para garantir fila limpa no Chromium
+  setTimeout(() => {
+    if (!cancelado) {
+      falarProximaFrase();
+    }
+  }, 15);
 
   return {
     cancelar: () => {
