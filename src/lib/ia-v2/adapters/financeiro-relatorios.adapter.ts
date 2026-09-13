@@ -186,14 +186,17 @@ export class FinanceiroRelatoriosAdapter {
         pendencias: pendenciasLista,
       };
 
+      const fmtBRL = (v: number) =>
+        `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
       const resumoFormatado =
         `Resumo Financeiro Consolidado (${periodo === "hoje" ? "Hoje" : periodo === "semana" ? "Últimos 7 dias" : "Mês Atual"}):\n\n` +
-        `• **Faturamento Bruto:** R$ ${faturamentoBruto.toFixed(2)} (Recebido: R$ ${valoresRecebidos.toFixed(2)})\n` +
-        `• **Ticket Médio:** R$ ${ticketMedio.toFixed(2)} (${totalEntradasCount} atendimentos pagos)\n` +
-        `• **Entradas por Forma:** Pix: R$ ${totalPix.toFixed(2)} | Dinheiro: R$ ${totalDinheiro.toFixed(2)} | Cartões: R$ ${(totalCartaoCredito + totalCartaoDebito).toFixed(2)}\n` +
-        `• **A Receber (No prazo):** R$ ${valoresAReceber.toFixed(2)}\n` +
-        `• **Inadimplência (Vencidos):** R$ ${valoresVencidosDevedores.toFixed(2)}${devedoresLista.length > 0 ? ` (${devedoresLista.length} cliente(s) com pendências)` : ""}\n` +
-        `• **Saldo Líquido:** R$ ${saldoLiquido.toFixed(2)}`;
+        `• **Faturamento Bruto:** ${fmtBRL(faturamentoBruto)} (Recebido: ${fmtBRL(valoresRecebidos)})\n` +
+        `• **Ticket Médio:** ${fmtBRL(ticketMedio)} (${totalEntradasCount} atendimentos pagos)\n` +
+        `• **Entradas por Forma:** Pix: ${fmtBRL(totalPix)} | Dinheiro: ${fmtBRL(totalDinheiro)} | Cartões: ${fmtBRL(totalCartaoCredito + totalCartaoDebito)}\n` +
+        `• **A Receber (No prazo):** ${fmtBRL(valoresAReceber)}\n` +
+        `• **Inadimplência (Vencidos):** ${fmtBRL(valoresVencidosDevedores)}${devedoresLista.length > 0 ? ` (${devedoresLista.length} cliente(s) com pendências)` : ""}\n` +
+        `• **Saldo Líquido:** ${fmtBRL(saldoLiquido)}`;
 
       return {
         success: true,

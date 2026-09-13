@@ -9,6 +9,116 @@ import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
 import { AlertaCard } from "./cards/AlertaCard";
 import { ComunicacaoCard } from "./cards/ComunicacaoCard";
 import { Sparkles, User, ArrowRight } from "lucide-react";
+const renderInlineMarkdown = (text: string, isAssistant: boolean): React.ReactNode[] => {
+  const parts: React.ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g;
+  const segments = text.split(regex);
+
+  segments.forEach((seg, idx) => {
+    if (!seg) return;
+
+    if (seg.startsWith("**") && seg.endsWith("**")) {
+      const boldText = seg.slice(2, -2);
+      parts.push(
+        <strong key={idx} className={isAssistant ? "font-semibold text-foreground" : "font-semibold text-white"}>
+          {boldText}
+        </strong>
+      );
+    } else if (seg.startsWith("*") && seg.endsWith("*")) {
+      const italicText = seg.slice(1, -1);
+      parts.push(
+        <em key={idx} className="italic opacity-90">
+          {italicText}
+        </em>
+      );
+    } else if (seg.startsWith("[") && seg.includes("](") && seg.endsWith(")")) {
+      const match = seg.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        const linkText = match[1];
+        const linkUrl = match[2];
+        parts.push(
+          <a
+            key={idx}
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 underline font-medium"
+          >
+            {linkText}
+          </a>
+        );
+      } else {
+        parts.push(seg);
+      }
+    } else {
+      parts.push(seg);
+    }
+  });
+
+  return parts;
+};
+
+export const FormattedMessageContent: React.FC<{ content: string; isAssistant: boolean }> = ({ content, isAssistant }) => {
+  if (!content) return null;
+
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+  let currentList: React.ReactNode[] = [];
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={`list-${elements.length}`} className="my-2 space-y-1.5 pl-0.5">
+          {currentList}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  lines.forEach((line, lineIdx) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      elements.push(<div key={`br-${lineIdx}`} className="h-1.5" />);
+      return;
+    }
+
+    const isBullet = /^[•*\-–—]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed);
+
+    if (isBullet) {
+      const cleanLine = trimmed.replace(/^[•*\-–—]\s+/, "").replace(/^\d+\.\s+/, "");
+      currentList.push(
+        <li key={`li-${lineIdx}`} className="flex items-start gap-2 text-xs md:text-sm">
+          <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${isAssistant ? "bg-emerald-700" : "bg-white"}`} />
+          <span className="flex-1 leading-relaxed">
+            {renderInlineMarkdown(cleanLine, isAssistant)}
+          </span>
+        </li>
+      );
+    } else {
+      flushList();
+      const isHeader = /^#{1,6}\s+/.test(trimmed) || (trimmed.endsWith(":") && trimmed.length < 80);
+      if (isHeader) {
+        const cleanHeader = trimmed.replace(/^#{1,6}\s+/, "");
+        elements.push(
+          <div key={`h-${lineIdx}`} className={`font-semibold text-xs md:text-sm pt-1 pb-0.5 ${isAssistant ? "text-foreground" : "text-white"}`}>
+            {renderInlineMarkdown(cleanHeader, isAssistant)}
+          </div>
+        );
+      } else {
+        elements.push(
+          <p key={`p-${lineIdx}`} className="leading-relaxed">
+            {renderInlineMarkdown(trimmed, isAssistant)}
+          </p>
+        );
+      }
+    }
+  });
+
+  flushList();
+  return <div className="space-y-1">{elements}</div>;
+};
 
 interface JessiChatProps {
   messages: JessiMessage[];
@@ -56,9 +166,7 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                   : "bg-emerald-800 text-white shadow-xs rounded-br-xs"
               }`}
             >
-              <div className="whitespace-pre-wrap leading-relaxed">
-                {msg.content}
-              </div>
+              <FormattedMessageContent content={msg.content} isAssistant={isAssistant} />
 
               {msg.cards && msg.cards.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-border/40">
