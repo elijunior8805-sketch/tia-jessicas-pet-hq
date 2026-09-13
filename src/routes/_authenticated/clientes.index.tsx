@@ -76,6 +76,14 @@ function ClientesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  const selecionar = (id: string | null) => {
+    navigate({
+      to: "/clientes",
+      search: (prev: any) => ({ ...prev, sel: id || undefined }),
+      replace: true,
+    });
+  };
+
   const termo = q.trim();
   const searching = termo.length >= 1;
 
@@ -483,7 +491,7 @@ function ClientesPage() {
                     cliente={c}
                     selecionado={c.id === sel}
                     onClick={() => selecionar(c.id)}
-                    cobranca={cobrancasByCliente?.[c.id]}
+                    cobranca={undefined}
                   />
                 ))}
                 {podeMais && (

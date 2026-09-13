@@ -18,6 +18,7 @@ export const JessiV2CardTypeSchema = z.enum([
   "comparativo",
   "proativo",
   "comunicacao",
+  "reativacao",
 ]);
 
 export type JessiV2CardType = z.infer<typeof JessiV2CardTypeSchema>;
