@@ -540,17 +540,24 @@ function PetCard({ pet }: { pet: any }) {
       <div className="text-xs text-muted-foreground mb-3">
         {pet.proxima_visita ? `Próx: ${new Date(pet.proxima_visita).toLocaleDateString("pt-BR")}` : "Sem próxima visita"}
       </div>
-      <div className="mt-auto grid grid-cols-2 gap-2">
-        <Link to="/pets/$petId/ficha" params={{ petId: pet.id }}>
-          <Button size="sm" variant="outline" className="w-full gap-1">
-            <FileText className="h-3.5 w-3.5"/> Ficha
+      <div className="mt-auto space-y-2">
+        <Link to="/agenda" search={{ novo: true, cliente: pet.cliente_id, pet: pet.id }}>
+          <Button size="sm" className="w-full gap-1.5 bg-primary text-primary-foreground font-semibold rounded-lg shadow-2xs">
+            <CalendarPlus className="h-3.5 w-3.5" /> Check-in / Agendar
           </Button>
         </Link>
-        <Link to="/pets/$petId/historico" params={{ petId: pet.id }}>
-          <Button size="sm" className="w-full gap-1">
-            <ClipboardList className="h-3.5 w-3.5"/> Histórico
-          </Button>
-        </Link>
+        <div className="grid grid-cols-2 gap-2">
+          <Link to="/pets/$petId/ficha" params={{ petId: pet.id }}>
+            <Button size="sm" variant="outline" className="w-full gap-1">
+              <FileText className="h-3.5 w-3.5"/> Ficha
+            </Button>
+          </Link>
+          <Link to="/pets/$petId/historico" params={{ petId: pet.id }}>
+            <Button size="sm" variant="outline" className="w-full gap-1">
+              <ClipboardList className="h-3.5 w-3.5"/> Histórico
+            </Button>
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -20,6 +20,8 @@ export type FotoItem = {
   created_at?: string;
   created_by?: string | null;
   created_by_nome?: string | null;
+  localUrl?: string | null;
+  uploading?: boolean;
 };
 
 export type EtapaStatusValor = "pendente" | "em_preenchimento" | "concluida";
