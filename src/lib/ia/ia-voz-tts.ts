@@ -104,7 +104,30 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/[:;]\s*$/g, ".");
   t = t.replace(/[:;]\s*\n/g, ".\n");
 
-  // 11. Remove quebras de linha desnecessárias e múltiplos espaços
+  // 11. Unidades e símbolos comuns para leitura natural
+  t = t.replace(/\bn[º°.]\s*/gi, "número ");
+  t = t.replace(/\b(\d+)\s?kg\b/gi, "$1 quilos");
+  t = t.replace(/\b(\d+)\s?km\b/gi, "$1 quilômetros");
+  t = t.replace(/\b(\d+)\s?ml\b/gi, "$1 mililitros");
+  t = t.replace(/\b(\d+)\s?min\b/gi, "$1 minutos");
+  t = t.replace(/(\d+)\s*x\s*(\d+)/gi, "$1 vezes $2");
+
+  // 12. Números pequenos por extenso (soa mais humano que dígitos soltos)
+  const porExtenso: Record<string, string> = {
+    "0": "zero", "1": "um", "2": "dois", "3": "três", "4": "quatro",
+    "5": "cinco", "6": "seis", "7": "sete", "8": "oito", "9": "nove",
+    "10": "dez", "11": "onze", "12": "doze", "13": "treze", "14": "catorze",
+    "15": "quinze", "16": "dezesseis", "17": "dezessete", "18": "dezoito",
+    "19": "dezenove", "20": "vinte",
+  };
+  t = t.replace(/\b(1?[0-9]|20)\b(?!\s*(reais|centavos|horas|quilos|quilômetros|mililitros|minutos|por cento|vezes))/g, (m) => porExtenso[m] ?? m);
+
+  // 13. Suaviza emendas telegráficas para ritmo conversacional
+  t = t.replace(/\s+-\s+/g, ", ");
+  t = t.replace(/\s+–\s+/g, ", ");
+  t = t.replace(/\s+—\s+/g, ", ");
+
+  // 14. Remove quebras de linha desnecessárias e múltiplos espaços
   t = t.replace(/\n+/g, ". ");
   t = t.replace(/\s+/g, " ").trim();
 
@@ -202,22 +225,35 @@ export function segmentarEmFrases(texto: string): string[] {
   const regex = /([^.?!]+[.?!]+)/g;
   const matches = texto.match(regex);
 
-  if (!matches || matches.length === 0) {
-    return [texto.trim()];
-  }
-
-  const frases: string[] = [];
-  matches.forEach((m) => {
-    const f = m.trim();
-    if (f.length > 0) {
-      frases.push(f);
-    }
-  });
+  const frasesBase: string[] = matches && matches.length > 0
+    ? matches.map((m) => m.trim()).filter((f) => f.length > 0)
+    : [texto.trim()];
 
   // Se sobrou algum trecho sem pontuação no final
   const resto = texto.replace(regex, "").trim();
   if (resto.length > 0) {
-    frases.push(resto);
+    frasesBase.push(resto);
+  }
+
+  // Segunda passada: frases muito longas ganham "respirações" em vírgulas e conectivos,
+  // para a voz não atropelar e soar natural como uma pessoa falando.
+  const frases: string[] = [];
+  for (const frase of frasesBase) {
+    if (frase.length <= 140) {
+      frases.push(frase);
+      continue;
+    }
+    const partes = frase.split(/,\s+/);
+    let atual = "";
+    for (const parte of partes) {
+      if (atual && (atual.length + parte.length) > 120) {
+        frases.push(atual.replace(/[,\s]+$/, "") + ",");
+        atual = parte;
+      } else {
+        atual = atual ? `${atual}, ${parte}` : parte;
+      }
+    }
+    if (atual) frases.push(atual);
   }
 
   return frases;
@@ -284,8 +320,8 @@ export function reproduzirFalaHumana(
     try {
       const utterance = new SpeechSynthesisUtterance(fraseAtual);
       utterance.lang = "pt-BR";
-      utterance.rate = 1.01; // Cadência conversacional perfeitamente natural
-      utterance.pitch = 1.02; // Tom amigável, receptivo e caloroso
+      utterance.rate = 0.98; // Cadência calma e conversacional, sem atropelos
+      utterance.pitch = 1.03; // Tom levemente acolhedor e caloroso
       utterance.volume = 1.0;
 
       if (melhorVoz) {
