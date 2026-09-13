@@ -750,7 +750,7 @@ function AgendaPage() {
             ))}
           </div>
 
-          {isLoading && (!agendamentos || agendamentos.length === 0) ? (
+          {isLoading && (!agendamentos || (agendamentos as any[]).length === 0) ? (
             <div className="grid gap-3">
               {[1, 2, 3].map((n) => (
                 <div key={n} className="h-28 rounded-2xl bg-card border border-border/40 p-4 space-y-3 animate-pulse shadow-xs">

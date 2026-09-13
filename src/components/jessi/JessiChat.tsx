@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { JessiMessage } from "@/lib/ia/jessi-contracts";
 import { AgendaCard } from "./cards/AgendaCard";
 import { ClienteCard } from "./cards/ClienteCard";
