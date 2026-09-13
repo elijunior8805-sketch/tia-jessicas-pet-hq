@@ -396,6 +396,8 @@ export const JessiChat: React.FC<JessiChatProps> = ({
             </button>
           </div>
         </div>
+      )}
+
       {/* Botão flutuante suave para descer quando estiver navegando no histórico */}
       {showScrollBottom && (
         <div className="sticky bottom-1 left-0 right-0 flex justify-center pointer-events-none z-10 pb-1">
