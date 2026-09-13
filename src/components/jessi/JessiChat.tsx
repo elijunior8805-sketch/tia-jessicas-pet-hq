@@ -8,10 +8,12 @@ import { ComprovanteCard } from "./cards/ComprovanteCard";
 import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
 import { AlertaCard } from "./cards/AlertaCard";
 import { ComunicacaoCard } from "./cards/ComunicacaoCard";
+import { ReativacaoCard } from "./cards/ReativacaoCard";
 import { Sparkles, User, ArrowRight } from "lucide-react";
+
 const renderInlineMarkdown = (text: string, isAssistant: boolean): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
-  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g;
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^\s)]+(?:\?[^\s)]*)?\))/g;
   const segments = text.split(regex);
 
   segments.forEach((seg, idx) => {
@@ -184,6 +186,9 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                         return <ComprovanteCard key={cIdx} data={card.data} />;
                       case "comunicacao":
                         return <ComunicacaoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                      case "reativacao":
+                      case "proativo":
+                        return <ReativacaoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "confirmacao":
                         return (
                           <ConfirmacaoCard

@@ -1908,30 +1908,16 @@ export async function processarMensagemJessiV2Core(
           if (lista.length > 0) {
             const itensTexto = lista.slice(0, 6).map((r) => {
               const petStr = r.pet?.nome ? ` (Pet: **${r.pet.nome}**)` : "";
-              const msgLink = r.mensagemSugerida?.urlWhatsApp
-                ? ` [📲 Enviar WhatsApp](${r.mensagemSugerida.urlWhatsApp})`
-                : "";
-              return `• **${r.cliente?.nome || "Cliente"}**${petStr} — inativo há **${r.diasInativo || 0} dias**${msgLink}`;
+              return `• **${r.cliente?.nome || "Cliente"}**${petStr} — inativo há **${r.diasInativo || 0} dias**`;
             });
 
-            respostaTexto = `Identifiquei **${lista.length} cliente(s) e pet(s)** com potencial para reativação:\n\n${itensTexto.join("\n")}\n\n💡 Você pode clicar no link para enviar a mensagem carinhosa pelo WhatsApp ou acessar a aba **Reativação** no menu!`;
+            respostaTexto = `Identifiquei **${lista.length} cliente(s) e pet(s)** com potencial para reativação:\n\n${itensTexto.join("\n")}\n\n💡 Utilize o card abaixo para enviar mensagens personalizadas no WhatsApp com 1 clique:`;
 
-            if (lista[0]?.mensagemSugerida) {
-              const top = lista[0];
-              cards.push({
-                type: "comunicacao",
-                title: "Mensagem de Reativação Sugerida",
-                subtitle: `${top.cliente?.nome || "Cliente"} (${top.pet?.nome || "Pet"})`,
-                data: {
-                  mensagemFormatada: top.mensagemSugerida.textoMensagem,
-                  urlWhatsApp: top.mensagemSugerida.urlWhatsApp,
-                  telefoneFormatado: top.cliente?.telefone,
-                  cliente: top.cliente?.nome,
-                  pet: top.pet?.nome,
-                  tipoMensagem: "reativacao_carinho",
-                },
-              });
-            }
+            cards.push({
+              type: "reativacao",
+              title: "Reativação de Clientes",
+              data: lista,
+            });
           } else {
             respostaTexto = `Ótima notícia! Não há clientes inativos sem agendamento no momento. Todos estão com visitas recentes ou agendamentos ativos.`;
           }
