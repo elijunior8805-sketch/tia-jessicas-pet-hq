@@ -35,8 +35,12 @@ export interface UseJessiVoiceReturn {
  */
 const DICIONARIO_SPA: Record<string, string> = {
   "banho e tosa": "banho e tosa",
+  "banhitosa": "banho e tosa",
+  "banho etosa": "banho e tosa",
+  "banho tosa": "banho e tosa",
   "tosa higiênica": "tosa higiênica",
   "tosa higienica": "tosa higiênica",
+  "tosa higiênico": "tosa higiênica",
   "banho essencial": "banho essencial",
   "banho simples": "banho essencial",
   "banho premium": "banho premium",
@@ -44,6 +48,7 @@ const DICIONARIO_SPA: Record<string, string> = {
   "hidratacao": "hidratação",
   "leva e traz": "leva e traz",
   "leva traz": "leva e traz",
+  "levar e trazer": "leva e traz",
   "eli junior": "Eli Júnior",
   "eli júnior": "Eli Júnior",
   "eli jr": "Eli Júnior",
@@ -51,6 +56,7 @@ const DICIONARIO_SPA: Record<string, string> = {
   "tor": "Thor",
   "rex": "Rex",
   "pix": "Pix",
+  "pics": "Pix",
   "débito": "débito",
   "crédito": "crédito",
   "comprovante": "comprovante",
@@ -61,6 +67,19 @@ const DICIONARIO_SPA: Record<string, string> = {
   "faturamento": "faturamento",
 };
 
+/** Corrige vícios comuns do reconhecimento de voz e devolve frase fluida. */
+const CORRECOES_FALA: Array<[RegExp, string]> = [
+  [/\bvc\b/gi, "você"],
+  [/\bpq\b/gi, "porque"],
+  [/\btb\b/gi, "também"],
+  [/\btbm\b/gi, "também"],
+  [/\bqto\b/gi, "quanto"],
+  [/\bamnh\b|\bamanhã de manha\b/gi, "amanhã de manhã"],
+  [/\bmeio dia e meia\b/gi, "meio-dia e meia"],
+  [/\bda\s+(qui|aki)\b/gi, "daqui"],
+  [/\bpeti shop\b|\bpet shop\b/gi, "pet shop"],
+];
+
 export function aperfeicoarTextoSpa(texto: string): string {
   let corrigido = texto;
   for (const [termo, substituicao] of Object.entries(DICIONARIO_SPA)) {
@@ -68,6 +87,35 @@ export function aperfeicoarTextoSpa(texto: string): string {
     corrigido = corrigido.replace(regex, substituicao);
   }
   return corrigido;
+}
+
+/**
+ * Humaniza a transcrição final: aplica o vocabulário do Spa, corrige vícios
+ * comuns do reconhecedor, capitaliza o início das frases e fecha a pontuação,
+ * entregando um texto fluido e natural para leitura e envio.
+ */
+export function humanizarTranscricao(texto: string): string {
+  let t = aperfeicoarTextoSpa((texto || "").replace(/\s+/g, " ").trim());
+  if (!t) return "";
+
+  for (const [regex, substituicao] of CORRECOES_FALA) {
+    t = t.replace(regex, substituicao);
+  }
+
+  // Capitaliza a primeira letra de cada frase
+  t = t.replace(/(^\s*[a-zà-ÿ]|[.!?]\s+[a-zà-ÿ])/g, (m) => m.toUpperCase());
+
+  // Garante pontuação final para a frase não ficar "pendurada"
+  if (!/[.!?…]$/.test(t)) {
+    // Perguntas comuns ganham interrogação
+    if (/^(qual|quais|quanto|quantos|quantas|quando|onde|como|quem|será|pode|tem|temos|existe)\b/i.test(t)) {
+      t += "?";
+    } else {
+      t += ".";
+    }
+  }
+
+  return t;
 }
 
 export function useJessiVoice(
