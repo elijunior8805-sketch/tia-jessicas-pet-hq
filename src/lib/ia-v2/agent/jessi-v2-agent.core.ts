@@ -1906,7 +1906,7 @@ export async function processarMensagemJessiV2Core(
           const lista = (resRetorno.data as any[]) || [];
 
           if (lista.length > 0) {
-            const itensTexto = lista.slice(0, 5).map((r) => {
+            const itensTexto = lista.slice(0, 6).map((r) => {
               const petStr = r.pet?.nome ? ` (Pet: **${r.pet.nome}**)` : "";
               const msgLink = r.mensagemSugerida?.urlWhatsApp
                 ? ` [📲 Enviar WhatsApp](${r.mensagemSugerida.urlWhatsApp})`
@@ -1914,17 +1914,27 @@ export async function processarMensagemJessiV2Core(
               return `• **${r.cliente?.nome || "Cliente"}**${petStr} — inativo há **${r.diasInativo || 0} dias**${msgLink}`;
             });
 
-            respostaTexto = `Identifiquei ${lista.length} cliente(s) inativo(s) com alto potencial de retorno:\n\n${itensTexto.join("\n")}\n\nVocê pode clicar no link para abrir a mensagem de carinho personalizada no WhatsApp!`;
-          } else {
-            respostaTexto = `Ótima notícia! Todos os clientes ativos têm agendamentos recentes e estão em dia com os cuidados.`;
-          }
+            respostaTexto = `Identifiquei **${lista.length} cliente(s) e pet(s)** com potencial para reativação:\n\n${itensTexto.join("\n")}\n\n💡 Você pode clicar no link para enviar a mensagem carinhosa pelo WhatsApp ou acessar a aba **Reativação** no menu!`;
 
-          cards.push({
-            type: "proativo",
-            title: "Reativação de Clientes (Saudade)",
-            subtitle: `${lista.length} cliente(s) sugerido(s)`,
-            data: resRetorno.data,
-          });
+            if (lista[0]?.mensagemSugerida) {
+              const top = lista[0];
+              cards.push({
+                type: "comunicacao",
+                title: "Mensagem de Reativação Sugerida",
+                subtitle: `${top.cliente?.nome || "Cliente"} (${top.pet?.nome || "Pet"})`,
+                data: {
+                  mensagemFormatada: top.mensagemSugerida.textoMensagem,
+                  urlWhatsApp: top.mensagemSugerida.urlWhatsApp,
+                  telefoneFormatado: top.cliente?.telefone,
+                  cliente: top.cliente?.nome,
+                  pet: top.pet?.nome,
+                  tipoMensagem: "reativacao_carinho",
+                },
+              });
+            }
+          } else {
+            respostaTexto = `Ótima notícia! Não há clientes inativos sem agendamento no momento. Todos estão com visitas recentes ou agendamentos ativos.`;
+          }
         } else {
           const petIdCtx = novoContexto.pet?.id || contextoAtual.pet?.id;
           const clienteIdCtx = novoContexto.cliente?.id || contextoAtual.cliente?.id;

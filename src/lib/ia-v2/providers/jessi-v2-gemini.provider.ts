@@ -491,7 +491,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     // 7. Extrai termo livre para busca caso ainda não haja
     if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
       let termoLivre = texto
-        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?)\b/gi, "")
+        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?|clientes?|reativar|reativação|reativacao|inativos?|sumidos?|saudade|não|nao|vêm|vem|mais|menos|há|ha|sem|visita|visitas|atendimento|atendimentos)\b/gi, "")
         .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
         .replace(/\b(banho e tosa|banho essencial|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
         .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
@@ -670,15 +670,19 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         explicacao = `Consultando créditos/validade do plano para ${petNomeResolvido || "o pet/cliente ativo no contexto"}.`;
       }
     }
-    // Reativação de Clientes & Clientes Inativos / Sumidos
+    // Reativação de Clientes & Clientes Inativos / Sumidos & Régua de Inatividade
     else if (
       textoLower.includes("reativar") ||
       textoLower.includes("reativação") ||
       textoLower.includes("reativacao") ||
       textoLower.includes("cliente sumido") ||
       textoLower.includes("clientes sumidos") ||
+      textoLower.includes("pet sumido") ||
+      textoLower.includes("pets sumidos") ||
       textoLower.includes("cliente inativo") ||
       textoLower.includes("clientes inativos") ||
+      textoLower.includes("pet inativo") ||
+      textoLower.includes("pets inativos") ||
       textoLower.includes("quem sumiu") ||
       textoLower.includes("quem tá sumido") ||
       textoLower.includes("quem ta sumido") ||
@@ -686,14 +690,46 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("quem está sumido") ||
       textoLower.includes("quem não vem") ||
       textoLower.includes("quem nao vem") ||
+      textoLower.includes("não vêm há") ||
+      textoLower.includes("nao vem ha") ||
+      textoLower.includes("não vem há") ||
+      textoLower.includes("não vêm a mais") ||
+      textoLower.includes("não vem a mais") ||
+      textoLower.includes("não vêm há mais") ||
+      textoLower.includes("nao vem ha mais") ||
+      textoLower.includes("não vêm a") ||
+      textoLower.includes("não vem a") ||
+      textoLower.includes("não vêm") ||
+      textoLower.includes("nao vem") ||
+      textoLower.includes("não voltam") ||
+      textoLower.includes("nao voltam") ||
       textoLower.includes("faz tempo que não vem") ||
       textoLower.includes("faz tempo que nao vem") ||
+      textoLower.includes("sem visita") ||
+      textoLower.includes("sem visitas") ||
+      textoLower.includes("sem atendimento") ||
       textoLower.includes("saudade") ||
       textoLower.includes("retorno de cliente") ||
       textoLower.includes("retorno de clientes") ||
       textoLower.includes("clientes perdidos") ||
       textoLower.includes("recuperar cliente") ||
-      textoLower.includes("recuperar clientes")
+      textoLower.includes("recuperar clientes") ||
+      textoLower.includes("mais de 30 dias") ||
+      textoLower.includes("mais de 60 dias") ||
+      textoLower.includes("mais de 90 dias") ||
+      textoLower.includes("mais de 120 dias") ||
+      textoLower.includes("há mais de 30") ||
+      textoLower.includes("ha mais de 30") ||
+      textoLower.includes("há 30 dias") ||
+      textoLower.includes("ha 30 dias") ||
+      textoLower.includes("régua de dias") ||
+      textoLower.includes("regua de dias") ||
+      textoLower.includes("régua de reativação") ||
+      textoLower.includes("regua de reativacao") ||
+      textoLower.includes("campanha promocional") ||
+      textoLower.includes("campanhas promocionais") ||
+      textoLower.includes("campanha de reativação") ||
+      textoLower.includes("campanhas de reativação")
     ) {
       dominio = "clientes_pets";
       intencao = "identificar_clientes_retorno";
@@ -840,6 +876,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       ? clienteNomeDaMensagem
       : petNomeDaMensagem
       ? petNomeDaMensagem
+      : (intencao === "identificar_clientes_retorno")
+      ? null
       : (dominio === "clientes_pets" || intencao === "consultar_ultimo_atendimento")
       ? (clienteNomeResolvido || petNomeResolvido || null)
       : (!jaTemPetEClienteNoContexto && (intencao === "criar_agendamento" || intencao === "cancelar_agendamento" || intencao === "reagendar_agendamento"))
