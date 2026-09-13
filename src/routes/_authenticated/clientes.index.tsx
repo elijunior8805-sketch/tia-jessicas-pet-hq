@@ -491,7 +491,7 @@ function ClientesPage() {
                     cliente={c}
                     selecionado={c.id === sel}
                     onClick={() => selecionar(c.id)}
-                    cobranca={cobrancasByCliente?.[c.id]}
+                    cobranca={undefined}
                   />
                 ))}
                 {podeMais && (
