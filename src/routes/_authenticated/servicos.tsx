@@ -101,10 +101,12 @@ function ServicosPage() {
         (s) => s.nome.trim().toUpperCase() === "BANHO SIMPLES"
       );
       if (banhoSimples) {
-        supabase
-          .from("servicos")
-          .update({ nome: "Banho Essencial" })
-          .eq("id", banhoSimples.id)
+        void Promise.resolve(
+          supabase
+            .from("servicos")
+            .update({ nome: "Banho Essencial" })
+            .eq("id", banhoSimples.id)
+        )
           .then(() => {
             qc.invalidateQueries({ queryKey: ["servicos"] });
             qc.invalidateQueries({ queryKey: ["servicos-ativos"] });

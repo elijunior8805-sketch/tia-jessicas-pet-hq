@@ -1123,7 +1123,7 @@ export async function processarMensagemJessiV2Core(
         } else if (servicosDB && servicosDB.length > 1) {
           // Verifica correspondência exata
           const matchExato = servicosDB.find(
-            (s) => s.nome.trim().toLowerCase() === servicoNome.trim().toLowerCase()
+            (s) => s.nome.trim().toLowerCase() === (servicoNome || "").trim().toLowerCase()
           );
 
           if (matchExato) {
@@ -1942,6 +1942,8 @@ export async function processarMensagemJessiV2Core(
           } else if (clienteIdCtx) {
             const resCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteIdCtx);
             const dadosCli: any = resCli.data || {};
+            const nomeCli: string = dadosCli.nome || novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "Cliente";
+            const petsCli: any[] = dadosCli.pets || [];
             const telCli = dadosCli.whatsapp || dadosCli.telefone ? `Telefone: ${dadosCli.whatsapp || dadosCli.telefone}.` : "";
             if (perguntaSobrePets) {
               if (petsCli.length === 0) {
