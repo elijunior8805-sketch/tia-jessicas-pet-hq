@@ -9,7 +9,7 @@ import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
 import { AlertaCard } from "./cards/AlertaCard";
 import { ComunicacaoCard } from "./cards/ComunicacaoCard";
 import { ReativacaoCard } from "./cards/ReativacaoCard";
-import { Sparkles, User, ArrowRight } from "lucide-react";
+import { ChevronDown, Sparkles, User, ArrowRight } from "lucide-react";
 
 const renderInlineMarkdown = (text: string, isAssistant: boolean): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
@@ -139,21 +139,80 @@ export const JessiChat: React.FC<JessiChatProps> = ({
   onCancelProcessing,
   isLoading,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = React.useState(false);
+  const userScrolledUpRef = useRef(false);
 
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "end",
+      });
+    } else if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const isUp = distanceFromBottom > 100;
+    userScrolledUpRef.current = isUp;
+    setShowScrollBottom(isUp);
+  }, []);
+
+  // Auto-scroll imediato e suave quando novas mensagens ou cards chegam
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    // Se o usuário não subiu propositalmente, ou se é mensagem enviada pelo usuário, rola pro fim
+    const lastMsg = messages[messages.length - 1];
+    const isUserLast = lastMsg?.role === "user";
+
+    if (!userScrolledUpRef.current || isUserLast || isLoading) {
+      scrollToBottom(true);
+      // Timeout seguro para renderização de cards assíncronos
+      const t1 = setTimeout(() => scrollToBottom(true), 60);
+      const t2 = setTimeout(() => scrollToBottom(true), 200);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [messages, isLoading, scrollToBottom]);
+
+  // ResizeObserver para manter scroll sincronizado quando cards mudam de altura
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver(() => {
+      if (!userScrolledUpRef.current) {
+        scrollToBottom(false);
+      }
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollToBottom]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 scroll-smooth relative"
+    >
       {messages.map((msg) => {
         const isAssistant = msg.role === "assistant";
 
         return (
           <div
             key={msg.id}
-            className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"}`}
+            className={`flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${isAssistant ? "justify-start" : "justify-end"}`}
           >
             {isAssistant && (
               <div className="h-8 w-8 rounded-full bg-emerald-800 text-[#F5E6BE] flex items-center justify-center shrink-0 shadow-2xs border border-[#C8A951]/40">
@@ -336,6 +395,18 @@ export const JessiChat: React.FC<JessiChatProps> = ({
               📢 Reativar clientes
             </button>
           </div>
+        </div>
+      {/* Botão flutuante suave para descer quando estiver navegando no histórico */}
+      {showScrollBottom && (
+        <div className="sticky bottom-1 left-0 right-0 flex justify-center pointer-events-none z-10 pb-1">
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-900/90 hover:bg-emerald-950 text-white text-xs font-semibold shadow-lg backdrop-blur-xs border border-[#C8A951]/50 transition-all transform hover:scale-105 active:scale-95 animate-in fade-in slide-in-from-bottom-2"
+          >
+            <ChevronDown className="h-3.5 w-3.5 animate-bounce" />
+            <span>Últimas mensagens</span>
+          </button>
         </div>
       )}
 

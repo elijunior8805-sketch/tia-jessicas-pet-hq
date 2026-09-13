@@ -49,6 +49,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
   onRemoveFile,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isListening = voiceStatus === "listening" || voiceStatus === "transcribing" || voiceStatus === "requesting_permission";
   const isSending = voiceStatus === "sending";
 
@@ -58,6 +59,15 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
       if ((inputText.trim() || selectedFile) && !isLoading) {
         onSend();
       }
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    // Ajuste suave de altura automática
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
     }
   };
 
@@ -170,8 +180,9 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
         <div className="flex-1 relative">
           <Textarea
+            ref={textareaRef}
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={
               isContinuousMode

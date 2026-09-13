@@ -47,17 +47,27 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const handleSendMessageRef = useRef<((text?: string) => Promise<void>) | null>(null);
 
-  // Hook de reconhecimento de voz com auto-envio imediato
+  // Hook de reconhecimento de voz contínua com detecção de silêncio de 1.2s e auto-envio
   const {
     voiceStatus,
     isListening,
+    isContinuousMode,
     interimTranscript,
+    ttsEnabled,
+    setTtsEnabled,
     startListening,
     stopListening,
+    startContinuousMode,
+    stopContinuousMode,
+    toggleContinuousMode,
+    pauseListening,
+    resumeListening,
     cancelListening,
+    resetTranscript,
+    speakResponse,
   } = useJessiVoice(
     (textoFinal) => {
-      if (textoFinal.trim()) {
+      if (!isContinuousMode && textoFinal.trim()) {
         setInputText(textoFinal);
       }
     },
@@ -69,21 +79,26 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   );
 
   React.useEffect(() => {
-    if (isListening) {
+    if (isLoading) {
+      setStatus("processando");
+      setStatusDetalhe("Consultando inteligência e registros...");
+    } else if (voiceStatus === "sending") {
+      setStatus("enviando");
+      setStatusDetalhe("Enviando comando...");
+    } else if (voiceStatus === "transcribing") {
+      setStatus("transcrevendo");
+      setStatusDetalhe("Transcrevendo fala...");
+    } else if (voiceStatus === "listening") {
       setStatus("ouvindo");
-      setStatusDetalhe("Ouvindo sua voz...");
-    } else if (status === "ouvindo") {
+      setStatusDetalhe(isContinuousMode ? "Modo Contínuo: Ouvindo..." : "Ouvindo sua voz...");
+    } else if (status === "ouvindo" || status === "transcrevendo" || status === "enviando") {
       setStatus("disponivel");
       setStatusDetalhe(undefined);
     }
-  }, [isListening]);
+  }, [voiceStatus, isListening, isContinuousMode, isLoading]);
 
   const handleToggleVoice = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening(inputText);
-    }
+    toggleContinuousMode();
   };
 
   const handleNovaConversa = () => {
@@ -108,10 +123,22 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   };
 
   const handleSendMessage = async (customText?: string) => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }
+
+    pauseListening();
+    resetTranscript();
+
     if (isLoading) return;
 
     const textToSend = customText || inputText;
-    if (!textToSend.trim() && !selectedFile) return;
+    if (!textToSend.trim() && !selectedFile) {
+      if (isContinuousMode) resumeListening();
+      return;
+    }
 
     const userMessageId = `msg_user_${Date.now()}`;
     const userMsg: JessiMessage = {
@@ -155,6 +182,17 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Fala a resposta com TTS natural e retoma a escuta suavemente
+      if (ttsEnabled && res?.respostaTexto) {
+        speakResponse(res.respostaTexto, () => {
+          if (isContinuousMode) resumeListening();
+        });
+      } else if (isContinuousMode) {
+        setTimeout(() => {
+          resumeListening();
+        }, 300);
+      }
     } catch (err: any) {
       console.error("Erro na comunicação com a Jessi V2:", err);
       toast.error("Não foi possível processar o comando. Tente novamente.");
@@ -167,6 +205,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           timestamp: new Date().toISOString(),
         },
       ]);
+      if (isContinuousMode) {
+        setTimeout(() => resumeListening(), 1000);
+      }
     } finally {
       setIsLoading(false);
       setStatus("disponivel");
@@ -330,10 +371,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               onSend={() => handleSendMessage()}
               isLoading={isLoading}
               voiceStatus={voiceStatus}
-              isContinuousMode={false}
+              isContinuousMode={isContinuousMode}
               onToggleContinuousVoice={handleToggleVoice}
-              ttsEnabled={false}
-              onToggleTts={() => {}}
+              ttsEnabled={ttsEnabled}
+              onToggleTts={() => setTtsEnabled(!ttsEnabled)}
               onCancelVoice={cancelListening}
               interimTranscript={interimTranscript}
               selectedFile={selectedFile}
