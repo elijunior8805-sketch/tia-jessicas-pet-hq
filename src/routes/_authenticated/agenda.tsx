@@ -134,6 +134,7 @@ function ProgramasCuidadoBadge({ petId, onReservarBanho }: { petId: string | nul
   const { data: creditos, isLoading } = useQuery({
     queryKey: ["creditos-pet", petId],
     enabled: !!petId,
+    staleTime: 60_000,
     queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
   });
 
@@ -362,8 +363,10 @@ function AgendaPage() {
 
 
 
-  const { data: agendamentos, isLoading } = useQuery({
+  const { data: agendamentos, isLoading, isFetching } = useQuery({
     queryKey: ["agendamentos", date, statusFilter],
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       let q = supabase
         .from("agendamentos")
@@ -383,9 +386,68 @@ function AgendaPage() {
     },
   });
 
+  // Prefetch inteligente dos dias vizinhos (ontem e amanhã) para transição 100% instantânea (0ms)
+  useEffect(() => {
+    const prevDate = shiftDate(date, -1);
+    const nextDate = shiftDate(date, 1);
+
+    const fetchAgendamentosDia = async (targetDate: string) => {
+      let q = supabase
+        .from("agendamentos")
+        .select(`
+          id, data, hora, duracao_min, valor_previsto, taxa_leva_traz, observacoes, status,
+          clientes(id, nome, whatsapp, vip),
+          pets(id, nome, raca, porte),
+          servicos(id, nome, valor, duracao_min),
+          agendamento_servicos(id, servico_id, nome, valor_unit, duracao_min, ordem)
+        `)
+        .eq("data", targetDate)
+        .order("hora", { ascending: true });
+      if (statusFilter !== "todos") q = q.eq("status", statusFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    };
+
+    qc.prefetchQuery({
+      queryKey: ["agendamentos", prevDate, statusFilter],
+      queryFn: () => fetchAgendamentosDia(prevDate),
+      staleTime: 60_000,
+    });
+    qc.prefetchQuery({
+      queryKey: ["agendamentos", nextDate, statusFilter],
+      queryFn: () => fetchAgendamentosDia(nextDate),
+      staleTime: 60_000,
+    });
+  }, [date, statusFilter, qc]);
+
+  // Pré-aquecimento de serviços ativos ao carregar a agenda para abertura instantânea do modal
+  useEffect(() => {
+    qc.prefetchQuery({
+      queryKey: ["servicos-ativos"],
+      staleTime: 5 * 60_000,
+      queryFn: async () => {
+        const { data } = await supabase
+          .from("servicos")
+          .select("id, nome, valor, duracao_min, categoria")
+          .eq("ativo", true)
+          .order("nome");
+        return (data ?? [])
+          .filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"))
+          .map((s: any) =>
+            s.nome?.trim().toUpperCase() === "BANHO SIMPLES"
+              ? { ...s, nome: "Banho Essencial" }
+              : s
+          );
+      },
+    });
+  }, [qc]);
+
   // Busca valores realizados dos atendimentos do dia (para finalizados)
   const { data: atendimentosDia } = useQuery({
     queryKey: ["agenda-atendimentos-dia", date],
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("atendimentos")
@@ -688,8 +750,19 @@ function AgendaPage() {
             ))}
           </div>
 
-          {isLoading ? (
-            <div className="text-sm text-muted-foreground">Carregando…</div>
+          {isLoading && (!agendamentos || agendamentos.length === 0) ? (
+            <div className="grid gap-3">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="h-28 rounded-2xl bg-card border border-border/40 p-4 space-y-3 animate-pulse shadow-xs">
+                  <div className="flex justify-between">
+                    <div className="h-5 w-32 bg-muted rounded-md" />
+                    <div className="h-5 w-20 bg-muted rounded-full" />
+                  </div>
+                  <div className="h-4 w-48 bg-muted/70 rounded-md" />
+                  <div className="h-4 w-24 bg-muted/50 rounded-md" />
+                </div>
+              ))}
+            </div>
           ) : !filtrados || filtrados.length === 0 ? (
             <EmptyState
               icon={CalendarIcon}
@@ -1484,6 +1557,7 @@ function NovoAgendamentoDialog({
   const { data: responsaveis = [] } = useQuery({
     queryKey: ["responsaveis-transporte"],
     enabled: open,
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data: roles } = await supabase
         .from("user_roles")
@@ -1507,6 +1581,8 @@ function NovoAgendamentoDialog({
   } = useQuery({
     queryKey: ["clientes-select", debouncedClienteSearch, defaultClienteId ?? ""],
     enabled: open,
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const raw = debouncedClienteSearch.trim();
       const digits = raw.replace(/\D+/g, "");
@@ -1565,6 +1641,7 @@ function NovoAgendamentoDialog({
   const { data: pets } = useQuery({
     queryKey: ["pets-of-cliente", clienteId],
     enabled: !!clienteId,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data } = await supabase
         .from("pets")
@@ -1585,6 +1662,7 @@ function NovoAgendamentoDialog({
   const { data: servicos } = useQuery({
     queryKey: ["servicos-ativos"],
     enabled: open,
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data } = await supabase
         .from("servicos")
@@ -1604,6 +1682,7 @@ function NovoAgendamentoDialog({
   const { data: creditosPet } = useQuery({
     queryKey: ["creditos-pet", petId],
     enabled: !!petId,
+    staleTime: 60_000,
     queryFn: () => getCreditosDisponiveis({ data: { pet_id: petId! } }),
   });
 
@@ -2165,6 +2244,7 @@ function EditarServicosDialog({
   const { data: servicos } = useQuery({
     queryKey: ["servicos-ativos"],
     enabled: open,
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data } = await supabase
         .from("servicos")
@@ -2184,6 +2264,7 @@ function EditarServicosDialog({
   const { data: creditosPet } = useQuery({
     queryKey: ["creditos-pet", agendamento?.pet_id],
     enabled: !!agendamento?.pet_id,
+    staleTime: 60_000,
     queryFn: () => getCreditosDisponiveis({ data: { pet_id: agendamento.pet_id } }),
   });
 
