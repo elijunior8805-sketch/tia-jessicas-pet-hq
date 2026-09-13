@@ -112,24 +112,21 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\b(\d+)\s?min\b/gi, "$1 minutos");
   t = t.replace(/(\d+)\s*x\s*(\d+)/gi, "$1 vezes $2");
 
-  // 12. Números pequenos por extenso (soa mais humano que dígitos soltos)
-  const porExtenso: Record<string, string> = {
-    "0": "zero", "1": "um", "2": "dois", "3": "três", "4": "quatro",
-    "5": "cinco", "6": "seis", "7": "sete", "8": "oito", "9": "nove",
-    "10": "dez", "11": "onze", "12": "doze", "13": "treze", "14": "catorze",
-    "15": "quinze", "16": "dezesseis", "17": "dezessete", "18": "dezoito",
-    "19": "dezenove", "20": "vinte",
-  };
-  t = t.replace(/\b(1?[0-9]|20)\b(?!\s*(reais|centavos|horas|quilos|quilômetros|mililitros|minutos|por cento|vezes))/g, (m) => porExtenso[m] ?? m);
-
-  // 13. Suaviza emendas telegráficas para ritmo conversacional
+  // 12. Suaviza emendas telegráficas para ritmo conversacional
   t = t.replace(/\s+-\s+/g, ", ");
   t = t.replace(/\s+–\s+/g, ", ");
   t = t.replace(/\s+—\s+/g, ", ");
 
-  // 14. Remove quebras de linha desnecessárias e múltiplos espaços
+  // 13. Remove quebras de linha desnecessárias e múltiplos espaços
   t = t.replace(/\n+/g, ". ");
   t = t.replace(/\s+/g, " ").trim();
+
+  // 14. Consolida pontuação duplicada e garante fechamento de frase (prosódia natural)
+  t = t.replace(/,(\s*[.!?])/g, "$1");
+  t = t.replace(/([.!?])(\s*[.!?])+/g, "$1");
+  if (t && !/[.!?…]$/.test(t)) {
+    t += ".";
+  }
 
   return t;
 }
