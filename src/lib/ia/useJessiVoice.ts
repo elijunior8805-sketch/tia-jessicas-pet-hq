@@ -164,24 +164,24 @@ export function useJessiVoice(
     recognizerRef.current = new VoiceRecognizer({
       silenceMs: 1500, // 1.5s de silêncio para envio automático
       onFinal: (texto) => {
-        const aperfeicoado = aperfeicoarTextoSpa(texto);
-        setFinalTranscript(aperfeicoado);
+        const humanizado = humanizarTranscricao(texto);
+        setFinalTranscript(humanizado);
         setInterimTranscript("");
         if (onTranscriptFinalRef.current) {
-          onTranscriptFinalRef.current(aperfeicoado);
+          onTranscriptFinalRef.current(humanizado);
         }
       },
       onInterim: (texto) => {
         setInterimTranscript(texto);
       },
       onUtteranceComplete: (utterance: VoiceUtterance) => {
-        const textoAperfeicoado = aperfeicoarTextoSpa(utterance.text).trim();
-        if (ehFalaValida(textoAperfeicoado) && onAutoSendRef.current) {
+        const textoHumanizado = humanizarTranscricao(utterance.text);
+        if (ehFalaValida(textoHumanizado) && onAutoSendRef.current) {
           pararTodoAudio();
           recognizerRef.current?.pauseListening();
           setInterimTranscript("");
-          setFinalTranscript(textoAperfeicoado);
-          onAutoSendRef.current(textoAperfeicoado);
+          setFinalTranscript(textoHumanizado);
+          onAutoSendRef.current(textoHumanizado);
         }
       },
       onStatusChange: (status) => {
