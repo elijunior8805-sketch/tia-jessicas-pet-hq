@@ -94,42 +94,46 @@ export function MobileNav() {
     <>
       <nav
         aria-label="Navegação principal"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-sidebar-border bg-sidebar text-sidebar-foreground"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-sidebar-border/80 bg-sidebar/95 backdrop-blur-md text-sidebar-foreground shadow-lg"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-5 h-16 items-center">
           {primary.map((item) => {
             const active = isActive(item.url);
             return (
-              <li key={item.url} className="min-w-0">
+              <li key={item.url} className="min-w-0 h-full">
                 <Link
                   to={item.url}
-                  className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium tracking-wide transition-colors ${
+                  className={`flex flex-col items-center justify-center gap-1 h-full w-full py-1 text-[11px] font-medium tracking-tight transition-all active:scale-90 touch-manipulation select-none ${
                     active
-                      ? "text-sidebar-primary"
+                      ? "text-sidebar-primary font-bold"
                       : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
                   }`}
                 >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  <span className="truncate max-w-full px-1">{item.title}</span>
+                  <div className={`p-1 rounded-full transition-all ${active ? "bg-sidebar-accent/80 text-sidebar-primary ring-1 ring-sidebar-border" : ""}`}>
+                    <item.icon className="h-5 w-5 shrink-0" />
+                  </div>
+                  <span className="truncate max-w-full px-0.5 leading-none">{item.title}</span>
                 </Link>
               </li>
             );
           })}
-          <li className="min-w-0">
+          <li className="min-w-0 h-full">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
                 <button
                   type="button"
-                  className="w-full flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium tracking-wide text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  className="w-full h-full flex flex-col items-center justify-center gap-1 py-1 text-[11px] font-medium tracking-tight text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all active:scale-90 touch-manipulation select-none"
                 >
-                  <Menu className="h-5 w-5 shrink-0" />
-                  <span>Menu</span>
+                  <div className="p-1 rounded-full">
+                    <Menu className="h-5 w-5 shrink-0" />
+                  </div>
+                  <span className="leading-none">Menu</span>
                 </button>
               </SheetTrigger>
               <SheetContent
                 side="right"
-                className="w-[86%] max-w-sm bg-sidebar text-sidebar-foreground border-sidebar-border p-0"
+                className="w-[88%] max-w-sm bg-sidebar text-sidebar-foreground border-sidebar-border p-0"
               >
                 <SheetHeader className="px-5 pt-5 pb-4 border-b border-sidebar-border">
                   <SheetTitle className="flex items-center gap-3 text-sidebar-foreground">
@@ -144,13 +148,13 @@ export function MobileNav() {
                     </span>
                   </SheetTitle>
                 </SheetHeader>
-                <div className="overflow-y-auto max-h-[calc(100vh-5rem)] px-2 py-3">
+                <div className="overflow-y-auto max-h-[calc(100vh-5rem)] px-3 py-3">
                   {groups.map((g) => (
                     <div key={g.label} className="mb-4">
-                      <div className="px-3 pb-2 text-[10px] uppercase tracking-widest text-sidebar-foreground/50">
+                      <div className="px-3 pb-2 text-[10px] uppercase tracking-widest text-sidebar-foreground/50 font-semibold">
                         {g.label}
                       </div>
-                      <ul className="space-y-0.5">
+                      <ul className="space-y-1">
                         {g.items.map((item) => {
                           const active = isActive(item.url);
                           return (
@@ -158,13 +162,13 @@ export function MobileNav() {
                               <Link
                                 to={item.url}
                                 onClick={() => setOpen(false)}
-                                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${
+                                className={`flex items-center gap-3.5 rounded-xl px-3.5 py-3 min-h-[48px] text-sm font-medium transition-all active:scale-[0.98] touch-manipulation ${
                                   active
-                                    ? "bg-sidebar-accent text-sidebar-primary"
+                                    ? "bg-sidebar-accent text-sidebar-primary font-semibold shadow-2xs"
                                     : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60"
                                 }`}
                               >
-                                <item.icon className="h-4 w-4 shrink-0" />
+                                <item.icon className="h-5 w-5 shrink-0" />
                                 <span className="truncate">{item.title}</span>
                               </Link>
                             </li>
