@@ -112,26 +112,14 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\b(\d+)\s?min\b/gi, "$1 minutos");
   t = t.replace(/(\d+)\s*x\s*(\d+)/gi, "$1 vezes $2");
 
-  // 12. Suaviza emendas telegráficas para ritmo conversacional
-  t = t.replace(/\s+-\s+/g, ", ");
-  t = t.replace(/\s+–\s+/g, ", ");
-  t = t.replace(/\s+—\s+/g, ", ");
-
-  // 13. Remove quebras de linha desnecessárias e múltiplos espaços
+  // 12. Remove quebras de linha desnecessárias e múltiplos espaços
   t = t.replace(/\n+/g, ". ");
   t = t.replace(/\s+/g, " ").trim();
-
-  // 14. Consolida pontuação duplicada e garante fechamento de frase (prosódia natural)
-  t = t.replace(/,(\s*[.!?])/g, "$1");
-  t = t.replace(/([.!?])(\s*[.!?])+/g, "$1");
-  if (t && !/[.!?…]$/.test(t)) {
-    t += ".";
-  }
 
   return t;
 }
 
-/// Cache global de vozes do navegador
+// Cache global de vozes do navegador
 let vozesDisponiveisCache: SpeechSynthesisVoice[] = [];
 
 if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -149,7 +137,7 @@ if (typeof window !== "undefined" && window.speechSynthesis) {
 
 /**
  * Seleciona a melhor voz natural disponível no sistema/navegador em Português do Brasil.
- * Dá prioridade absoluta a vozes neurais e expressivas (Edge Francisca Natural, Google Cloud/Chrome, Apple Siri).
+ * Dá prioridade absoluta a vozes neurais e expressivas (Edge Natural, Apple Siri/Enhanced, Google Cloud).
  */
 export function obterMelhorVozPtBr(voices?: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   let listaVozes = (voices && voices.length > 0) ? voices : vozesDisponiveisCache;
@@ -213,44 +201,32 @@ export function obterMelhorVozPtBr(voices?: SpeechSynthesisVoice[]): SpeechSynth
 }
 
 /**
- * Segmenta um texto longo em frases coerentes para pronúncia fluida com ritmo natural.
+ * Segmenta um texto longo apenas em frases completas (terminadas em ponto, interrogação ou exclamação).
+ * NUNCA fatia no meio de vírgulas para evitar quebras mecânicas e robóticas na voz.
  */
 export function segmentarEmFrases(texto: string): string[] {
   if (!texto) return [];
 
-  // Quebra por pontos finais, interrogações e exclamações, mantendo a pontuação
+  // Quebra por pontos finais, interrogações e exclamações, preservando a frase inteira
   const regex = /([^.?!]+[.?!]+)/g;
   const matches = texto.match(regex);
 
-  const frasesBase: string[] = matches && matches.length > 0
-    ? matches.map((m) => m.trim()).filter((f) => f.length > 0)
-    : [texto.trim()];
+  if (!matches || matches.length === 0) {
+    return [texto.trim()];
+  }
+
+  const frases: string[] = [];
+  matches.forEach((m) => {
+    const f = m.trim();
+    if (f.length > 0) {
+      frases.push(f);
+    }
+  });
 
   // Se sobrou algum trecho sem pontuação no final
   const resto = texto.replace(regex, "").trim();
   if (resto.length > 0) {
-    frasesBase.push(resto);
-  }
-
-  // Segunda passada: frases muito longas ganham "respirações" em vírgulas e conectivos,
-  // para a voz não atropelar e soar natural como uma pessoa falando.
-  const frases: string[] = [];
-  for (const frase of frasesBase) {
-    if (frase.length <= 140) {
-      frases.push(frase);
-      continue;
-    }
-    const partes = frase.split(/,\s+/);
-    let atual = "";
-    for (const parte of partes) {
-      if (atual && (atual.length + parte.length) > 120) {
-        frases.push(atual.replace(/[,\s]+$/, "") + ",");
-        atual = parte;
-      } else {
-        atual = atual ? `${atual}, ${parte}` : parte;
-      }
-    }
-    if (atual) frases.push(atual);
+    frases.push(resto);
   }
 
   return frases;
@@ -317,15 +293,15 @@ export function reproduzirFalaHumana(
     try {
       const utterance = new SpeechSynthesisUtterance(fraseAtual);
       utterance.lang = "pt-BR";
-      utterance.rate = 0.98; // Cadência calma e conversacional, sem atropelos
-      utterance.pitch = 1.03; // Tom levemente acolhedor e caloroso
+      utterance.rate = 1.0; // Velocidade perfeitamente natural, fluida e conversacional
+      utterance.pitch = 1.04; // Tom amigável, receptivo e caloroso
       utterance.volume = 1.0;
 
       if (melhorVoz) {
         utterance.voice = melhorVoz;
       }
 
-      // Retém referência para evitar GC no Chromium
+      // Retém referência para evitar GC prematuro no Chromium / Safari
       utterancesAtivas.add(utterance);
 
       const limparUtterance = () => {
@@ -341,10 +317,10 @@ export function reproduzirFalaHumana(
       utterance.onend = () => {
         limparUtterance();
         if (cancelado) return;
-        // Pequena pausa natural de 70ms entre frases para respiração fluida
+        // Pausa natural de respiração entre frases completas
         setTimeout(() => {
           falarProximaFrase();
-        }, 70);
+        }, 90);
       };
 
       utterance.onerror = (e) => {
@@ -370,12 +346,8 @@ export function reproduzirFalaHumana(
     }
   }, tempoTotalEstimado);
 
-  // Inicia a reprodução com micro-delay após cancelamento para garantir fila limpa no Chromium
-  setTimeout(() => {
-    if (!cancelado) {
-      falarProximaFrase();
-    }
-  }, 15);
+  // Inicia a fala imediatamente de forma suave
+  falarProximaFrase();
 
   return {
     cancelar: () => {

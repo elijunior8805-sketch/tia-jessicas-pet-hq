@@ -162,7 +162,7 @@ export function useJessiVoice(
     }
 
     recognizerRef.current = new VoiceRecognizer({
-      silenceMs: 1200, // 1.2s de silêncio para envio imediato e fluido
+      silenceMs: 1500, // 1.5s de silêncio para envio natural sem interrupções precoces
       onFinal: (texto) => {
         const humanizado = humanizarTranscricao(texto);
         setFinalTranscript(humanizado);

@@ -82,14 +82,14 @@ export class VoiceRecognizer {
   private pararSolicitado = false;
   private iniciando = false;
   private silenceTimer: any = null;
-  private silenceMs = 1200;
+  private silenceMs = 1500;
   private ultimaFalaEnviada = "";
   private ultimoEnvioTimestamp = 0;
   private reconnectAttempts = 0;
   private lastReconnectTime = 0;
 
   constructor(private options: VoiceRecognitionOptions) {
-    this.silenceMs = options.silenceMs ?? 1200;
+    this.silenceMs = options.silenceMs ?? 1500;
   }
 
   private initRecognition(): boolean {
