@@ -375,7 +375,7 @@ function UploadButton({
         accept="image/*"
         capture="environment"
         className="hidden"
-        disabled={disabled || busy}
+        disabled={disabled}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
@@ -389,7 +389,7 @@ function UploadButton({
         accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
         multiple
         className="hidden"
-        disabled={disabled || busy}
+        disabled={disabled}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
@@ -397,10 +397,10 @@ function UploadButton({
         }}
       />
 
-      <button type="button" onClick={() => camRef.current?.click()} className={btnCls} disabled={disabled || busy}>
-        <Camera className="h-4 w-4" /> {busy ? "Enviando…" : "Tirar foto"}
+      <button type="button" onClick={() => camRef.current?.click()} className={btnCls} disabled={disabled}>
+        <Camera className="h-4 w-4" /> Tirar foto
       </button>
-      <button type="button" onClick={() => fileRef.current?.click()} className={btnCls} disabled={disabled || busy}>
+      <button type="button" onClick={() => fileRef.current?.click()} className={btnCls} disabled={disabled}>
         <Upload className="h-4 w-4" /> {label === "Adicionar foto" ? "Carregar arquivo" : label}
       </button>
     </div>
