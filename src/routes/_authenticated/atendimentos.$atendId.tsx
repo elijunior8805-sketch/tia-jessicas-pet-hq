@@ -809,14 +809,14 @@ function AtendimentoDetalhe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usarCreditoPrograma, elegibilidadeCredito, atendimento]);
 
+  const [pendingUploads, setPendingUploads] = useState<Array<{ id: string; tipo: "antes" | "depois"; localUrl: string; uploading: boolean }>>([]);
+
   if (isLoading) {
     return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
   }
   if (!atendimento) {
     return <PageShell><div className="text-sm text-muted-foreground">Atendimento não encontrado.</div></PageShell>;
   }
-
-  const [pendingUploads, setPendingUploads] = useState<Array<{ id: string; tipo: "antes" | "depois"; localUrl: string; uploading: boolean }>>([]);
 
   const pet = (atendimento as any).pets;
   const cliente = (atendimento as any).clientes;
@@ -826,15 +826,15 @@ function AtendimentoDetalhe() {
   const rawFotosAntes: FotoItem[] = ((atendimento as any).fotos_antes ?? []) as FotoItem[];
   const rawFotosDepois: FotoItem[] = ((atendimento as any).fotos_depois ?? []) as FotoItem[];
 
-  const fotosAntes: FotoItem[] = useMemo(() => {
-    const pending = pendingUploads.filter((p) => p.tipo === "antes");
-    return [...rawFotosAntes, ...pending.map((p) => ({ path: p.id, localUrl: p.localUrl, uploading: true }))];
-  }, [rawFotosAntes, pendingUploads]);
+  const fotosAntes: FotoItem[] = [
+    ...rawFotosAntes,
+    ...pendingUploads.filter((p) => p.tipo === "antes").map((p) => ({ path: p.id, localUrl: p.localUrl, uploading: true })),
+  ];
 
-  const fotosDepois: FotoItem[] = useMemo(() => {
-    const pending = pendingUploads.filter((p) => p.tipo === "depois");
-    return [...rawFotosDepois, ...pending.map((p) => ({ path: p.id, localUrl: p.localUrl, uploading: true }))];
-  }, [rawFotosDepois, pendingUploads]);
+  const fotosDepois: FotoItem[] = [
+    ...rawFotosDepois,
+    ...pendingUploads.filter((p) => p.tipo === "depois").map((p) => ({ path: p.id, localUrl: p.localUrl, uploading: true })),
+  ];
 
   const valorSolicitados = sumItens(solicitados);
   const valorExtras = sumItens(extras);
