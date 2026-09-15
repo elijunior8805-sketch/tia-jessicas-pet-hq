@@ -541,7 +541,7 @@ function PetCard({ pet }: { pet: any }) {
         {pet.proxima_visita ? `Próx: ${new Date(pet.proxima_visita).toLocaleDateString("pt-BR")}` : "Sem próxima visita"}
       </div>
       <div className="mt-auto space-y-2">
-        <Link to="/agenda" search={{ novo: true, cliente: pet.cliente_id, pet: pet.id }}>
+        <Link to="/agenda" search={{ novo: true, cliente: pet.cliente_id, pet: pet.id } as any}>
           <Button size="sm" className="w-full gap-1.5 bg-primary text-primary-foreground font-semibold rounded-lg shadow-2xs">
             <CalendarPlus className="h-3.5 w-3.5" /> Check-in / Agendar
           </Button>
