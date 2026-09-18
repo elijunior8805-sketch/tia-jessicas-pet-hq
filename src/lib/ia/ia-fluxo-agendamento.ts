@@ -32,6 +32,7 @@ export interface AgendaDraft {
   etapa: EtapaAgendamento;
   comando_original: string;
   termo_cliente?: string | null;
+  termo_pet?: string | null;
   cliente?: ClienteFluxo | null;
   candidatos?: ClienteFluxo[];
   pets_candidatos?: { id: string; nome: string }[];
