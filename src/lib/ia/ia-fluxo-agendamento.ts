@@ -83,6 +83,7 @@ export function iniciarDraft(texto: string): AgendaDraft {
     etapa: "cliente",
     comando_original: texto,
     termo_cliente: pre.cliente_nome,
+    termo_pet: pre.pet_nome,
     termo_servico: pre.servico_nome,
     data: pre.data,
     hora: pre.hora,
