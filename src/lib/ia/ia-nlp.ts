@@ -272,6 +272,14 @@ export function extrairNomePet(texto: string): string | null {
     const r = capturarNome(original, t, m.index + m[0].length, STOP_NOME_PET);
     if (r.nome) return r.nome;
   }
+
+  // "para o Thor do Eli Júnior" → o nome antes de "do/da" é o pet
+  const mPara = t.match(/\b(?:para\s+(?:o|a)\s+|pro\s+|pra\s+|para\s+)/);
+  if (mPara && mPara.index !== undefined) {
+    const r = capturarNome(original, t, mPara.index + mPara[0].length, STOP_NOME_PET);
+    if (r.nome && /^(?:do|da|de)\s+/.test(r.restoNorm)) return r.nome;
+  }
+
   return null;
 }
 
