@@ -160,6 +160,18 @@ async function proximaPergunta(draft: AgendaDraft): Promise<PassoFluxo> {
     if (pets.length === 1) {
       return proximaPergunta({ ...draft, pet: pets[0] });
     }
+
+    // Se o pet já foi citado no comando, seleciona automaticamente
+    if (draft.termo_pet) {
+      const alvo = limpar(draft.termo_pet);
+      const achado =
+        pets.find((p) => limpar(p.nome) === alvo) ||
+        pets.find((p) => limpar(p.nome).startsWith(alvo) || alvo.startsWith(limpar(p.nome)));
+      if (achado) {
+        return proximaPergunta({ ...draft, pet: achado, termo_pet: null });
+      }
+    }
+
     return {
       draft: { ...draft, etapa: "pet", pets_candidatos: pets },
       mensagem:
