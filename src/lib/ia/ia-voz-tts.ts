@@ -116,6 +116,15 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\n+/g, ". ");
   t = t.replace(/\s+/g, " ").trim();
 
+  // 13. Pontuação final e limpeza de duplicidades (evita leitura "pendurada")
+  t = t.replace(/\s+([.,!?])/g, "$1");
+  t = t.replace(/([.!?])\s*\1+/g, "$1");
+  t = t.replace(/,\s*,+/g, ",");
+  t = t.replace(/,\s*([.!?])/g, "$1");
+  if (t && !/[.!?…]$/.test(t)) {
+    t += ".";
+  }
+
   return t;
 }
 
