@@ -193,18 +193,29 @@ export function interpretarHora(texto: string): string | null {
   return null;
 }
 
+/** Ordenado do mais específico para o mais genérico (o primeiro que casar vence). */
 const SERVICOS_CONHECIDOS = [
+  "banho e tosa completa",
+  "banho e tosa higienica",
   "banho e tosa",
-  "banho",
+  "banho essencial",
+  "banho premium",
+  "banho terapeutico",
+  "banho medicamentoso",
+  "banho simples",
   "tosa higienica",
   "tosa na maquina",
   "tosa na tesoura",
+  "tosa completa",
+  "tosa bebe",
   "tosa",
   "hidratacao",
   "desembolo",
   "escovacao",
-  "tosa bebe",
+  "corte de unha",
+  "limpeza de ouvido",
   "spa",
+  "banho",
 ];
 
 export function detectarServico(texto: string): string | null {
