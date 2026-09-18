@@ -302,8 +302,12 @@ export function reproduzirFalaHumana(
     try {
       const utterance = new SpeechSynthesisUtterance(fraseAtual);
       utterance.lang = "pt-BR";
-      utterance.rate = 1.0; // Velocidade perfeitamente natural, fluida e conversacional
-      utterance.pitch = 1.04; // Tom amigável, receptivo e caloroso
+      // Ritmo levemente mais calmo em frases longas e um pouco mais solto nas curtas
+      const ehLonga = fraseAtual.length > 120;
+      const ehPergunta = /\?\s*$/.test(fraseAtual);
+      utterance.rate = ehLonga ? 0.96 : 0.99;
+      // Perguntas sobem levemente o tom; o restante fica caloroso e estável
+      utterance.pitch = ehPergunta ? 1.06 : 1.02;
       utterance.volume = 1.0;
 
       if (melhorVoz) {
@@ -326,10 +330,11 @@ export function reproduzirFalaHumana(
       utterance.onend = () => {
         limparUtterance();
         if (cancelado) return;
-        // Pausa natural de respiração entre frases completas
+        // Respiração natural: pausa maior depois de perguntas e frases longas
+        const pausa = ehPergunta ? 220 : ehLonga ? 170 : 120;
         setTimeout(() => {
           falarProximaFrase();
-        }, 90);
+        }, pausa);
       };
 
       utterance.onerror = (e) => {
