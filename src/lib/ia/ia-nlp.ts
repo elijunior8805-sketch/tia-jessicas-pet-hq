@@ -337,6 +337,7 @@ export function extrairNomeCliente(texto: string): string | null {
 export interface PreInterpretacao {
   intencao: "criar_agendamento" | null;
   cliente_nome: string | null;
+  pet_nome: string | null;
   servico_nome: string | null;
   data: string | null;
   hora: string | null;
@@ -360,6 +361,7 @@ export function preInterpretar(texto: string, hoje = hojeSP()): PreInterpretacao
   const hora = interpretarHora(texto);
   const servico_nome = detectarServico(texto);
   const cliente_nome = querAgendar ? extrairNomeCliente(texto) : null;
+  const pet_nome = querAgendar ? extrairNomePet(texto) : null;
   const transporte = /\bleva e traz\b|\btransporte\b|\bbuscar\b|\bbusca e entrega\b/.test(t)
     ? true
     : /\bsem transporte\b|\bsem leva e traz\b/.test(t)
@@ -379,6 +381,7 @@ export function preInterpretar(texto: string, hoje = hojeSP()): PreInterpretacao
   return {
     intencao: querAgendar ? "criar_agendamento" : null,
     cliente_nome,
+    pet_nome,
     servico_nome,
     data,
     hora,
