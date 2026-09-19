@@ -440,6 +440,14 @@ export class VoiceRecognizer {
     this.acumulado = "";
     this.interimAtual = "";
   }
+
+  getStatus(): VoiceRecognitionStatus {
+    return this.status;
+  }
+
+  getIsContinuous(): boolean {
+    return this.isContinuous;
+  }
 }
 
 /**
