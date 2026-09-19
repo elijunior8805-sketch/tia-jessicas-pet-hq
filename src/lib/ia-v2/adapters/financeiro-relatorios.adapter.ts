@@ -157,16 +157,12 @@ export class FinanceiroRelatoriosAdapter {
           outros: totalOutrasFormas,
         },
         devedores: devedoresLista,
-      };
+      const { converterNumeroParaExtenso } = await import("@/lib/ia/ia-voz");
+      const fatExtenso = converterNumeroParaExtenso(faturamentoBruto);
+      const recExtenso = converterNumeroParaExtenso(valoresRecebidos);
+      const periodoTexto = periodo === "hoje" ? "Hoje" : periodo === "semana" ? "Nesta semana" : "Neste mês";
 
-      const resumoFormatado =
-        `Resumo Financeiro Consolidado (${periodo === "hoje" ? "Hoje" : periodo === "semana" ? "Últimos 7 dias" : "Mês Atual"}):\n\n` +
-        `• **Faturamento Bruto:** R$ ${faturamentoBruto.toFixed(2)} (Recebido: R$ ${valoresRecebidos.toFixed(2)})\n` +
-        `• **Ticket Médio:** R$ ${ticketMedio.toFixed(2)} (${totalEntradasCount} atendimentos pagos)\n` +
-        `• **Entradas por Forma:** Pix: R$ ${totalPix.toFixed(2)} | Dinheiro: R$ ${totalDinheiro.toFixed(2)} | Cartões: R$ ${(totalCartaoCredito + totalCartaoDebito).toFixed(2)}\n` +
-        `• **A Receber (No prazo):** R$ ${valoresAReceber.toFixed(2)}\n` +
-        `• **Inadimplência (Vencidos):** R$ ${valoresVencidosDevedores.toFixed(2)}${devedoresLista.length > 0 ? ` (${devedoresLista.length} cliente(s) com pendências)` : ""}\n` +
-        `• **Saldo Líquido:** R$ ${saldoLiquido.toFixed(2)}`;
+      const resumoFormatado = `${periodoTexto}, o faturamento foi de ${fatExtenso}. Desse total, ${recExtenso} já foram recebidos.`;
 
       return {
         success: true,

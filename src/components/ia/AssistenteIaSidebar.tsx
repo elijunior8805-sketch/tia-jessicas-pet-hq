@@ -45,14 +45,17 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Hook de reconhecimento de voz
+  // Hook de reconhecimento e síntese de voz
   const {
     voiceStatus,
     isListening,
     interimTranscript,
+    isSpeaking,
     startListening,
     stopListening,
     cancelListening,
+    falarResposta,
+    pararFala,
   } = useJessiVoice((textoFinal) => {
     if (textoFinal.trim()) {
       setInputText(textoFinal);
@@ -63,21 +66,26 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     if (isListening) {
       setStatus("ouvindo");
       setStatusDetalhe("Ouvindo sua voz...");
-    } else if (status === "ouvindo") {
+    } else if (isSpeaking) {
+      setStatus("executando");
+      setStatusDetalhe("Falando resposta...");
+    } else if (status === "ouvindo" || status === "executando") {
       setStatus("disponivel");
       setStatusDetalhe(undefined);
     }
-  }, [isListening]);
+  }, [isListening, isSpeaking]);
 
   const handleToggleVoice = () => {
     if (isListening) {
       stopListening();
     } else {
+      pararFala();
       startListening(inputText);
     }
   };
 
   const handleNovaConversa = () => {
+    pararFala();
     setMessages([
       {
         id: `msg_welcome_${Date.now()}`,
@@ -101,6 +109,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const handleSendMessage = async (customText?: string) => {
     if (isLoading) return;
 
+    pararFala();
     const textToSend = customText || inputText;
     if (!textToSend.trim() && !selectedFile) return;
 
@@ -136,16 +145,23 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         setContexto((prev) => ({ ...prev, ...res.novoContexto }));
       }
 
+      const respostaTextoFinal = res?.respostaTexto || "Não consegui obter uma resposta no momento.";
+
       const assistantMsg: JessiMessage = {
         id: `msg_asst_${Date.now()}`,
         role: "assistant",
-        content: res?.respostaTexto || "Não consegui obter uma resposta no momento.",
+        content: respostaTextoFinal,
         timestamp: new Date().toISOString(),
         cards: res?.cards || [],
         pendingAction: res?.pendingAction || null,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Reproduz em áudio com voz feminina natural apenas a frase final da Jéssica
+      if (respostaTextoFinal) {
+        falarResposta(respostaTextoFinal);
+      }
     } catch (err: any) {
       console.error("Erro na comunicação com a Jessi V2:", err);
       toast.error("Não foi possível processar o comando. Tente novamente.");

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { VoiceRecognizer, VoiceRecognitionStatus, consolidarTranscricao } from "./ia-voz";
+import { VoiceRecognizer, VoiceRecognitionStatus, consolidarTranscricao, falarTextoJessi, pararFalaJessi } from "./ia-voz";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
@@ -8,10 +8,13 @@ export interface UseJessiVoiceReturn {
   isReviewing: boolean;
   interimTranscript: string;
   finalTranscript: string;
+  isSpeaking: boolean;
   startListening: (textoAtual?: string) => void;
   stopListening: () => void;
   cancelListening: () => void;
   resetTranscript: () => void;
+  falarResposta: (texto: string) => void;
+  pararFala: () => void;
 }
 
 /**
@@ -19,6 +22,7 @@ export interface UseJessiVoiceReturn {
  */
 const DICIONARIO_SPA: Record<string, string> = {
   "banho e tosa": "banho e tosa",
+  "banho essencial": "banho essencial",
   "tosa higiênica": "tosa higiênica",
   "tosa higienica": "tosa higiênica",
   "banho simples": "banho simples",
@@ -33,6 +37,8 @@ const DICIONARIO_SPA: Record<string, string> = {
   "thor": "Thor",
   "tor": "Thor",
   "rex": "Rex",
+  "belinha": "Belinha",
+  "cleusa": "Cleusa",
   "pix": "Pix",
   "débito": "débito",
   "crédito": "crédito",
@@ -57,6 +63,7 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
   const [voiceStatus, setVoiceStatus] = useState<VoiceRecognitionStatus>("idle");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
 
   useEffect(() => {
@@ -89,10 +96,13 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
 
     return () => {
       recognizerRef.current?.abort();
+      pararFalaJessi();
     };
   }, [onTranscriptFinal]);
 
   const startListening = useCallback((textoAtual = "") => {
+    pararFalaJessi();
+    setIsSpeaking(false);
     if (!recognizerRef.current) return;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
@@ -118,15 +128,31 @@ export function useJessiVoice(onTranscriptFinal?: (texto: string) => void): UseJ
     setFinalTranscript("");
   }, []);
 
+  const falarResposta = useCallback((texto: string) => {
+    setIsSpeaking(true);
+    falarTextoJessi(texto, () => {
+      setIsSpeaking(false);
+    });
+  }, []);
+
+  const pararFala = useCallback(() => {
+    pararFalaJessi();
+    setIsSpeaking(false);
+  }, []);
+
   return {
     voiceStatus,
     isListening: voiceStatus === "listening" || voiceStatus === "requesting_permission",
     isReviewing: voiceStatus === "reviewing",
     interimTranscript,
     finalTranscript,
+    isSpeaking,
     startListening,
     stopListening,
     cancelListening,
     resetTranscript,
+    falarResposta,
+    pararFala,
   };
 }
+

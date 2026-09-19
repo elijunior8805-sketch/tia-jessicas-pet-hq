@@ -64,21 +64,16 @@ export class AgendaAdapter {
       const total = agendamentos?.length || 0;
       let summary = "";
 
-      if (total === 0) {
-        summary = `Não há nenhum agendamento registrado para a data ${data}. A grade está totalmente livre.`;
-      } else {
-        const itens = (agendamentos || []).map((ag: any) => {
-          const horaFmt = (ag.hora || "").slice(0, 5) || "--:--";
-          const pet = ag.pets?.nome || "Pet";
-          const raca = ag.pets?.raca ? ` (${ag.pets.raca})` : "";
-          const tutor = ag.clientes?.nome ? ` • Tutor: ${ag.clientes.nome}` : "";
-          const srv = ag.servicos?.nome || "Atendimento";
-          const st = ag.status === "confirmado" ? "Confirmado" : ag.status === "em_atendimento" ? "Em Atendimento" : ag.status === "concluido" ? "Concluído" : "Aguardando confirmação";
-          const transp = ag.leva_traz_modalidade && ag.leva_traz_modalidade !== "nao_utilizar" ? " 🚐 (Leva e Traz)" : "";
-          return `• ${horaFmt} — **${pet}**${raca} • ${srv}${tutor} • Status: ${st}${transp}`;
-        });
+      const { formatarDataPorExtenso, formatarHorarioPorExtenso } = await import("@/lib/ia/ia-voz");
+      const dataExtenso = formatarDataPorExtenso(data);
 
-        summary = `Encontrei ${total} agendamento(s) para ${data}:\n\n${itens.join("\n")}`;
+      if (total === 0) {
+        summary = `Não há nenhum agendamento registrado para o dia ${dataExtenso}.`;
+      } else {
+        const primeiroHorario = agendamentos && agendamentos[0]?.hora ? formatarHorarioPorExtenso(agendamentos[0].hora) : "";
+        const horarioTexto = primeiroHorario ? `, às ${primeiroHorario}` : "";
+        const qtdTexto = total === 1 ? "um agendamento" : total === 2 ? "dois agendamentos" : total === 3 ? "três agendamentos" : `${total} agendamentos`;
+        summary = `Encontrei ${qtdTexto} para o dia ${dataExtenso}${horarioTexto}. Quer ver os detalhes?`;
       }
 
       return {

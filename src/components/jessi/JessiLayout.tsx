@@ -49,31 +49,37 @@ export const JessiLayout: React.FC = () => {
     carregarCentral();
   }, []);
 
-  // Hook real de reconhecimento de voz
+  // Hook real de reconhecimento e síntese de voz
   const {
     voiceStatus,
     isListening,
     interimTranscript,
     finalTranscript,
+    isSpeaking,
     startListening,
     stopListening,
     cancelListening,
+    falarResposta,
+    pararFala,
   } = useJessiVoice((textoFinal) => {
     if (textoFinal.trim()) {
       setInputText(textoFinal);
     }
   });
 
-  // Sincroniza status visual quando estiver gravando voz
+  // Sincroniza status visual quando estiver gravando voz ou falando
   React.useEffect(() => {
     if (isListening) {
       setStatus("ouvindo");
       setStatusDetalhe("Ouvindo comando de voz...");
-    } else if (status === "ouvindo") {
+    } else if (isSpeaking) {
+      setStatus("processando");
+      setStatusDetalhe("Falando resposta...");
+    } else if (status === "ouvindo" || status === "processando") {
       setStatus("disponivel");
       setStatusDetalhe(undefined);
     }
-  }, [isListening]);
+  }, [isListening, isSpeaking]);
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
@@ -81,11 +87,13 @@ export const JessiLayout: React.FC = () => {
     if (isListening) {
       stopListening();
     } else {
+      pararFala();
       startListening(inputText);
     }
   };
 
   const handleCancelProcessing = () => {
+    pararFala();
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -97,6 +105,7 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleNovaConversa = () => {
+    pararFala();
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -115,6 +124,7 @@ export const JessiLayout: React.FC = () => {
       return;
     }
 
+    pararFala();
     const textToSend = customText || inputText;
     if (!textToSend.trim() && !selectedFile) return;
 
@@ -171,6 +181,10 @@ export const JessiLayout: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      if (res.respostaTexto) {
+        falarResposta(res.respostaTexto);
+      }
 
       if (res.novoContexto) {
         setContexto((prev) => ({ ...prev, ...res.novoContexto }));
