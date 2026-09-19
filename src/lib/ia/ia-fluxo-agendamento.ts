@@ -32,6 +32,7 @@ export interface AgendaDraft {
   etapa: EtapaAgendamento;
   comando_original: string;
   termo_cliente?: string | null;
+  termo_pet?: string | null;
   cliente?: ClienteFluxo | null;
   candidatos?: ClienteFluxo[];
   pets_candidatos?: { id: string; nome: string }[];
@@ -82,6 +83,7 @@ export function iniciarDraft(texto: string): AgendaDraft {
     etapa: "cliente",
     comando_original: texto,
     termo_cliente: pre.cliente_nome,
+    termo_pet: pre.pet_nome,
     termo_servico: pre.servico_nome,
     data: pre.data,
     hora: pre.hora,
@@ -158,6 +160,18 @@ async function proximaPergunta(draft: AgendaDraft): Promise<PassoFluxo> {
     if (pets.length === 1) {
       return proximaPergunta({ ...draft, pet: pets[0] });
     }
+
+    // Se o pet já foi citado no comando, seleciona automaticamente
+    if (draft.termo_pet) {
+      const alvo = limpar(draft.termo_pet);
+      const achado =
+        pets.find((p) => limpar(p.nome) === alvo) ||
+        pets.find((p) => limpar(p.nome).startsWith(alvo) || alvo.startsWith(limpar(p.nome)));
+      if (achado) {
+        return proximaPergunta({ ...draft, pet: achado, termo_pet: null });
+      }
+    }
+
     return {
       draft: { ...draft, etapa: "pet", pets_candidatos: pets },
       mensagem:
@@ -212,11 +226,14 @@ async function proximaPergunta(draft: AgendaDraft): Promise<PassoFluxo> {
     };
   }
 
+  // Contexto curto do que já foi entendido, para respostas diretas e proativas
+  const jaEntendido = `${draft.pet.nome} · ${draft.servico.nome}`;
+
   // DATA
   if (!draft.data) {
     return {
       draft: { ...draft, etapa: "data" },
-      mensagem: `Para qual **data**? (ex.: 28/08, 28 do 8, amanhã, próxima terça)`,
+      mensagem: `Anotei: **${jaEntendido}**. Para qual **data**? (ex.: amanhã, 28/08, próxima terça)`,
       pronto: false,
     };
   }
@@ -225,7 +242,7 @@ async function proximaPergunta(draft: AgendaDraft): Promise<PassoFluxo> {
   if (!draft.hora) {
     return {
       draft: { ...draft, etapa: "hora" },
-      mensagem: `Qual o **horário** do dia ${formatarData(draft.data)}? (ex.: 14h, 14:30, duas da tarde)`,
+      mensagem: `Anotei: **${jaEntendido}** em ${formatarData(draft.data)}. Qual o **horário**? (ex.: 14h, 14:30, duas da tarde)`,
       pronto: false,
     };
   }
@@ -234,7 +251,7 @@ async function proximaPergunta(draft: AgendaDraft): Promise<PassoFluxo> {
   if (draft.transporte === null || draft.transporte === undefined) {
     return {
       draft: { ...draft, etapa: "transporte" },
-      mensagem: `Vai usar **Leva e Traz** neste agendamento? (sim/não)`,
+      mensagem: `Vai usar **Leva e Traz** para ${draft.pet.nome}? (sim/não)`,
       pronto: false,
     };
   }

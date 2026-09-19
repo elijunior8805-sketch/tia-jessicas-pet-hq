@@ -51,19 +51,34 @@ export function useRealtimeSync(): SyncStatus {
     }
 
     const channel = supabase.channel("realtime-sync-global");
+    const pendingTables = new Set<string>();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleInvalidation = (tabela: string) => {
+      pendingTables.add(tabela);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (cancelled || pendingTables.size === 0) return;
+        const tablesToInvalidate = Array.from(pendingTables);
+        pendingTables.clear();
+
+        qc.invalidateQueries({
+          predicate: (q) =>
+            q.queryKey.some(
+              (k) =>
+                typeof k === "string" &&
+                tablesToInvalidate.some((tbl) => k.includes(tbl)),
+            ),
+        });
+      }, 250);
+    };
 
     for (const tabela of TABELAS_REALTIME) {
       channel.on(
         "postgres_changes",
         { event: "*", schema: "public", table: tabela },
         () => {
-          // Invalida qualquer query que use o nome da tabela como parte da chave.
-          qc.invalidateQueries({
-            predicate: (q) =>
-              q.queryKey.some(
-                (k) => typeof k === "string" && k.includes(tabela),
-              ),
-          });
+          scheduleInvalidation(tabela);
         },
       );
     }
@@ -78,6 +93,7 @@ export function useRealtimeSync(): SyncStatus {
 
     return () => {
       cancelled = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       supabase.removeChannel(channel);

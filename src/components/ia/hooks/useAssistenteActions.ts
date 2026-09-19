@@ -76,14 +76,14 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
   const [canRetry, setCanRetry] = useState(false);
   const [faseLiberacao, setFaseLiberacao] = useState<
     "observacao" | "teste_controlado" | "piloto" | "producao"
-  >("observacao");
+  >("producao");
 
   // Fase de liberação controlada (Parte 4)
   useEffect(() => {
     if (!isOpen) return;
     getFaseLiberacao()
-      .then((r: any) => setFaseLiberacao(r?.fase || "observacao"))
-      .catch(() => setFaseLiberacao("observacao"));
+      .then((r: any) => setFaseLiberacao(r?.fase || "producao"))
+      .catch(() => setFaseLiberacao("producao"));
   }, [isOpen]);
 
 
@@ -119,8 +119,6 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
             setIsReviewingVoice(true);
           } else if (status === "requesting_permission") {
             setIaStatus("requesting_permission");
-          } else if (status === "finalizing") {
-            setIaStatus("processing");
           } else if (status === "idle") {
             setIaStatus("idle");
             setInterimTranscript("");
@@ -148,7 +146,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
 
     return () => {
       if (recognizerRef.current) {
-        recognizerRef.current.stop();
+        recognizerRef.current.abort();
         recognizerRef.current = null;
       }
     };
@@ -464,7 +462,7 @@ export function useAssistenteActions(isOpen: boolean, onClose: () => void) {
         
         if (progs && progs.length > 0) {
           respostaFinal = `### 🎁 Planos do Clubinho\n\n` +
-            `Equivalência de Banho: **1 crédito de banho do Clubinho cobre Banho Simples ou Banho Premium**.\n\n` +
+            `Equivalência de Banho: **1 crédito de banho do Clubinho cobre Banho Essencial ou Banho Premium**.\n\n` +
             progs.map((p: any) => `- **${p.nome}**: R$ ${Number(p.preco || 0).toFixed(2)}`).join("\n");
         } else {
           respostaFinal = "Não encontrei planos do Clubinho ativos no catálogo.";

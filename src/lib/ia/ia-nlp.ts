@@ -193,18 +193,29 @@ export function interpretarHora(texto: string): string | null {
   return null;
 }
 
+/** Ordenado do mais específico para o mais genérico (o primeiro que casar vence). */
 const SERVICOS_CONHECIDOS = [
+  "banho e tosa completa",
+  "banho e tosa higienica",
   "banho e tosa",
-  "banho",
+  "banho essencial",
+  "banho premium",
+  "banho terapeutico",
+  "banho medicamentoso",
+  "banho simples",
   "tosa higienica",
   "tosa na maquina",
   "tosa na tesoura",
+  "tosa completa",
+  "tosa bebe",
   "tosa",
   "hidratacao",
   "desembolo",
   "escovacao",
-  "tosa bebe",
+  "corte de unha",
+  "limpeza de ouvido",
   "spa",
+  "banho",
 ];
 
 export function detectarServico(texto: string): string | null {
@@ -220,32 +231,98 @@ const PALAVRAS_AGENDAR = /\b(agendar|agenda|agendamento|marcar|marca|marque|rese
 const STOP_NOME =
   /\b(dia|dias|para|pra|pro|no|na|em|as|às|a|de|do|da|hoje|amanha|depois|proxima|proximo|banho|tosa|hidratacao|spa|com|cliente|pet|horas?|h|hs|servico|servicos|leva|traz|transporte|segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/;
 
+/** Palavras que encerram a captura de um nome de pet (permite "pet"/"cliente" fora da lista). */
+const STOP_NOME_PET =
+  /\b(dia|dias|para|pra|pro|no|na|em|as|às|a|de|do|da|hoje|amanha|depois|proxima|proximo|banho|tosa|hidratacao|spa|com|cliente|tutor|tutora|dono|dona|horas?|h|hs|servico|servicos|leva|traz|transporte|segunda|terca|quarta|quinta|sexta|sabado|domingo|essencial|premium|simples|higienica)\b/;
+
+/** Captura tokens de nome a partir de uma posição, devolvendo também onde parou. */
+function capturarNome(
+  original: string,
+  normalizado: string,
+  inicio: number,
+  stop: RegExp,
+): { nome: string | null; restoNorm: string; restoOrig: string } {
+  const restoNorm = normalizado.slice(inicio).trim();
+  const restoOrig = original.slice(inicio).trim();
+  const tokensNorm = restoNorm.split(" ");
+  const tokensOrig = restoOrig.split(" ");
+  const nome: string[] = [];
+  let i = 0;
+  for (; i < tokensNorm.length && nome.length < 4; i++) {
+    const tk = tokensNorm[i];
+    if (!tk) continue;
+    if (stop.test(tk) || /^\d/.test(tk)) break;
+    nome.push((tokensOrig[i] || tk).replace(/[,.;]$/, ""));
+  }
+  const final = nome.join(" ").trim();
+  return {
+    nome: final.length >= 2 ? final : null,
+    restoNorm: tokensNorm.slice(i).join(" "),
+    restoOrig: tokensOrig.slice(i).join(" "),
+  };
+}
+
+/** Extrai o provável nome do pet citado no comando ("pet Thor", "cachorro Rex", "do Thor"). */
+export function extrairNomePet(texto: string): string | null {
+  const original = (texto || "").replace(/\s+/g, " ").trim();
+  const t = limpar(original);
+
+  const m = t.match(/\b(?:pet|petinho|cachorro|cachorra|cao|cadela|gato|gata|animal)\s+(?:o\s+|a\s+|chamado\s+|chamada\s+)?/);
+  if (m && m.index !== undefined) {
+    const r = capturarNome(original, t, m.index + m[0].length, STOP_NOME_PET);
+    if (r.nome) return r.nome;
+  }
+
+  // "para o Thor do Eli Júnior" → o nome antes de "do/da" é o pet
+  const mPara = t.match(/\b(?:para\s+(?:o|a)\s+|pro\s+|pra\s+|para\s+)/);
+  if (mPara && mPara.index !== undefined) {
+    const r = capturarNome(original, t, mPara.index + mPara[0].length, STOP_NOME_PET);
+    if (r.nome && /^(?:do|da|de)\s+/.test(r.restoNorm)) return r.nome;
+  }
+
+  return null;
+}
+
 /** Extrai o provável nome do cliente citado no comando. */
 export function extrairNomeCliente(texto: string): string | null {
   const original = (texto || "").replace(/\s+/g, " ").trim();
   const t = limpar(original);
 
   const capturar = (inicio: number): string | null => {
-    const restoNorm = t.slice(inicio).trim();
-    const restoOrig = original.slice(inicio).trim();
-    const tokensNorm = restoNorm.split(" ");
-    const tokensOrig = restoOrig.split(" ");
-    const nome: string[] = [];
-    for (let i = 0; i < tokensNorm.length && nome.length < 4; i++) {
-      const tk = tokensNorm[i];
-      if (!tk) continue;
-      if (STOP_NOME.test(tk) || /^\d/.test(tk)) break;
-      nome.push((tokensOrig[i] || tk).replace(/[,.;]$/, ""));
+    const r = capturarNome(original, t, inicio, STOP_NOME);
+    if (!r.nome) return null;
+    // "Thor do Eli Júnior" → o nome logo após "do/da/de" é o tutor, não o pet
+    const mDono = r.restoNorm.match(/^(?:do|da|de)\s+(?:o\s+|a\s+)?/);
+    if (mDono) {
+      const dono = capturarNome(r.restoOrig, r.restoNorm, mDono[0].length, STOP_NOME);
+      if (dono.nome) return dono.nome;
     }
-    const final = nome.join(" ").trim();
-    return final.length >= 2 ? final : null;
+    return r.nome;
   };
+
+  // "tutor <nome>" / "dono <nome>" / "responsável <nome>"
+  const mTutor = t.match(/\b(?:tutor|tutora|dono|dona|responsavel)\s+(?:o\s+|a\s+)?/);
+  if (mTutor && mTutor.index !== undefined) {
+    const r = capturarNome(original, t, mTutor.index + mTutor[0].length, STOP_NOME);
+    if (r.nome) return r.nome;
+  }
 
   // "cliente <nome>"
   const mCliente = t.match(/\bcliente\s+/);
   if (mCliente && mCliente.index !== undefined) {
     const r = capturar(mCliente.index + mCliente[0].length);
     if (r) return r;
+  }
+
+  // "pet Thor do Eli Júnior" → captura o tutor depois do pet
+  const mPet = t.match(/\b(?:pet|cachorro|cachorra|cao|cadela|gato|gata)\s+/);
+  if (mPet && mPet.index !== undefined) {
+    const rPet = capturarNome(original, t, mPet.index + mPet[0].length, STOP_NOME_PET);
+    const mDono = rPet.restoNorm.match(/^(?:do|da|de)\s+(?:o\s+|a\s+)?/);
+    if (mDono) {
+      const dono = capturarNome(rPet.restoOrig, rPet.restoNorm, mDono[0].length, STOP_NOME);
+      if (dono.nome) return dono.nome;
+    }
   }
 
   // "para o <nome>" / "pro <nome>" / "para <nome>"
@@ -268,6 +345,7 @@ export function extrairNomeCliente(texto: string): string | null {
 export interface PreInterpretacao {
   intencao: "criar_agendamento" | null;
   cliente_nome: string | null;
+  pet_nome: string | null;
   servico_nome: string | null;
   data: string | null;
   hora: string | null;
@@ -291,6 +369,7 @@ export function preInterpretar(texto: string, hoje = hojeSP()): PreInterpretacao
   const hora = interpretarHora(texto);
   const servico_nome = detectarServico(texto);
   const cliente_nome = querAgendar ? extrairNomeCliente(texto) : null;
+  const pet_nome = querAgendar ? extrairNomePet(texto) : null;
   const transporte = /\bleva e traz\b|\btransporte\b|\bbuscar\b|\bbusca e entrega\b/.test(t)
     ? true
     : /\bsem transporte\b|\bsem leva e traz\b/.test(t)
@@ -310,6 +389,7 @@ export function preInterpretar(texto: string, hoje = hojeSP()): PreInterpretacao
   return {
     intencao: querAgendar ? "criar_agendamento" : null,
     cliente_nome,
+    pet_nome,
     servico_nome,
     data,
     hora,

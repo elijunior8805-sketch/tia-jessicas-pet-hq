@@ -1116,7 +1116,7 @@ export const verificarElegibilidadeCredito = createServerFn({ method: "POST" })
       }
     }
 
-    const servicosInput = data.servicos.length > 0 ? data.servicos : [{ nome: "Banho Simples", valor: 60, categoria: "banho" }];
+    const servicosInput = data.servicos.length > 0 ? data.servicos : [{ nome: "Banho Essencial", valor: 60, categoria: "banho" }];
     const servicosCobertos: any[] = [];
     const servicosExtras: any[] = [];
     let totalCoberto = 0;

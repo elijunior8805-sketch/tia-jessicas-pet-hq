@@ -1,7 +1,14 @@
 import React from "react";
 import { Sparkles, Mic, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
-export type JessiStatus = "disponivel" | "ouvindo" | "transcrevendo" | "processando" | "aguardando_confirmacao" | "erro";
+export type JessiStatus =
+  | "disponivel"
+  | "ouvindo"
+  | "transcrevendo"
+  | "enviando"
+  | "processando"
+  | "aguardando_confirmacao"
+  | "erro";
 
 interface JessiStatusIndicatorProps {
   status: JessiStatus;
@@ -23,13 +30,19 @@ export const JessiStatusIndicator: React.FC<JessiStatusIndicatorProps> = ({ stat
       badge: "bg-red-50 text-red-800 border-red-200",
     },
     transcrevendo: {
-      label: "Transcrevendo áudio...",
+      label: "Transcrevendo fala...",
       icon: Loader2,
       color: "text-amber-600 animate-spin",
       badge: "bg-amber-50 text-amber-800 border-amber-200",
     },
+    enviando: {
+      label: "Enviando comando...",
+      icon: Loader2,
+      color: "text-blue-600 animate-spin",
+      badge: "bg-blue-50 text-blue-800 border-blue-200",
+    },
     processando: {
-      label: "Consultando o sistema...",
+      label: "Processando...",
       icon: Loader2,
       color: "text-emerald-700 animate-spin",
       badge: "bg-emerald-50 text-emerald-800 border-emerald-200",

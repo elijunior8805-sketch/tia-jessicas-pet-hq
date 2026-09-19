@@ -54,11 +54,64 @@ export const Route = createFileRoute("/_authenticated/atendimentos/$atendId")({
 
 // ---------- Storage helpers ----------
 
+async function comprimirImagem(file: File, maxDimension = 1920, quality = 0.82): Promise<File> {
+  if (typeof window === "undefined" || !file.type.startsWith("image/") || file.type.includes("svg") || file.size < 600 * 1024) {
+    return file;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compressed = new File([blob], file.name.replace(/\.[a-z0-9]+$/i, ".jpg"), {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          });
+          resolve(compressed);
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
 async function uploadArquivo(atendId: string, sub: string, file: File): Promise<string> {
-  const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
+  const compressed = await comprimirImagem(file);
+  const ext = (compressed.name.split(".").pop() ?? "jpg").toLowerCase();
   const path = `atendimentos/${atendId}/${sub}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("spa-fotos").upload(path, file, {
-    upsert: false, contentType: file.type,
+  const { error } = await supabase.storage.from("spa-fotos").upload(path, compressed, {
+    upsert: false, contentType: compressed.type || "image/jpeg",
   });
   if (error) throw error;
   return path;
@@ -80,28 +133,37 @@ function useSignedUrl(path: string | null | undefined) {
 }
 
 function Thumb({
-  path, onRemove, onStar, starred, disabled, onClick,
+  path, localUrl, uploading, onRemove, onStar, starred, disabled, onClick,
 }: {
-  path: string; onRemove?: () => void; onStar?: () => void;
+  path: string; localUrl?: string | null; uploading?: boolean; onRemove?: () => void; onStar?: () => void;
   starred?: boolean; disabled?: boolean; onClick?: () => void;
 }) {
-  const { data: url } = useSignedUrl(path);
+  const { data: signedUrl } = useSignedUrl(localUrl ? undefined : path);
+  const displayUrl = localUrl || signedUrl;
   return (
     <div className="relative group">
-      {url ? (
-        <img
-          src={url} alt="foto"
-          onClick={onClick}
-          className={`h-24 w-24 rounded-lg object-cover border cursor-zoom-in ${starred ? "ring-2 ring-primary" : ""}`}
-        />
+      {displayUrl ? (
+        <div className="relative">
+          <img
+            src={displayUrl} alt="foto"
+            onClick={onClick}
+            className={`h-24 w-24 rounded-xl object-cover border cursor-zoom-in transition-all ${starred ? "ring-2 ring-primary shadow-sm" : ""} ${uploading ? "opacity-75" : ""}`}
+          />
+          {uploading && (
+            <div className="absolute inset-0 bg-black/40 rounded-xl flex flex-col items-center justify-center pointer-events-none gap-1">
+              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="text-[9px] text-white font-medium">Enviando...</span>
+            </div>
+          )}
+        </div>
       ) : (
-        <div className="h-24 w-24 rounded-lg bg-muted animate-pulse" />
+        <div className="h-24 w-24 rounded-xl bg-muted animate-pulse" />
       )}
-      {onStar && !disabled && (
+      {onStar && !disabled && !uploading && (
         <button
           type="button" onClick={onStar}
-          className={`absolute top-1 left-1 h-6 w-6 rounded-full grid place-items-center transition ${
-            starred ? "bg-primary text-primary-foreground" : "bg-background/80 text-muted-foreground opacity-0 group-hover:opacity-100"
+          className={`absolute top-1 left-1 h-6 w-6 rounded-full grid place-items-center transition shadow-2xs ${
+            starred ? "bg-primary text-primary-foreground" : "bg-background/80 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background"
           }`}
           title={starred ? "Foto principal" : "Marcar como principal"}
         >
@@ -111,7 +173,7 @@ function Thumb({
       {onRemove && !disabled && (
         <button
           type="button" onClick={onRemove}
-          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground grid place-items-center opacity-0 group-hover:opacity-100 transition"
+          className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-destructive text-destructive-foreground grid place-items-center opacity-0 group-hover:opacity-100 transition shadow-2xs hover:scale-110"
           title="Remover"
         >
           <Trash2 className="h-3 w-3" />
@@ -196,28 +258,37 @@ async function compartilharFotoWhats(path: string, whatsapp: string | null | und
 
 
 function ResultadoFotoCard({
-  path, principal, disabled, hero, onZoom, onStar, onRemove, onDownload, onShare, filename,
+  path, localUrl, uploading, principal, disabled, hero, onZoom, onStar, onRemove, onDownload, onShare, filename,
 }: {
-  path: string; principal?: boolean; disabled?: boolean; hero?: boolean; filename: string;
+  path: string; localUrl?: string | null; uploading?: boolean; principal?: boolean; disabled?: boolean; hero?: boolean; filename: string;
   onZoom: () => void; onStar?: () => void; onRemove?: () => void;
   onDownload: () => void; onShare?: () => void;
 }) {
-  const { data: url } = useSignedUrl(path);
+  const { data: signedUrl } = useSignedUrl(localUrl ? undefined : path);
+  const displayUrl = localUrl || signedUrl;
   return (
     <div className={`group relative overflow-hidden bg-muted ${
       hero
         ? "rounded-2xl border-2 border-primary/40 ring-1 ring-gold/40 shadow-premium"
         : `rounded-xl border ${principal ? "ring-2 ring-primary shadow-elegant" : ""}`
     }`}>
-      {url ? (
-        <img
-          src={url}
-          alt={filename}
-          onClick={onZoom}
-          className={`w-full object-cover cursor-zoom-in transition group-hover:scale-[1.02] ${
-            hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"
-          }`}
-        />
+      {displayUrl ? (
+        <div className="relative w-full h-full">
+          <img
+            src={displayUrl}
+            alt={filename}
+            onClick={onZoom}
+            className={`w-full object-cover cursor-zoom-in transition group-hover:scale-[1.02] ${
+              hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"
+            } ${uploading ? "opacity-75" : ""}`}
+          />
+          {uploading && (
+            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center pointer-events-none gap-1">
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="text-[10px] text-white font-medium">Enviando em segundo plano...</span>
+            </div>
+          )}
+        </div>
       ) : (
         <div className={`w-full bg-muted animate-pulse ${hero ? "aspect-[4/5] sm:aspect-[16/10]" : "aspect-square"}`} />
       )}
@@ -231,10 +302,10 @@ function ResultadoFotoCard({
         </span>
       )}
 
-      {onStar && !disabled && !principal && (
+      {onStar && !disabled && !principal && !uploading && (
         <button
           type="button" onClick={onStar}
-          className="absolute top-2 left-2 h-8 w-8 rounded-full bg-background/90 text-muted-foreground grid place-items-center opacity-0 group-hover:opacity-100 transition hover:text-primary"
+          className="absolute top-2 left-2 h-8 w-8 rounded-full bg-background/90 text-muted-foreground grid place-items-center opacity-0 group-hover:opacity-100 transition hover:text-primary shadow-xs"
           title="Marcar como principal"
         >
           <Star className="h-4 w-4" />
@@ -244,7 +315,7 @@ function ResultadoFotoCard({
       {onRemove && !disabled && (
         <button
           type="button" onClick={onRemove}
-          className="absolute top-2 right-2 h-8 w-8 rounded-full bg-destructive text-destructive-foreground grid place-items-center opacity-0 group-hover:opacity-100 transition"
+          className="absolute top-2 right-2 h-8 w-8 rounded-full bg-destructive text-destructive-foreground grid place-items-center opacity-0 group-hover:opacity-100 transition shadow-xs hover:scale-110"
           title="Remover"
         >
           <Trash2 className="h-4 w-4" />
@@ -255,6 +326,7 @@ function ResultadoFotoCard({
       <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex gap-2 ${hero ? "p-3 sm:p-4" : "p-2"}`}>
         <Button
           type="button" size="sm" variant="secondary"
+          disabled={uploading}
           className={`flex-1 backdrop-blur bg-white/95 hover:bg-white text-foreground ${hero ? "h-11 text-sm font-semibold" : "h-9 text-xs"}`}
           onClick={(e) => { e.stopPropagation(); onDownload(); }}
         >
@@ -263,6 +335,7 @@ function ResultadoFotoCard({
         {onShare && (
           <Button
             type="button" size="sm"
+            disabled={uploading}
             className={`flex-1 bg-[#25D366] hover:bg-[#20b858] text-white ${hero ? "h-11 text-sm font-semibold" : "h-9 text-xs"}`}
             onClick={(e) => { e.stopPropagation(); onShare(); }}
           >
@@ -277,26 +350,21 @@ function ResultadoFotoCard({
 function UploadButton({
   onFile, disabled, label = "Adicionar foto",
 }: { onFile: (f: File) => Promise<void> | void; disabled?: boolean; label?: string }) {
-  const [busy, setBusy] = useState(false);
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handle = async (files: File[]) => {
+  const handle = (files: File[]) => {
     if (files.length === 0) return;
-    setBusy(true);
-    try {
-      for (const f of files) await onFile(f);
-      toast.success("Foto(s) enviada(s)");
-    } catch (err: any) {
-      toast.error(err.message ?? "Erro ao enviar foto");
-    } finally {
-      setBusy(false);
+    for (const f of files) {
+      Promise.resolve(onFile(f)).catch((err) => {
+        toast.error(err?.message ?? "Erro ao enviar foto");
+      });
     }
   };
 
   const btnCls =
-    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm cursor-pointer hover:bg-accent transition " +
-    (disabled || busy ? "opacity-60 pointer-events-none" : "");
+    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm cursor-pointer hover:bg-accent transition active:scale-95 touch-manipulation " +
+    (disabled ? "opacity-60 pointer-events-none" : "");
 
   return (
     <div className="inline-flex flex-wrap gap-2">
@@ -307,7 +375,7 @@ function UploadButton({
         accept="image/*"
         capture="environment"
         className="hidden"
-        disabled={disabled || busy}
+        disabled={disabled}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
@@ -321,7 +389,7 @@ function UploadButton({
         accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
         multiple
         className="hidden"
-        disabled={disabled || busy}
+        disabled={disabled}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
@@ -329,10 +397,10 @@ function UploadButton({
         }}
       />
 
-      <button type="button" onClick={() => camRef.current?.click()} className={btnCls} disabled={disabled || busy}>
-        <Camera className="h-4 w-4" /> {busy ? "Enviando…" : "Tirar foto"}
+      <button type="button" onClick={() => camRef.current?.click()} className={btnCls} disabled={disabled}>
+        <Camera className="h-4 w-4" /> Tirar foto
       </button>
-      <button type="button" onClick={() => fileRef.current?.click()} className={btnCls} disabled={disabled || busy}>
+      <button type="button" onClick={() => fileRef.current?.click()} className={btnCls} disabled={disabled}>
         <Upload className="h-4 w-4" /> {label === "Adicionar foto" ? "Carregar arquivo" : label}
       </button>
     </div>
@@ -455,7 +523,13 @@ function AtendimentoDetalhe() {
     queryFn: async () => {
       const { data } = await supabase.from("servicos")
         .select("id, nome, valor, categoria").eq("ativo", true).order("nome");
-      return (data ?? []).filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"));
+      return (data ?? [])
+        .filter((s: any) => !s.nome.toUpperCase().includes("BANHO SPA"))
+        .map((s: any) =>
+          s.nome?.trim().toUpperCase() === "BANHO SIMPLES"
+            ? { ...s, nome: "Banho Essencial" }
+            : s
+        );
     },
   });
 
@@ -735,6 +809,8 @@ function AtendimentoDetalhe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usarCreditoPrograma, elegibilidadeCredito, atendimento]);
 
+  const [pendingUploads, setPendingUploads] = useState<Array<{ id: string; tipo: "antes" | "depois"; localUrl: string; uploading: boolean }>>([]);
+
   if (isLoading) {
     return <PageShell><div className="text-sm text-muted-foreground">Carregando…</div></PageShell>;
   }
@@ -747,8 +823,18 @@ function AtendimentoDetalhe() {
   const encerrado = !!(atendimento as any).encerrado_em;
   const readOnly = encerrado && !isAdmin;
 
-  const fotosAntes: FotoItem[] = ((atendimento as any).fotos_antes ?? []) as FotoItem[];
-  const fotosDepois: FotoItem[] = ((atendimento as any).fotos_depois ?? []) as FotoItem[];
+  const rawFotosAntes: FotoItem[] = ((atendimento as any).fotos_antes ?? []) as FotoItem[];
+  const rawFotosDepois: FotoItem[] = ((atendimento as any).fotos_depois ?? []) as FotoItem[];
+
+  const fotosAntes: FotoItem[] = [
+    ...rawFotosAntes,
+    ...pendingUploads.filter((p) => p.tipo === "antes").map((p) => ({ path: p.id, localUrl: p.localUrl, uploading: true })),
+  ];
+
+  const fotosDepois: FotoItem[] = [
+    ...rawFotosDepois,
+    ...pendingUploads.filter((p) => p.tipo === "depois").map((p) => ({ path: p.id, localUrl: p.localUrl, uploading: true })),
+  ];
 
   const valorSolicitados = sumItens(solicitados);
   const valorExtras = sumItens(extras);
@@ -862,24 +948,40 @@ function AtendimentoDetalhe() {
 
   const addFoto = async (tipo: "antes" | "depois", file: File) => {
     if (readOnly) return;
-    const path = await uploadArquivo(atendId, `foto-${tipo}`, file);
-    const novo: FotoItem = {
-      path,
-      created_at: new Date().toISOString(),
-      created_by: myProfile?.id ?? null,
-      created_by_nome: myProfile?.nome ?? null,
-    };
-    const key = tipo === "antes" ? "fotos_antes" : "fotos_depois";
-    const list = tipo === "antes" ? fotosAntes : fotosDepois;
-    await patchMut.mutateAsync({ [key]: [...list, novo] as any });
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const localUrl = URL.createObjectURL(file);
+
+    // 1. Mostra instantaneamente na galeria (0ms) sem travar a digitação ou tela
+    setPendingUploads((prev) => [...prev, { id: tempId, tipo, localUrl, uploading: true }]);
+
+    try {
+      // 2. Comprime e envia em background
+      const path = await uploadArquivo(atendId, `foto-${tipo}`, file);
+      const novo: FotoItem = {
+        path,
+        created_at: new Date().toISOString(),
+        created_by: myProfile?.id ?? null,
+        created_by_nome: myProfile?.nome ?? null,
+      };
+      const key = tipo === "antes" ? "fotos_antes" : "fotos_depois";
+      const list = tipo === "antes" ? rawFotosAntes : rawFotosDepois;
+      await patchMut.mutateAsync({ [key]: [...list, novo] as any });
+      toast.success("Foto enviada com sucesso!");
+    } catch (err: any) {
+      console.error("Erro no upload de foto:", err);
+      toast.error(err?.message ?? "Erro ao enviar foto");
+    } finally {
+      setPendingUploads((prev) => prev.filter((p) => p.id !== tempId));
+      setTimeout(() => URL.revokeObjectURL(localUrl), 5000);
+    }
   };
 
   const removeFoto = async (tipo: "antes" | "depois", idx: number) => {
     if (readOnly) return;
     const key = tipo === "antes" ? "fotos_antes" : "fotos_depois";
-    const list = tipo === "antes" ? fotosAntes : fotosDepois;
+    const list = tipo === "antes" ? rawFotosAntes : rawFotosDepois;
     const item = list[idx];
-    if (item?.path) {
+    if (item?.path && !item.path.startsWith("temp_")) {
       await supabase.storage.from("spa-fotos").remove([item.path]).catch(() => {});
     }
     patchMut.mutate({ [key]: list.filter((_, i) => i !== idx) as any });
@@ -887,7 +989,7 @@ function AtendimentoDetalhe() {
 
   const setPrincipal = (idx: number) => {
     if (readOnly) return;
-    const list = fotosDepois.map((f, i) => ({ ...f, principal: i === idx }));
+    const list = rawFotosDepois.map((f, i) => ({ ...f, principal: i === idx }));
     patchMut.mutate({
       fotos_depois: list as any,
       foto_principal_depois: list[idx]?.path ?? null,
@@ -1540,9 +1642,15 @@ function AtendimentoDetalhe() {
             ) : (
               <div className="flex flex-wrap gap-3">
                 {fotosAntes.map((f, i) => (
-                  <Thumb key={i} path={f.path} disabled={readOnly}
-                    onClick={() => setZoomFoto(f.path)}
-                    onRemove={() => removeFoto("antes", i)} />
+                  <Thumb
+                    key={f.path || i}
+                    path={f.path}
+                    localUrl={f.localUrl}
+                    uploading={f.uploading}
+                    disabled={readOnly}
+                    onClick={() => f.path && !f.path.startsWith("temp_") ? setZoomFoto(f.path) : undefined}
+                    onRemove={() => !f.uploading ? removeFoto("antes", i) : undefined}
+                  />
                 ))}
               </div>
             )}
@@ -1645,22 +1753,25 @@ function AtendimentoDetalhe() {
               const petSlug = (pet?.nome ?? "pet").toLowerCase().replace(/\s+/g, "-");
               const cardFor = (i: number, opts: { hero?: boolean } = {}) => {
                 const f = fotosDepois[i];
+                if (!f) return null;
                 const filename = `${petSlug}-pronto-${i + 1}.jpg`;
                 return (
                   <ResultadoFotoCard
-                    key={i}
+                    key={f.path || i}
                     path={f.path}
+                    localUrl={f.localUrl}
+                    uploading={f.uploading}
                     principal={!!f.principal}
                     disabled={readOnly}
                     hero={opts.hero}
                     filename={filename}
-                    onZoom={() => setZoomFoto(f.path)}
-                    onStar={f.principal ? undefined : () => setPrincipal(i)}
-                    onRemove={() => removeFoto("depois", i)}
-                    onDownload={() => baixarFoto(f.path, filename)}
-                    onShare={() => compartilharFotoWhats(
+                    onZoom={() => f.path && !f.path.startsWith("temp_") ? setZoomFoto(f.path) : undefined}
+                    onStar={f.principal || f.uploading ? undefined : () => setPrincipal(i)}
+                    onRemove={() => !f.uploading ? removeFoto("depois", i) : undefined}
+                    onDownload={() => f.path && !f.path.startsWith("temp_") ? baixarFoto(f.path, filename) : undefined}
+                    onShare={() => f.path && !f.path.startsWith("temp_") ? compartilharFotoWhats(
                       f.path, cliente?.whatsapp, pet?.nome ?? "seu pet", cliente?.nome ?? "",
-                    )}
+                    ) : undefined}
                   />
                 );
               };

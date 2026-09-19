@@ -1,5 +1,5 @@
 import React from "react";
-import { User, Phone, MapPin, PawPrint, CalendarPlus, Gift, ArrowRight } from "lucide-react";
+import { User, Phone, MapPin, PawPrint, CalendarPlus, Gift, ArrowRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ClienteCardProps {
@@ -36,7 +36,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
               {onActionClick && (
                 <Button
                   size="sm"
-                  onClick={() => onActionClick(`Selecionar opção ${idx + 1}: ${opcao.nome || opcao.nomePrincipal}`)}
+                  onClick={() => onActionClick(`Selecionar opção ${idx + 1}: ${opcao.nome || opcao.nomePrincipal}${opcao.id ? ` [id:${opcao.id}]` : ""}`)}
                   className="h-7 px-2.5 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-medium"
                 >
                   Selecionar
@@ -49,7 +49,28 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
     );
   }
 
-  const clientes = Array.isArray(data) ? data : data?.clientes || (data?.id || data?.nome ? [data] : []);
+  const clientes = React.useMemo(() => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.clientes)) return data.clientes;
+    if (data?.cliente && typeof data.cliente === "object") {
+      const cli = { ...data.cliente };
+      if (!cli.pets && (data.nome || data.id)) {
+        cli.pets = [{ id: data.id, nome: data.nome, raca: data.raca, porte: data.porte }];
+      }
+      return [cli];
+    }
+    if (data?.clientes && typeof data.clientes === "object") {
+      const cli = { ...data.clientes };
+      if (!cli.pets && (data.nome || data.id)) {
+        cli.pets = [{ id: data.id, nome: data.nome, raca: data.raca, porte: data.porte }];
+      }
+      return [cli];
+    }
+    if (data?.id && (data?.nome || data?.nomePrincipal)) {
+      return [data];
+    }
+    return [];
+  }, [data]);
 
   if (!clientes.length) {
     return (
@@ -126,9 +147,17 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
                       onClick={() => onActionClick(`E os créditos do ${primeiroPet}?`)}
                       className="h-6 px-2 text-[10px] text-[#8C6D1F] border-[#C8A951]/50 hover:bg-amber-50 rounded-md font-medium"
                     >
-                      <Gift className="h-2.5 w-2.5 mr-1" /> Créditos do {primeiroPet}
+                      <Gift className="h-2.5 w-2.5 mr-1" /> Créditos
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onActionClick(`Preparar mensagem de WhatsApp para ${c.nome}`)}
+                    className="h-6 px-2 text-[10px] text-emerald-800 border-emerald-300 hover:bg-emerald-50 rounded-md font-medium"
+                  >
+                    <MessageSquare className="h-2.5 w-2.5 mr-1" /> Mensagem
+                  </Button>
                   <Button
                     size="sm"
                     onClick={() => onActionClick(`Agende um banho para o ${primeiroPet || c.nome} amanhã`)}
