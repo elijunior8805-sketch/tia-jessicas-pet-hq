@@ -309,14 +309,6 @@ export class VoiceRecognizer {
     }, delay);
   }
 
-  getStatus() {
-    return this.status;
-  }
-
-  getIsContinuous() {
-    return this.isContinuous;
-  }
-
   /** Ativa o Modo Contínuo de Voz com uma única permissão do usuário */
   startContinuous(textoInicial = "") {
     if (!this.initRecognition()) return;
