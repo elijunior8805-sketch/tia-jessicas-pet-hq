@@ -1741,6 +1741,11 @@ export async function processarMensagemJessiV2Core(
       const nomeCliente = clienteNome || "Cliente";
       const nomePet = petNome || "Pet";
       const dataHoraAlvo = intencao.entidades.data ? `${intencao.entidades.data}${intencao.entidades.hora ? ` às ${intencao.entidades.hora}` : ""}` : "Data a definir";
+      let entendido = `Comando recebido: "${input.mensagem}"`;
+      let seraAlterado = `Gravação pendente para ${nomePet} (Tutor: ${nomeCliente}).`;
+      let situacaoAtual = "Registro em estado draft aguardando aprovação.";
+      let resultadoEsperado = `Execução oficial de ${intencao.intencao.replace(/_/g, " ")} após confirmação humana.`;
+      const alertas: string[] = ["Nenhuma alteração foi gravada ainda.", "A confirmação expira em 15 minutos."];
       if (intencao.dominio === "programas_creditos") {
         entendido = `Uso/liberação de 1 crédito do plano do Clubinho para ${nomePet}.`;
         seraAlterado = `Abatimento de 1 sessão no saldo de créditos do cliente ${nomeCliente}.`;
@@ -1820,7 +1825,6 @@ export async function processarMensagemJessiV2Core(
           ...novoContexto,
           operacaoPreparada: pendingAction,
         };
-      }
     } else {
       // RESPOSTAS CONVERSACIONAIS E CONSULTAS REAIS (FASE 2 — SOMENTE LEITURA)
       if (intencao.dominio === "agenda") {
