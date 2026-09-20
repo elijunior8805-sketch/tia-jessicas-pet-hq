@@ -7,6 +7,7 @@ export type JessiStatus =
   | "transcrevendo"
   | "enviando"
   | "processando"
+  | "executando"
   | "aguardando_confirmacao"
   | "erro";
 
@@ -45,6 +46,12 @@ export const JessiStatusIndicator: React.FC<JessiStatusIndicatorProps> = ({ stat
       label: "Processando...",
       icon: Loader2,
       color: "text-emerald-700 animate-spin",
+      badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    },
+    executando: {
+      label: "Falando resposta...",
+      icon: Sparkles,
+      color: "text-emerald-700",
       badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
     },
     aguardando_confirmacao: {
