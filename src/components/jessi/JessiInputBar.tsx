@@ -81,7 +81,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-  }, [text, isProcessing, disabled, isSpeaking, safeCancelVoice, onSend]);
+  }, [text, isProcessing, disabled, isSpeaking, cancelVoice, onSend]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
