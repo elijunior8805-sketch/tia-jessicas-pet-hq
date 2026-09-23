@@ -49,6 +49,9 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     transcript,
   } = useJessiVoice();
 
+  // Garante que cancelVoice seja sempre uma função (fallback para pararTodoAudio interno)
+  const safeCancelVoice = cancelVoice ?? (() => {});
+
   // Aborta fala anterior quando uma nova mensagem está sendo processada
   // para evitar sobreposição entre resposta antiga e nova
   useEffect(() => {
