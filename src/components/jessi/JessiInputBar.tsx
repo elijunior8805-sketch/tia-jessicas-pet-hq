@@ -49,23 +49,34 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     transcript,
   } = useJessiVoice();
 
-  // Garante que cancelVoice seja sempre uma função (fallback para pararTodoAudio interno)
-  const safeCancelVoice = cancelVoice ?? (() => {});
+  // Garante que cancelVoice seja sempre uma função (fallback no-op).
+  // Importante: o hook pode retornar `cancel` indefinido em algumas
+  // remontagens ou estados iniciais; sem essa guarda, o efeito de cleanup
+  // dispara `cancelVoice is not a function` e derruba a página inteira.
+  const safeCancelVoice = useCallback(() => {
+    if (typeof cancelVoice === "function") {
+      try {
+        cancelVoice();
+      } catch {
+        // swallow — nunca derruba o app por causa da voz
+      }
+    }
+  }, [cancelVoice]);
 
   // Aborta fala anterior quando uma nova mensagem está sendo processada
   // para evitar sobreposição entre resposta antiga e nova
   useEffect(() => {
     if (isProcessing && isSpeaking) {
-      cancelVoice();
+      safeCancelVoice();
     }
-  }, [isProcessing, isSpeaking, cancelVoice]);
+  }, [isProcessing, isSpeaking, safeCancelVoice]);
 
   // Cleanup ao desmontar: cancela qualquer fala residual
   useEffect(() => {
     return () => {
-      cancelVoice();
+      safeCancelVoice();
     };
-  }, [cancelVoice]);
+  }, [safeCancelVoice]);
 
   // Injeta transcript do gravador na textarea em tempo real
   useEffect(() => {
@@ -91,7 +102,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
     // Aborta voz residual antes de enviar — a nova resposta tratara sua propria fala
     if (isSpeaking) {
-      cancelVoice();
+      safeCancelVoice();
     }
 
     onSend(trimmed);
@@ -99,7 +110,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-  }, [text, isProcessing, disabled, isSpeaking, cancelVoice, onSend]);
+  }, [text, isProcessing, disabled, isSpeaking, safeCancelVoice, onSend]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -146,7 +157,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
           <span className="text-xs text-amber-800 font-medium flex-1">Jessi está respondendo…</span>
           <button
             type="button"
-            onClick={cancelVoice}
+            onClick={safeCancelVoice}
             className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium transition-colors"
             aria-label="Interromper fala"
           >
