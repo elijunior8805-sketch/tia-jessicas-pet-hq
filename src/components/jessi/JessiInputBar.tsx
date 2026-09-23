@@ -43,25 +43,11 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     isRecording,
     isSupported: voiceSupported,
     speak,
-    pararFala: safePararFala,
+    cancelVoice,
     startRecording,
     stopRecording,
     transcript,
   } = useJessiVoice();
-
-  // Garante que safePararFala seja sempre uma função (fallback no-op).
-  // Importante: o hook pode retornar `pararFala` indefinido em algumas
-  // remontagens ou estados iniciais; sem essa guarda, o efeito de cleanup
-  // dispara `pararFala is not a function` e derruba a página inteira.
-  const safePararFala = useCallback(() => {
-    if (typeof safePararFala === "function") {
-      try {
-        safePararFala();
-      } catch {
-        // swallow — nunca derruba o app por causa da voz
-      }
-    }
-  }, []);
 
   // Injeta transcript do gravador na textarea em tempo real
   useEffect(() => {
@@ -87,7 +73,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
     // Aborta voz residual antes de enviar — a nova resposta tratara sua propria fala
     if (isSpeaking) {
-      safePararFala();
+      cancelVoice();
     }
 
     onSend(trimmed);
@@ -142,7 +128,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
           <span className="text-xs text-amber-800 font-medium flex-1">Jessi está respondendo…</span>
           <button
             type="button"
-            onClick={safePararFala}
+            onClick={cancelVoice}
             className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium transition-colors"
             aria-label="Interromper fala"
           >
