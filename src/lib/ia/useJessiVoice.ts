@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   VoiceRecognizer,
   VoiceRecognitionStatus,
@@ -33,6 +33,7 @@ export interface UseJessiVoiceReturn {
   speakResponse: (entrada: string | { texto: string }, onFinish?: () => void) => void;
   falarResposta: (texto: string) => void;
   pararFala: () => void;
+  cancelVoice: () => void;
 }
 
 /**
