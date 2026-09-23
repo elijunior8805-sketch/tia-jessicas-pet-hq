@@ -20,7 +20,7 @@ const SpeakingWaveform: React.FC = () => (
         key={i}
         className="w-0.5 rounded-full bg-[#C8A951] animate-pulse"
         style={{
-          height: `${8 + i % 3 * 4}px`,
+          height: `${8 + (i % 3) * 4}px`,
           animationDuration: `${0.4 + (i % 3) * 0.15}s`,
           animationDelay: `${i * 0.08}s`,
           opacity: 0.7 + (i % 2) * 0.3,
@@ -40,22 +40,21 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const {
     isSpeaking,
-    isRecording,
+    isListening,
     isSupported: voiceSupported,
-    speak,
+    speakResponse,
     cancelVoice,
-    startRecording,
-    stopRecording,
+    startListening,
+    stopListening,
     transcript,
-  } = useJessiVoice();
+  } = useJessiVoice(undefined, undefined);
+
+  const isRecording = isListening;
 
   // Injeta transcript do gravador na textarea em tempo real
   useEffect(() => {
     if (transcript && isRecording) {
-      setText((prev) => {
-        // Substitui apenas o conteúdo que o usuário não editou manualmente
-        return transcript;
-      });
+      setText(transcript);
     }
   }, [transcript, isRecording]);
 
@@ -72,7 +71,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     if (!trimmed || isProcessing || disabled) return;
 
     // Aborta voz residual antes de enviar — a nova resposta tratara sua propria fala
-    if (isSpeaking) {
+    if (isSpeaking && typeof cancelVoice === "function") {
       cancelVoice();
     }
 
@@ -95,11 +94,18 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
   const handleMicClick = useCallback(() => {
     if (isRecording) {
-      stopRecording();
+      stopListening();
     } else {
-      startRecording();
+      startListening();
     }
-  }, [isRecording, startRecording, stopRecording]);
+  }, [isRecording, startListening, stopListening]);
+
+  // Funcao segura para cancelar voz — nunca lancara "nao e funcao"
+  const safeCancelVoice = useCallback(() => {
+    if (typeof cancelVoice === "function") {
+      cancelVoice();
+    }
+  }, [cancelVoice]);
 
   const canSend = !disabled && !isProcessing && text.trim().length > 0;
   const isActive = isProcessing || isSpeaking || isRecording;
@@ -115,20 +121,20 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
           </span>
           <Square
             className="h-3.5 w-3.5 text-red-500 cursor-pointer hover:text-red-700"
-            onClick={stopRecording}
+            onClick={stopListening}
             aria-label="Parar gravação"
           />
         </div>
       )}
 
-      {/* Barra de status quando a Jessi está falando */}
+      {/* Barra de status quando a Jessi esta falando */}
       {isSpeaking && !isRecording && (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
           <SpeakingWaveform />
-          <span className="text-xs text-amber-800 font-medium flex-1">Jessi está respondendo…</span>
+          <span className="text-xs text-amber-800 font-medium flex-1">Jessi esta respondendo…</span>
           <button
             type="button"
-            onClick={cancelVoice}
+            onClick={safeCancelVoice}
             className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium transition-colors"
             aria-label="Interromper fala"
           >
@@ -139,18 +145,18 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
       )}
 
       <div className="flex items-end gap-2">
-        {/* Microfone */}
+        {/* Microfone — sempre visivel quando suportado e nao ha processamento em curso */}
         {voiceSupported && !isProcessing && (
           <button
             type="button"
             onClick={handleMicClick}
-            disabled={disabled || isProcessing}
+            disabled={disabled}
             className={`shrink-0 mb-1 h-9 w-9 rounded-full flex items-center justify-center transition-all ${
               isRecording
                 ? "bg-red-500 hover:bg-red-600 text-white shadow-md"
                 : "bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300"
-            } ${disabled || isProcessing ? "opacity-40 cursor-not-allowed" : ""}`}
-            aria-label={isRecording ? "Parar gravação" : "Gravar comando de voz"}
+            } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+            aria-label={isRecording ? "Parar gravacao" : "Gravar comando de voz"}
           >
             <Mic className={`h-4 w-4 ${isRecording ? "animate-pulse" : ""}`} />
           </button>
@@ -182,7 +188,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
             style={{ minHeight: "44px", maxHeight: "160px" }}
           />
 
-          {/* Botão de envio */}
+          {/* Botao de envio */}
           <button
             type="button"
             onClick={handleSubmit}
@@ -203,7 +209,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
         </div>
       </div>
 
-      {/* Dica contextual sutil */}
+      {/* Dica contextual subtil */}
       {(isSpeaking || isRecording) && (
         <p className="text-[11px] text-muted-foreground/70 text-center">
           {isRecording

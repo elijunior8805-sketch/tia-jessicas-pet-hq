@@ -136,6 +136,7 @@ export function useJessiVoice(
   const [finalTranscript, setFinalTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isSupported, setIsSupported] = useState(false);
 
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
