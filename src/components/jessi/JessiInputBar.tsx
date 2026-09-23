@@ -43,40 +43,25 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
     isRecording,
     isSupported: voiceSupported,
     speak,
-    cancel: cancelVoice,
+    pararFala: safePararFala,
     startRecording,
     stopRecording,
     transcript,
   } = useJessiVoice();
 
-  // Garante que cancelVoice seja sempre uma função (fallback no-op).
-  // Importante: o hook pode retornar `cancel` indefinido em algumas
+  // Garante que safePararFala seja sempre uma função (fallback no-op).
+  // Importante: o hook pode retornar `pararFala` indefinido em algumas
   // remontagens ou estados iniciais; sem essa guarda, o efeito de cleanup
-  // dispara `cancelVoice is not a function` e derruba a página inteira.
-  const safeCancelVoice = useCallback(() => {
-    if (typeof cancelVoice === "function") {
+  // dispara `pararFala is not a function` e derruba a página inteira.
+  const safePararFala = useCallback(() => {
+    if (typeof safePararFala === "function") {
       try {
-        cancelVoice();
+        safePararFala();
       } catch {
         // swallow — nunca derruba o app por causa da voz
       }
     }
-  }, [cancelVoice]);
-
-  // Aborta fala anterior quando uma nova mensagem está sendo processada
-  // para evitar sobreposição entre resposta antiga e nova
-  useEffect(() => {
-    if (isProcessing && isSpeaking) {
-      safeCancelVoice();
-    }
-  }, [isProcessing, isSpeaking, safeCancelVoice]);
-
-  // Cleanup ao desmontar: cancela qualquer fala residual
-  useEffect(() => {
-    return () => {
-      safeCancelVoice();
-    };
-  }, [safeCancelVoice]);
+  }, []);
 
   // Injeta transcript do gravador na textarea em tempo real
   useEffect(() => {
@@ -102,7 +87,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
 
     // Aborta voz residual antes de enviar — a nova resposta tratara sua propria fala
     if (isSpeaking) {
-      safeCancelVoice();
+      safePararFala();
     }
 
     onSend(trimmed);
@@ -157,7 +142,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
           <span className="text-xs text-amber-800 font-medium flex-1">Jessi está respondendo…</span>
           <button
             type="button"
-            onClick={safeCancelVoice}
+            onClick={safePararFala}
             className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium transition-colors"
             aria-label="Interromper fala"
           >
