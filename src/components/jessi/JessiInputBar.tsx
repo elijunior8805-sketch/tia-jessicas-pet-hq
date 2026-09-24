@@ -1,222 +1,171 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import { Send, Mic, Square, Sparkles } from "lucide-react";
-import { useJessiVoice } from "@/lib/ia/useJessiVoice";
+import React, { useRef } from "react";
+import { Mic, MicOff, Paperclip, Send, Square, Volume2, VolumeX, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
+import { cn } from "@/lib/utils";
 
 interface JessiInputBarProps {
-  onSend: (text: string) => void;
-  isProcessing?: boolean;
-  disabled?: boolean;
-  placeholder?: string;
+  inputText: string;
+  setInputText: (text: string) => void;
+  onSend: () => void;
+  isLoading?: boolean;
+  voiceStatus: VoiceRecognitionStatus;
+  isContinuousMode: boolean;
+  onToggleContinuousVoice: () => void;
+  onCancelVoice: () => void;
+  interimTranscript?: string;
+  ttsEnabled: boolean;
+  onToggleTts: () => void;
+  selectedFile?: File | null;
+  onSelectFile?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveFile?: () => void;
 }
 
-/**
- * Waveform simulado — 5 barras que pulsam em velocidades ligeiramente diferentes.
- * Mantém o feedback visual de "falando" sem depender de análise de áudio real.
- */
-const SpeakingWaveform: React.FC = () => (
-  <div className="flex items-center gap-0.5 px-1 select-none" aria-label="Falando">
-    {[0, 1, 2, 3, 4].map((i) => (
-      <div
-        key={i}
-        className="w-0.5 rounded-full bg-[#C8A951] animate-pulse"
-        style={{
-          height: `${8 + (i % 3) * 4}px`,
-          animationDuration: `${0.4 + (i % 3) * 0.15}s`,
-          animationDelay: `${i * 0.08}s`,
-          opacity: 0.7 + (i % 2) * 0.3,
-        }}
-      />
-    ))}
-  </div>
-);
-
 export const JessiInputBar: React.FC<JessiInputBarProps> = ({
+  inputText,
+  setInputText,
   onSend,
-  isProcessing = false,
-  disabled = false,
-  placeholder = "Pergunte para a Jessi ou digite um comando…",
+  isLoading = false,
+  voiceStatus,
+  isContinuousMode,
+  onToggleContinuousVoice,
+  onCancelVoice,
+  interimTranscript = "",
+  ttsEnabled,
+  onToggleTts,
+  selectedFile,
+  onSelectFile,
+  onRemoveFile,
 }) => {
-  const [text, setText] = useState("");
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const {
-    isSpeaking,
-    isListening,
-    isSupported: voiceSupported,
-    speakResponse,
-    cancelVoice,
-    startListening,
-    stopListening,
-    transcript,
-  } = useJessiVoice(undefined, undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isListening = voiceStatus === "listening" || voiceStatus === "requesting_permission";
+  const canSend = Boolean(inputText.trim() || selectedFile) && !isLoading;
 
-  const isRecording = isListening;
-
-  // Injeta transcript do gravador na textarea em tempo real
-  useEffect(() => {
-    if (transcript && isRecording) {
-      setText(transcript);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && canSend) {
+      event.preventDefault();
+      onSend();
     }
-  }, [transcript, isRecording]);
-
-  // Auto-resize da textarea
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
-    const ta = e.target;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
-  }, []);
-
-  const handleSubmit = useCallback(() => {
-    const trimmed = text.trim();
-    if (!trimmed || isProcessing || disabled) return;
-
-    // Aborta voz residual antes de enviar — a nova resposta tratara sua propria fala
-    if (isSpeaking && typeof cancelVoice === "function") {
-      cancelVoice();
-    }
-
-    onSend(trimmed);
-    setText("");
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-    }
-  }, [text, isProcessing, disabled, isSpeaking, cancelVoice, onSend]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit]
-  );
-
-  const handleMicClick = useCallback(() => {
-    if (isRecording) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  }, [isRecording, startListening, stopListening]);
-
-  // Funcao segura para cancelar voz — nunca lancara "nao e funcao"
-  const safeCancelVoice = useCallback(() => {
-    if (typeof cancelVoice === "function") {
-      cancelVoice();
-    }
-  }, [cancelVoice]);
-
-  const canSend = !disabled && !isProcessing && text.trim().length > 0;
-  const isActive = isProcessing || isSpeaking || isRecording;
+  };
 
   return (
-    <div className="flex flex-col gap-2 px-4 pb-4 pt-2 border-t bg-background/80 backdrop-blur-sm">
-      {/* Barra de status quando gravando */}
-      {isRecording && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200">
-          <div className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
-          <span className="text-xs text-red-700 font-medium flex-1">
-            Gravando… diga seu comando ou toque no microfone novamente para parar
+    <div className="shrink-0 border-t border-border/70 bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-sm md:px-4">
+      {(isListening || interimTranscript) && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-destructive" />
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+            {interimTranscript || "Ouvindo… fale seu comando naturalmente"}
           </span>
-          <Square
-            className="h-3.5 w-3.5 text-red-500 cursor-pointer hover:text-red-700"
-            onClick={stopListening}
-            aria-label="Parar gravação"
-          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onCancelVoice}
+            aria-label="Cancelar gravação"
+            title="Cancelar gravação"
+            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
 
-      {/* Barra de status quando a Jessi esta falando */}
-      {isSpeaking && !isRecording && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
-          <SpeakingWaveform />
-          <span className="text-xs text-amber-800 font-medium flex-1">Jessi esta respondendo…</span>
-          <button
-            type="button"
-            onClick={safeCancelVoice}
-            className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium transition-colors"
-            aria-label="Interromper fala"
-          >
-            <Square className="h-3 w-3" />
-            Parar
-          </button>
+      {selectedFile && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+          <span className="min-w-0 truncate text-foreground">{selectedFile.name}</span>
+          {onRemoveFile && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onRemoveFile}
+              aria-label="Remover arquivo"
+              className="h-7 w-7"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       )}
 
-      <div className="flex items-end gap-2">
-        {/* Microfone — sempre visivel quando suportado e nao ha processamento em curso */}
-        {voiceSupported && !isProcessing && (
-          <button
-            type="button"
-            onClick={handleMicClick}
-            disabled={disabled}
-            className={`shrink-0 mb-1 h-9 w-9 rounded-full flex items-center justify-center transition-all ${
-              isRecording
-                ? "bg-red-500 hover:bg-red-600 text-white shadow-md"
-                : "bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300"
-            } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
-            aria-label={isRecording ? "Parar gravacao" : "Gravar comando de voz"}
-          >
-            <Mic className={`h-4 w-4 ${isRecording ? "animate-pulse" : ""}`} />
-          </button>
+      <div className="flex items-end gap-1.5 rounded-2xl border border-input bg-background p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring/40">
+        {onSelectFile && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={onSelectFile}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              aria-label="Anexar arquivo"
+              title="Anexar arquivo"
+              className="h-9 w-9 shrink-0 text-muted-foreground"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+          </>
         )}
 
-        {/* Campo de texto */}
-        <div className="relative flex-1">
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isSpeaking
-                ? "Aguarde a Jessi terminar de falar…"
-                : isProcessing
-                ? "Consultando dados e verificando regras…"
-                : placeholder
-            }
-            disabled={disabled || isProcessing}
-            rows={1}
-            className={`w-full resize-none rounded-2xl border bg-background px-4 py-2.5 pr-12 text-sm placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-60 transition-colors ${
-              isSpeaking
-                ? "border-amber-300 ring-1 ring-amber-200 focus-visible:ring-amber-400/50"
-                : isRecording
-                ? "border-red-300 ring-1 ring-red-200"
-                : "border-border focus-visible:border-emerald-400"
-            }`}
-            style={{ minHeight: "44px", maxHeight: "160px" }}
-          />
+        <Textarea
+          value={inputText}
+          onChange={(event) => setInputText(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={isListening ? "Estou ouvindo…" : "Pergunte para a Jessi ou digite um comando…"}
+          disabled={isLoading}
+          rows={1}
+          className="max-h-32 min-h-9 flex-1 resize-none border-0 px-2 py-2 text-sm shadow-none focus-visible:ring-0"
+        />
 
-          {/* Botao de envio */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSend}
-            className={`absolute right-2 bottom-1.5 h-8 w-8 rounded-full flex items-center justify-center transition-all ${
-              canSend
-                ? "bg-emerald-800 hover:bg-emerald-900 text-[#C8A951] shadow-sm"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-            }`}
-            aria-label="Enviar mensagem"
-          >
-            {isActive ? (
-              <Sparkles className="h-4 w-4 animate-pulse" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onToggleTts}
+          aria-label={ttsEnabled ? "Desativar respostas por voz" : "Ativar respostas por voz"}
+          title={ttsEnabled ? "Desativar respostas por voz" : "Ativar respostas por voz"}
+          className="hidden h-9 w-9 shrink-0 text-muted-foreground sm:inline-flex"
+        >
+          {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onToggleContinuousVoice}
+          disabled={isLoading}
+          aria-label={isContinuousMode || isListening ? "Parar comando por voz" : "Ativar comando por voz"}
+          title={isContinuousMode || isListening ? "Parar comando por voz" : "Ativar comando por voz"}
+          className={cn(
+            "h-9 w-9 shrink-0",
+            isContinuousMode || isListening
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground"
+              : "text-primary hover:bg-primary/10 hover:text-primary",
+          )}
+        >
+          {isContinuousMode || isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        </Button>
+
+        <Button
+          type="button"
+          size="icon"
+          onClick={onSend}
+          disabled={!canSend}
+          aria-label="Enviar mensagem"
+          title="Enviar mensagem"
+          className="h-9 w-9 shrink-0"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
-
-      {/* Dica contextual subtil */}
-      {(isSpeaking || isRecording) && (
-        <p className="text-[11px] text-muted-foreground/70 text-center">
-          {isRecording
-            ? "Toque no microfone ou pressione Enter para enviar"
-            : "Toque em 'Parar' para interromper a resposta de voz"}
-        </p>
-      )}
     </div>
   );
 };
