@@ -383,5 +383,6 @@ export function useJessiVoice(
     speakResponse,
     falarResposta,
     pararFala,
+    cancelVoice: pararTodoAudio,
   };
 }
