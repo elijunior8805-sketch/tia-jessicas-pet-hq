@@ -23,6 +23,7 @@ import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/li
 import { consultarAniversariantesJessi } from "@/lib/ia/tools/comunicacao-tools";
 import { consultarResumoNegocioJessi, realizarAuditoriaIntegridadeJessi, consultarQualidadeIAJessi } from "@/lib/ia/tools/auditoria-tools";
 import { AnalyticsAdapter } from "../adapters/analytics.adapter";
+import { SentinelasAdapter } from "../adapters/sentinelas.adapter";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Autonomia Supervisionada)
@@ -1835,8 +1836,44 @@ export async function processarMensagemJessiV2Core(
         const dataAlvo = intencao.entidades.data || contextoAtual.dataReferencia;
         const petAlvoId = novoContexto.pet?.id || contextoAtual.pet?.id;
         const petAlvoNome = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome;
+        if (
+          intencao.intencao === "verificar_sentinelas" ||
+          intencao.intencao === "sentinela_atrasos" ||
+          intencao.intencao === "sentinela_cancelamentos" ||
+          intencao.intencao === "sentinela_fechamento"
+        ) {
+          const resSentinela = await SentinelasAdapter.executarSentinelasGeral(sb, dataAlvo);
+          const sentData = resSentinela.data;
 
-        if (intencao.intencao === "otimizar_rotas_leva_traz") {
+          if (intencao.intencao === "sentinela_fechamento") {
+            const caixa = sentData.fechamentoCaixa;
+            respostaTexto = `💼 **Fechamento de Caixa Diário — ${dataAlvo}**\n\n• **Atendimentos**: ${caixa.atendimentosConcluidos} concluído(s) de ${caixa.totalAgendamentos}\n• **Total Recebido**: R$ ${caixa.totalRecebido.toFixed(2)} (Pix: R$ ${caixa.recebidoPix.toFixed(2)}, Cartão: R$ ${caixa.recebidoCartao.toFixed(2)})\n• **Pendente / A Receber**: R$ ${caixa.totalPendenteAReceber.toFixed(2)}\n\n💡 Clique no botão do card para compartilhar o relatório oficial pronto no WhatsApp!`;
+          } else if (intencao.intencao === "sentinela_atrasos") {
+            const atrasos = sentData.atrasosDetectados;
+            if (atrasos.length > 0) {
+              const itensAtr = atrasos.map((a) => `• **${a.petNome}** (${a.clienteNome}) — ${a.minutosAtraso} min de atraso (Agendado: ${a.horarioAgendado})`).join("\n");
+              respostaTexto = `🚨 **Sentinela de Atrasos Operacionais**:\nDetectei **${atrasos.length} pet(s) em atraso**:\n\n${itensAtr}\n\n💡 Mensagens carinhosas prontas para envio com 1 clique no WhatsApp abaixo.`;
+            } else {
+              respostaTexto = `✅ **Sentinela de Atrasos**: Nenhum atraso registrado no momento! Todos os pets agendados já chegaram ou estão dentro do horário normal.`;
+            }
+          } else if (intencao.intencao === "sentinela_cancelamentos") {
+            const vagas = sentData.cancelamentosEVagas;
+            if (vagas.length > 0) {
+              respostaTexto = `⚡ **Sentinela de Vagas & Cancelamentos**:\nEncontrei **${vagas.length} horário(s) liberado(s)** na grade de hoje. Já separei os melhores clientes para contato imediato no card abaixo.`;
+            } else {
+              respostaTexto = `✨ **Sentinela de Vagas**: Grade 100% otimizada sem vagas ou cancelamentos ociosos.`;
+            }
+          } else {
+            respostaTexto = `🛡️ **Sentinelas Autônomas em Background**\n${sentData.resumoVoz}\n\n• **Atrasos na chegada**: ${sentData.atrasosDetectados.length}\n• **Vagas/Cancelamentos para preencher**: ${sentData.cancelamentosEVagas.length}\n• **Total Recebido no Caixa**: R$ ${sentData.fechamentoCaixa.totalRecebido.toFixed(2)}`;
+          }
+
+          cards.push({
+            type: "sentinela",
+            title: "Sentinelas Autônomas em Background",
+            subtitle: `Status: ${sentData.statusGeral.toUpperCase()}`,
+            data: sentData,
+          });
+        } else if (intencao.intencao === "otimizar_rotas_leva_traz") {
           const resRotas = await otimizarRotasLevaTrazJessi(sb, { data: dataAlvo });
           respostaTexto = resRotas.summary || `Itinerário do Leva e Traz otimizado para ${dataAlvo}.`;
           cards.push({

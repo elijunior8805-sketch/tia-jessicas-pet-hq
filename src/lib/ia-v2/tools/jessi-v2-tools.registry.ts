@@ -9,6 +9,7 @@ import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.a
 import { MensagensWhatsAppAdapter, JessiV2WhatsAppPayload } from "../adapters/mensagens-whatsapp.adapter";
 import { ProativoAdapter } from "../adapters/proativo.adapter";
 import { AnalyticsAdapter } from "../adapters/analytics.adapter";
+import { SentinelasAdapter } from "../adapters/sentinelas.adapter";
 import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/lib/ia/tools/leva-traz-tools";
 import { processarComprovanteJessi, conciliarEBaixarComprovanteJessi } from "@/lib/ia/tools/comprovante-tools";
 import { gerarMensagensCobrancaJessi, consultarAniversariantesJessi, consultarReativacaoJessi, sugerirRespostaJessi } from "@/lib/ia/tools/comunicacao-tools";
@@ -858,6 +859,38 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  verificar_sentinelas: {
+    nomeInterno: "verificar_sentinelas",
+    descricao: "Verifica em tempo real todas as sentinelas autônomas em background (atrasos, cancelamentos e caixa)",
+    intencoes: [
+      "verificar_sentinelas",
+      "sentinela_atrasos",
+      "sentinela_cancelamentos",
+      "sentinela_fechamento",
+      "consultar_atrasos",
+      "consultar_cancelamentos",
+      "consultar_fechamento_caixa",
+    ],
+    area: "agenda",
+    parametros: {
+      data: {
+        tipo: "string",
+        obrigatorio: false,
+        descricao: "Data de referência YYYY-MM-DD",
+      },
+    },
+    retorno: "Relatório com atrasos detectados, vagas de cancelamento e fechamento de caixa",
+    permissoes: ["agenda", "admin", "financeiro"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "SentinelasAdapter.executarSentinelasGeral",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 8000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
 };
 
 /**
@@ -993,6 +1026,23 @@ export async function despacharFerramentaV2(
       case "analise_ocupacao_semanal":
       case "analise_cancelamentos":
         return await AnalyticsAdapter.executarAnaliseDinamica(sb, params.tipo || params.pergunta || params.termo || "");
+
+      case "verificar_sentinelas":
+      case "verificar_sentinelas_operacionais":
+      case "sentinelas_background":
+        return await SentinelasAdapter.executarSentinelasGeral(sb, params.data);
+
+      case "sentinela_atrasos":
+      case "consultar_atrasos":
+        return await SentinelasAdapter.verificarSentinelaAtrasos(sb, params.data);
+
+      case "sentinela_cancelamentos":
+      case "consultar_cancelamentos":
+        return await SentinelasAdapter.verificarSentinelaCancelamentos(sb, params.data);
+
+      case "sentinela_fechamento":
+      case "consultar_fechamento_caixa":
+        return await SentinelasAdapter.verificarSentinelaFechamento(sb, params.data);
 
       case "gerar_mensagem_whatsapp":
         return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);

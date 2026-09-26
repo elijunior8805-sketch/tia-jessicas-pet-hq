@@ -800,6 +800,28 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("análise estatística") ||
       textoLower.includes("analise estatistica");
 
+    // Sentinelas Autônomas em Background (Atrasos, Vagas/Cancelamento, Fechamento de Caixa)
+    const ehSentinela =
+      textoLower.includes("sentinela") ||
+      textoLower.includes("sentinelas") ||
+      textoLower.includes("alerta de atraso") ||
+      textoLower.includes("alertas de atraso") ||
+      textoLower.includes("quem tá atrasado") ||
+      textoLower.includes("quem ta atrasado") ||
+      textoLower.includes("quem está atrasado") ||
+      textoLower.includes("tem algum atraso") ||
+      textoLower.includes("tem atraso") ||
+      textoLower.includes("atrasos de hoje") ||
+      textoLower.includes("fechamento de caixa") ||
+      textoLower.includes("fechamento do caixa") ||
+      textoLower.includes("fechar o caixa") ||
+      textoLower.includes("fechar caixa") ||
+      textoLower.includes("relatório de fechamento") ||
+      textoLower.includes("relatorio de fechamento") ||
+      textoLower.includes("resumo do caixa para envio") ||
+      textoLower.includes("resumo para os sócios") ||
+      textoLower.includes("resumo para os socios");
+
     if (ehAgradecimentoDespedida) {
       dominio = "geral_conversacional";
       intencao = "agradecimento_despedida";
@@ -817,6 +839,27 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       intencao = "consultar_analise_negocio";
       ferramentaSugerida = "consultar_analise_negocio";
       explicacao = "Executando análise estatística cruzada de desempenho operacional.";
+    }
+    // Sentinelas Autônomas em Background
+    else if (ehSentinela) {
+      dominio = "agenda";
+      if (textoLower.includes("fechamento") || textoLower.includes("fechar") || textoLower.includes("sócios") || textoLower.includes("socios")) {
+        intencao = "sentinela_fechamento";
+        ferramentaSugerida = "sentinela_fechamento";
+        explicacao = "Consolidando fechamento diário do caixa com métricas e compartilhamento.";
+      } else if (textoLower.includes("atraso") || textoLower.includes("atrasado")) {
+        intencao = "sentinela_atrasos";
+        ferramentaSugerida = "sentinela_atrasos";
+        explicacao = "Verificando atrasos na chegada dos pets com follow-up gentil.";
+      } else if (textoLower.includes("cancelamento") || textoLower.includes("vaga")) {
+        intencao = "sentinela_cancelamentos";
+        ferramentaSugerida = "sentinela_cancelamentos";
+        explicacao = "Identificando vagas por cancelamento com candidatos para preenchimento.";
+      } else {
+        intencao = "verificar_sentinelas";
+        ferramentaSugerida = "verificar_sentinelas";
+        explicacao = "Executando varredura geral das sentinelas operacionais em background.";
+      }
     }
     // Aniversariantes
     else if (ehAniversariantes) {

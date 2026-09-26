@@ -18,7 +18,9 @@ import {
   ExternalLink,
   Copy,
   Check,
-  PhoneCall
+  PhoneCall,
+  Share2,
+  BarChart3
 } from "lucide-react";
 import { JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { Button } from "@/components/ui/button";
@@ -437,7 +439,23 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
         <span className="text-xs font-semibold text-foreground block font-display">
           Comandos Rápidos Operacionais:
         </span>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => onQuickAction("Verificar sentinelas operacionais")}
+            className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-amber-50/50 hover:border-amber-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
+          >
+            <ShieldAlert className="h-4 w-4 text-amber-700 shrink-0" />
+            <span className="truncate">Sentinelas &amp; Atrasos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickAction("Fechamento de caixa de hoje")}
+            className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
+          >
+            <Share2 className="h-4 w-4 text-emerald-700 shrink-0" />
+            <span className="truncate">Fechamento de Caixa</span>
+          </button>
           <button
             type="button"
             onClick={() => onQuickAction("Quais os horários livres de hoje?")}
@@ -452,7 +470,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
             className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
           >
             <Car className="h-4 w-4 text-emerald-700 shrink-0" />
-            <span className="truncate">Rotas Leva & Traz</span>
+            <span className="truncate">Rotas Leva &amp; Traz</span>
           </button>
           <button
             type="button"
@@ -464,11 +482,11 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => onQuickAction("Como está o financeiro deste mês?")}
-            className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
+            onClick={() => onQuickAction("Análise de faturamento por porte e raça")}
+            className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-blue-50/50 hover:border-blue-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
           >
-            <DollarSign className="h-4 w-4 text-emerald-700 shrink-0" />
-            <span className="truncate">Diagnóstico Financeiro</span>
+            <BarChart3 className="h-4 w-4 text-blue-700 shrink-0" />
+            <span className="truncate">Análise Porte &amp; Raça</span>
           </button>
         </div>
       </div>
