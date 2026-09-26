@@ -39,7 +39,14 @@ export const Route = createFileRoute("/_authenticated/clientes/")({
   component: ClientesPage,
 });
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
+
+const normalizar = (s?: string | null) =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 function ClientesPage() {
   const navigate = useNavigate();
@@ -52,9 +59,9 @@ function ClientesPage() {
   const [q, setQ] = useState(qParam ?? "");
   const [page, setPage] = useState(0);
 
-  // Debounce
+  // Debounce rápido para digitação fluida
   useEffect(() => {
-    const t = setTimeout(() => setQ(rawQ), 280);
+    const t = setTimeout(() => setQ(rawQ), 200);
     return () => clearTimeout(t);
   }, [rawQ]);
 
@@ -69,8 +76,16 @@ function ClientesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  const selecionar = (id: string | null) => {
+    navigate({
+      to: "/clientes",
+      search: (prev: any) => ({ ...prev, sel: id || undefined }),
+      replace: true,
+    });
+  };
+
   const termo = q.trim();
-  const searching = termo.length >= 2;
+  const searching = termo.length >= 1;
 
   // Total de clientes
   const { data: totalClientes } = useQuery({
@@ -123,135 +138,192 @@ function ClientesPage() {
     },
   });
 
-  // Cadastrados recentemente (estado inicial) — respeita filtro VIP
-  const { data: recentes } = useQuery({
-    queryKey: ["clientes-recentes", onlyVip],
+  // Clientes listados no estado padrão (respeitando filtros de aba VIP e Clubinho)
+  const { data: recentes, isFetching: buscandoRecentes } = useQuery({
+    queryKey: ["clientes-recentes", currentTab, onlyVip, page],
     enabled: !searching,
+    staleTime: 15_000,
     queryFn: async () => {
       let query = supabase
         .from("clientes")
-        .select("id, nome, telefone, whatsapp, bairro, vip, ativo, foto_url, created_at, pets(id, nome, foto_url)")
-        .order(onlyVip ? "nome" : "created_at", { ascending: onlyVip ? true : false })
-        .limit(onlyVip ? 100 : 5);
-      if (onlyVip) query = query.eq("vip", true);
+        .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url, ativo)")
+        .order(onlyVip || currentTab === "vip" ? "nome" : "created_at", { ascending: onlyVip || currentTab === "vip" ? true : false })
+        .range(0, (page + 1) * PAGE_SIZE - 1);
+
+      if (onlyVip || currentTab === "vip") {
+        query = query.eq("vip", true);
+      }
+
+      if (currentTab === "clubinho") {
+        const { data: clubinhos } = await supabase
+          .from("programas_contratados")
+          .select("cliente_id")
+          .eq("status_do_programa", "ativo");
+        const clubinhoIds = Array.from(new Set((clubinhos ?? []).map((cl: any) => cl.cliente_id).filter(Boolean)));
+        if (clubinhoIds.length > 0) {
+          query = query.in("id", clubinhoIds);
+        } else {
+          return [];
+        }
+      }
+
       const { data } = await query;
       return data ?? [];
     },
   });
 
-  // Resultados da busca
-  const { data: resultados, isFetching: buscando } = useQuery({
-    queryKey: ["clientes-busca", termo, page, onlyVip],
+  // Resultados da busca multi-vetorial (Nome, Telefone, WhatsApp, Pet, CPF, Bairro, Email)
+  const { data: resultados, isFetching: buscandoResultados } = useQuery({
+    queryKey: ["clientes-busca", termo, currentTab, onlyVip],
     enabled: searching,
     staleTime: 15_000,
     queryFn: async () => {
-      const like = `%${termo}%`;
-      // Busca em clientes (nome, cpf, telefone, whatsapp, bairro, email)
-      let baseQ = supabase
-        .from("clientes")
-        .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url)")
-        .or(
-          `nome.ilike.${like},cpf.ilike.${like},telefone.ilike.${like},whatsapp.ilike.${like},bairro.ilike.${like},email.ilike.${like}`,
-        )
-        .order("nome")
-        .range(0, (page + 1) * PAGE_SIZE - 1);
-      if (onlyVip) baseQ = baseQ.eq("vip", true);
+      const termoOriginal = termo.trim();
+      const termoNorm = normalizar(termoOriginal);
+      const termoDigits = termoOriginal.replace(/\D/g, "");
+      const tokens = termoNorm.split(/\s+/).filter((t) => t.length > 0);
 
-      const { data: byCliente } = await baseQ;
-
-      // Busca por pet (nome ou raça) — traz cliente_id de pets que casam
-      const { data: petsMatch } = await supabase
-        .from("pets")
-        .select("cliente_id")
-        .or(`nome.ilike.${like},raca.ilike.${like}`)
-        .limit(50);
-
-      const clienteIds = Array.from(
-        new Set((petsMatch ?? []).map((p: any) => p.cliente_id).filter(Boolean)),
-      );
-
-      let byPet: any[] = [];
-      if (clienteIds.length > 0) {
-        const alreadyIds = new Set((byCliente ?? []).map((c: any) => c.id));
-        const missing = clienteIds.filter((id) => !alreadyIds.has(id));
-        if (missing.length > 0) {
-          let q2 = supabase
-            .from("clientes")
-            .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url)")
-            .in("id", missing)
-            .limit(20);
-          if (onlyVip) q2 = q2.eq("vip", true);
-          const { data } = await q2;
-          byPet = data ?? [];
+      // 1. Vector A: RPC buscar_clientes_inteligente (PostgreSQL unaccent + regex dígitos + pets)
+      let rpcIds: string[] = [];
+      try {
+        const { data: rpcData } = await supabase.rpc("buscar_clientes_inteligente", {
+          termo: termoOriginal,
+          max_rows: 50,
+        });
+        if (Array.isArray(rpcData)) {
+          rpcIds = rpcData.map((r: any) => r.id).filter(Boolean);
         }
+      } catch (e) {
+        console.warn("[clientes] rpc buscar_clientes_inteligente fallback", e);
       }
 
-      const merged = [...(byCliente ?? []), ...byPet];
-      // Dedup
-      const map = new Map<string, any>();
-      merged.forEach((c) => map.set(c.id, c));
-      const arr = Array.from(map.values());
+      // 2. Vector B: Busca direta em clientes com tokens ilike
+      let directIds: string[] = [];
+      try {
+        const orClauses: string[] = [];
+        tokens.forEach((t) => {
+          orClauses.push(`nome.ilike.%${t}%`);
+          orClauses.push(`email.ilike.%${t}%`);
+          orClauses.push(`bairro.ilike.%${t}%`);
+        });
+        if (termoDigits.length >= 2) {
+          orClauses.push(`telefone.ilike.%${termoDigits}%`);
+          orClauses.push(`whatsapp.ilike.%${termoDigits}%`);
+          orClauses.push(`cpf.ilike.%${termoDigits}%`);
+        }
+        if (orClauses.length > 0) {
+          const { data: directClients } = await supabase
+            .from("clientes")
+            .select("id")
+            .or(orClauses.join(","))
+            .limit(50);
+          directIds = (directClients ?? []).map((c: any) => c.id).filter(Boolean);
+        }
+      } catch (e) {
+        console.warn("[clientes] direct query fallback", e);
+      }
 
-      // Ordenar por relevância: começa com termo > contém no nome > outros
-      const t = termo.toLowerCase();
-      arr.sort((a, b) => {
-        const an = String(a.nome ?? "").toLowerCase();
-        const bn = String(b.nome ?? "").toLowerCase();
-        const as = an.startsWith(t) ? 0 : an.includes(t) ? 1 : 2;
-        const bs = bn.startsWith(t) ? 0 : bn.includes(t) ? 1 : 2;
-        if (as !== bs) return as - bs;
+      // 3. Vector C: Busca em pets (nome do pet ou raça)
+      let petClientIds: string[] = [];
+      try {
+        const petOrClauses = tokens.map((t) => `nome.ilike.%${t}%,raca.ilike.%${t}%`).join(",");
+        if (petOrClauses) {
+          const { data: petsMatch } = await supabase
+            .from("pets")
+            .select("cliente_id")
+            .or(petOrClauses)
+            .limit(50);
+          petClientIds = (petsMatch ?? []).map((p: any) => p.cliente_id).filter(Boolean);
+        }
+      } catch (e) {
+        console.warn("[clientes] pet search fallback", e);
+      }
+
+      // 4. União e deduplicação de IDs encontrados
+      const allMatchedIds = Array.from(new Set([...rpcIds, ...directIds, ...petClientIds]));
+
+      let hydratedList: any[] = [];
+
+      if (allMatchedIds.length > 0) {
+        let qHydrate = supabase
+          .from("clientes")
+          .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url, ativo)")
+          .in("id", allMatchedIds);
+
+        if (onlyVip || currentTab === "vip") qHydrate = qHydrate.eq("vip", true);
+
+        const { data } = await qHydrate;
+        hydratedList = data ?? [];
+      } else {
+        // 5. Fallback Amplo: busca em memória com normalização profunda (cobre 100% de apelidos/acentos)
+        const { data: allActive } = await supabase
+          .from("clientes")
+          .select("id, nome, cpf, telefone, whatsapp, bairro, email, vip, ativo, foto_url, created_at, pets(id, nome, raca, foto_url, ativo)")
+          .order("nome")
+          .limit(300);
+
+        hydratedList = (allActive ?? []).filter((c: any) => {
+          if (onlyVip || currentTab === "vip") {
+            if (!c.vip) return false;
+          }
+          const nomeNorm = normalizar(c.nome);
+          const emailNorm = normalizar(c.email);
+          const bairroNorm = normalizar(c.bairro);
+          const foneDigits = (c.telefone || "").replace(/\D/g, "");
+          const zapDigits = (c.whatsapp || "").replace(/\D/g, "");
+          const cpfDigits = (c.cpf || "").replace(/\D/g, "");
+          const petsNorm = (c.pets || []).map((p: any) => normalizar(p.nome) + " " + normalizar(p.raca)).join(" ");
+
+          const textoCompleto = `${nomeNorm} ${emailNorm} ${bairroNorm} ${petsNorm}`;
+          const matchTexto = tokens.every((token) => textoCompleto.includes(token));
+          const matchDigitos = termoDigits.length >= 2 && (
+            foneDigits.includes(termoDigits) || zapDigits.includes(termoDigits) || cpfDigits.includes(termoDigits)
+          );
+
+          return matchTexto || matchDigitos;
+        });
+      }
+
+      // Se tab for clubinho, filtra apenas clientes com clubinho ativo
+      if (currentTab === "clubinho") {
+        const { data: clubinhos } = await supabase
+          .from("programas_contratados")
+          .select("cliente_id")
+          .eq("status_do_programa", "ativo");
+        const clubinhoIds = new Set((clubinhos ?? []).map((cl: any) => cl.cliente_id));
+        hydratedList = hydratedList.filter((c) => clubinhoIds.has(c.id));
+      }
+
+      // 6. Ranqueamento por relevância
+      hydratedList.sort((a, b) => {
+        const an = normalizar(a.nome);
+        const bn = normalizar(b.nome);
+        const aPets = (a.pets || []).map((p: any) => normalizar(p.nome));
+        const bPets = (b.pets || []).map((p: any) => normalizar(p.nome));
+
+        const getScore = (nome: string, pets: string[]) => {
+          if (nome === termoNorm) return 1000;
+          if (nome.startsWith(termoNorm)) return 500;
+          if (pets.some((p) => p === termoNorm)) return 400;
+          if (pets.some((p) => p.startsWith(termoNorm))) return 300;
+          if (nome.includes(termoNorm)) return 200;
+          if (pets.some((p) => p.includes(termoNorm))) return 150;
+          return 50;
+        };
+
+        const scoreA = getScore(an, aPets);
+        const scoreB = getScore(bn, bPets);
+        if (scoreA !== scoreB) return scoreB - scoreA;
         return an.localeCompare(bn);
       });
-      return arr.slice(0, (page + 1) * PAGE_SIZE);
+
+      return hydratedList;
     },
   });
 
-  // Alertas financeiros para os clientes listados (batelada)
-  const clienteIdsListados = useMemo(
-    () => (searching ? resultados ?? [] : recentes ?? []).map((c: any) => c.id),
-    [resultados, recentes, searching],
-  );
-
-  const { data: cobrancasByCliente } = useQuery({
-    queryKey: ["clientes-saldos-dinamico", clienteIdsListados],
-    enabled: clienteIdsListados.length > 0,
-    staleTime: 30_000,
-    queryFn: async () => {
-      const hoje = new Date().toISOString().slice(0, 10);
-      const { data } = await supabase
-        .from("pagamentos")
-        .select("cliente_id, valor_total, valor_pago, status, vencimento, atendimentos(finalizado, valor_executado, taxa_leva_traz, desconto)")
-        .in("cliente_id", clienteIdsListados)
-        .is("arquivado_em", null)
-        .neq("status", "cancelado")
-        .in("status", ["pendente", "parcial", "atrasado"]);
-      const map: Record<string, { vencido: number; total: number }> = {};
-      (data ?? []).forEach((r: any) => {
-        const a = r.atendimentos;
-        const bruto = a?.finalizado
-          ? Math.max(Number(a.valor_executado || 0) + Number(a.taxa_leva_traz || 0) - Number(a.desconto || 0), 0)
-          : Number(r.valor_total || 0);
-        const saldo = Math.max(bruto - Number(r.valor_pago || 0), 0);
-        if (saldo <= 0 || !r.cliente_id) return;
-        if (!map[r.cliente_id]) map[r.cliente_id] = { vencido: 0, total: 0 };
-        map[r.cliente_id].total += saldo;
-        if (r.vencimento && r.vencimento < hoje) map[r.cliente_id].vencido += saldo;
-      });
-      return map;
-    },
-  });
-
-  const selecionar = (id: string | null) => {
-    navigate({
-      to: "/clientes",
-      search: (prev: any) => ({ ...prev, sel: id ?? undefined }),
-      replace: false,
-    });
-  };
-
-  const podeMais = searching && (resultados?.length ?? 0) >= (page + 1) * PAGE_SIZE;
-
-  const lista = searching ? resultados ?? [] : [];
+  const buscando = searching ? buscandoResultados : buscandoRecentes;
+  const lista = searching ? (resultados ?? []) : (recentes ?? []);
+  const podeMais = !searching && (recentes?.length ?? 0) >= (page + 1) * PAGE_SIZE;
 
   return (
     <PageShell>
@@ -367,53 +439,51 @@ function ClientesPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {!searching && (
-              <div className="divide-y">
-                {(recentes ?? []).map((c: any) => (
-                  <ClienteRow
-                    key={c.id}
-                    cliente={c}
-                    selecionado={c.id === sel}
-                    onClick={() => selecionar(c.id)}
-                    cobranca={cobrancasByCliente?.[c.id]}
-                  />
-                ))}
-                {(recentes ?? []).length === 0 && (
-                  <div className="p-6 text-sm text-muted-foreground text-center">
-                    {onlyVip ? "Nenhum cliente marcado como VIP." : "Nenhum cliente cadastrado ainda."}
-                  </div>
-                )}
+            {buscando && lista.length === 0 && (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+                Buscando clientes…
               </div>
             )}
 
-            {searching && lista.length === 0 && !buscando && (
+            {!buscando && lista.length === 0 && (
               <div className="p-6 text-center">
                 <div className="mx-auto w-12 h-12 rounded-full bg-muted grid place-items-center mb-3">
                   <Search className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="text-sm font-medium text-foreground mb-1">
-                  Nenhum cliente encontrado
+                  {searching
+                    ? "Nenhum cliente encontrado"
+                    : currentTab === "vip" || onlyVip
+                    ? "Nenhum cliente marcado como VIP"
+                    : currentTab === "clubinho"
+                    ? "Nenhum cliente com plano Clubinho ativo"
+                    : "Nenhum cliente cadastrado ainda"}
                 </div>
                 <div className="text-xs text-muted-foreground mb-4">
-                  Verifique o telefone, CPF ou nome digitado.
+                  {searching
+                    ? "Verifique o telefone, CPF, nome do cliente ou do pet digitado."
+                    : "Cadastre novos clientes para gerenciar fichas e atendimentos."}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Button size="sm" variant="outline" onClick={() => { setRawQ(""); setQ(""); }}>
-                    Limpar pesquisa
-                  </Button>
+                <div className="flex flex-col gap-2 max-w-[220px] mx-auto">
+                  {searching && (
+                    <Button size="sm" variant="outline" onClick={() => { setRawQ(""); setQ(""); }}>
+                      Limpar pesquisa
+                    </Button>
+                  )}
                   <Link
                     to="/clientes/novo"
                     search={{ nome: /[a-zA-Z]/.test(termo) ? termo : undefined, telefone: /^\d/.test(termo) ? termo : undefined } as any}
                   >
                     <Button size="sm" className="gap-1 w-full">
-                      <UserPlus className="h-3.5 w-3.5" /> Cadastrar "{termo}"
+                      <UserPlus className="h-3.5 w-3.5" /> {searching ? `Cadastrar "${termo}"` : "Cadastrar novo cliente"}
                     </Button>
                   </Link>
                 </div>
               </div>
             )}
 
-            {searching && lista.length > 0 && (
+            {lista.length > 0 && (
               <div className="divide-y">
                 {lista.map((c: any) => (
                   <ClienteRow
@@ -421,7 +491,7 @@ function ClientesPage() {
                     cliente={c}
                     selecionado={c.id === sel}
                     onClick={() => selecionar(c.id)}
-                    cobranca={cobrancasByCliente?.[c.id]}
+                    cobranca={undefined}
                   />
                 ))}
                 {podeMais && (

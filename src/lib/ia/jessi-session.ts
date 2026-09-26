@@ -16,6 +16,7 @@ export interface JessiContextState {
   cobrancaSelecionadaId?: string | null;
   comprovantePendenteId?: string | null;
   acaoPendente?: JessiPendingAction | null;
+  operacaoPreparada?: JessiPendingAction | null;
 }
 
 export interface JessiSessionData {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { JessiSidebar } from "./JessiSidebar";
@@ -11,7 +11,7 @@ import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia
 import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
-import { Sparkles, PanelRightOpen, PanelRightClose } from "lucide-react";
+import { Sparkles, PanelRightOpen, PanelRightClose, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const JessiLayout: React.FC = () => {
@@ -33,7 +33,7 @@ export const JessiLayout: React.FC = () => {
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [moduloAtivo, setModuloAtivo] = useState("rotina");
 
-  // Carrega a Central Operacional Proativa com dados 100% reais do banco na inicialização
+  // Carrega a Central Operacional Proativa com dados 100% reais do banco na inicializacao
   React.useEffect(() => {
     async function carregarCentral() {
       try {
@@ -49,43 +49,74 @@ export const JessiLayout: React.FC = () => {
     carregarCentral();
   }, []);
 
-  // Hook real de reconhecimento de voz
+  const handleSendMessageRef = React.useRef<((text?: string) => Promise<void>) | null>(null);
+
+  // Hook de reconhecimento de voz continua com deteccao de silencio e auto-envio
   const {
     voiceStatus,
     isListening,
+    isContinuousMode,
     interimTranscript,
     finalTranscript,
+    isSpeaking,
+    ttsEnabled,
+    setTtsEnabled,
     startListening,
     stopListening,
+    startContinuousMode,
+    stopContinuousMode,
+    toggleContinuousMode,
+    pauseListening,
+    resumeListening,
     cancelListening,
-  } = useJessiVoice((textoFinal) => {
-    if (textoFinal.trim()) {
-      setInputText(textoFinal);
+    resetTranscript,
+    speakResponse,
+    falarResposta,
+    pararFala,
+  } = useJessiVoice(
+    (textoFinal) => {
+      if (!isContinuousMode && textoFinal.trim()) {
+        setInputText(textoFinal);
+      }
+    },
+    (textoParaEnvio) => {
+      if (textoParaEnvio.trim() && handleSendMessageRef.current) {
+        handleSendMessageRef.current(textoParaEnvio.trim());
+      }
     }
-  });
+  );
 
-  // Sincroniza status visual quando estiver gravando voz
+  // Sincroniza status visual quando estiver gravando voz ou em modo continuo
   React.useEffect(() => {
-    if (isListening) {
+    if (isLoading) {
+      setStatus("processando");
+      setStatusDetalhe("Consultando sistema e regras operacionais...");
+    } else if (voiceStatus === "sending") {
+      setStatus("enviando");
+      setStatusDetalhe("Enviando comando...");
+    } else if (voiceStatus === "transcribing") {
+      setStatus("transcrevendo");
+      setStatusDetalhe("Transcrevendo fala...");
+    } else if (voiceStatus === "listening") {
       setStatus("ouvindo");
-      setStatusDetalhe("Ouvindo comando de voz...");
-    } else if (status === "ouvindo") {
+      setStatusDetalhe(isContinuousMode ? "Modo Contínuo: Ouvindo..." : "Ouvindo sua voz...");
+    } else if (isSpeaking) {
+      setStatus("processando");
+      setStatusDetalhe("Falando resposta...");
+    } else if (status === "ouvindo" || status === "transcrevendo" || status === "enviando" || status === "processando") {
       setStatus("disponivel");
       setStatusDetalhe(undefined);
     }
-  }, [isListening]);
+  }, [voiceStatus, isListening, isContinuousMode, isSpeaking, isLoading]);
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const handleToggleVoice = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening(inputText);
-    }
+    toggleContinuousMode();
   };
 
   const handleCancelProcessing = () => {
+    pararFala();
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -94,9 +125,13 @@ export const JessiLayout: React.FC = () => {
     setStatus("disponivel");
     setStatusDetalhe(undefined);
     toast.info("Processamento cancelado pelo usuário.");
+    if (isContinuousMode) {
+      resumeListening();
+    }
   };
 
   const handleNovaConversa = () => {
+    pararFala();
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -110,13 +145,30 @@ export const JessiLayout: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
-    // 1. Prevenção Rígida de Duplicidade: Impede envio simultâneo se já estiver processando
+    // 0. Desbloqueia contexto de audio se suportado pelo navegador
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }
+
+    // 1. Pausa o microfone para nao capturar a propria fala
+    pauseListening();
+    resetTranscript();
+
+    // 2. Prevencao Rigida de Duplicidade: Impede envio simultaneo se ja estiver processando
     if (isLoading) {
       return;
     }
 
+    pararFala();
     const textToSend = customText || inputText;
-    if (!textToSend.trim() && !selectedFile) return;
+    if (!textToSend.trim() && !selectedFile) {
+      if (isContinuousMode) {
+        resumeListening();
+      }
+      return;
+    }
 
     const userMessageId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const userMsg: JessiMessage = {
@@ -126,7 +178,7 @@ export const JessiLayout: React.FC = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // 2. Preserva mensagem enviada no histórico
+    // 3. Preserva mensagem enviada no historico
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
@@ -157,6 +209,7 @@ export const JessiLayout: React.FC = () => {
 
       // Se foi cancelado antes do retorno, descarta a resposta
       if (controller.signal.aborted) {
+        if (isContinuousMode) resumeListening();
         return;
       }
 
@@ -167,13 +220,13 @@ export const JessiLayout: React.FC = () => {
         timestamp: new Date().toISOString(),
         cards: res.cards as any,
         pendingAction: res.pendingAction,
-        intent: res.intencao,
+        intent: (res as any).intencao,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      if (res.novoContexto) {
-        setContexto((prev) => ({ ...prev, ...res.novoContexto }));
+      if ((res as any).novoContexto) {
+        setContexto((prev) => ({ ...prev, ...(res as any).novoContexto }));
       }
 
       if (res.pendingAction) {
@@ -183,8 +236,37 @@ export const JessiLayout: React.FC = () => {
         setStatus("disponivel");
         setStatusDetalhe(undefined);
       }
+
+      // 4. Retomada automatica da escuta e fala da resposta da Jessi
+      const ehEncerramento = (res as any).intencao?.intencao === "agradecimento_despedida" ||
+                             (res as any).intent?.intencao === "agradecimento_despedida";
+
+      if (ttsEnabled && res.respostaTexto) {
+        speakResponse(res.respostaTexto, () => {
+          if (isContinuousMode) {
+            if (ehEncerramento) {
+              stopContinuousMode();
+              setStatus("disponivel");
+              setStatusDetalhe(undefined);
+            } else {
+              resumeListening();
+            }
+          }
+        });
+      } else if (isContinuousMode) {
+        if (ehEncerramento) {
+          stopContinuousMode();
+          setStatus("disponivel");
+          setStatusDetalhe(undefined);
+        } else {
+          setTimeout(() => {
+            resumeListening();
+          }, 350);
+        }
+      }
     } catch (err: any) {
       if (controller.signal.aborted) {
+        if (isContinuousMode) resumeListening();
         return;
       }
 
@@ -211,8 +293,14 @@ export const JessiLayout: React.FC = () => {
       toast.error("Instabilidade na conexão. Tente novamente.");
       setStatus("erro");
       setStatusDetalhe("Falha temporária de conexão");
+
+      if (isContinuousMode) {
+        setTimeout(() => {
+          resumeListening();
+        }, 1200);
+      }
     } finally {
-      // 3. Retira o indicador de processamento ao concluir ou falhar
+      // 5. Retira o indicador de processamento ao concluir ou falhar
       setIsLoading(false);
       setSelectedFile(null);
       setFilePreview(null);
@@ -220,8 +308,19 @@ export const JessiLayout: React.FC = () => {
     }
   };
 
-  const handleConfirmAction = async (pendingAction: JessiPendingAction) => {
-    if (!pendingAction) return;
+  handleSendMessageRef.current = handleSendMessage;
+
+  const handleConfirmAction = async (pendingAction?: any) => {
+    const action = pendingAction || contexto?.operacaoPreparada || (messages.slice(-1)[0]?.pendingAction);
+    if (!action) {
+      toast.error("Nenhuma ação pendente localizada para confirmação.");
+      return;
+    }
+
+    const actionId = action.id || `idemp_${Date.now()}`;
+    const actionTitle = action.title || action.motivo || "Operação";
+    const actionTool = action.tool || action.tipo || "criar_agendamento";
+    const actionParams = action.params || action.parametros || action.estadoProposto || {};
 
     setIsLoading(true);
     setStatus("processando");
@@ -229,12 +328,15 @@ export const JessiLayout: React.FC = () => {
     try {
       const res = await processarMensagemFn({
         data: {
-          mensagem: `Confirmar ação: ${pendingAction.title}`,
-          confirmacaoAcaoPendenteId: pendingAction.id,
+          mensagem: `Confirmar ação: ${actionTitle}`,
+          contexto: contexto as any,
+          historico: messages.slice(-10) as any,
+          confirmacaoAcaoPendenteId: actionId,
           dadosConfirmacao: {
-            tool: pendingAction.tool,
-            params: pendingAction.params,
+            tool: actionTool,
+            params: actionParams,
           },
+          correlationId: `req_conf_${Date.now()}`,
         },
       });
 
@@ -247,10 +349,22 @@ export const JessiLayout: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+      if ((res as any).novoContexto) {
+        setContexto((prev) => ({ ...prev, ...(res as any).novoContexto }));
+      }
       setStatus("disponivel");
       toast.success("Ação confirmada e registrada com sucesso!");
-    } catch (err) {
-      toast.error("Erro ao executar ação confirmada.");
+
+      if (ttsEnabled && res.respostaTexto) {
+        speakResponse(res.respostaTexto, () => {
+          if (isContinuousMode) {
+            resumeListening();
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error("Erro ao executar ação confirmada:", err);
+      toast.error(err?.message || "Erro ao executar ação confirmada.");
       setStatus("erro");
     } finally {
       setIsLoading(false);
@@ -317,16 +431,16 @@ export const JessiLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#FAF8F5] overflow-hidden">
-      {/* Sidebar de Navegação */}
+    <div className="flex w-full h-[calc(100dvh-3.5rem)] pb-20 md:pb-0 bg-[#FAF8F5] overflow-hidden">
+      {/* Sidebar de Navegacao */}
       <JessiSidebar
         onNovaConversa={handleNovaConversa}
         onSelecionarModulo={handleSelecionarModulo}
         moduloAtivo={moduloAtivo}
       />
 
-      {/* Área Central de Conversação */}
-      <main className="flex-1 flex flex-col h-full bg-background border-r border-border/70 overflow-hidden">
+      {/* Area Central de Conversacao */}
+      <main className="w-full flex-1 flex flex-col h-full bg-background md:border-r border-border/70 overflow-hidden min-w-0">
         {/* Header da Jessi */}
         <header className="h-14 border-b border-border/70 bg-card/70 backdrop-blur-xs px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -345,6 +459,20 @@ export const JessiLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant={isContinuousMode ? "default" : "outline"}
+              size="sm"
+              onClick={toggleContinuousMode}
+              title={isContinuousMode ? "Desativar modo de conversa contínua" : "Ativar Modo de Conversa por Voz Contínua"}
+              className={`h-8 px-2.5 text-xs font-semibold gap-1.5 rounded-lg transition-all ${
+                isContinuousMode
+                  ? "bg-red-600 hover:bg-red-700 text-white shadow-xs animate-pulse"
+                  : "text-emerald-800 border-emerald-300 hover:bg-emerald-50"
+              }`}
+            >
+              <Mic className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isContinuousMode ? "Voz Contínua ON" : "Ativar Voz"}</span>
+            </Button>
             <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
             <Button
               variant="ghost"
@@ -385,9 +513,12 @@ export const JessiLayout: React.FC = () => {
           onSend={() => handleSendMessage()}
           isLoading={isLoading}
           voiceStatus={voiceStatus}
-          onToggleVoice={handleToggleVoice}
+          isContinuousMode={isContinuousMode}
+          onToggleContinuousVoice={toggleContinuousMode}
           onCancelVoice={cancelListening}
           interimTranscript={interimTranscript}
+          ttsEnabled={ttsEnabled}
+          onToggleTts={() => setTtsEnabled(!ttsEnabled)}
           selectedFile={selectedFile}
           onSelectFile={handleFileSelect}
           onRemoveFile={() => {

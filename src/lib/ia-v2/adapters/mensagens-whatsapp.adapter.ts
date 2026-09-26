@@ -39,9 +39,11 @@ export class MensagensWhatsAppAdapter {
     let texto = "";
 
     switch (payload.tipoMensagem) {
-      case "lembrete_agenda":
-        texto = `Olá, ${payload.nomeCliente}! 🐾 Passando para lembrar do agendamento do(a) ${payload.nomePet || "seu pet"} no Spa de Pet Tia Jéssica marcado para ${payload.detalhes?.horario || "hoje"}. Estamos ansiosos para recebê-lo!`;
+      case "lembrete_agenda": {
+        const infoHorario = payload.detalhes?.horario ? payload.detalhes.horario : "no horário agendado";
+        texto = `Olá, ${payload.nomeCliente}! 🐾 Passando para lembrar do agendamento do(a) ${payload.nomePet || "seu pet"} no Spa de Pet Tia Jéssica ${infoHorario.startsWith("para") || infoHorario.startsWith("no") || infoHorario.startsWith("às") ? infoHorario : `para ${infoHorario}`}. Estamos ansiosos para recebê-lo!`;
         break;
+      }
 
       case "pet_pronto":
         texto = `Oi, ${payload.nomeCliente}! ✨ O(A) ${payload.nomePet || "seu pet"} já finalizou o banho e tosa e está cheiroso(a) e pronto(a) para voltar para casa! Pode vir buscá-lo(a). 🐶🚿`;
@@ -80,20 +82,20 @@ export class MensagensWhatsAppAdapter {
     log: JessiV2ComunicacaoLog
   ): Promise<void> {
     try {
-      await sb.from("ia_auditoria" as any).insert({
-        user_id: log.usuarioId,
+      await sb.from("ia_auditoria").insert({
+        usuario_id: log.usuarioId || null,
         comando_original: `COMUNICACAO_${log.canal.toUpperCase()}: Destinatário ${log.destinatario}`,
-        intencao_detectada: "envio_comunicacao",
-        ferramenta_utilizada: "MensagensWhatsAppAdapter",
-        parametros: {
+        intencao_identificada: "envio_comunicacao",
+        ferramentas_chamadas: ["MensagensWhatsAppAdapter"],
+        metadados: {
           destinatario: log.destinatario,
           conteudoAprovado: log.conteudoAprovado,
           canal: log.canal,
           detalhes: log.detalhes,
         },
-        resposta_ia: log.resultado === "sucesso" ? "Disparo registrado e autorizado" : "Tentativa de disparo",
-        sucesso: log.resultado === "sucesso",
+        status: log.resultado === "sucesso" ? "sucesso" : "erro",
         tempo_resposta_ms: 0,
+        transcricao: log.conteudoAprovado,
         created_at: new Date().toISOString(),
       });
     } catch (err) {

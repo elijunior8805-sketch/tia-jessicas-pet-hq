@@ -1,158 +1,167 @@
 import React, { useRef } from "react";
-import { Mic, MicOff, Send, Paperclip, X, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
+import { Mic, MicOff, Paperclip, Send, Square, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
+import { cn } from "@/lib/utils";
 
 interface JessiInputBarProps {
   inputText: string;
-  setInputText: (val: string) => void;
+  setInputText: (text: string) => void;
   onSend: () => void;
-  isLoading: boolean;
-  voiceStatus: "idle" | "listening" | "reviewing" | "requesting_permission" | "finalizing" | "error" | "processing";
-  onToggleVoice: () => void;
+  isLoading?: boolean;
+  voiceStatus: VoiceRecognitionStatus;
+  isContinuousMode: boolean;
+  onToggleContinuousVoice: () => void;
   onCancelVoice: () => void;
   interimTranscript?: string;
-  selectedFile: File | null;
-  onSelectFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveFile: () => void;
+  ttsEnabled: boolean;
+  onToggleTts: () => void;
+  selectedFile?: File | null;
+  onSelectFile?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveFile?: () => void;
 }
 
 export const JessiInputBar: React.FC<JessiInputBarProps> = ({
   inputText,
   setInputText,
   onSend,
-  isLoading,
+  isLoading = false,
   voiceStatus,
-  onToggleVoice,
+  isContinuousMode,
+  onToggleContinuousVoice,
   onCancelVoice,
-  interimTranscript,
+  interimTranscript = "",
+  ttsEnabled,
+  onToggleTts,
   selectedFile,
   onSelectFile,
   onRemoveFile,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isListening = voiceStatus === "listening" || voiceStatus === "requesting_permission";
+  const canSend = Boolean(inputText.trim() || selectedFile) && !isLoading;
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if ((inputText.trim() || selectedFile) && !isLoading) {
-        onSend();
-      }
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && canSend) {
+      event.preventDefault();
+      onSend();
     }
   };
 
   return (
-    <div className="border-t border-border/70 bg-background/95 backdrop-blur-xs p-3 md:p-4 space-y-2">
-      {/* Visual de gravação de voz em tempo real */}
-      {isListening && (
-        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-red-50 text-red-950 border border-red-200 text-xs animate-pulse">
-          <div className="flex items-center gap-2 truncate">
-            <span className="h-2 w-2 rounded-full bg-red-600 animate-ping shrink-0" />
-            <span className="font-semibold text-red-900 shrink-0">Ouvindo sua voz:</span>
-            <span className="italic text-red-800 truncate">
-              {interimTranscript || inputText || "Fale seu comando..."}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={onToggleVoice}
-              className="h-7 px-2.5 text-[11px] font-semibold gap-1 rounded-lg"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Concluir Fala
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onCancelVoice}
-              className="h-7 px-2 text-[11px] border-red-200 text-red-800 hover:bg-red-100 rounded-lg"
-            >
-              Cancelar
-            </Button>
-          </div>
+    <div className="shrink-0 border-t border-border/70 bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-sm md:px-4">
+      {(isListening || interimTranscript) && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-destructive" />
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+            {interimTranscript || "Ouvindo… fale seu comando naturalmente"}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onCancelVoice}
+            aria-label="Cancelar gravação"
+            title="Cancelar gravação"
+            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
 
       {selectedFile && (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-medium">
-          {selectedFile.type.startsWith("image/") ? (
-            <ImageIcon className="h-4 w-4 text-emerald-700" />
-          ) : (
-            <FileText className="h-4 w-4 text-emerald-700" />
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+          <span className="min-w-0 truncate text-foreground">{selectedFile.name}</span>
+          {onRemoveFile && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onRemoveFile}
+              aria-label="Remover arquivo"
+              className="h-7 w-7"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
           )}
-          <span className="truncate max-w-[200px]">{selectedFile.name}</span>
-          <button
-            type="button"
-            onClick={onRemoveFile}
-            className="p-0.5 hover:bg-emerald-200/50 rounded-full text-emerald-800"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
         </div>
       )}
 
-      <div className="flex items-end gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,application/pdf"
-          className="hidden"
-          onChange={onSelectFile}
+      <div className="flex items-end gap-1.5 rounded-2xl border border-input bg-background p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring/40">
+        {onSelectFile && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={onSelectFile}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              aria-label="Anexar arquivo"
+              title="Anexar arquivo"
+              className="h-9 w-9 shrink-0 text-muted-foreground"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+
+        <Textarea
+          value={inputText}
+          onChange={(event) => setInputText(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={isListening ? "Estou ouvindo…" : "Pergunte para a Jessi ou digite um comando…"}
+          disabled={isLoading}
+          rows={1}
+          className="max-h-32 min-h-9 flex-1 resize-none border-0 px-2 py-2 text-sm shadow-none focus-visible:ring-0"
         />
 
         <Button
           type="button"
+          variant="ghost"
           size="icon"
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isLoading}
-          title="Anexar comprovante ou imagem"
-          className="h-10 w-10 shrink-0 border-border/80 text-muted-foreground hover:text-foreground rounded-xl"
+          onClick={onToggleTts}
+          aria-label={ttsEnabled ? "Desativar respostas por voz" : "Ativar respostas por voz"}
+          title={ttsEnabled ? "Desativar respostas por voz" : "Ativar respostas por voz"}
+          className="hidden h-9 w-9 shrink-0 text-muted-foreground sm:inline-flex"
         >
-          <Paperclip className="h-4 w-4" />
+          {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onToggleContinuousVoice}
+          disabled={isLoading}
+          aria-label={isContinuousMode || isListening ? "Parar comando por voz" : "Ativar comando por voz"}
+          title={isContinuousMode || isListening ? "Parar comando por voz" : "Ativar comando por voz"}
+          className={cn(
+            "h-9 w-9 shrink-0",
+            isContinuousMode || isListening
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground"
+              : "text-primary hover:bg-primary/10 hover:text-primary",
+          )}
+        >
+          {isContinuousMode || isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
         </Button>
 
         <Button
           type="button"
           size="icon"
-          variant={isListening ? "destructive" : "outline"}
-          onClick={onToggleVoice}
-          disabled={isLoading}
-          title={isListening ? "Parar gravação de voz" : "Falar comando por voz"}
-          className={`h-10 w-10 shrink-0 border-border/80 rounded-xl transition-all ${
-            isListening
-              ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
-              : "text-muted-foreground hover:text-emerald-700 hover:border-emerald-600/40"
-          }`}
-        >
-          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-        </Button>
-
-        <div className="flex-1 relative">
-          <Textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isListening
-                ? "Ouvindo sua voz..."
-                : "Fale com a Jessi: consultar agenda, buscar cliente, verificar saldos, comprovantes..."
-            }
-            rows={1}
-            disabled={isLoading}
-            className="min-h-[40px] max-h-32 resize-none py-2 px-3 text-xs md:text-sm bg-background border-border/80 focus-visible:ring-emerald-700 rounded-xl"
-          />
-        </div>
-
-        <Button
-          type="button"
-          size="icon"
-          disabled={(!inputText.trim() && !selectedFile) || isLoading}
           onClick={onSend}
-          className="h-10 w-10 shrink-0 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl shadow-xs"
+          disabled={!canSend}
+          aria-label="Enviar mensagem"
+          title="Enviar mensagem"
+          className="h-9 w-9 shrink-0"
         >
           <Send className="h-4 w-4" />
         </Button>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -159,40 +160,70 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const handleSendMessageRef = useRef<((text?: string) => Promise<void>) | null>(null);
 
-  // Hook de reconhecimento de voz
+  // Hook de reconhecimento de voz continua com deteccao de silencio e envio natural
   const {
     voiceStatus,
     isListening,
+    isContinuousMode,
     interimTranscript,
+    isSpeaking,
+    ttsEnabled,
+    setTtsEnabled,
     startListening,
     stopListening,
+    startContinuousMode,
+    stopContinuousMode,
+    toggleContinuousMode,
+    pauseListening,
+    resumeListening,
     cancelListening,
-  } = useJessiVoice((textoFinal) => {
-    if (textoFinal.trim()) {
-      setInputText(textoFinal);
+    resetTranscript,
+    speakResponse,
+    falarResposta,
+    pararFala,
+  } = useJessiVoice(
+    (textoFinal) => {
+      if (!isContinuousMode && textoFinal.trim()) {
+        setInputText(textoFinal);
+      }
+    },
+    (textoParaEnvio) => {
+      if (textoParaEnvio.trim() && handleSendMessageRef.current) {
+        handleSendMessageRef.current(textoParaEnvio.trim());
+      }
     }
-  });
+  );
 
   React.useEffect(() => {
-    if (isListening) {
+    if (isLoading) {
+      setStatus("processando");
+      setStatusDetalhe("Consultando inteligência e registros...");
+    } else if (voiceStatus === "sending") {
+      setStatus("enviando");
+      setStatusDetalhe("Enviando comando...");
+    } else if (voiceStatus === "transcribing") {
+      setStatus("transcrevendo");
+      setStatusDetalhe("Transcrevendo fala...");
+    } else if (voiceStatus === "listening") {
       setStatus("ouvindo");
-      setStatusDetalhe("Ouvindo sua voz...");
-    } else if (status === "ouvindo") {
+      setStatusDetalhe(isContinuousMode ? "Modo Contínuo: Ouvindo..." : "Ouvindo sua voz...");
+    } else if (isSpeaking) {
+      setStatus("executando");
+      setStatusDetalhe("Falando resposta...");
+    } else if (status === "ouvindo" || status === "transcrevendo" || status === "enviando" || status === "executando") {
       setStatus("disponivel");
       setStatusDetalhe(undefined);
     }
-  }, [isListening]);
+  }, [voiceStatus, isListening, isContinuousMode, isSpeaking, isLoading]);
 
   const handleToggleVoice = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening(inputText);
-    }
+    toggleContinuousMode();
   };
 
   const handleNovaConversa = () => {
+    pararFala();
     setMessages([
       {
         id: `msg_welcome_${Date.now()}`,
@@ -214,10 +245,23 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   };
 
   const handleSendMessage = async (customText?: string) => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }
+
+    pauseListening();
+    resetTranscript();
+
     if (isLoading) return;
 
+    pararFala();
     const textToSend = customText || inputText;
-    if (!textToSend.trim() && !selectedFile) return;
+    if (!textToSend.trim() && !selectedFile) {
+      if (isContinuousMode) resumeListening();
+      return;
+    }
 
     const userMessageId = `msg_user_${Date.now()}`;
     const userMsg: JessiMessage = {
@@ -230,7 +274,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsLoading(true);
-    setStatus("interpretando");
+    setStatus("processando");
     setStatusDetalhe("Consultando inteligência e registros...");
 
     try {
@@ -251,16 +295,29 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         setContexto((prev) => ({ ...prev, ...res.novoContexto }));
       }
 
+      const respostaTextoFinal = res?.respostaTexto || "Não consegui obter uma resposta no momento.";
+
       const assistantMsg: JessiMessage = {
         id: `msg_asst_${Date.now()}`,
         role: "assistant",
-        content: res?.respostaTexto || "Não consegui obter uma resposta no momento.",
+        content: respostaTextoFinal,
         timestamp: new Date().toISOString(),
         cards: res?.cards || [],
         pendingAction: res?.pendingAction || null,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Reproduz em audio com voz feminina natural brasileira
+      if (ttsEnabled && respostaTextoFinal) {
+        speakResponse(respostaTextoFinal, () => {
+          if (isContinuousMode) resumeListening();
+        });
+      } else if (isContinuousMode) {
+        setTimeout(() => {
+          resumeListening();
+        }, 300);
+      }
     } catch (err: any) {
       console.error("Erro na comunicação com a Jessi V2:", err);
       toast.error("Não foi possível processar o comando. Tente novamente.");
@@ -273,6 +330,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           timestamp: new Date().toISOString(),
         },
       ]);
+      if (isContinuousMode) {
+        setTimeout(() => resumeListening(), 1000);
+      }
     } finally {
       setIsLoading(false);
       setStatus("disponivel");
@@ -281,10 +341,12 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     }
   };
 
+  handleSendMessageRef.current = handleSendMessage;
+
   const handleConfirmAction = async (pendingAction: JessiPendingAction) => {
     if (isLoading) return;
     setIsLoading(true);
-    setStatus("executando");
+    setStatus("processando");
     setStatusDetalhe("Gravando alteração com validação...");
 
     try {
@@ -314,6 +376,9 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       setMessages((prev) => [...prev, confirmMsg]);
       toast.success("Ação confirmada e gravada!");
+      if (ttsEnabled && res?.respostaTexto) {
+        speakResponse(res.respostaTexto);
+      }
     } catch (err: any) {
       toast.error(err?.message || "Falha ao executar a confirmação.");
     } finally {
@@ -382,7 +447,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
                       Supervisionada
                     </span>
                   </div>
-                  <JessiStatusIndicator status={status} detalhe={statusDetalhe} />
+                  <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
                 </div>
               </div>
 
@@ -464,7 +529,10 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               onSend={() => handleSendMessage()}
               isLoading={isLoading}
               voiceStatus={voiceStatus}
-              onToggleVoice={handleToggleVoice}
+              isContinuousMode={isContinuousMode}
+              onToggleContinuousVoice={handleToggleVoice}
+              ttsEnabled={ttsEnabled}
+              onToggleTts={() => setTtsEnabled(!ttsEnabled)}
               onCancelVoice={cancelListening}
               interimTranscript={interimTranscript}
               selectedFile={selectedFile}

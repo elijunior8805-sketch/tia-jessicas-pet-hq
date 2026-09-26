@@ -66,7 +66,7 @@ export const MOTORES_ESTRATEGICOS: MotorCampanha[] = [
     tag: "Aumento de Ticket",
     corTag: "bg-emerald-500/20 text-emerald-200 border-emerald-400/40",
     icone: Scissors,
-    publicoAlvo: "Clientes de banho simples ou tosa pendente",
+    publicoAlvo: "Clientes de banho essencial ou tosa pendente",
     textoOferta: "O pelinho do {{pet}} merece uma renovação completa! Fechando o pacote de Banho + Tosa Completa (ou higiênica) esta semana, você ganha 20% de desconto exclusivo no combo! ✨🐾",
     chamadaAcao: "Vagas limitadas para tosa nesta semana!",
     impactoNegocio: "Aumento imediato do faturamento por atendimento",

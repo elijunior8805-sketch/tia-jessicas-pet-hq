@@ -17,6 +17,8 @@ export const JessiV2CardTypeSchema = z.enum([
   "alerta",
   "comparativo",
   "proativo",
+  "comunicacao",
+  "reativacao",
 ]);
 
 export type JessiV2CardType = z.infer<typeof JessiV2CardTypeSchema>;
@@ -125,6 +127,8 @@ export const JessiV2IntentSchema = z.object({
     profissionalId: z.string().optional().nullable(),
     termoBusca: z.string().optional().nullable(),
     periodo: z.enum(["hoje", "amanha", "semana", "mes", "personalizado"]).optional().nullable(),
+    agendamentoId: z.string().optional().nullable(),
+    motivo: z.string().optional().nullable(),
   }),
   requerConfirmacao: z.boolean(),
   ferramentaSugerida: z.string().optional().nullable(),

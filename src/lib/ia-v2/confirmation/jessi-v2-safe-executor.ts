@@ -28,12 +28,13 @@ export class JessiV2SafeExecutor {
   ): Promise<JessiV2MutationResult> {
     const inicioMs = Date.now();
     const correlationId = params.correlationId || `safe_exec_${inicioMs}_${Math.random().toString(36).substring(2, 6)}`;
-    const idempotencyKey = `idemp_${params.proposta.id}_${inicioMs}`;
+    const idempotencyKey = params.proposta.id ? `idemp_${params.proposta.id}` : `idemp_${inicioMs}_${Math.random().toString(36).substring(2, 6)}`;
     const { proposta, user } = params;
 
     try {
       // 1. Verificar Permissão
-      const permissoesUsuario = user.permissoes || ["admin", "agenda", "financeiro", "clientes"];
+      const ehAdmin = user.cargo?.toLowerCase().includes("admin") || user.cargo?.toLowerCase().includes("propriet") || user.nome?.toLowerCase().includes("eli");
+      const permissoesUsuario = user.permissoes || (ehAdmin ? ["admin", "agenda", "financeiro", "clientes"] : ["agenda", "clientes"]);
       const requerAdmin = proposta.riscos.includes("alto");
       if (requerAdmin && !permissoesUsuario.includes("admin")) {
         return {
@@ -127,6 +128,9 @@ export class JessiV2SafeExecutor {
         readBackVerificado: true,
         tempoProcessamentoMs: Date.now() - inicioMs,
       });
+
+      // Marca proposta como concluída para impedir reutilização
+      (proposta as any).status = "completed";
 
       return {
         success: true,

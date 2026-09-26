@@ -25,7 +25,16 @@ export const JESSI_CONFIG: JessiIdentity = {
   subtitulo: "Assistente Operacional do Spa",
   papel: "Assistente Operacional e Estratégica do Proprietário — Spa de Pet Tia Jéssica",
   saudacao: (hora?: number) => {
-    const h = hora !== undefined ? hora : new Date().getHours();
+    const h =
+      hora !== undefined
+        ? hora
+        : Number(
+            new Intl.DateTimeFormat("en-GB", {
+              timeZone: "America/Sao_Paulo",
+              hour: "2-digit",
+              hour12: false,
+            }).format(new Date())
+          );
     if (h >= 5 && h < 12) return "Bom dia! Como posso ajudar na operação do Spa hoje?";
     if (h >= 12 && h < 18) return "Boa tarde! Vamos conferir a rotina e os atendimentos?";
     return "Boa noite! Pronta para revisar o fechamento ou organizar o próximo dia.";

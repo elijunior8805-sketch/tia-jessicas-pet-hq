@@ -81,8 +81,7 @@ export interface JessiMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: string;
-  cards?: Array<{
-    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta" | "leva_traz";
+    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta" | "leva_traz" | "comunicacao" | "reativacao" | "proativo";
     data: any;
   }>;
   pendingAction?: JessiPendingAction | null;

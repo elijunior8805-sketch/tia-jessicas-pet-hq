@@ -236,7 +236,7 @@ A IA nunca poderá excluir dados, alterar valores, realizar cobranças, enviar m
 
 12. Serviços, Leva e Traz e pagamentos
 
-Serviços configuráveis com nome, categoria, descrição, valor, duração e status ativo/inativo. Incluir banho simples/Premium, hidratações, desembolo, remoção de subpelo, tosas, unhas, pata, rosto e pata + rosto.
+Serviços configuráveis com nome, categoria, descrição, valor, duração e status ativo/inativo. Incluir banho essencial/Premium, hidratações, desembolo, remoção de subpelo, tosas, unhas, pata, rosto e pata + rosto.
 
 Criar Taxa de Entrega/Leva e Traz opcional:
 

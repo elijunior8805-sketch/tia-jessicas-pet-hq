@@ -107,28 +107,51 @@ export class FinanceiroRelatoriosAdapter {
       // 2. Consulta de valores pendentes e devedores (vencidos) com vínculo do cliente
       const { data: pagamentosPendentes } = await sb
         .from("pagamentos")
-        .select("id, valor_total, valor_pago, vencimento, status, clientes(id, nome, whatsapp)")
+        .select("id, cliente_id, valor_total, valor_pago, vencimento, status, clientes(id, nome, whatsapp, telefone)")
         .neq("status", "pago")
         .neq("status", "cancelado")
         .is("arquivado_em", null);
 
       let valoresAReceber = 0;
       let valoresVencidosDevedores = 0;
+      const pendenciasLista: any[] = [];
       const devedoresLista: any[] = [];
 
       (pagamentosPendentes || []).forEach((p: any) => {
         const pendente = Math.max((Number(p.valor_total) || 0) - (Number(p.valor_pago) || 0), 0);
-        const nomeCli = p.clientes?.nome || "Cliente";
+        const cliObj = p.clientes || p.cliente || (Array.isArray(p.clientes) ? p.clientes[0] : null);
+        const nomeCli = cliObj?.nome || p.clienteNome || p.cliente_nome || p.nome || "Cliente";
+        const whatsappCli = cliObj?.whatsapp || cliObj?.telefone || p.whatsapp || p.telefone || "";
+        const clienteId = p.cliente_id || cliObj?.id || p.clienteId;
+        const ehVencido = Boolean(p.vencimento && p.vencimento < hojeDataStr);
 
-        if (p.vencimento && p.vencimento < hojeDataStr) {
+        const itemMapeado = {
+          id: p.id,
+          clienteId,
+          cliente_id: clienteId,
+          clienteNome: nomeCli,
+          cliente_nome: nomeCli,
+          nome: nomeCli,
+          clientes: {
+            id: clienteId,
+            nome: nomeCli,
+            whatsapp: whatsappCli,
+          },
+          whatsapp: whatsappCli,
+          telefone: whatsappCli,
+          valor: pendente,
+          valor_total: Number(p.valor_total || pendente),
+          valor_pago: Number(p.valor_pago || 0),
+          saldo: pendente,
+          vencimento: p.vencimento,
+          status: ehVencido ? "vencido" : (p.status || "pendente"),
+        };
+
+        pendenciasLista.push(itemMapeado);
+
+        if (ehVencido) {
           valoresVencidosDevedores += pendente;
-          devedoresLista.push({
-            id: p.id,
-            clienteNome: nomeCli,
-            valor: pendente,
-            vencimento: p.vencimento,
-            status: "vencido",
-          });
+          devedoresLista.push(itemMapeado);
         } else {
           valoresAReceber += pendente;
         }
@@ -143,6 +166,8 @@ export class FinanceiroRelatoriosAdapter {
         valoresRecebidos,
         valoresAReceber,
         valoresVencidosDevedores,
+        totalValoresEmAberto: valoresAReceber + valoresVencidosDevedores,
+        totalAReceberPendente: valoresAReceber + valoresVencidosDevedores,
         despesas,
         saldoLiquido,
         ticketMedio,
@@ -156,17 +181,17 @@ export class FinanceiroRelatoriosAdapter {
           cartaoDebito: totalCartaoDebito,
           outros: totalOutrasFormas,
         },
-        devedores: devedoresLista,
+        devedores: pendenciasLista,
+        itens_pendentes: pendenciasLista,
+        pendencias: pendenciasLista,
       };
 
-      const resumoFormatado =
-        `Resumo Financeiro Consolidado (${periodo === "hoje" ? "Hoje" : periodo === "semana" ? "Últimos 7 dias" : "Mês Atual"}):\n\n` +
-        `• **Faturamento Bruto:** R$ ${faturamentoBruto.toFixed(2)} (Recebido: R$ ${valoresRecebidos.toFixed(2)})\n` +
-        `• **Ticket Médio:** R$ ${ticketMedio.toFixed(2)} (${totalEntradasCount} atendimentos pagos)\n` +
-        `• **Entradas por Forma:** Pix: R$ ${totalPix.toFixed(2)} | Dinheiro: R$ ${totalDinheiro.toFixed(2)} | Cartões: R$ ${(totalCartaoCredito + totalCartaoDebito).toFixed(2)}\n` +
-        `• **A Receber (No prazo):** R$ ${valoresAReceber.toFixed(2)}\n` +
-        `• **Inadimplência (Vencidos):** R$ ${valoresVencidosDevedores.toFixed(2)}${devedoresLista.length > 0 ? ` (${devedoresLista.length} cliente(s) com pendências)` : ""}\n` +
-        `• **Saldo Líquido:** R$ ${saldoLiquido.toFixed(2)}`;
+      const { converterNumeroParaExtenso } = await import("@/lib/ia/ia-voz");
+      const fatExtenso = converterNumeroParaExtenso(faturamentoBruto);
+      const recExtenso = converterNumeroParaExtenso(valoresRecebidos);
+      const periodoTexto = periodo === "hoje" ? "Hoje" : periodo === "semana" ? "Nesta semana" : "Neste mês";
+
+      const resumoFormatado = `${periodoTexto}, o faturamento foi de ${fatExtenso}. Desse total, ${recExtenso} já foram recebidos.`;
 
       return {
         success: true,
@@ -224,7 +249,7 @@ export class FinanceiroRelatoriosAdapter {
       const { data: novoPagamento, error } = await sb
         .from("pagamentos")
         .insert({
-          agendamento_id: params.agendamentoId || null,
+          atendimento_id: params.agendamentoId || null,
           cliente_id: params.clienteId || null,
           valor_total: params.valorTotal,
           valor_pago: params.valorTotal,
@@ -233,6 +258,7 @@ export class FinanceiroRelatoriosAdapter {
           data_pagamento: agora,
           observacoes: params.observacoes || "Recebimento confirmado pelo operador",
           is_teste: false,
+          idempotency_key: idempotencyKey,
         } as any)
         .select("id, valor_total, valor_pago, status, forma, data_pagamento")
         .single();

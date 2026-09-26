@@ -67,14 +67,16 @@ export async function gerarCentralOperacionalJessi(
   amanhaDt.setDate(amanhaDt.getDate() + 1);
   const amanhaStr = new Intl.DateTimeFormat("en-CA", { timeZone: fusoSP, year: "numeric", month: "2-digit", day: "2-digit" }).format(amanhaDt);
 
-  const horaAtual = agora.getHours();
+  const horaAtual = Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone: fusoSP, hour: "2-digit", hour12: false }).format(agora)
+  );
   const cumprimento = horaAtual < 12 ? "Bom dia" : horaAtual < 18 ? "Boa tarde" : "Boa noite";
   const nomeUsuario = user?.nome || "Eli";
 
   // 1. Agendamentos de Hoje e Amanhã
   const [agendHojeRes, agendAmanhaRes, pagamentosRes, progRes, clientesInativosRes] = await Promise.all([
     sb.from("agendamentos")
-      .select("id, data, hora, status, leva_traz_modalidade, pets(nome, raca), clientes(nome, telefone), servicos(nome, preco)")
+      .select("id, data, hora, status, leva_traz_modalidade, pets(nome, raca), clientes(nome, telefone), servicos(nome, valor)")
       .eq("data", hojeStr)
       .order("hora", { ascending: true }),
     sb.from("agendamentos")
@@ -108,7 +110,7 @@ export async function gerarCentralOperacionalJessi(
   const concluidosHoje = listaHoje.filter((a: any) => a.status === "finalizado" || a.status === "concluido").length;
   const emAtendimentoHoje = listaHoje.filter((a: any) => a.status === "em_atendimento").length;
   const levaTrazHoje = listaHoje.filter((a: any) => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
-  const faturamentoPrevistoHoje = listaHoje.reduce((acc: number, curr: any) => acc + Number(curr.servicos?.preco || 0), 0);
+  const faturamentoPrevistoHoje = listaHoje.reduce((acc: number, curr: any) => acc + Number(curr.servicos?.valor || 0), 0);
 
   const proximo: any = listaHoje.find((a: any) => a.status === "agendado" || a.status === "confirmado");
   const proximoAtendimento = proximo ? {
@@ -277,7 +279,7 @@ export async function gerarCentralOperacionalJessi(
     id: "op_programas_renovacao",
     tipo: "programa",
     titulo: "Equivalência de Banhos Ativa",
-    descricao: "1 crédito de banho cobre tanto Banho Simples quanto Banho Premium sem custo adicional.",
+    descricao: "1 crédito de banho cobre tanto Banho Essencial quanto Banho Premium sem custo adicional.",
     acaoSugerida: "Oferecer upgrade para clientes de planos ativos.",
     comando: "consultar catalogo de programas",
   });
