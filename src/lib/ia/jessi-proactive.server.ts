@@ -311,4 +311,3 @@ export async function gerarCentralOperacionalJessi(
     oportunidades,
   };
 }
-}
