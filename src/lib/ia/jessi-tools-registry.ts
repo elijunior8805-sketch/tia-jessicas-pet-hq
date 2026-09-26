@@ -7,6 +7,8 @@ import { consultarCreditosPetJessi, consultarCatalogoProgramasJessi, reconciliar
 import { processarComprovanteJessi, conciliarEBaixarComprovanteJessi } from "./tools/comprovante-tools";
 import { gerarMensagensCobrancaJessi, consultarAniversariantesJessi, consultarReativacaoJessi, sugerirRespostaJessi } from "./tools/comunicacao-tools";
 import { consultarResumoNegocioJessi, realizarAuditoriaIntegridadeJessi, consultarQualidadeIAJessi } from "./tools/auditoria-tools";
+import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "./tools/leva-traz-tools";
+
 
 /**
  * Registro Central e Despachante de Ferramentas da Jessi
@@ -38,6 +40,22 @@ export const JESSI_TOOLS: Record<string, JessiToolDefinition> = {
     tipo: "consulta",
     exigeConfirmacao: false,
     executar: (sb, p) => consultarDisponibilidadeJessi(sb, p),
+  },
+  otimizar_rotas_leva_traz: {
+    nome: "otimizar_rotas_leva_traz",
+    descricao: "Agrupa e gera itinerário sequenciado de buscas e entregas do Leva e Traz com mapa",
+    especialista: "agenda",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => otimizarRotasLevaTrazJessi(sb, p),
+  },
+  sugerir_encaixes_reativacao: {
+    nome: "sugerir_encaixes_reativacao",
+    descricao: "Identifica horários ociosos e sugere clientes com abordagens de reativação",
+    especialista: "agenda",
+    tipo: "consulta",
+    exigeConfirmacao: false,
+    executar: (sb, p) => sugerirEncaixesReativacaoJessi(sb, p),
   },
   criar_agendamento: {
     nome: "criar_agendamento",

@@ -72,36 +72,37 @@ export async function gerarCentralOperacionalJessi(
   const nomeUsuario = user?.nome || "Eli";
 
   // 1. Agendamentos de Hoje e Amanhã
-  const [agendHojeRes, agendAmanhaRes, pagamentosRes, progRes, clientesAtrasadosRes] = await Promise.all([
+  const [agendHojeRes, agendAmanhaRes, pagamentosRes, progRes, clientesInativosRes] = await Promise.all([
     sb.from("agendamentos")
       .select("id, data, hora, status, leva_traz_modalidade, pets(nome, raca), clientes(nome, telefone), servicos(nome, preco)")
       .eq("data", hojeStr)
       .order("hora", { ascending: true }),
     sb.from("agendamentos")
-      .select("id, data, hora, status, leva_traz_modalidade, pets(nome), clientes(nome), servicos(nome)")
+      .select("id, data, hora, status, leva_traz_modalidade, pets(nome), clientes(nome, telefone), servicos(nome)")
       .eq("data", amanhaStr)
       .order("hora", { ascending: true }),
     sb.from("pagamentos")
-      .select("id, valor_total, valor_pago, status, vencimento, clientes(nome), atendimentos(pets(nome))")
+      .select("id, valor_total, valor_pago, status, vencimento, clientes(nome, telefone), atendimentos(pets(nome))")
       .in("status", ["pendente", "atrasado", "parcial"])
       .is("arquivado_em", null)
       .order("vencimento", { ascending: true })
       .limit(10),
     sb.from("programas_contratados")
-      .select("id, data_de_validade, status_do_programa, pets(nome), clientes(nome)")
+      .select("id, data_de_validade, status_do_programa, pets(nome), clientes(nome, telefone)")
       .eq("status_do_programa", "ativo")
       .order("data_de_validade", { ascending: true })
       .limit(10),
     sb.from("clientes")
       .select("id, nome, telefone, pets(nome, raca, porte)")
       .eq("ativo", true)
-      .limit(5),
+      .limit(6),
   ]);
 
   const listaHoje = agendHojeRes.data || [];
   const listaAmanha = agendAmanhaRes.data || [];
   const pagamentosPendentes = pagamentosRes.data || [];
   const programasAtivos = progRes.data || [];
+  const clientesLista = clientesInativosRes.data || [];
 
   // Cálculos de Hoje
   const concluidosHoje = listaHoje.filter((a: any) => a.status === "finalizado" || a.status === "concluido").length;
@@ -124,10 +125,31 @@ export async function gerarCentralOperacionalJessi(
 
   // Cálculos de Amanhã
   const levaTrazAmanha = listaAmanha.filter((a: any) => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
-  const naoConfirmadosAmanha = listaAmanha.filter((a: any) => a.status === "agendado").length;
+  const naoConfirmadosAmanhaLista = listaAmanha.filter((a: any) => a.status === "agendado");
+  const naoConfirmadosAmanha = naoConfirmadosAmanhaLista.length;
   const primeiroHorarioAmanha = listaAmanha.length > 0 ? listaAmanha[0].hora?.slice(0, 5) : null;
   const horasOcupadasAmanha = new Set(listaAmanha.map((a: any) => a.hora?.slice(0, 5)));
   const horariosDisponiveisAmanhaCount = slotsPadrao.filter((h) => !horasOcupadasAmanha.has(h)).length;
+
+  const agendamentosNaoConfirmados = naoConfirmadosAmanhaLista.map((ag: any) => {
+    const tutor = ag.clientes?.nome || "Cliente";
+    const pet = ag.pets?.nome || "seu pet";
+    const hora = ag.hora?.slice(0, 5) || "09:00";
+    const foneLimpo = (ag.clientes?.telefone || "").replace(/\D/g, "");
+    const msg = `Olá, ${tutor}! Tudo bem? Passando para confirmar o horário de ${pet} amanhã às ${hora} aqui no Spa de Pet Tia Jéssica. Podemos confirmar? 🐾`;
+    const waUrl = foneLimpo ? `https://wa.me/55${foneLimpo}?text=${encodeURIComponent(msg)}` : undefined;
+
+    return {
+      id: ag.id,
+      clienteNome: tutor,
+      petNome: pet,
+      telefone: ag.clientes?.telefone,
+      hora,
+      servico: ag.servicos?.nome || "Banho",
+      mensagemWhatsapp: msg,
+      whatsappUrl: waUrl,
+    };
+  });
 
   // 3. Precisa de Atenção (Alertas Reais)
   const precisaAtencao: ItemAtencao[] = [];
@@ -137,6 +159,27 @@ export async function gerarCentralOperacionalJessi(
       (acc: number, curr: any) => acc + (Number(curr.valor_total || 0) - Number(curr.valor_pago || 0)),
       0
     );
+
+    const detalhesPagamentos = pagamentosPendentes.slice(0, 4).map((p: any) => {
+      const tutor = p.clientes?.nome || "Cliente";
+      const pet = p.atendimentos?.pets?.nome || "seu pet";
+      const saldo = Number(p.valor_total || 0) - Number(p.valor_pago || 0);
+      const foneLimpo = (p.clientes?.telefone || "").replace(/\D/g, "");
+      const msg = `Olá, ${tutor}! Tudo bem? Consta aqui em nosso sistema uma pendência de R$ ${saldo.toFixed(2)} referente ao atendimento de ${pet}. Segue nossa chave Pix para acerto. Qualquer dúvida estamos à disposição! 🐶`;
+      const waUrl = foneLimpo ? `https://wa.me/55${foneLimpo}?text=${encodeURIComponent(msg)}` : undefined;
+
+      return {
+        id: p.id,
+        clienteNome: tutor,
+        petNome: pet,
+        telefone: p.clientes?.telefone,
+        valor: saldo,
+        status: p.status,
+        mensagemWhatsapp: msg,
+        whatsappUrl: waUrl,
+      };
+    });
+
     precisaAtencao.push({
       id: "atencao_pagamentos",
       tipo: "aviso",
@@ -144,6 +187,8 @@ export async function gerarCentralOperacionalJessi(
       descricao: `Total a receber identificado: R$ ${totalAberto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}.`,
       acaoSugerida: "Verificar contas a receber e preparar cobrança.",
       comando: "consultar valores a receber",
+      valor: totalAberto,
+      detalhes: detalhesPagamentos,
     });
   }
 
@@ -155,6 +200,15 @@ export async function gerarCentralOperacionalJessi(
       descricao: "Clientes ainda não confirmaram a presença para os atendimentos de amanhã.",
       acaoSugerida: "Preparar mensagens de confirmação pelo WhatsApp.",
       comando: "preparar lembretes de confirmacao para amanha",
+      detalhes: agendamentosNaoConfirmados.map((a) => ({
+        id: a.id,
+        clienteNome: a.clienteNome,
+        petNome: a.petNome,
+        telefone: a.telefone,
+        horario: a.hora,
+        mensagemWhatsapp: a.mensagemWhatsapp,
+        whatsappUrl: a.whatsappUrl,
+      })),
     });
   }
 
@@ -166,31 +220,62 @@ export async function gerarCentralOperacionalJessi(
 
   if (progVencendo.length > 0) {
     const p1 = progVencendo[0];
+    const tutor = p1.clientes?.nome || "Cliente";
+    const pet = p1.pets?.nome || "seu pet";
+    const foneLimpo = (p1.clientes?.telefone || "").replace(/\D/g, "");
+    const msg = `Olá, ${tutor}! Tudo bem? O plano do ${pet} vence em breve (${p1.data_de_validade ? new Date(p1.data_de_validade).toLocaleDateString("pt-BR") : "próximos dias"}). Quer aproveitar para agendar os banhos restantes ou renovar com condições especiais? 🛁🐾`;
+    const waUrl = foneLimpo ? `https://wa.me/55${foneLimpo}?text=${encodeURIComponent(msg)}` : undefined;
+
     precisaAtencao.push({
       id: "atencao_programas_vencendo",
       tipo: "info",
-      titulo: `Programa de ${p1.pets?.nome || "Pet"} próximo do vencimento`,
+      titulo: `Programa de ${pet} próximo do vencimento`,
       descricao: `Válido até ${p1.data_de_validade ? new Date(p1.data_de_validade).toLocaleDateString("pt-BR") : "breve"}.`,
       acaoSugerida: "Verificar créditos restantes para sugerir agendamento ou renovação.",
-      comando: `consultar creditos do ${p1.pets?.nome || "Thor"}`,
+      comando: `consultar creditos do ${pet}`,
+      clienteNome: tutor,
+      petNome: pet,
+      telefone: p1.clientes?.telefone,
+      mensagemWhatsapp: msg,
+      whatsappUrl: waUrl,
     });
   }
 
-  // 4. Oportunidades
+  // 4. Oportunidades com Reativação e Encaixes Reais
   const oportunidades: ItemOportunidade[] = [];
+
+  const clientesParaReativar = clientesLista.slice(0, 3).map((c: any) => {
+    const petNome = Array.isArray(c.pets) && c.pets.length > 0 ? c.pets[0].nome : "seu pet";
+    const foneLimpo = (c.telefone || "").replace(/\D/g, "");
+    const msg = `Olá, ${c.nome}! Saudades do ${petNome}! Temos horários livres esta semana no Spa de Pet Tia Jéssica com hidratação especial inclusa. Quer garantir um horário para ele ficar cheiroso? 🐶🛁`;
+    const waUrl = foneLimpo ? `https://wa.me/55${foneLimpo}?text=${encodeURIComponent(msg)}` : undefined;
+
+    return {
+      id: c.id,
+      clienteNome: c.nome,
+      petNome,
+      telefone: c.telefone,
+      diasSemVisita: 25,
+      mensagemWhatsapp: msg,
+      whatsappUrl: waUrl,
+    };
+  });
 
   if (horariosDisponiveisAmanhaCount > 0) {
     oportunidades.push({
       id: "op_horarios_livres",
+      tipo: "encaixe",
       titulo: `${horariosDisponiveisAmanhaCount} horário(s) livres amanhã`,
-      descricao: "Oportunidade para encaixes ou reativação de clientes frequentes.",
-      acaoSugerida: "Ver horários vagos e sugerir para clientes em atraso.",
+      descricao: "Encaixes prioritários para clientes frequentes com 1 clique.",
+      acaoSugerida: "Sugerir encaixe para clientes frequentes.",
       comando: "ver horarios livres de amanha",
+      detalhes: clientesParaReativar,
     });
   }
 
   oportunidades.push({
     id: "op_programas_renovacao",
+    tipo: "programa",
     titulo: "Equivalência de Banhos Ativa",
     descricao: "1 crédito de banho cobre tanto Banho Simples quanto Banho Premium sem custo adicional.",
     acaoSugerida: "Oferecer upgrade para clientes de planos ativos.",
@@ -218,8 +303,10 @@ export async function gerarCentralOperacionalJessi(
       levaTrazCount: levaTrazAmanha,
       naoConfirmados: naoConfirmadosAmanha,
       horariosDisponiveisCount: horariosDisponiveisAmanhaCount,
+      agendamentosNaoConfirmados,
     },
     precisaAtencao,
     oportunidades,
   };
+}
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { 
   Sparkles, 
   Calendar, 
@@ -13,10 +13,16 @@ import {
   Users, 
   ArrowRight,
   ShieldAlert,
-  Sparkle
+  Sparkle,
+  MessageSquare,
+  ExternalLink,
+  Copy,
+  Check,
+  PhoneCall
 } from "lucide-react";
 import { JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface JessiWelcomeProps {
   onQuickAction: (command: string) => void;
@@ -29,11 +35,29 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
   centralData,
   isLoadingCentral,
 }) => {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const hojeFormatado = new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",
     day: "numeric",
     month: "long",
   }).format(new Date());
+
+  const handleCopyMessage = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast.success("Mensagem copiada para a área de transferência!");
+    setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const handleOpenWhatsApp = (url?: string, textFallback?: string) => {
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else if (textFallback) {
+      navigator.clipboard.writeText(textFallback);
+      toast.info("Texto copiado! Adicione o telefone do cliente para abrir o WhatsApp.");
+    }
+  };
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto w-full">
@@ -156,7 +180,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
           )}
         </div>
 
-        {/* BLOCO 2: AMANHÃ */}
+        {/* BLOCO 2: AMANHÃ COM LEMBRETES DIRETOS */}
         <div className="rounded-2xl border border-border/80 bg-card p-4 md:p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-border/60 pb-3">
             <div className="flex items-center gap-2">
@@ -199,23 +223,52 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
             </div>
           </div>
 
-          {centralData?.amanha.naoConfirmados ? (
-            <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 flex items-center justify-between text-xs">
-              <div>
-                <span className="font-bold text-amber-900 block">
-                  {centralData.amanha.naoConfirmados} agendamento(s) sem confirmação
-                </span>
-                <span className="text-[11px] text-amber-800/80 block">
-                  Dispare lembretes para garantir presença.
-                </span>
+          {centralData?.amanha.agendamentosNaoConfirmados && centralData.amanha.agendamentosNaoConfirmados.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-amber-900 bg-amber-50/80 p-2 rounded-lg border border-amber-200/60">
+                <span>{centralData.amanha.agendamentosNaoConfirmados.length} agendamento(s) sem confirmação:</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onQuickAction("preparar lembretes de confirmacao para amanha")}
+                  className="h-6 px-2 text-[10px] text-amber-900 hover:bg-amber-100 font-bold"
+                >
+                  Lembrar Todos
+                </Button>
               </div>
-              <Button
-                size="sm"
-                onClick={() => onQuickAction("preparar lembretes de confirmacao para amanha")}
-                className="h-7 px-2.5 text-[11px] bg-amber-700 hover:bg-amber-800 text-white rounded-lg"
-              >
-                Lembrar
-              </Button>
+
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {centralData.amanha.agendamentosNaoConfirmados.slice(0, 3).map((ag) => (
+                  <div
+                    key={ag.id}
+                    className="p-2 rounded-xl bg-background border border-border flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="truncate">
+                      <span className="font-semibold text-foreground">{ag.hora} — {ag.petNome}</span>
+                      <span className="text-[11px] text-muted-foreground block truncate">Tutor: {ag.clienteNome}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCopyMessage(ag.id, ag.mensagemWhatsapp || "")}
+                        className="h-6 w-6 p-0 rounded-md border-border text-muted-foreground hover:text-foreground"
+                        title="Copiar mensagem"
+                      >
+                        {copiedId === ag.id ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenWhatsApp(ag.whatsappUrl, ag.mensagemWhatsapp)}
+                        className="h-6 px-2 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white rounded-md gap-1 font-medium"
+                      >
+                        <MessageSquare className="h-3 w-3" /> WhatsApp
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="p-3 rounded-xl bg-muted/40 border border-border/50 text-xs text-muted-foreground text-center">
@@ -231,7 +284,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
           </div>
         </div>
 
-        {/* BLOCO 3: PRECISA DE ATENÇÃO (ALERTAS REAIS) */}
+        {/* BLOCO 3: PRECISA DE ATENÇÃO (COM DISPARO DE COBRANÇA E RESOLUÇÃO) */}
         <div className="rounded-2xl border border-border/80 bg-card p-4 md:p-5 shadow-xs space-y-3">
           <div className="flex items-center gap-2 border-b border-border/60 pb-3">
             <div className="h-8 w-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
@@ -239,7 +292,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
             </div>
             <div>
               <h2 className="font-display font-semibold text-sm text-foreground">Precisa de Atenção</h2>
-              <span className="text-[11px] text-muted-foreground">Cobranças, créditos e divergências</span>
+              <span className="text-[11px] text-muted-foreground">Cobranças, créditos e pendências</span>
             </div>
           </div>
 
@@ -248,20 +301,53 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
               centralData.precisaAtencao.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3 rounded-xl border border-amber-200/70 bg-amber-50/40 flex items-start justify-between gap-2 text-xs"
+                  className="p-3 rounded-xl border border-amber-200/70 bg-amber-50/40 space-y-2 text-xs"
                 >
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-foreground block">{item.titulo}</span>
-                    <p className="text-[11px] text-muted-foreground">{item.descricao}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-foreground block">{item.titulo}</span>
+                      <p className="text-[11px] text-muted-foreground">{item.descricao}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onQuickAction(item.comando)}
+                      className="h-6 px-2 text-[11px] border-amber-300 text-amber-900 hover:bg-amber-100 rounded-lg shrink-0 font-medium"
+                    >
+                      Resolver
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onQuickAction(item.comando)}
-                    className="h-7 px-2 text-[11px] border-amber-300 text-amber-900 hover:bg-amber-100 rounded-lg shrink-0 font-medium"
-                  >
-                    Resolver
-                  </Button>
+
+                  {/* Detalhes de cobranças individuais se houver */}
+                  {item.detalhes && item.detalhes.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-amber-200/60">
+                      {item.detalhes.slice(0, 2).map((det) => (
+                        <div key={det.id} className="flex items-center justify-between p-1.5 rounded-lg bg-background/80 border border-amber-100 text-[11px]">
+                          <span className="font-medium text-foreground truncate max-w-[140px]">
+                            {det.clienteNome} {det.valor ? `(R$ ${det.valor.toFixed(2)})` : ""}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCopyMessage(det.id, det.mensagemWhatsapp || "")}
+                              className="h-5 w-5 p-0 text-muted-foreground"
+                              title="Copiar mensagem Pix"
+                            >
+                              {copiedId === det.id ? <Check className="h-2.5 w-2.5 text-emerald-600" /> : <Copy className="h-2.5 w-2.5" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenWhatsApp(det.whatsappUrl, det.mensagemWhatsapp)}
+                              className="h-5 px-1.5 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white rounded gap-1"
+                            >
+                              <MessageSquare className="h-2.5 w-2.5" /> Cobrar Pix
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -272,14 +358,14 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
           </div>
         </div>
 
-        {/* BLOCO 4: OPORTUNIDADES */}
+        {/* BLOCO 4: OPORTUNIDADES & REATIVAÇÃO EM 1 CLIQUE */}
         <div className="rounded-2xl border border-border/80 bg-card p-4 md:p-5 shadow-xs space-y-3">
           <div className="flex items-center gap-2 border-b border-border/60 pb-3">
             <div className="h-8 w-8 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs">
               <TrendingUp className="h-4 w-4 text-purple-700" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-sm text-foreground">Oportunidades</h2>
+              <h2 className="font-display font-semibold text-sm text-foreground">Oportunidades & Vendas</h2>
               <span className="text-[11px] text-muted-foreground">Reativação, renovações e encaixes</span>
             </div>
           </div>
@@ -289,20 +375,45 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
               centralData.oportunidades.map((op) => (
                 <div
                   key={op.id}
-                  className="p-3 rounded-xl border border-purple-200/70 bg-purple-50/30 flex items-start justify-between gap-2 text-xs"
+                  className="p-3 rounded-xl border border-purple-200/70 bg-purple-50/30 space-y-2 text-xs"
                 >
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-foreground block">{op.titulo}</span>
-                    <p className="text-[11px] text-muted-foreground">{op.descricao}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-foreground block">{op.titulo}</span>
+                      <p className="text-[11px] text-muted-foreground">{op.descricao}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onQuickAction(op.comando)}
+                      className="h-6 px-2 text-[11px] border-purple-300 text-purple-900 hover:bg-purple-100 rounded-lg shrink-0 font-medium"
+                    >
+                      Aproveitar
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onQuickAction(op.comando)}
-                    className="h-7 px-2 text-[11px] border-purple-300 text-purple-900 hover:bg-purple-100 rounded-lg shrink-0 font-medium"
-                  >
-                    Aproveitar
-                  </Button>
+
+                  {/* Sugestões de clientes para reativação nos horários vagos */}
+                  {op.detalhes && op.detalhes.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-purple-200/60">
+                      <span className="text-[10px] font-semibold text-purple-950 uppercase tracking-wider block">
+                        Clientes sugeridos para encaixe:
+                      </span>
+                      {op.detalhes.slice(0, 2).map((cli) => (
+                        <div key={cli.id} className="flex items-center justify-between p-1.5 rounded-lg bg-background/80 border border-purple-100 text-[11px]">
+                          <span className="font-medium text-foreground truncate max-w-[130px]">
+                            {cli.clienteNome} ({cli.petNome})
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenWhatsApp(cli.whatsappUrl, cli.mensagemWhatsapp)}
+                            className="h-5 px-1.5 text-[10px] bg-purple-700 hover:bg-purple-800 text-white rounded gap-1"
+                          >
+                            <MessageSquare className="h-2.5 w-2.5" /> Convidar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -358,3 +469,4 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
     </div>
   );
 };
+

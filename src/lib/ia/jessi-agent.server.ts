@@ -142,7 +142,9 @@ export async function processarMensagemJessiCore(
         respostaTexto = resQuery.summary || resQuery.texto || intencao.resposta_ia || "Consulta realizada com sucesso.";
 
         // Identifica card especializado e atualiza contexto
-        if (toolDef.especialista === "agenda") {
+        if (toolDef.nome === "otimizar_rotas_leva_traz") {
+          cards.push({ type: "leva_traz", data: resQuery.data });
+        } else if (toolDef.especialista === "agenda") {
           cards.push({ type: "agenda", data: resQuery.data });
         } else if (toolDef.especialista === "clientes_pets") {
           cards.push({ type: "cliente", data: resQuery.data });
@@ -160,6 +162,7 @@ export async function processarMensagemJessiCore(
         } else if (toolDef.especialista === "programas_cuidado") {
           cards.push({ type: "programa", data: resQuery.data });
         }
+
       }
     } else {
       // Resposta conversacional direta

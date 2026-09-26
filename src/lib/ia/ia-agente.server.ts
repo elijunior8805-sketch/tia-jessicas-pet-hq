@@ -103,6 +103,46 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       exige_confirmacao: false,
       resposta_ia: "Preparando o resumo operacional do dia..."
     },
+    "consultar rota leva e traz": {
+      intencao: "otimizar_rotas_leva_traz",
+      ferramenta: "otimizar_rotas_leva_traz",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Otimizando itinerário e rotas do Leva e Traz de hoje..."
+    },
+    "otimizar rota": {
+      intencao: "otimizar_rotas_leva_traz",
+      ferramenta: "otimizar_rotas_leva_traz",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Gerando rota otimizada e mapa do itinerário..."
+    },
+    "clientes inativos": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Analisando clientes com potencial de reativação para preencher horários vagos..."
+    },
+    "sugerir encaixes": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Cruzando vagas ociosas com clientes frequentes para sugerir encaixes..."
+    },
   };
 
   // Checagem de prefixos para o mapeamentoDireto

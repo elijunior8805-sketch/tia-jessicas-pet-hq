@@ -1,10 +1,25 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Sparkles, X, RotateCcw, ExternalLink } from "lucide-react";
+import { 
+  Sparkles, 
+  X, 
+  RotateCcw, 
+  ExternalLink,
+  Calendar,
+  DollarSign,
+  Users,
+  Clock,
+  Car,
+  Package,
+  AlertTriangle,
+  Gift,
+  TrendingUp,
+  Scissors
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { JessiChat } from "@/components/jessi/JessiChat";
 import { JessiInputBar } from "@/components/jessi/JessiInputBar";
 import { JessiStatusIndicator, JessiStatus } from "@/components/jessi/JessiStatusIndicator";
@@ -18,14 +33,99 @@ interface AssistenteIaSidebarProps {
   onClose: () => void;
 }
 
+interface ContextSuggestion {
+  label: string;
+  icon: any;
+  command: string;
+}
+
 export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProps) {
+  const routerState = useRouterState();
+  const currentPath = routerState?.location?.pathname || "/";
   const processarMensagemFn = useServerFn(processarMensagemJessi);
+
+  // Mapeamento dinâmico de contexto e sugestões conforme a rota ativa
+  const { moduloNome, sugestoesContextuais, saudacaoContextual } = useMemo(() => {
+    if (currentPath.includes("/agenda")) {
+      return {
+        moduloNome: "Agenda & Grade",
+        saudacaoContextual: "Olá, Eli! Estou conectada à Agenda do Spa. Posso verificar horários livres, checar confirmações ou agendar um novo atendimento.",
+        sugestoesContextuais: [
+          { label: "Vagas livres hoje", icon: Clock, command: "consultar horarios livres hoje" },
+          { label: "Confirmar amanhã", icon: Calendar, command: "preparar lembretes de confirmacao para amanha" },
+          { label: "Leva e Traz de hoje", icon: Car, command: "consultar rota leva e traz de hoje" },
+          { label: "Criar Agendamento", icon: Sparkles, command: "criar agendamento" },
+        ],
+      };
+    }
+
+    if (currentPath.includes("/financeiro") || currentPath.includes("/cobrancas") || currentPath.includes("/pagamentos")) {
+      return {
+        moduloNome: "Financeiro & Cobrança",
+        saudacaoContextual: "Olá, Eli! Estou conectada ao módulo Financeiro. Posso conferir contas a receber, faturamento do mês ou conciliação Pix.",
+        sugestoesContextuais: [
+          { label: "Contas a Receber", icon: DollarSign, command: "consultar valores a receber" },
+          { label: "Faturamento do Mês", icon: TrendingUp, command: "consultar faturamento do mes" },
+          { label: "Pendências de Cobrança", icon: AlertTriangle, command: "consultar pendencias financeiras" },
+          { label: "Programas Ativos", icon: Sparkles, command: "consultar catalogo de programas" },
+        ],
+      };
+    }
+
+    if (currentPath.includes("/clientes") || currentPath.includes("/pets")) {
+      return {
+        moduloNome: "Clientes & Pets",
+        saudacaoContextual: "Olá, Eli! Estou no módulo de Clientes & Pets. Posso buscar a ficha de um tutor, histórico de atendimentos ou aniversariantes.",
+        sugestoesContextuais: [
+          { label: "Buscar Cliente", icon: Users, command: "buscar cliente" },
+          { label: "Pets para Reativar", icon: Clock, command: "clientes inativos ha mais de 20 dias" },
+          { label: "Aniversariantes", icon: Gift, command: "aniversariantes do mes" },
+          { label: "Créditos de Programas", icon: Sparkles, command: "consultar saldos de planos" },
+        ],
+      };
+    }
+
+    if (currentPath.includes("/estoque") || currentPath.includes("/compras") || currentPath.includes("/fornecedores")) {
+      return {
+        moduloNome: "Estoque & Suprimentos",
+        saudacaoContextual: "Olá, Eli! Conectada ao Estoque. Posso verificar níveis de shampoos, itens abaixo do mínimo e lista de compras.",
+        sugestoesContextuais: [
+          { label: "Itens em Baixa", icon: Package, command: "consultar estoque baixo" },
+          { label: "Shampoos & Cosméticos", icon: Sparkles, command: "consultar estoque de shampoos" },
+          { label: "Últimas Compras", icon: DollarSign, command: "consultar ultimas compras" },
+        ],
+      };
+    }
+
+    if (currentPath.includes("/atendimentos")) {
+      return {
+        moduloNome: "Atendimentos & Execução",
+        saudacaoContextual: "Olá, Eli! Estou conectada à bancada de Atendimentos. Posso conferir os banhos em andamento, observações de tosa e histórico do pet.",
+        sugestoesContextuais: [
+          { label: "Em Atendimento Agora", icon: Scissors, command: "consultar atendimentos em andamento" },
+          { label: "Próximos da Fila", icon: Clock, command: "consultar proximos atendimentos de hoje" },
+          { label: "Finalizar Atendimento", icon: Sparkles, command: "como finalizar atendimento" },
+        ],
+      };
+    }
+
+    return {
+      moduloNome: "Central Geral",
+      saudacaoContextual: "Olá, Eli! Sou a Jessi, seu copiloto no Spa de Pet Tia Jéssica. Posso consultar a agenda, contas a receber, histórico de pets ou preparar agendamentos com sua supervisão. Como posso ajudar agora?",
+      sugestoesContextuais: [
+        { label: "Agenda de hoje", icon: Calendar, command: "consultar agenda de hoje" },
+        { label: "Caixa & Finanças", icon: DollarSign, command: "consultar valores a receber" },
+        { label: "Horários livres", icon: Clock, command: "consultar horarios livres hoje" },
+        { label: "Programas & Banhos", icon: Sparkles, command: "consultar catalogo de programas" },
+      ],
+    };
+  }, [currentPath]);
 
   const [messages, setMessages] = useState<JessiMessage[]>([
     {
       id: "msg_welcome",
       role: "assistant",
-      content: "Olá, Eli! Sou a Jessi, assistente inteligente do Spa de Pet Tia Jéssica. Posso consultar a agenda, conferir saldo de programas, verificar o faturamento ou preparar agendamentos com sua supervisão. Como posso ajudar agora?",
+      content: saudacaoContextual,
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -42,6 +142,21 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       day: "2-digit",
     }).format(new Date()),
   });
+
+  // Atualiza mensagem de boas-vindas se rota mudar e o chat estiver limpo
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].id === "msg_welcome") {
+      setMessages([
+        {
+          id: "msg_welcome",
+          role: "assistant",
+          content: saudacaoContextual,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    }
+  }, [saudacaoContextual]);
+
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -303,6 +418,15 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               </div>
             </div>
 
+            {/* Barra de Contexto da Rota Ativa */}
+            <div className="bg-emerald-950/10 px-4 py-1.5 border-b border-border/50 flex items-center justify-between text-xs shrink-0">
+              <div className="flex items-center gap-1.5 text-emerald-900 font-medium">
+                <Sparkles className="h-3.5 w-3.5 text-[#C8A951]" />
+                <span className="text-[11px]">Contexto: <strong className="text-foreground">{moduloNome}</strong></span>
+              </div>
+              <span className="text-[10px] text-muted-foreground">Sugestões em tempo real</span>
+            </div>
+
             {/* Corpo Conversacional Interativo com Cards */}
             <JessiChat
               messages={messages}
@@ -311,6 +435,27 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
               onCancelAction={handleCancelAction}
               isLoading={isLoading}
             />
+
+            {/* Pílulas de Sugestões Rápidas Contextuais */}
+            <div className="px-3 py-2 bg-muted/30 border-t border-border/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider shrink-0 pl-1">
+                Sugestões:
+              </span>
+              {sugestoesContextuais.map((sug, idx) => {
+                const Icon = sug.icon;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendMessage(sug.command)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background hover:bg-emerald-50 hover:border-emerald-600/50 border border-border/80 text-[11px] font-medium text-foreground whitespace-nowrap transition-all shadow-2xs group shrink-0"
+                  >
+                    <Icon className="h-3 w-3 text-emerald-700 group-hover:scale-110 transition-transform" />
+                    <span>{sug.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Barra de Entrada de Mensagens e Voz */}
             <JessiInputBar
@@ -332,3 +477,4 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     </AnimatePresence>
   );
 }
+

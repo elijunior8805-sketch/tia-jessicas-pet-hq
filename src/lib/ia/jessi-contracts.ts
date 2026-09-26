@@ -82,7 +82,7 @@ export interface JessiMessage {
   content: string;
   timestamp: string;
   cards?: Array<{
-    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta";
+    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta" | "leva_traz";
     data: any;
   }>;
   pendingAction?: JessiPendingAction | null;
@@ -104,12 +104,36 @@ export interface BlocoHoje {
   horariosLivres: string[];
 }
 
+export interface AgendamentoNaoConfirmado {
+  id: string;
+  clienteNome: string;
+  petNome: string;
+  telefone?: string;
+  hora: string;
+  servico?: string;
+  mensagemWhatsapp?: string;
+  whatsappUrl?: string;
+}
+
 export interface BlocoAmanha {
   totalAgendamentos: number;
   primeiroHorario?: string | null;
   levaTrazCount: number;
   naoConfirmados: number;
   horariosDisponiveisCount: number;
+  agendamentosNaoConfirmados?: AgendamentoNaoConfirmado[];
+}
+
+export interface ItemAtencaoDetalhe {
+  id: string;
+  clienteNome: string;
+  petNome?: string;
+  telefone?: string;
+  valor?: number;
+  status?: string;
+  horario?: string;
+  mensagemWhatsapp?: string;
+  whatsappUrl?: string;
 }
 
 export interface ItemAtencao {
@@ -119,6 +143,13 @@ export interface ItemAtencao {
   descricao: string;
   acaoSugerida: string;
   comando: string;
+  telefone?: string;
+  clienteNome?: string;
+  petNome?: string;
+  valor?: number;
+  mensagemWhatsapp?: string;
+  whatsappUrl?: string;
+  detalhes?: ItemAtencaoDetalhe[];
 }
 
 export interface ItemOportunidade {
@@ -127,6 +158,16 @@ export interface ItemOportunidade {
   descricao: string;
   acaoSugerida: string;
   comando: string;
+  tipo?: "encaixe" | "reativacao" | "programa" | "geral";
+  detalhes?: Array<{
+    id: string;
+    clienteNome: string;
+    petNome?: string;
+    telefone?: string;
+    diasSemVisita?: number;
+    mensagemWhatsapp?: string;
+    whatsappUrl?: string;
+  }>;
 }
 
 export interface JessiProactiveCentral {
@@ -138,3 +179,4 @@ export interface JessiProactiveCentral {
   precisaAtencao: ItemAtencao[];
   oportunidades: ItemOportunidade[];
 }
+

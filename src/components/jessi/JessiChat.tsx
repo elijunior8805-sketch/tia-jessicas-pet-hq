@@ -7,7 +7,9 @@ import { ProgramaCard } from "./cards/ProgramaCard";
 import { ComprovanteCard } from "./cards/ComprovanteCard";
 import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
 import { AlertaCard } from "./cards/AlertaCard";
+import { LevaTrazCard } from "./cards/LevaTrazCard";
 import { Sparkles, User, ArrowRight } from "lucide-react";
+
 
 interface JessiChatProps {
   messages: JessiMessage[];
@@ -98,6 +100,8 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                             )}
                           </div>
                         );
+                      case "leva_traz":
+                        return <LevaTrazCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       default:
                         return null;
                     }
