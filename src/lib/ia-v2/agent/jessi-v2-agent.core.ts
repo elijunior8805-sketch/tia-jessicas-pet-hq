@@ -24,6 +24,7 @@ import { consultarAniversariantesJessi } from "@/lib/ia/tools/comunicacao-tools"
 import { consultarResumoNegocioJessi, realizarAuditoriaIntegridadeJessi, consultarQualidadeIAJessi } from "@/lib/ia/tools/auditoria-tools";
 import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 import { SentinelasAdapter } from "../adapters/sentinelas.adapter";
+import { humanizarRespostaParaVoz } from "@/lib/ia/ia-voz-conversational";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Autonomia Supervisionada)
@@ -2293,9 +2294,14 @@ export async function processarMensagemJessiV2Core(
       jessi_version: "v2.0.0",
     });
 
+    const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
+    const respostaFinal = ehCanalVoz
+      ? humanizarRespostaParaVoz(respostaTexto, cards, input.modoBancada, user?.nome)
+      : respostaTexto;
+
     return {
       versao: "v2",
-      respostaTexto,
+      respostaTexto: respostaFinal,
       cards,
       pendingAction,
       novoContexto: {

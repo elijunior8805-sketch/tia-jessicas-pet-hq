@@ -150,6 +150,8 @@ export interface JessiV2ProcessInput {
     tool: string;
     params: Record<string, any>;
   } | null;
+  canal?: "voz" | "texto";
+  modoBancada?: boolean;
   correlationId?: string;
 }
 

@@ -237,6 +237,8 @@ export const JessiLayout: React.FC = () => {
           mensagem: textToSend,
           contexto: contexto as any,
           historico: messages.slice(-20) as any,
+          canal: isContinuousMode || isBancadaModeOpen ? "voz" : "texto",
+          modoBancada: isBancadaModeOpen,
           correlationId: `req_${Date.now()}`,
         },
       });

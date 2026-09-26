@@ -324,6 +324,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           mensagem: textToSend.trim(),
           contexto: contexto as any,
           historico: historicoRecente,
+          canal: isContinuousMode || isBancadaModeOpen ? "voz" : "texto",
+          modoBancada: isBancadaModeOpen,
         },
       });
 

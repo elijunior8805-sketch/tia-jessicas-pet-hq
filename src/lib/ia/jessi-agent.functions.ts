@@ -15,6 +15,8 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
       historico: z.array(z.any()).optional(),
       confirmacaoAcaoPendenteId: z.string().nullable().optional(),
       dadosConfirmacao: z.record(z.any()).nullable().optional(),
+      canal: z.enum(["voz", "texto"]).optional(),
+      modoBancada: z.boolean().optional(),
       correlationId: z.string().optional(),
     }).parse(data)
   )
