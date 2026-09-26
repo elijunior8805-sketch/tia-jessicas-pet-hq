@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { JessiSidebar } from "./JessiSidebar";
@@ -11,7 +11,8 @@ import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia
 import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
-import { Sparkles, PanelRightOpen, PanelRightClose, Mic } from "lucide-react";
+import { JessiBancadaMode } from "./JessiBancadaMode";
+import { Sparkles, PanelRightOpen, PanelRightClose, Mic, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const JessiLayout: React.FC = () => {
@@ -32,6 +33,7 @@ export const JessiLayout: React.FC = () => {
   });
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [moduloAtivo, setModuloAtivo] = useState("rotina");
+  const [isBancadaModeOpen, setIsBancadaModeOpen] = useState(false);
 
   // Carrega a Central Operacional Proativa com dados 100% reais do banco na inicializacao
   React.useEffect(() => {
@@ -168,6 +170,36 @@ export const JessiLayout: React.FC = () => {
         resumeListening();
       }
       return;
+    }
+
+    // Intercepta confirmação por voz quando houver ação pendente ativa
+    const acaoPendenteAtiva = contexto?.operacaoPreparada || messages.slice(-1)[0]?.pendingAction;
+    if (acaoPendenteAtiva && !selectedFile) {
+      const textoNorm = textToSend.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const ehConfirmacaoVoz =
+        /^(pode confirmar|confirmar|confirma|pode agendar|pode marcar|pode cancelar|pode fazer|sim|autorizado|ok pode confirmar|ta confirmado|confirmo|pode registrar|sim pode|pode|autorizo|confirme)$/i.test(textoNorm) ||
+        textoNorm === "sim" ||
+        textoNorm === "pode" ||
+        textoNorm === "confirma" ||
+        textoNorm === "confirmar" ||
+        textoNorm === "pode confirmar";
+
+      const ehCancelamentoVoz =
+        /^(cancela|cancelar|nao cancela|nao|esquece|deixa pra la|nao confirma|cancela isso|parar)$/i.test(textoNorm) ||
+        textoNorm === "nao" ||
+        textoNorm === "não" ||
+        textoNorm === "cancela" ||
+        textoNorm === "cancelar";
+
+      if (ehConfirmacaoVoz) {
+        setInputText("");
+        await handleConfirmAction(acaoPendenteAtiva);
+        return;
+      } else if (ehCancelamentoVoz) {
+        setInputText("");
+        handleCancelAction();
+        return;
+      }
     }
 
     const userMessageId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -460,6 +492,23 @@ export const JessiLayout: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setIsBancadaModeOpen(true);
+                if (!isContinuousMode) {
+                  startContinuousMode();
+                }
+                setTtsEnabled(true);
+              }}
+              title="Ativar Modo Bancada Mãos-Livres para Banho e Tosa"
+              className="h-8 px-3 text-xs font-bold gap-1.5 rounded-lg bg-[#123F2A] hover:bg-[#1A5C3D] text-[#F5E6BE] border border-[#C8A951]/50 shadow-xs cursor-pointer"
+            >
+              <Headphones className="h-3.5 w-3.5 text-[#C8A951] animate-pulse" />
+              <span className="hidden sm:inline">Modo Bancada</span>
+            </Button>
+
+            <Button
               variant={isContinuousMode ? "default" : "outline"}
               size="sm"
               onClick={toggleContinuousMode}
@@ -493,6 +542,13 @@ export const JessiLayout: React.FC = () => {
               onQuickAction={handleSendMessage} 
               centralData={centralData}
               isLoadingCentral={isLoadingCentral}
+              onOpenBancadaMode={() => {
+                setIsBancadaModeOpen(true);
+                if (!isContinuousMode) {
+                  startContinuousMode();
+                }
+                setTtsEnabled(true);
+              }}
             />
           ) : (
             <JessiChat
@@ -533,6 +589,25 @@ export const JessiLayout: React.FC = () => {
         contexto={contexto}
         isOpen={isContextOpen}
         onClose={() => setIsContextOpen(false)}
+      />
+
+      {/* Modo Bancada Mãos-Livres */}
+      <JessiBancadaMode
+        isOpen={isBancadaModeOpen}
+        onClose={() => setIsBancadaModeOpen(false)}
+        voiceStatus={voiceStatus}
+        isListening={isListening}
+        isSpeaking={isSpeaking}
+        interimTranscript={interimTranscript}
+        finalTranscript={finalTranscript}
+        ttsEnabled={ttsEnabled}
+        onToggleTts={() => setTtsEnabled(!ttsEnabled)}
+        onToggleListening={toggleContinuousMode}
+        onSendMessage={(txt) => handleSendMessage(txt)}
+        onConfirmAction={handleConfirmAction}
+        onCancelAction={handleCancelAction}
+        messages={messages}
+        isLoading={isLoading}
       />
     </div>
   );

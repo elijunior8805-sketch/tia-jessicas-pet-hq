@@ -20,7 +20,9 @@ import {
   Check,
   PhoneCall,
   Share2,
-  BarChart3
+  BarChart3,
+  Headphones,
+  Mic
 } from "lucide-react";
 import { JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { Button } from "@/components/ui/button";
@@ -32,12 +34,14 @@ interface JessiWelcomeProps {
   onQuickAction: (command: string) => void;
   centralData?: JessiProactiveCentral | null;
   isLoadingCentral?: boolean;
+  onOpenBancadaMode?: () => void;
 }
 
 export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
   onQuickAction,
   centralData,
   isLoadingCentral,
+  onOpenBancadaMode,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -87,8 +91,35 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
         </div>
       </div>
 
-      {/* 2. Briefing Executivo em Áudio (Podcast da Jessi) */}
-      <JessiAudioBriefing centralData={centralData} />
+      {/* 2. Briefing Executivo em Áudio & Modo Bancada Mãos-Livres */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className={onOpenBancadaMode ? "lg:col-span-2" : "lg:col-span-3"}>
+          <JessiAudioBriefing centralData={centralData} />
+        </div>
+        {onOpenBancadaMode && (
+          <div className="rounded-2xl border border-[#C8A951]/40 bg-linear-to-br from-[#123F2A] via-[#164E34] to-[#0D3322] p-4 text-white flex flex-col justify-between shadow-md">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Headphones className="h-5 w-5 text-[#C8A951] animate-pulse" />
+                <span className="font-bold text-xs sm:text-sm text-[#F5E6BE] font-display">
+                  Modo Bancada Mãos-Livres
+                </span>
+              </div>
+              <p className="text-[11px] text-white/80 leading-snug">
+                Fale com a Jessi enquanto realiza banhos e tosas. Microfone contínuo e confirmações por voz.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={onOpenBancadaMode}
+              className="mt-3 w-full h-8 text-xs bg-[#C8A951] hover:bg-[#B59640] text-[#123F2A] font-bold rounded-xl shadow-xs cursor-pointer gap-1.5"
+            >
+              <Mic className="h-3.5 w-3.5" />
+              Ativar Modo Bancada
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* 3. Grid de 4 Blocos Operacionais */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-5">
