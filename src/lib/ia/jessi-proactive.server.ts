@@ -1,59 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
+import type { BlocoHoje, BlocoAmanha, ItemAtencao, ItemOportunidade, JessiProactiveCentral } from "./jessi-contracts";
+
+export type { BlocoHoje, BlocoAmanha, ItemAtencao, ItemOportunidade, JessiProactiveCentral } from "./jessi-contracts";
 
 /**
  * Central Operacional Proativa da Jessi - Spa de Pet Tia Jéssica
  */
-
-export interface BlocoHoje {
-  totalAgendamentos: number;
-  proximoAtendimento?: {
-    hora: string;
-    pet: string;
-    tutor: string;
-    servico: string;
-  } | null;
-  emAtendimento: number;
-  concluidos: number;
-  levaTrazCount: number;
-  faturamentoPrevisto: number;
-  horariosLivres: string[];
-}
-
-export interface BlocoAmanha {
-  totalAgendamentos: number;
-  primeiroHorario?: string | null;
-  levaTrazCount: number;
-  naoConfirmados: number;
-  horariosDisponiveisCount: number;
-}
-
-export interface ItemAtencao {
-  id: string;
-  tipo: "urgente" | "aviso" | "info";
-  titulo: string;
-  descricao: string;
-  acaoSugerida: string;
-  comando: string;
-}
-
-export interface ItemOportunidade {
-  id: string;
-  titulo: string;
-  descricao: string;
-  acaoSugerida: string;
-  comando: string;
-}
-
-export interface JessiProactiveCentral {
-  saudacaoPersonalizada: string;
-  dataReferencia: string;
-  proprietarioNome: string;
-  hoje: BlocoHoje;
-  amanha: BlocoAmanha;
-  precisaAtencao: ItemAtencao[];
-  oportunidades: ItemOportunidade[];
-}
 
 export async function gerarCentralOperacionalJessi(
   sb: SupabaseClient<Database>,
