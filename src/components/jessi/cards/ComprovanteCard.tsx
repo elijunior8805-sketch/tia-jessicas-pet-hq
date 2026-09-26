@@ -1,6 +1,8 @@
-import React from "react";
-import { FileText, CheckCircle, AlertCircle, User, Calendar, CreditCard } from "lucide-react";
+import React, { useState } from "react";
+import { FileText, CheckCircle, AlertCircle, User, Calendar, CreditCard, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface ComprovanteCardProps {
   data: any;
@@ -8,6 +10,7 @@ interface ComprovanteCardProps {
 }
 
 export const ComprovanteCard: React.FC<ComprovanteCardProps> = ({ data, onConfirmarConciliacao }) => {
+  const [copied, setCopied] = useState(false);
   const valor = Number(data?.valor || 0);
   const pagador = data?.pagador || "-";
   const dataTransacao = data?.data || "-";
@@ -15,22 +18,41 @@ export const ComprovanteCard: React.FC<ComprovanteCardProps> = ({ data, onConfir
   const situacao = data?.situacao || "concluido";
   const candidatos = data?.candidatos || [];
 
+  const handleCopyResumo = () => {
+    const resumo = `Comprovante Pix: R$ ${valor.toFixed(2)} - Pagador: ${pagador} - Data: ${dataTransacao}`;
+    navigator.clipboard.writeText(resumo);
+    setCopied(true);
+    toast.success("Dados do comprovante copiados!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className="rounded-xl border border-border/80 bg-background/95 p-3.5 space-y-3 text-xs shadow-xs">
+    <div className="rounded-xl border border-border/80 bg-card p-3.5 space-y-3 text-xs shadow-xs">
       <div className="flex items-center justify-between border-b border-border/50 pb-2">
         <span className="font-semibold text-foreground flex items-center gap-1.5">
           <FileText className="h-4 w-4 text-emerald-600" />
           <span>Comprovante Pix Processado</span>
         </span>
-        <Badge
-          className={
-            situacao === "concluido"
-              ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-              : "bg-amber-100 text-amber-800 border-amber-200"
-          }
-        >
-          {situacao === "concluido" ? "Concluído" : "Agendado"}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleCopyResumo}
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            title="Copiar dados"
+          >
+            {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+          </Button>
+          <Badge
+            className={
+              situacao === "concluido"
+                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                : "bg-amber-100 text-amber-800 border-amber-200"
+            }
+          >
+            {situacao === "concluido" ? "Concluído" : "Agendado"}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -86,7 +108,7 @@ export const ComprovanteCard: React.FC<ComprovanteCardProps> = ({ data, onConfir
                     onClick={() => onConfirmarConciliacao(c)}
                     className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-medium"
                   >
-                    Vincular
+                    Vincular & Baixar
                   </button>
                 )}
               </div>
@@ -97,3 +119,4 @@ export const ComprovanteCard: React.FC<ComprovanteCardProps> = ({ data, onConfir
     </div>
   );
 };
+

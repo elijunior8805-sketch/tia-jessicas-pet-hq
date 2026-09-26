@@ -23,6 +23,8 @@ import {
 import { JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { JessiAudioBriefing } from "./JessiAudioBriefing";
+
 
 interface JessiWelcomeProps {
   onQuickAction: (command: string) => void;
@@ -83,8 +85,12 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
         </div>
       </div>
 
-      {/* 2. Grid de 4 Blocos Operacionais */}
+      {/* 2. Briefing Executivo em Áudio (Podcast da Jessi) */}
+      <JessiAudioBriefing centralData={centralData} />
+
+      {/* 3. Grid de 4 Blocos Operacionais */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-5">
+
         
         {/* BLOCO 1: HOJE */}
         <div className="rounded-2xl border border-border/80 bg-card p-3.5 sm:p-4 md:p-5 shadow-xs space-y-3.5 sm:space-y-4 min-w-0">
