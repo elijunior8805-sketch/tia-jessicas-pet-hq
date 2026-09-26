@@ -225,10 +225,27 @@ export class VoiceRecognizer {
   private agendarDisparoSilencio() {
     this.limparTimerSilencio();
 
-    // Se houver fala acumulada ou interim ativo, conta 1.5s de silêncio
+    const textoAtual = `${this.acumulado} ${this.interimAtual}`.trim().toLowerCase();
+    const palavras = textoAtual.split(/\s+/).filter(Boolean);
+
+    // Detecção dinâmica de latência:
+    // 1. Respostas rápidas e confirmações ("sim", "pode confirmar", "cancela") -> 600ms
+    const ehComandoCurto =
+      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|pode|autorizado|fechar|sair)$/i.test(textoAtual) ||
+      palavras.length <= 2;
+
+    // 2. Frases completas ou perguntas (>= 3 palavras) -> 850ms
+    // 3. Ditados longos -> 1100ms
+    let delayCalculado = this.silenceMs;
+    if (ehComandoCurto && palavras.length <= 2) {
+      delayCalculado = 650;
+    } else if (palavras.length >= 3) {
+      delayCalculado = Math.min(this.silenceMs, 850);
+    }
+
     this.silenceTimer = setTimeout(() => {
       this.processarSilencioDetectado();
-    }, this.silenceMs);
+    }, delayCalculado);
   }
 
   private limparTimerSilencio() {

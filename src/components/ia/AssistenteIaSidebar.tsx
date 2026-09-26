@@ -28,6 +28,8 @@ import { processarMensagemJessi } from "@/lib/ia/jessi-agent.functions";
 import { JessiMessage, JessiPendingAction } from "@/lib/ia/jessi-contracts";
 import { JessiContextState } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
+import { JessiBancadaMode } from "@/components/jessi/JessiBancadaMode";
+import { Headphones, ShieldAlert, Share2 } from "lucide-react";
 
 interface AssistenteIaSidebarProps {
   isOpen: boolean;
@@ -135,6 +137,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
   const [status, setStatus] = useState<JessiStatus>("disponivel");
   const [statusDetalhe, setStatusDetalhe] = useState<string | undefined>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isBancadaModeOpen, setIsBancadaModeOpen] = useState(false);
   const [contexto, setContexto] = useState<JessiContextState>({
     dataReferencia: new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Sao_Paulo",
@@ -261,6 +264,36 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     if (!textToSend.trim() && !selectedFile) {
       if (isContinuousMode) resumeListening();
       return;
+    }
+
+    // Intercepta confirmação por voz quando houver ação pendente ativa
+    const acaoPendenteAtiva = contexto?.operacaoPreparada || messages.slice(-1)[0]?.pendingAction;
+    if (acaoPendenteAtiva && !selectedFile) {
+      const textoNorm = textToSend.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const ehConfirmacaoVoz =
+        /^(pode confirmar|confirmar|confirma|pode agendar|pode marcar|pode cancelar|pode fazer|sim|autorizado|ok pode confirmar|ta confirmado|confirmo|pode registrar|sim pode|pode|autorizo|confirme)$/i.test(textoNorm) ||
+        textoNorm === "sim" ||
+        textoNorm === "pode" ||
+        textoNorm === "confirma" ||
+        textoNorm === "confirmar" ||
+        textoNorm === "pode confirmar";
+
+      const ehCancelamentoVoz =
+        /^(cancela|cancelar|nao cancela|nao|esquece|deixa pra la|nao confirma|cancela isso|parar)$/i.test(textoNorm) ||
+        textoNorm === "nao" ||
+        textoNorm === "não" ||
+        textoNorm === "cancela" ||
+        textoNorm === "cancelar";
+
+      if (ehConfirmacaoVoz) {
+        setInputText("");
+        await handleConfirmAction(acaoPendenteAtiva);
+        return;
+      } else if (ehCancelamentoVoz) {
+        setInputText("");
+        handleCancelAction();
+        return;
+      }
     }
 
     const userMessageId = `msg_user_${Date.now()}`;
@@ -453,6 +486,22 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
               <div className="flex items-center gap-1">
                 <Button
+                  size="sm"
+                  onClick={() => {
+                    setIsBancadaModeOpen(true);
+                    if (!isContinuousMode) {
+                      startContinuousMode();
+                    }
+                    setTtsEnabled(true);
+                  }}
+                  className="h-8 px-2.5 text-xs font-bold gap-1 bg-[#123F2A] hover:bg-[#1A5C3D] text-[#F5E6BE] border border-[#C8A951]/50 rounded-lg shadow-xs cursor-pointer"
+                  title="Ativar Modo Bancada Mãos-Livres para Banho e Tosa"
+                >
+                  <Headphones className="h-3.5 w-3.5 text-[#C8A951] animate-pulse" />
+                  <span className="hidden sm:inline">Bancada</span>
+                </Button>
+
+                <Button
                   size="icon"
                   variant="ghost"
                   onClick={handleNovaConversa}
@@ -542,6 +591,25 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
           </motion.div>
         </div>
       )}
+
+      {/* Modo Bancada Mãos-Livres Integrado */}
+      <JessiBancadaMode
+        isOpen={isBancadaModeOpen}
+        onClose={() => setIsBancadaModeOpen(false)}
+        voiceStatus={voiceStatus}
+        isListening={isListening}
+        isSpeaking={isSpeaking}
+        interimTranscript={interimTranscript}
+        finalTranscript={finalTranscript}
+        ttsEnabled={ttsEnabled}
+        onToggleTts={() => setTtsEnabled(!ttsEnabled)}
+        onToggleListening={toggleContinuousMode}
+        onSendMessage={(txt) => handleSendMessage(txt)}
+        onConfirmAction={handleConfirmAction}
+        onCancelAction={handleCancelAction}
+        messages={messages}
+        isLoading={isLoading}
+      />
     </AnimatePresence>
   );
 }
