@@ -3,7 +3,7 @@ import { MessageSquare, Send, Copy, Check, ExternalLink, User, Phone, Sparkles, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { abrirWhatsApp, formatarTelefoneBR, gerarLinkWhatsApp } from "@/lib/whatsapp";
+import { abrirWhatsApp, formatarTelefoneBR, montarWaUrl, normalizarTelefoneBR } from "@/lib/whatsapp";
 
 interface ComunicacaoCardProps {
   data: any;
@@ -63,7 +63,8 @@ export const ComunicacaoCard: React.FC<ComunicacaoCardProps> = ({ data, onAction
               const tutorNome = item.clientes?.nome || item.clienteNome || "Tutor";
               const telefone = item.clientes?.telefone || item.telefone || "";
               const msgParabens = `Olá, ${tutorNome}! 🎉 Hoje é um dia super especial: aniversário do(a) querido(a) ${petNome}! 🎂🐾 Toda a equipe do Spa de Pet Tia Jéssica deseja muita saúde, lambeijos e alegrias! Que tal trazer ele(a) para um banho especial de aniversário? 🐶✨`;
-              const urlWhats = telefone ? gerarLinkWhatsApp(telefone, msgParabens) : null;
+              const telefoneValidado = normalizarTelefoneBR(telefone);
+              const urlWhats = telefoneValidado.ok ? montarWaUrl(telefoneValidado.e164, msgParabens) : null;
               const isItemCopied = copiedId === `niver-${idx}`;
 
               return (
