@@ -440,35 +440,35 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <button
             type="button"
-            onClick={() => onQuickAction("Localize o cliente Eli Júnior")}
+            onClick={() => onQuickAction("Quais os horários livres de hoje?")}
             className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
           >
-            <Users className="h-4 w-4 text-emerald-700 shrink-0" />
-            <span className="truncate">Buscar Eli Júnior</span>
+            <Clock className="h-4 w-4 text-emerald-700 shrink-0" />
+            <span className="truncate">Horários Livres Hoje</span>
           </button>
           <button
             type="button"
-            onClick={() => onQuickAction("Quais são os pets do Eli Júnior?")}
+            onClick={() => onQuickAction("Otimizar rotas do Leva e Traz")}
             className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
           >
-            <Gift className="h-4 w-4 text-emerald-700 shrink-0" />
-            <span className="truncate">Pets do Eli Júnior</span>
+            <Car className="h-4 w-4 text-emerald-700 shrink-0" />
+            <span className="truncate">Rotas Leva & Traz</span>
           </button>
           <button
             type="button"
-            onClick={() => onQuickAction("consultar valores a receber")}
+            onClick={() => onQuickAction("Quem são os clientes sumidos?")}
+            className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-purple-50/50 hover:border-purple-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
+          >
+            <Users className="h-4 w-4 text-purple-700 shrink-0" />
+            <span className="truncate">Reativar Clientes</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickAction("Como está o financeiro deste mês?")}
             className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
           >
             <DollarSign className="h-4 w-4 text-emerald-700 shrink-0" />
-            <span className="truncate">Contas a Receber</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickAction("consultar catalogo de programas")}
-            className="flex items-center gap-2 p-2.5 rounded-xl border border-border/80 bg-background hover:bg-emerald-50/50 hover:border-emerald-600/40 text-left text-xs font-medium text-foreground transition-all shadow-2xs group min-w-0"
-          >
-            <Sparkles className="h-4 w-4 text-[#C8A951] shrink-0" />
-            <span className="truncate">Programas & Banhos</span>
+            <span className="truncate">Diagnóstico Financeiro</span>
           </button>
         </div>
       </div>

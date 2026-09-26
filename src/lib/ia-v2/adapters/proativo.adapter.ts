@@ -5,6 +5,8 @@ import { AgendaAdapter } from "./agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "./financeiro-relatorios.adapter";
 import { ProgramasCreditosAdapter } from "./programas-creditos.adapter";
 import { MensagensWhatsAppAdapter } from "./mensagens-whatsapp.adapter";
+import { identificarAniversariantesIA } from "@/lib/ia/ia-comunicacao.server";
+import { gerarLinkWhatsApp } from "@/lib/whatsapp";
 
 /**
  * Motor de Proatividade da Jessi V2 (Seção 18)
@@ -62,11 +64,13 @@ export class ProativoAdapter {
       }).format(hoje);
 
       // 1. Coleta concorrente dos dados operacionais reais
-      const [agendaRes, finRes, progRes, encaixesRes] = await Promise.all([
+      const [agendaRes, finRes, progRes, encaixesRes, niverRes, retornoRes] = await Promise.all([
         AgendaAdapter.consultarAgendaPorData(sb, hojeStr),
         FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, "hoje"),
         ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb),
         AgendaAdapter.identificarEncaixesDisponiveis(sb, hojeStr),
+        identificarAniversariantesIA(sb),
+        ProativoAdapter.identificarClientesParaRetorno(sb),
       ]);
 
       const itensPrioritarios: JessiV2ProactiveItem[] = [];
@@ -90,7 +94,27 @@ export class ProativoAdapter {
         });
       }
 
-      // Vetor 3 & 4: Programas Vencendo e Créditos Não Utilizados
+      // Vetor 3: Aniversariantes do Dia
+      const aniversariantes = (niverRes?.data as any[]) || [];
+      aniversariantes.slice(0, 3).forEach((n: any) => {
+        const petNome = n.nome || n.petNome || "Pet";
+        const tutorNome = n.clientes?.nome || n.clienteNome || "Tutor";
+        const tel = n.clientes?.telefone || n.telefone || "";
+        const msg = `Olá, ${tutorNome}! 🎉 Hoje é o aniversário do(a) querido(a) ${petNome}! 🎂🐾 O Spa de Pet Tia Jéssica deseja muita saúde e alegrias!`;
+        const link = tel ? gerarLinkWhatsApp(tel, msg) : undefined;
+        itensPrioritarios.push({
+          id: `niver_${n.id}`,
+          categoria: "sugestao_mensagem",
+          urgencia: "media",
+          titulo: `🎂 Aniversário de ${petNome} hoje!`,
+          descricao: `Tutor(a): ${tutorNome}. Envie felicitações carinhosas com 1 clique.`,
+          acaoSugerida: "Parabenizar no WhatsApp",
+          comandoAtivacao: `parabenizar aniversariante ${petNome}`,
+          linkWhatsApp: link,
+        });
+      });
+
+      // Vetor 4 & 5: Programas Vencendo e Créditos Não Utilizados
       const programas = progRes.data || [];
       const programasVencendo = programas.filter((p: any) => p.diasRestantes <= 7 && p.creditosDisponiveis > 0);
 
@@ -115,7 +139,22 @@ export class ProativoAdapter {
         });
       });
 
-      // Vetor 5: Pagamentos Pendentes / Vencidos
+      // Vetor 6: Clientes para Retorno / Reativação
+      const retornos = (retornoRes?.data as any[]) || [];
+      if (retornos.length > 0) {
+        const topRetorno = retornos[0];
+        oportunidadesVendas.push({
+          id: "opp_reativacao_clientes",
+          categoria: "clientes_para_retorno",
+          urgencia: "media",
+          titulo: `${retornos.length} cliente(s) para reativação`,
+          descricao: `Exemplo: ${topRetorno.cliente?.nome || "Cliente"} (${topRetorno.pet?.nome || "Pet"}) ausente há ${topRetorno.diasInativo || 0} dias.`,
+          acaoSugerida: "Convidar no WhatsApp",
+          comandoAtivacao: "quem são os clientes sumidos",
+        });
+      }
+
+      // Vetor 7: Pagamentos Pendentes / Vencidos
       const pendencias = finRes.data.valoresVencidosDevedores || 0;
       if (pendencias > 0) {
         itensPrioritarios.push({
