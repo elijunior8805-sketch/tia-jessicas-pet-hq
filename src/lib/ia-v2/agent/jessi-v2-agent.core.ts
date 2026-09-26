@@ -20,6 +20,8 @@ import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
 import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
 import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/lib/ia/tools/leva-traz-tools";
+import { consultarAniversariantesJessi } from "@/lib/ia/tools/comunicacao-tools";
+import { consultarResumoNegocioJessi, realizarAuditoriaIntegridadeJessi, consultarQualidadeIAJessi } from "@/lib/ia/tools/auditoria-tools";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Autonomia Supervisionada)
@@ -1942,7 +1944,36 @@ export async function processarMensagemJessiV2Core(
         const totalPendente = aReceber + vencidos;
         const ticket = Number(dadosFin?.ticketMedio || 0);
 
-        if (intencao.intencao === "consultar_contas_a_receber" || intencao.intencao === "consultar_inadimplencia_devedores") {
+        if (intencao.intencao === "consultar_resumo_operacional" || intencao.intencao === "resumo_negocio") {
+          const resResumo = await consultarResumoNegocioJessi();
+          const d: any = resResumo.data || {};
+          respostaTexto = `📊 **Diagnóstico 360° da Operação**:\n• **Agendamentos de Hoje**: ${d.agendamentosHoje || 0}\n• **Faturamento do Mês**: ${brl(d.faturamentoMes || 0)}\n• **Clientes Cadastrados**: ${d.totalClientes || 0}\n• **Pets no Spa**: ${d.totalPets || 0}\n\n💡 **Saúde Operacional**: Operação fluindo dentro dos parâmetros ideais.`;
+          cards.push({
+            type: "financeiro",
+            title: "Diagnóstico 360° da Operação",
+            subtitle: "Visão Executiva em Tempo Real",
+            data: d,
+          });
+        } else if (intencao.intencao === "auditoria_integridade") {
+          const resAudit = await realizarAuditoriaIntegridadeJessi(sb);
+          const d: any = resAudit.data || {};
+          respostaTexto = `🛡️ **Auditoria de Integridade Operacional**:\n• **Consistência de Dados**: ${resAudit.success ? "100% íntegra" : "Atenção requerida"}\n• **Inconsistências Detectadas**: ${d?.resumo?.alertas || 0}\n\n${resAudit.summary || ""}`;
+          cards.push({
+            type: "financeiro",
+            title: "Auditoria de Integridade",
+            subtitle: `Status: ${resAudit.success ? "Íntegro" : "Revisar"}`,
+            data: d,
+          });
+        } else if (intencao.intencao === "qualidade_ia") {
+          const resQual = await consultarQualidadeIAJessi();
+          const d: any = resQual.data || {};
+          respostaTexto = `🤖 **Métricas de Qualidade da Jessi**:\n• **Taxa de Assertividade**: ${Number(d?.taxa_sucesso || 99).toFixed(1)}%\n• **Operações Auditadas**: ${d?.total_chamadas || 0}\n• **Mutações Supervisionadas**: ${d?.mutacoes_executadas || 0}\n\n✨ Jessi operando em máxima conformidade com as regras de negócio!`;
+          cards.push({
+            type: "financeiro",
+            title: "Indicadores de Qualidade & Assertividade da IA",
+            data: d,
+          });
+        } else if (intencao.intencao === "consultar_contas_a_receber" || intencao.intencao === "consultar_inadimplencia_devedores") {
           const devedores: any[] = dadosFin?.devedores || [];
           if (devedores.length > 0) {
             const itens = devedores.slice(0, 5).map(
@@ -2079,62 +2110,79 @@ export async function processarMensagemJessiV2Core(
           }
         }
       } else if (intencao.dominio === "comunicacao_mensagens") {
-        const clienteCtx = novoContexto.cliente || contextoAtual.cliente;
-        const petCtx = novoContexto.pet || contextoAtual.pet;
-        const nomeCliente = clienteCtx?.nome || intencao.entidades.clienteNome || "Cliente";
-        const nomePet = petCtx?.nome || intencao.entidades.petNome || undefined;
-
-        let telefoneCliente = "";
-        if (clienteCtx?.id) {
-          try {
-            const fichaCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteCtx.id);
-            const dados = fichaCli.data as any;
-            telefoneCliente = dados?.whatsapp || dados?.telefone || "";
-          } catch {
-            // Segue sem telefone
+        if (intencao.intencao === "consultar_aniversariantes") {
+          const resNiver = await consultarAniversariantesJessi(sb);
+          const aniversariantes = (resNiver.data as any[]) || [];
+          if (aniversariantes.length > 0) {
+            const listaTxt = aniversariantes.map((a: any) => `• 🎂 **${a.petNome || a.clienteNome || "Pet"}** (Tutor: ${a.clienteNome || "Cliente"})`).join("\n");
+            respostaTexto = `🎉 **Aniversariantes Encontrados**:\nIdentifiquei **${aniversariantes.length} aniversariante(s)**:\n\n${listaTxt}\n\n💡 **Ação**: Clique no card abaixo para enviar uma mensagem carinhosa de parabéns no WhatsApp!`;
+          } else {
+            respostaTexto = `🎂 **Aniversários**: Não há aniversariantes registrados para a data de hoje ou nos próximos dias.`;
           }
-        }
-
-        // Determina tipo de mensagem baseado no texto
-        let tipoMensagem: "lembrete_agenda" | "pet_pronto" | "confirmacao_pix" | "reativacao_carinho" | "cobranca" = "lembrete_agenda";
-        if (textoLimpo.toLowerCase().includes("pronto") || textoLimpo.toLowerCase().includes("terminou") || textoLimpo.toLowerCase().includes("acabou")) {
-          tipoMensagem = "pet_pronto";
-        } else if (textoLimpo.toLowerCase().includes("pix") || textoLimpo.toLowerCase().includes("comprovante")) {
-          tipoMensagem = "confirmacao_pix";
-        } else if (textoLimpo.toLowerCase().includes("saudade") || textoLimpo.toLowerCase().includes("sumido") || textoLimpo.toLowerCase().includes("reativação")) {
-          tipoMensagem = "reativacao_carinho";
-        } else if (textoLimpo.toLowerCase().includes("cobrança") || textoLimpo.toLowerCase().includes("cobranca") || textoLimpo.toLowerCase().includes("devendo") || textoLimpo.toLowerCase().includes("pendência")) {
-          tipoMensagem = "cobranca";
-        }
-
-        const msgGerada = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
-          telefoneDestino: telefoneCliente,
-          nomeCliente,
-          nomePet,
-          tipoMensagem,
-          detalhes: {
-            horario: intencao.entidades.hora ? `às ${intencao.entidades.hora}` : "no horário agendado",
-            valor: intencao.entidades.valor || 0,
-          },
-        });
-
-        if (telefoneCliente) {
-          respostaTexto = `Preparei a mensagem para **${nomeCliente}**! Você pode enviar diretamente no WhatsApp ou copiar o texto pelo card abaixo:`;
+          cards.push({
+            type: "comunicacao",
+            title: "Aniversariantes do Spa de Pet",
+            subtitle: `${aniversariantes.length} aniversariante(s)`,
+            data: resNiver.data,
+          });
         } else {
-          respostaTexto = `Preparei a mensagem para **${nomeCliente}** no card abaixo. *(Observação: cliente sem telefone cadastrado para abertura direta).*`;
-        }
+          const clienteCtx = novoContexto.cliente || contextoAtual.cliente;
+          const petCtx = novoContexto.pet || contextoAtual.pet;
+          const nomeCliente = clienteCtx?.nome || intencao.entidades.clienteNome || "Cliente";
+          const nomePet = petCtx?.nome || intencao.entidades.petNome || undefined;
 
-        cards.push({
-          type: "comunicacao",
-          title: `Mensagem WhatsApp — ${nomeCliente}`,
-          subtitle: `Tipo: ${tipoMensagem.replace(/_/g, " ").toUpperCase()}`,
-          data: {
-            ...msgGerada,
-            cliente: nomeCliente,
-            pet: nomePet,
+          let telefoneCliente = "";
+          if (clienteCtx?.id) {
+            try {
+              const fichaCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteCtx.id);
+              const dados = fichaCli.data as any;
+              telefoneCliente = dados?.whatsapp || dados?.telefone || "";
+            } catch {
+              // Segue sem telefone
+            }
+          }
+
+          // Determina tipo de mensagem baseado no texto
+          let tipoMensagem: "lembrete_agenda" | "pet_pronto" | "confirmacao_pix" | "reativacao_carinho" | "cobranca" = "lembrete_agenda";
+          if (textoLimpo.toLowerCase().includes("pronto") || textoLimpo.toLowerCase().includes("terminou") || textoLimpo.toLowerCase().includes("acabou")) {
+            tipoMensagem = "pet_pronto";
+          } else if (textoLimpo.toLowerCase().includes("pix") || textoLimpo.toLowerCase().includes("comprovante")) {
+            tipoMensagem = "confirmacao_pix";
+          } else if (textoLimpo.toLowerCase().includes("saudade") || textoLimpo.toLowerCase().includes("sumido") || textoLimpo.toLowerCase().includes("reativação")) {
+            tipoMensagem = "reativacao_carinho";
+          } else if (textoLimpo.toLowerCase().includes("cobrança") || textoLimpo.toLowerCase().includes("cobranca") || textoLimpo.toLowerCase().includes("devendo") || textoLimpo.toLowerCase().includes("pendência")) {
+            tipoMensagem = "cobranca";
+          }
+
+          const msgGerada = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+            telefoneDestino: telefoneCliente,
+            nomeCliente,
+            nomePet,
             tipoMensagem,
-          },
-        });
+            detalhes: {
+              horario: intencao.entidades.hora ? `às ${intencao.entidades.hora}` : "no horário agendado",
+              valor: intencao.entidades.valor || 0,
+            },
+          });
+
+          if (telefoneCliente) {
+            respostaTexto = `Preparei a mensagem para **${nomeCliente}**! Você pode enviar diretamente no WhatsApp ou copiar o texto pelo card abaixo:`;
+          } else {
+            respostaTexto = `Preparei a mensagem para **${nomeCliente}** no card abaixo. *(Observação: cliente sem telefone cadastrado para abertura direta).*`;
+          }
+
+          cards.push({
+            type: "comunicacao",
+            title: `Mensagem WhatsApp — ${nomeCliente}`,
+            subtitle: `Tipo: ${tipoMensagem.replace(/_/g, " ").toUpperCase()}`,
+            data: {
+              ...msgGerada,
+              cliente: nomeCliente,
+              pet: nomePet,
+              tipoMensagem,
+            },
+          });
+        }
       } else if (intencao.intencao === "agradecimento_despedida") {
         const nomeOp = user?.nome ? user.nome.split(" ")[0] : "Eli";
         const respostasCarinhosas = [

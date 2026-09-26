@@ -731,6 +731,49 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("quem convidar") ||
       textoLower.includes("convidar clientes");
 
+    // Aniversariantes do Dia / Semana
+    const ehAniversariantes =
+      textoLower.includes("aniversariante") ||
+      textoLower.includes("aniversariantes") ||
+      textoLower.includes("aniversário") ||
+      textoLower.includes("aniversario") ||
+      textoLower.includes("quem faz aniversário") ||
+      textoLower.includes("quem faz aniversario") ||
+      textoLower.includes("aniversariantes do mês") ||
+      textoLower.includes("aniversariantes de hoje");
+
+    // Resumo do Negócio / Diagnóstico Geral
+    const ehResumoOperacional =
+      textoLower.includes("resumo do negócio") ||
+      textoLower.includes("resumo do negocio") ||
+      textoLower.includes("diagnóstico 360") ||
+      textoLower.includes("diagnostico 360") ||
+      textoLower.includes("resumo operacional") ||
+      textoLower.includes("como está o negócio") ||
+      textoLower.includes("como ta o negocio") ||
+      textoLower.includes("visão geral do negócio") ||
+      textoLower.includes("visao geral do negocio");
+
+    // Auditoria de Integridade e Dados
+    const ehAuditoriaIntegridade =
+      textoLower.includes("auditoria de dados") ||
+      textoLower.includes("auditoria de integridade") ||
+      textoLower.includes("auditar dados") ||
+      textoLower.includes("auditoria integridade") ||
+      textoLower.includes("verificar consistência") ||
+      textoLower.includes("verificar consistencia") ||
+      textoLower.includes("auditar sistema");
+
+    // Qualidade e Assertividade da IA
+    const ehQualidadeIA =
+      textoLower.includes("qualidade da ia") ||
+      textoLower.includes("qualidade de ia") ||
+      textoLower.includes("assertividade da jessi") ||
+      textoLower.includes("assertividade da ia") ||
+      textoLower.includes("métricas da ia") ||
+      textoLower.includes("metricas da ia") ||
+      textoLower.includes("taxa de acerto");
+
     if (ehAgradecimentoDespedida) {
       dominio = "geral_conversacional";
       intencao = "agradecimento_despedida";
@@ -741,6 +784,34 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       intencao = "selecionar_candidato_ordinal";
       ferramentaSugerida = "buscar_clientes_pets";
       explicacao = `Seleção da opção ordinal "${matchOrdinal[1]}" da lista de desambiguação.`;
+    }
+    // Aniversariantes
+    else if (ehAniversariantes) {
+      dominio = "comunicacao_mensagens";
+      intencao = "consultar_aniversariantes";
+      ferramentaSugerida = "consultar_aniversariantes";
+      explicacao = "Consultando aniversariantes do dia e período.";
+    }
+    // Resumo Operacional / Negócio
+    else if (ehResumoOperacional) {
+      dominio = "financeiro_relatorios";
+      intencao = "consultar_resumo_operacional";
+      ferramentaSugerida = "consultar_resumo_operacional";
+      explicacao = "Gerando diagnóstico 360° da operação, clientes e finanças.";
+    }
+    // Auditoria de Integridade
+    else if (ehAuditoriaIntegridade) {
+      dominio = "financeiro_relatorios";
+      intencao = "auditoria_integridade";
+      ferramentaSugerida = "auditoria_integridade";
+      explicacao = "Auditoria de consistência entre atendimentos, contas e pagamentos.";
+    }
+    // Qualidade e Assertividade da IA
+    else if (ehQualidadeIA) {
+      dominio = "financeiro_relatorios";
+      intencao = "qualidade_ia";
+      ferramentaSugerida = "qualidade_ia";
+      explicacao = "Consultando métricas de qualidade e assertividade operacional da Jessi.";
     }
     // Rota e Itinerário Leva & Traz
     else if (ehConsultaLevaTraz) {

@@ -8,6 +8,10 @@ import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
 import { MensagensWhatsAppAdapter, JessiV2WhatsAppPayload } from "../adapters/mensagens-whatsapp.adapter";
 import { ProativoAdapter } from "../adapters/proativo.adapter";
+import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/lib/ia/tools/leva-traz-tools";
+import { processarComprovanteJessi, conciliarEBaixarComprovanteJessi } from "@/lib/ia/tools/comprovante-tools";
+import { gerarMensagensCobrancaJessi, consultarAniversariantesJessi, consultarReativacaoJessi, sugerirRespostaJessi } from "@/lib/ia/tools/comunicacao-tools";
+import { consultarResumoNegocioJessi, realizarAuditoriaIntegridadeJessi, consultarQualidadeIAJessi } from "@/lib/ia/tools/auditoria-tools";
 
 /**
  * Registro e Catálogo Oficial de Ferramentas da Jessi V2 (Seções 10, 16 e 17)
@@ -656,6 +660,172 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  otimizar_rotas_leva_traz: {
+    nomeInterno: "otimizar_rotas_leva_traz",
+    descricao: "Otimiza e sequencia rotas de transporte com mapa e itinerário WhatsApp",
+    intencoes: ["otimizar_rotas_leva_traz", "itinerario_leva_traz"],
+    area: "agenda",
+    parametros: {
+      data: { tipo: "string", obrigatorio: false, descricao: "Data em formato YYYY-MM-DD" },
+    },
+    retorno: "Itinerário sequenciado para motorista e rota",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "otimizarRotasLevaTrazJessi",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 8000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  sugerir_encaixes_reativacao: {
+    nomeInterno: "sugerir_encaixes_reativacao",
+    descricao: "Cruza horários vagos com clientes sumidos para sugerir encaixes",
+    intencoes: ["sugerir_encaixes_reativacao", "encaixes_reativacao"],
+    area: "agenda",
+    parametros: {
+      data: { tipo: "string", obrigatorio: false, descricao: "Data em formato YYYY-MM-DD" },
+    },
+    retorno: "Lista de clientes recomendados para vagas ociosas",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "sugerirEncaixesReativacaoJessi",
+    featureFlag: "ai_v2_proactive",
+    timeoutMs: 8000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  processar_comprovante: {
+    nomeInterno: "processar_comprovante",
+    descricao: "Processa comprovante Pix via visão computacional",
+    intencoes: ["processar_comprovante"],
+    area: "financeiro_relatorios",
+    parametros: {},
+    retorno: "Dados extraídos do comprovante",
+    permissoes: ["financeiro", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "processarComprovanteJessi",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 15000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  conciliar_comprovante: {
+    nomeInterno: "conciliar_comprovante",
+    descricao: "Baixa pagamento baseado em comprovante Pix",
+    intencoes: ["conciliar_comprovante"],
+    area: "financeiro_relatorios",
+    parametros: {},
+    retorno: "Quitação confirmada",
+    permissoes: ["financeiro", "admin"],
+    tipo: "mutacao_supervisionada",
+    nivelRisco: "medio",
+    confirmacaoNecessaria: true,
+    adaptador: "conciliarEBaixarComprovanteJessi",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: true,
+    verificacaoPosterior: true,
+  },
+  gerar_mensagens_cobranca: {
+    nomeInterno: "gerar_mensagens_cobranca",
+    descricao: "Gera abordagens de cobrança em 4 tons com chave Pix",
+    intencoes: ["gerar_mensagens_cobranca", "cobrar_cliente"],
+    area: "comunicacao_mensagens",
+    parametros: {},
+    retorno: "Mensagens de cobrança personalizadas",
+    permissoes: ["financeiro", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "gerarMensagensCobrancaJessi",
+    featureFlag: "ai_v2_messages",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  consultar_aniversariantes: {
+    nomeInterno: "consultar_aniversariantes",
+    descricao: "Lista aniversariantes do dia ou da semana",
+    intencoes: ["consultar_aniversariantes"],
+    area: "comunicacao_mensagens",
+    parametros: {},
+    retorno: "Lista de aniversariantes",
+    permissoes: ["clientes", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "consultarAniversariantesJessi",
+    featureFlag: "ai_v2_messages",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  consultar_resumo_operacional: {
+    nomeInterno: "consultar_resumo_operacional",
+    descricao: "Diagnóstico 360° da operação, estoque e finanças",
+    intencoes: ["consultar_resumo_operacional", "resumo_negocio"],
+    area: "financeiro_relatorios",
+    parametros: {},
+    retorno: "Resumo executivo do negócio",
+    permissoes: ["admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "consultarResumoNegocioJessi",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  auditoria_integridade: {
+    nomeInterno: "auditoria_integridade",
+    descricao: "Audita consistência entre atendimentos e recebimentos",
+    intencoes: ["auditoria_integridade"],
+    area: "financeiro_relatorios",
+    parametros: {},
+    retorno: "Relatório de auditoria",
+    permissoes: ["admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "realizarAuditoriaIntegridadeJessi",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 8000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  qualidade_ia: {
+    nomeInterno: "qualidade_ia",
+    descricao: "Métricas de assertividade da Jessi",
+    intencoes: ["qualidade_ia"],
+    area: "financeiro_relatorios",
+    parametros: {},
+    retorno: "Métricas de IA",
+    permissoes: ["admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "consultarQualidadeIAJessi",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 5000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
 };
 
 /**
@@ -743,7 +913,46 @@ export async function despacharFerramentaV2(
         return await ProativoAdapter.identificarHorariosVagos(sb, params.data);
 
       case "identificar_clientes_retorno":
+      case "consultar_clientes_inativos":
+      case "consultar_reativacao":
         return await ProativoAdapter.identificarClientesParaRetorno(sb);
+
+      case "otimizar_rotas_leva_traz":
+      case "consultar_leva_traz":
+      case "consultar_rota_leva_traz":
+        return await otimizarRotasLevaTrazJessi(sb, params);
+
+      case "sugerir_encaixes_reativacao":
+        return await sugerirEncaixesReativacaoJessi(sb, params);
+
+      case "processar_comprovante":
+      case "analisar_comprovante":
+        return await processarComprovanteJessi(sb, params as any);
+
+      case "conciliar_comprovante":
+      case "conciliar_e_baixar_comprovante":
+        return await conciliarEBaixarComprovanteJessi(sb, params as any);
+
+      case "gerar_mensagens_cobranca":
+      case "gerar_mensagem_cobranca":
+      case "cobrar_cliente":
+        return await gerarMensagensCobrancaJessi(sb, params as any);
+
+      case "consultar_aniversariantes":
+        return await consultarAniversariantesJessi(sb);
+
+      case "sugerir_resposta":
+        return await sugerirRespostaJessi(sb, params as any);
+
+      case "consultar_resumo_operacional":
+      case "resumo_negocio":
+        return await consultarResumoNegocioJessi();
+
+      case "auditoria_integridade":
+        return await realizarAuditoriaIntegridadeJessi(sb);
+
+      case "qualidade_ia":
+        return await consultarQualidadeIAJessi();
 
       case "gerar_mensagem_whatsapp":
         return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);
