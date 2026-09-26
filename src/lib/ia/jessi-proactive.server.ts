@@ -190,7 +190,7 @@ export async function gerarCentralOperacionalJessi(
       comando: `consultar creditos do ${pet}`,
       clienteNome: tutor,
       petNome: pet,
-      telefone: p1.clientes?.telefone,
+      telefone: p1.clientes?.telefone ?? undefined,
       mensagemWhatsapp: msg,
       whatsappUrl: waUrl,
     });
