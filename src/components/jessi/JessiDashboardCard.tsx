@@ -12,6 +12,8 @@ import {
   Clock,
   ShoppingCart,
   CheckCircle2,
+  Headphones,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -106,16 +108,29 @@ export function JessiDashboardCard() {
           </div>
         </div>
 
-        <Link to="/jessi">
-          <Button
-            size="sm"
-            className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs h-9 px-4 gap-1.5 font-semibold rounded-xl shadow-xs"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-[#C8A951]" />
-            Abrir Central da Jessi
-            <ArrowRight className="h-3.5 w-3.5 ml-0.5" />
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/jessi">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-emerald-700/40 bg-emerald-900/10 text-emerald-900 hover:bg-emerald-900/20 text-xs h-9 px-3 gap-1.5 font-bold rounded-xl cursor-pointer"
+            >
+              <Headphones className="h-3.5 w-3.5 text-[#C8A951]" />
+              <span className="hidden sm:inline">Modo Bancada</span>
+            </Button>
+          </Link>
+
+          <Link to="/jessi">
+            <Button
+              size="sm"
+              className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs h-9 px-4 gap-1.5 font-semibold rounded-xl shadow-xs cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-[#C8A951]" />
+              Abrir Central da Jessi
+              <ArrowRight className="h-3.5 w-3.5 ml-0.5" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Grid de KPIs Rápidos */}
