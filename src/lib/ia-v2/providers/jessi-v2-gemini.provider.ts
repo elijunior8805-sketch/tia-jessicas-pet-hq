@@ -707,6 +707,30 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLimpoPont === "so isso" ||
       textoLimpoPont === "tudo certo";
 
+    // Leva & Traz / Rotas e Itinerário
+    const ehConsultaLevaTraz =
+      textoLower.includes("leva e traz") ||
+      textoLower.includes("leva traz") ||
+      textoLower.includes("itinerario") ||
+      textoLower.includes("itinerário") ||
+      textoLower.includes("otimizar rota") ||
+      textoLower.includes("otimizar rotas") ||
+      textoLower.includes("rota do dia") ||
+      textoLower.includes("rota de hoje") ||
+      textoLower.includes("itinerário do motorista") ||
+      textoLower.includes("buscar e levar");
+
+    // Sugestão de Encaixes e Reativação para Grade
+    const ehSugerirEncaixes =
+      textoLower.includes("sugerir encaixe") ||
+      textoLower.includes("sugerir encaixes") ||
+      textoLower.includes("preencher vaga") ||
+      textoLower.includes("preencher vagas") ||
+      textoLower.includes("preencher horário") ||
+      textoLower.includes("preencher horario") ||
+      textoLower.includes("quem convidar") ||
+      textoLower.includes("convidar clientes");
+
     if (ehAgradecimentoDespedida) {
       dominio = "geral_conversacional";
       intencao = "agradecimento_despedida";
@@ -717,6 +741,20 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       intencao = "selecionar_candidato_ordinal";
       ferramentaSugerida = "buscar_clientes_pets";
       explicacao = `Seleção da opção ordinal "${matchOrdinal[1]}" da lista de desambiguação.`;
+    }
+    // Rota e Itinerário Leva & Traz
+    else if (ehConsultaLevaTraz) {
+      dominio = "agenda";
+      intencao = "otimizar_rotas_leva_traz";
+      ferramentaSugerida = "otimizar_rotas_leva_traz";
+      explicacao = `Otimizando rotas e itinerário do Leva e Traz para ${dataResolvida || "hoje"}.`;
+    }
+    // Sugerir Encaixes de Clientes em Vagas Ociosas
+    else if (ehSugerirEncaixes) {
+      dominio = "agenda";
+      intencao = "sugerir_encaixes_reativacao";
+      ferramentaSugerida = "sugerir_encaixes_reativacao";
+      explicacao = `Cruzando vagas ociosas com clientes sumidos para sugerir encaixes.`;
     }
     // Último Atendimento do Pet
     else if (ehConsultaUltimoAtendimento) {

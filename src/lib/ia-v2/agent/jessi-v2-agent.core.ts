@@ -19,6 +19,7 @@ import { JessiV2ConfirmationManager } from "../confirmation/jessi-v2-confirmatio
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
 import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
+import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/lib/ia/tools/leva-traz-tools";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Autonomia Supervisionada)
@@ -1832,7 +1833,23 @@ export async function processarMensagemJessiV2Core(
         const petAlvoId = novoContexto.pet?.id || contextoAtual.pet?.id;
         const petAlvoNome = novoContexto.pet?.nome || contextoAtual.pet?.nome || intencao.entidades.petNome;
 
-        if (intencao.intencao === "consultar_ultimo_atendimento" && petAlvoId) {
+        if (intencao.intencao === "otimizar_rotas_leva_traz") {
+          const resRotas = await otimizarRotasLevaTrazJessi(sb, { data: dataAlvo });
+          respostaTexto = resRotas.summary || `Itinerário do Leva e Traz otimizado para ${dataAlvo}.`;
+          cards.push({
+            type: "leva_traz",
+            title: `Itinerário e Rotas Leva e Traz — ${dataAlvo}`,
+            data: resRotas.data,
+          });
+        } else if (intencao.intencao === "sugerir_encaixes_reativacao") {
+          const resEncaixes = await sugerirEncaixesReativacaoJessi(sb, { data: dataAlvo });
+          respostaTexto = resEncaixes.summary || `Analisei as oportunidades de encaixe na grade para você.`;
+          cards.push({
+            type: "reativacao",
+            title: `Oportunidades de Encaixe & Reativação`,
+            data: resEncaixes.data,
+          });
+        } else if (intencao.intencao === "consultar_ultimo_atendimento" && petAlvoId) {
           const resUltimo = await AgendaAdapter.consultarUltimoAtendimentoPet(sb, petAlvoId, petAlvoNome || undefined);
           respostaTexto = resUltimo.summary || `Aqui está o histórico do último atendimento do pet:`;
           cards.push({
@@ -1843,74 +1860,118 @@ export async function processarMensagemJessiV2Core(
           });
         } else if (intencao.intencao === "consultar_horarios_livres") {
           const resEncaixes = await AgendaAdapter.identificarEncaixesDisponiveis(sb, dataAlvo);
-          const livres = (resEncaixes.data as any)?.horariosSugeridos || [];
-          const primeiro = livres[0];
+          const livres: string[] = (resEncaixes.data as any)?.horariosSugeridos || [];
+          const manha = livres.filter((h) => parseInt(h.split(":")[0], 10) < 12);
+          const tarde = livres.filter((h) => parseInt(h.split(":")[0], 10) >= 12);
 
           if (livres.length > 0) {
-            respostaTexto = `O primeiro horário livre para **${dataAlvo}** é às **${primeiro}**.\n\nHorários disponíveis na grade:\n${livres.map((h: string) => `• ${h}`).join("\n")}`;
+            const manhaTxt = manha.length > 0 ? `☀️ **Manhã (${manha.length} vagas)**: ${manha.join(", ")}` : "☀️ **Manhã**: Sem vagas livres";
+            const tardeTxt = tarde.length > 0 ? `🌤️ **Tarde (${tarde.length} vagas)**: ${tarde.join(", ")}` : "🌤️ **Tarde**: Sem vagas livres";
+            respostaTexto = `✨ **Horários Livres Encontrados (${dataAlvo})**:\nEncontrei **${livres.length} horários disponíveis** na grade operacional:\n\n${manhaTxt}\n${tardeTxt}\n\n💡 **Recomendação Estratégica**: Clique em um horário no card abaixo para agendar imediatamente ou peça *"Sugerir encaixes"* para convidar clientes inativos via WhatsApp.`;
           } else {
-            respostaTexto = `Não encontrei horários livres na grade para **${dataAlvo}**. Todos os horários estão preenchidos.`;
+            respostaTexto = `📅 **Disponibilidade para ${dataAlvo}**:\nGrade completa! Não temos horários livres neste dia. Deseja registrar encaixe ou consultar o dia seguinte?`;
           }
 
           cards.push({
             type: "agenda",
-            title: `Horários Livres na Grade — ${dataAlvo}`,
-            subtitle: `${livres.length} horário(s) disponível(is)`,
-            data: resEncaixes.data,
+            title: `Grade de Horários Disponíveis (${livres.length} vagas)`,
+            subtitle: dataAlvo,
+            data: {
+              tipo: "disponibilidade",
+              data: dataAlvo,
+              totalVagas: livres.length,
+              vagas_disponiveis: livres,
+              manha,
+              tarde,
+              sugestao: livres.slice(0, 3),
+            },
           });
         } else {
           const resAgenda = await AgendaAdapter.consultarAgendaPorData(sb, dataAlvo);
-          respostaTexto = resAgenda.summary || `Aqui está a grade de agendamentos para ${dataAlvo}:`;
-          cards.push({
-            type: "agenda",
-            title: `Agenda de Atendimentos — ${dataAlvo}`,
-            subtitle: `${resAgenda.total_count || 0} agendamento(s) encontrado(s)`,
-            data: resAgenda.data,
-          });
+          const agendamentos: any[] = resAgenda.data || [];
+          const total = agendamentos.length;
+
+          if (total === 0) {
+            respostaTexto = `📅 **Agenda de ${dataAlvo}**: Não há agendamentos confirmados para este dia. A grade está 100% livre!\n\n💡 **Sugestão Jessi**: Você pode preencher esses horários acionando clientes inativos ou disparando convites pelo WhatsApp. Deseja que eu liste clientes sugeridos para hoje?`;
+            cards.push({
+              type: "agenda",
+              title: `Agenda de Atendimentos — ${dataAlvo}`,
+              subtitle: "Grade Livre",
+              data: {
+                tipo: "disponibilidade",
+                data: dataAlvo,
+                totalVagas: 0,
+                vagas_disponiveis: [],
+              },
+            });
+          } else {
+            const confirmados = agendamentos.filter((a) => a.status === "confirmado" || a.status === "finalizado").length;
+            const emAtendimento = agendamentos.filter((a) => a.status === "em_atendimento").length;
+            const levaTraz = agendamentos.filter((a) => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
+
+            const itens = agendamentos.slice(0, 8).map((a) => {
+              const hora = a.hora ? String(a.hora).slice(0, 5) : "--:--";
+              const pet = a.pets?.nome || "Pet";
+              const tutor = a.clientes?.nome ? ` (${a.clientes.nome})` : "";
+              const servico = a.servicos?.nome || "Atendimento";
+              const st = a.status ? ` [${a.status}]` : "";
+              const lt = a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar" ? " 🚐" : "";
+              return `• **${hora}**: ${pet}${tutor} — ${servico}${lt}${st}`;
+            }).join("\n");
+
+            const header = `📋 **Visão Executiva da Agenda (${dataAlvo})**:\n- **Total agendados**: ${total} (${confirmados} confirmados, ${emAtendimento} em atendimento)\n${levaTraz > 0 ? `- **Leva & Traz**: ${levaTraz} viagens programadas\n` : ""}\n`;
+            respostaTexto = `${header}**Atendimentos programados:**\n${itens}${total > 8 ? `\n...e mais ${total - 8} agendamento(s).` : ""}`;
+
+            cards.push({
+              type: "agenda",
+              title: `Agenda de Atendimentos — ${dataAlvo}`,
+              subtitle: `${total} agendamento(s) encontrado(s)`,
+              data: agendamentos,
+            });
+          }
         }
       } else if (intencao.dominio === "financeiro_relatorios") {
         const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, "mes");
         const dadosFin = resFin.data as any;
+        const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-        if (intencao.intencao === "consultar_contas_a_receber") {
-          const aReceber = dadosFin?.valoresAReceber || 0;
-          const vencidos = dadosFin?.valoresVencidosDevedores || 0;
-          const totalPendente = aReceber + vencidos;
+        const faturamento = Number(dadosFin?.faturamentoBruto || dadosFin?.faturamento || 0);
+        const recebido = Number(dadosFin?.valoresRecebidos || dadosFin?.recebido || faturamento);
+        const aReceber = Number(dadosFin?.valoresAReceber || dadosFin?.pendente || 0);
+        const vencidos = Number(dadosFin?.valoresVencidosDevedores || 0);
+        const totalPendente = aReceber + vencidos;
+        const ticket = Number(dadosFin?.ticketMedio || 0);
 
-          respostaTexto =
-            `Temos **R$ ${aReceber.toFixed(2)}** a receber no prazo` +
-            (vencidos > 0 ? ` e **R$ ${vencidos.toFixed(2)}** em pagamentos pendentes.\n\nTotal em aberto: **R$ ${totalPendente.toFixed(2)}**.` : ".");
-
-          cards.push({
-            type: "financeiro",
-            title: "Contas a Receber",
-            subtitle: `Total pendente: R$ ${totalPendente.toFixed(2)}`,
-            data: dadosFin,
-          });
-        } else if (intencao.intencao === "consultar_inadimplencia_devedores") {
+        if (intencao.intencao === "consultar_contas_a_receber" || intencao.intencao === "consultar_inadimplencia_devedores") {
           const devedores: any[] = dadosFin?.devedores || [];
           if (devedores.length > 0) {
-            const itens = devedores.map(
-              (d) => `• **${d.clienteNome}**: R$ ${Number(d.valor).toFixed(2)} (Vencimento: ${new Date(`${d.vencimento}T12:00:00`).toLocaleDateString("pt-BR")})`
+            const itens = devedores.slice(0, 5).map(
+              (d) => `• **${d.clienteNome}**: ${brl(Number(d.valor || 0))} (Vencimento: ${new Date(`${d.vencimento}T12:00:00`).toLocaleDateString("pt-BR")})`
             );
-            respostaTexto = `Encontrei ${devedores.length} cliente(s) com pagamentos em aberto:\n\n${itens.join("\n")}\n\nTotal pendente: **R$ ${dadosFin.valoresVencidosDevedores.toFixed(2)}**.`;
+            respostaTexto = `⚠️ **Auditoria de Pendências e Cobranças**:\nLocalizei **${devedores.length} cliente(s) com saldo em aberto**, totalizando **${brl(totalPendente)}**.\n\n**Principais clientes com saldo pendente:**\n${itens.join("\n")}\n\n💡 **Ação Recomendada**: Clique em *"Cobrar WhatsApp"* no card abaixo para gerar a abordagem com chave Pix e valor já calculados.`;
           } else {
-            respostaTexto = `Ótima notícia! Não há nenhum cliente com pagamentos em atraso no momento.`;
+            respostaTexto = `🎉 **Inadimplência Zero**: Ótima notícia! Não há nenhum cliente com pagamentos em atraso no momento. Todas as contas estão em dia!`;
           }
 
           cards.push({
             type: "financeiro",
-            title: "Clientes com Pagamentos Pendentes",
-            subtitle: `${devedores.length} cliente(s) listado(s)`,
+            title: "Auditoria de Contas a Receber e Devedores",
+            subtitle: `Total pendente: ${brl(totalPendente)}`,
             data: dadosFin,
           });
         } else {
-          respostaTexto = resFin.summary || `Aqui está o resumo financeiro do Spa:`;
+          let resumoTexto = `📊 **Diagnóstico Financeiro Consolidado (Oficial)**:\n- **Faturamento Realizado**: ${brl(recebido)}\n- **Valores em Aberto**: ${brl(totalPendente)}\n`;
+          if (ticket > 0) {
+            resumoTexto += `- **Ticket Médio**: ${brl(ticket)}\n`;
+          }
+          resumoTexto += `\n💡 **Visão Estratégica**: Os dados financeiros são lidos diretamente da view oficial. Você pode clicar no card abaixo para conciliar comprovantes Pix ou detalhar as cobranças pendentes.`;
+
+          respostaTexto = resumoTexto;
           cards.push({
             type: "financeiro",
             title: "Resumo Financeiro Consolidado (Oficial)",
             subtitle: "Fonte: Transações Oficiais",
-            data: resFin.data,
+            data: dadosFin,
           });
         }
       } else if (intencao.dominio === "programas_creditos") {
@@ -1920,7 +1981,7 @@ export async function processarMensagemJessiV2Core(
 
         if (intencao.intencao === "consultar_programas_ativos" || (!cliId && !petId)) {
           const resProgGeral = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
-          respostaTexto = resProgGeral.summary || `Encontrei os seguintes contratos ativos no Clubinho:`;
+          respostaTexto = `📋 **Contratos Ativos do Clubinho**:\nLocalizei **${resProgGeral.total_count || 0} contrato(s) ativo(s)** de programas de cuidado.\n\n💡 **Regra de Equivalência**: Créditos de banho cobrem tanto Banho Essencial quanto Banho Premium integralmente.`;
           cards.push({
             type: "programa",
             title: "Contratos Ativos do Clubinho",
@@ -1929,11 +1990,14 @@ export async function processarMensagemJessiV2Core(
           });
         } else {
           const resCred = await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, cliId || "", petId || undefined);
-          
-          if (intencao.intencao === "consultar_validade_programa" && (resCred.data as any)?.validade) {
-            respostaTexto = `O plano de cuidados do **${petNome || "pet"}** é válido até **${(resCred.data as any).validade}** e restam **${(resCred.data as any).totalSessaoRestantes || 0}** sessão(ões).`;
+          const credData: any = resCred.data || {};
+          const restam = credData.totalSessaoRestantes || 0;
+          const validadeStr = credData.validade ? ` até **${credData.validade}**` : "";
+
+          if (intencao.intencao === "consultar_validade_programa" && credData.validade) {
+            respostaTexto = `📅 O plano de cuidados do **${petNome || "pet"}** é válido${validadeStr} e restam **${restam}** sessão(ões) disponíveis.\n\n💡 **Equivalência**: 1 crédito de banho é válido tanto para Banho Essencial quanto Banho Premium.`;
           } else {
-            respostaTexto = resCred.summary || `Aqui está o saldo de créditos do plano:`;
+            respostaTexto = `🐾 **Saldo de Créditos — ${petNome || "Pet"}**:\nO pet possui **${restam} crédito(s) ativo(s)**${validadeStr}.\n\n💡 **Dica Operacional**: Crédito de banho cobre Banho Essencial e Banho Premium sem cobrança adicional.`;
           }
 
           cards.push({
@@ -1951,10 +2015,10 @@ export async function processarMensagemJessiV2Core(
           if (lista.length > 0) {
             const itensTexto = lista.slice(0, 6).map((r) => {
               const petStr = r.pet?.nome ? ` (Pet: **${r.pet.nome}**)` : "";
-              return `• **${r.cliente?.nome || "Cliente"}**${petStr} — inativo há **${r.diasInativo || 0} dias**`;
+              return `• **${r.cliente?.nome || "Cliente"}**${petStr} — ausente há **${r.diasInativo || 0} dias**`;
             });
 
-            respostaTexto = `Identifiquei **${lista.length} cliente(s) e pet(s)** com potencial para reativação:\n\n${itensTexto.join("\n")}\n\n💡 Utilize o card abaixo para enviar mensagens personalizadas no WhatsApp com 1 clique:`;
+            respostaTexto = `🎯 **Oportunidades de Reativação de Clientes**:\nIdentifiquei **${lista.length} cliente(s) e pet(s)** sumidos com alto potencial de retorno:\n\n${itensTexto.join("\n")}\n\n💡 **Ação Proativa**: Clique nos botões do card abaixo para enviar mensagens de convite personalizadas no WhatsApp com 1 clique.`;
 
             cards.push({
               type: "reativacao",
@@ -1962,7 +2026,7 @@ export async function processarMensagemJessiV2Core(
               data: lista,
             });
           } else {
-            respostaTexto = `Ótima notícia! Não há clientes inativos sem agendamento no momento. Todos estão com visitas recentes ou agendamentos ativos.`;
+            respostaTexto = `🎉 **Engajamento Máximo**: Não há clientes inativos sem agendamento no momento! Todos os pets cadastrados estão com visitas recentes ou horários marcados.`;
           }
         } else {
           const petIdCtx = novoContexto.pet?.id || contextoAtual.pet?.id;
@@ -1971,7 +2035,7 @@ export async function processarMensagemJessiV2Core(
 
           if (petIdCtx && !(perguntaSobrePets && clienteIdCtx)) {
             const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petIdCtx);
-            respostaTexto = resFicha.summary || `Aqui está a ficha e histórico do **${novoContexto.pet?.nome || contextoAtual.pet?.nome || "pet"}**:`;
+            respostaTexto = `🐾 **Ficha 360° do Pet — ${novoContexto.pet?.nome || contextoAtual.pet?.nome || "Pet"}**:\nRaça: **${resFicha.data?.raca || "SRD"}** • Porte: **${resFicha.data?.porte || "Médio"}**\nHistórico e preferências detalhados no card abaixo:`;
             cards.push({
               type: "cliente",
               title: `Ficha Cadastral & Histórico`,
