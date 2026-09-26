@@ -61,6 +61,8 @@ export const JessiLayout: React.FC = () => {
     interimTranscript,
     finalTranscript,
     isSpeaking,
+    audioLevel,
+    isInterrupted,
     ttsEnabled,
     setTtsEnabled,
     startListening,
@@ -600,6 +602,8 @@ export const JessiLayout: React.FC = () => {
         isSpeaking={isSpeaking}
         interimTranscript={interimTranscript}
         finalTranscript={finalTranscript}
+        audioLevel={audioLevel}
+        isInterrupted={isInterrupted}
         ttsEnabled={ttsEnabled}
         onToggleTts={() => setTtsEnabled(!ttsEnabled)}
         onToggleListening={toggleContinuousMode}

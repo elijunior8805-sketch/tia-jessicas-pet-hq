@@ -30,6 +30,8 @@ interface JessiBancadaModeProps {
   isSpeaking: boolean;
   interimTranscript: string;
   finalTranscript: string;
+  audioLevel?: number;
+  isInterrupted?: boolean;
   ttsEnabled: boolean;
   onToggleTts: () => void;
   onToggleListening: () => void;
@@ -48,6 +50,8 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
   isSpeaking,
   interimTranscript,
   finalTranscript,
+  audioLevel = 0,
+  isInterrupted = false,
   ttsEnabled,
   onToggleTts,
   onToggleListening,
@@ -182,11 +186,19 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
           </div>
 
           <div className="space-y-1">
-            <span className="text-sm sm:text-base font-bold tracking-wide uppercase text-[#F5E6BE]">
+            {isInterrupted && (
+              <div className="mb-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-xs font-bold animate-bounce shadow-md">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                Interrupção detectada · Ouvindo sua nova fala...
+              </div>
+            )}
+            <span className="text-sm sm:text-base font-bold tracking-wide uppercase text-[#F5E6BE] block">
               {isLoading
                 ? "Jessi consultando dados..."
+                : isInterrupted
+                ? "Interrompida · Ouvindo você..."
                 : isSpeaking
-                ? "Jessi Falando Resposta..."
+                ? "Jessi Falando (Fale para interromper)..."
                 : isListening
                 ? (interimTranscript ? "Ouvindo você..." : "Microfone Aberto · Pode Falar")
                 : "Microfone Pausado"}
@@ -195,9 +207,31 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
               {pendingAction
                 ? "⚠️ Ação preparada! Diga \"Pode confirmar\" ou \"Cancelar\""
                 : isListening
-                ? "Fale naturalmente enquanto atende o pet"
+                ? "Fale naturalmente enquanto atende o pet — interrompa quando quiser"
                 : "Toque no microfone para reativar"}
             </p>
+
+            {/* Barras de Equalizador de Volume em Tempo Real */}
+            {isListening && (
+              <div className="flex items-center justify-center gap-1 pt-2 h-4">
+                {[...Array(9)].map((_, i) => {
+                  const barHeight = Math.max(
+                    4,
+                    Math.min(24, Math.round((audioLevel / 100) * (20 + (i % 3) * 4) + Math.random() * 2))
+                  );
+                  return (
+                    <div
+                      key={i}
+                      className="w-1 rounded-full bg-[#C8A951] transition-all duration-75"
+                      style={{
+                        height: `${barHeight}px`,
+                        opacity: audioLevel > 5 ? 0.9 : 0.25,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

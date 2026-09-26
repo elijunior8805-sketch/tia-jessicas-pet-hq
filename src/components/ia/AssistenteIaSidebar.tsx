@@ -173,6 +173,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     interimTranscript,
     finalTranscript,
     isSpeaking,
+    audioLevel,
+    isInterrupted,
     ttsEnabled,
     setTtsEnabled,
     startListening,
@@ -602,6 +604,8 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         isSpeaking={isSpeaking}
         interimTranscript={interimTranscript}
         finalTranscript={finalTranscript}
+        audioLevel={audioLevel}
+        isInterrupted={isInterrupted}
         ttsEnabled={ttsEnabled}
         onToggleTts={() => setTtsEnabled(!ttsEnabled)}
         onToggleListening={toggleContinuousMode}

@@ -9,6 +9,7 @@ import {
   pararFalaJessi,
 } from "./ia-voz";
 import { reproduzirFalaHumana, humanizarTextoParaVoz, ControladorFala } from "./ia-voz-tts";
+import { JessiBargeInDetector } from "./ia-barge-in";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
@@ -19,6 +20,8 @@ export interface UseJessiVoiceReturn {
   interimTranscript: string;
   finalTranscript: string;
   isSpeaking: boolean;
+  audioLevel: number;
+  isInterrupted: boolean;
   ttsEnabled: boolean;
   setTtsEnabled: (val: boolean) => void;
   startListening: (textoAtual?: string) => void;
@@ -135,6 +138,8 @@ export function useJessiVoice(
   const [interimTranscript, setInterimTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [isInterrupted, setIsInterrupted] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [isSupported, setIsSupported] = useState(false);
 
@@ -143,6 +148,8 @@ export function useJessiVoice(
   const onAutoSendRef = useRef(onAutoSend);
   const isSpeakingRef = useRef(false);
   const controladorFalaRef = useRef<ControladorFala | null>(null);
+  const bargeInDetectorRef = useRef<JessiBargeInDetector | null>(null);
+  const isContinuousModeRef = useRef(false);
 
   const pararTodoAudio = useCallback(() => {
     controladorFalaRef.current?.cancelar();
@@ -157,6 +164,20 @@ export function useJessiVoice(
     }
   }, []);
 
+  // Interrupção instantânea (Barge-in): Quando o usuário fala por cima da Jessi
+  const handleUserBargeIn = useCallback(() => {
+    if (!isSpeakingRef.current) return;
+
+    // 1. Corta imediatamente todo áudio e fala da IA (< 30ms)
+    pararTodoAudio();
+    setIsInterrupted(true);
+    setTimeout(() => setIsInterrupted(false), 1200);
+
+    // 2. Retoma instantaneamente o reconhecimento de fala para capturar a fala do usuário
+    recognizerRef.current?.resumeListening();
+    setVoiceStatus("listening");
+  }, [pararTodoAudio]);
+
   useEffect(() => {
     onTranscriptFinalRef.current = onTranscriptFinal;
   }, [onTranscriptFinal]);
@@ -166,6 +187,20 @@ export function useJessiVoice(
   }, [onAutoSend]);
 
   useEffect(() => {
+    isContinuousModeRef.current = isContinuousMode;
+  }, [isContinuousMode]);
+
+  useEffect(() => {
+    // Inicializa detector de interrupção com Web Audio API
+    bargeInDetectorRef.current = new JessiBargeInDetector({
+      onBargeIn: handleUserBargeIn,
+      onAudioLevel: (level) => {
+        setAudioLevel(level);
+      },
+      sensitivityThreshold: 0.04,
+      minVoiceDurationMs: 110,
+    });
+
     // Pre-carrega vozes do navegador para disponibilidade imediata
     if (typeof window !== "undefined" && window.speechSynthesis) {
       try {
@@ -179,7 +214,7 @@ export function useJessiVoice(
     }
 
     recognizerRef.current = new VoiceRecognizer({
-      silenceMs: 1500, // 1.5s de silencio para envio natural sem interrupcoes precoces
+      silenceMs: 1500,
       onFinal: (texto) => {
         const humanizado = humanizarTranscricao(texto);
         setFinalTranscript(humanizado);
@@ -210,7 +245,7 @@ export function useJessiVoice(
           setIsContinuousMode(false);
           toast.error("Permissão de microfone negada. Clique no ícone de cadeado do navegador para permitir o microfone.");
         } else if (erro === "no-speech") {
-          // Silencio momentaneo regular
+          // Silencio regular
         } else if (erro === "network") {
           toast.error("Reconhecimento de voz offline ou instável. Verifique sua conexão de rede.");
         } else if (erro === "audio-capture") {
@@ -224,15 +259,16 @@ export function useJessiVoice(
     return () => {
       pararTodoAudio();
       recognizerRef.current?.abort();
+      bargeInDetectorRef.current?.stop();
       if (typeof window !== "undefined" && window.speechSynthesis) {
         try {
           window.speechSynthesis.cancel();
         } catch {}
       }
     };
-  }, [pararTodoAudio]);
+  }, [pararTodoAudio, handleUserBargeIn]);
 
-  const startContinuousMode = useCallback(() => {
+  const startContinuousMode = useCallback(async () => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -253,15 +289,20 @@ export function useJessiVoice(
     setInterimTranscript("");
     setFinalTranscript("");
     recognizerRef.current.startContinuous();
-    toast.success("Modo Voz Contínuo Ativo! Fale seus comandos naturalmente.");
+
+    // Ativa detector de interrupção full-duplex
+    await bargeInDetectorRef.current?.start(() => isSpeakingRef.current);
+    toast.success("Modo Voz Contínuo Ativo! Você pode falar a qualquer momento, inclusive interromper a Jessi.");
   }, []);
 
   const stopContinuousMode = useCallback(() => {
     setIsContinuousMode(false);
     pararTodoAudio();
     recognizerRef.current?.stopContinuous();
+    bargeInDetectorRef.current?.stop();
     setInterimTranscript("");
     setFinalTranscript("");
+    setAudioLevel(0);
     toast.info("Modo Voz Contínuo desativado.");
   }, [pararTodoAudio]);
 
@@ -275,20 +316,23 @@ export function useJessiVoice(
 
   const pauseListening = useCallback(() => {
     recognizerRef.current?.pauseListening();
+    bargeInDetectorRef.current?.pause();
   }, []);
 
   const resumeListening = useCallback(() => {
     if (isContinuousMode && !isSpeakingRef.current) {
       recognizerRef.current?.resumeListening();
+      bargeInDetectorRef.current?.resume();
     }
   }, [isContinuousMode]);
 
-  const startListening = useCallback((textoAtual = "") => {
+  const startListening = useCallback(async (textoAtual = "") => {
     pararTodoAudio();
     if (!recognizerRef.current) return;
     setFinalTranscript(textoAtual);
     setInterimTranscript("");
     recognizerRef.current.start(textoAtual);
+    await bargeInDetectorRef.current?.start(() => isSpeakingRef.current);
   }, [pararTodoAudio]);
 
   const stopListening = useCallback(() => {
@@ -300,9 +344,11 @@ export function useJessiVoice(
     pararTodoAudio();
     if (!recognizerRef.current) return;
     recognizerRef.current.abort();
+    bargeInDetectorRef.current?.pause();
     setInterimTranscript("");
     setFinalTranscript("");
     setVoiceStatus("idle");
+    setAudioLevel(0);
   }, [pararTodoAudio]);
 
   const resetTranscript = useCallback(() => {
@@ -325,15 +371,19 @@ export function useJessiVoice(
       pararTodoAudio();
       isSpeakingRef.current = true;
       setIsSpeaking(true);
-      pauseListening();
+
+      // Em modo continuo, mantemos o detector de barge-in ativo e em escuta
+      if (isContinuousModeRef.current) {
+        bargeInDetectorRef.current?.resume();
+      }
 
       const finalizarFala = () => {
         isSpeakingRef.current = false;
         setIsSpeaking(false);
         controladorFalaRef.current = null;
         onFinish?.();
-        if (isContinuousMode) {
-          resumeListening();
+        if (isContinuousModeRef.current) {
+          recognizerRef.current?.resumeListening();
         }
       };
 
@@ -347,7 +397,7 @@ export function useJessiVoice(
         onError: finalizarFala,
       });
     },
-    [ttsEnabled, isContinuousMode, pauseListening, resumeListening, pararTodoAudio]
+    [ttsEnabled, pararTodoAudio]
   );
 
   const falarResposta = useCallback(
@@ -369,6 +419,8 @@ export function useJessiVoice(
     interimTranscript,
     finalTranscript,
     isSpeaking,
+    audioLevel,
+    isInterrupted,
     ttsEnabled,
     setTtsEnabled,
     startListening,
