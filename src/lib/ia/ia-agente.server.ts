@@ -103,6 +103,56 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       exige_confirmacao: false,
       resposta_ia: "Preparando o resumo operacional do dia..."
     },
+    "consultar_disponibilidade": {
+      intencao: "consultar_disponibilidade",
+      ferramenta: "consultar_disponibilidade",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Verificando horários disponíveis na grade de hoje..."
+    },
+    "quais os horários livres": {
+      intencao: "consultar_disponibilidade",
+      ferramenta: "consultar_disponibilidade",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Analisando a grade operacional e horários livres de hoje..."
+    },
+    "quais os horarios livres": {
+      intencao: "consultar_disponibilidade",
+      ferramenta: "consultar_disponibilidade",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Analisando a grade operacional e horários livres de hoje..."
+    },
+    "horários livres": {
+      intencao: "consultar_disponibilidade",
+      ferramenta: "consultar_disponibilidade",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Verificando horários livres na grade de hoje..."
+    },
+    "horarios livres": {
+      intencao: "consultar_disponibilidade",
+      ferramenta: "consultar_disponibilidade",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto, data: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Verificando horários livres na grade de hoje..."
+    },
     "consultar rota leva e traz": {
       intencao: "otimizar_rotas_leva_traz",
       ferramenta: "otimizar_rotas_leva_traz",
@@ -335,7 +385,40 @@ function fallbackClassificador(texto: string): IAIntent {
     };
   }
 
-  // 3. Agenda
+  // 3. Disponibilidade e Horários Livres
+  if (
+    lowercaseText.includes("livre") ||
+    lowercaseText.includes("livres") ||
+    lowercaseText.includes("vago") ||
+    lowercaseText.includes("vagos") ||
+    lowercaseText.includes("vaga") ||
+    lowercaseText.includes("vagas") ||
+    lowercaseText.includes("disponibilidade") ||
+    lowercaseText.includes("disponivel") ||
+    lowercaseText.includes("disponível") ||
+    lowercaseText.includes("tem horário") ||
+    lowercaseText.includes("tem horario")
+  ) {
+    let dataRef = hoje;
+    if (lowercaseText.includes("amanhã") || lowercaseText.includes("amanha")) {
+      const dt = new Date();
+      dt.setDate(dt.getDate() + 1);
+      dataRef = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dt);
+    }
+
+    return {
+      intencao: "consultar_disponibilidade",
+      ferramenta: "consultar_disponibilidade",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      exige_confirmacao: false,
+      parametros: { comando_original: texto, data: dataRef },
+      nivel_confianca: 0.95,
+      resposta_ia: "Consultando horários livres na grade operacional..."
+    };
+  }
+
+  // 3.1 Agenda
   if (lowercaseText.includes("agenda") || lowercaseText.includes("atendimentos") || lowercaseText.includes("horários") || lowercaseText.includes("horarios")) {
     let dataRef = hoje;
     if (lowercaseText.includes("amanhã") || lowercaseText.includes("amanha")) {

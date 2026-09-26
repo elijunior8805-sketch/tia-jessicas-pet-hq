@@ -55,12 +55,131 @@ export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) =
     );
   }
 
+  // Tratamento de Disponibilidade de Horários Livres
+  if (data?.tipo === "disponibilidade" || Array.isArray(data?.vagas_disponiveis)) {
+    const vagas: string[] = data?.vagas_disponiveis || [];
+    const manha = data?.manha || vagas.filter((s: string) => parseInt(s.split(":")[0], 10) < 12);
+    const tarde = data?.tarde || vagas.filter((s: string) => parseInt(s.split(":")[0], 10) >= 12);
+    const dataRef = data?.data || "hoje";
+
+    return (
+      <div className="rounded-2xl border border-emerald-300 bg-card p-4 space-y-3.5 text-xs shadow-xs my-2">
+        <div className="font-semibold text-emerald-950 flex items-center justify-between border-b border-border/60 pb-2">
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-4 w-4 text-emerald-700" />
+            <span>Grade de Horários Disponíveis ({vagas.length} vagas)</span>
+          </div>
+          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] px-2 py-0.5">
+            {dataRef}
+          </Badge>
+        </div>
+
+        {vagas.length === 0 ? (
+          <p className="text-muted-foreground text-xs">
+            Nenhum horário livre encontrado para esta data. Grade 100% ocupada!
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {/* Manhã */}
+            {manha.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-emerald-900 flex items-center gap-1">
+                  ☀️ Manhã ({manha.length} horários)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {manha.map((slot: string) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => onActionClick && onActionClick(`Agendar atendimento para às ${slot} hoje`)}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-emerald-900 font-semibold text-xs transition-all cursor-pointer shadow-2xs"
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tarde */}
+            {tarde.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-emerald-900 flex items-center gap-1">
+                  🌤️ Tarde ({tarde.length} horários)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {tarde.map((slot: string) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => onActionClick && onActionClick(`Agendar atendimento para às ${slot} hoje`)}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-emerald-900 font-semibold text-xs transition-all cursor-pointer shadow-2xs"
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {onActionClick && (
+          <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onActionClick("Sugerir clientes inativos para encaixe")}
+              className="h-7 px-2.5 text-xs text-emerald-900 border-emerald-300 hover:bg-emerald-50 rounded-lg font-medium"
+            >
+              <User className="h-3 w-3 mr-1 text-emerald-700" />
+              Sugerir Clientes para Preencher
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onActionClick("consultar agenda de hoje")}
+              className="h-7 px-2.5 text-xs bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-medium ml-auto"
+            >
+              Ver Ocupação
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const agendamentos = Array.isArray(data) ? data : data?.agendamentos || [];
 
   if (!agendamentos.length) {
     return (
-      <div className="rounded-xl border border-border/70 bg-card p-4 text-xs text-muted-foreground">
-        Nenhum agendamento encontrado para os filtros informados.
+      <div className="rounded-2xl border border-border/80 bg-card p-4 text-xs space-y-2.5 shadow-xs my-2">
+        <div className="flex items-center gap-2 text-foreground font-semibold">
+          <Calendar className="h-4 w-4 text-emerald-700" />
+          <span>Agenda Livre</span>
+        </div>
+        <p className="text-muted-foreground text-[11px]">
+          Não constam atendimentos agendados para este período. A grade está 100% livre para receber agendamentos.
+        </p>
+        {onActionClick && (
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onActionClick("Quais os horários livres de hoje?")}
+              className="h-7 px-2.5 text-xs text-emerald-900 border-emerald-300 hover:bg-emerald-50 rounded-lg font-medium"
+            >
+              <Clock className="h-3 w-3 mr-1 text-emerald-700" />
+              Ver Horários Vagos
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onActionClick("Sugerir clientes inativos para encaixe")}
+              className="h-7 px-2.5 text-xs bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-medium"
+            >
+              Convidar Clientes
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

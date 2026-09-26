@@ -21,13 +21,25 @@ export async function consultarKPIsFinanceirosJessi(
     ),
   });
 
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const faturamento = Number(res.data?.faturamentoBruto || res.data?.faturamento || 0);
+  const recebido = Number(res.data?.valoresRecebidos || res.data?.recebido || faturamento);
+  const pendente = Number(res.data?.valoresAReceber || res.data?.pendente || 0);
+  const ticket = Number(res.data?.ticketMedio || 0);
+
+  let resumoTexto = `📊 **Diagnóstico Financeiro (${mesRef})**:\n- **Faturamento Realizado**: ${brl(recebido)}\n- **Valores em Aberto**: ${brl(pendente)}\n`;
+  if (ticket > 0) {
+    resumoTexto += `- **Ticket Médio**: ${brl(ticket)}\n`;
+  }
+  resumoTexto += `\n💡 **Visão Estratégica**: O faturamento está sendo alimentado pela view oficial. Você pode clicar no card abaixo para conciliar comprovantes Pix ou detalhar as cobranças pendentes.`;
+
   return {
     success: res.success,
     source: "financeiro_kpis",
     data: res.data,
     filters_applied: { mes: mesRef },
     executed_at: new Date().toISOString(),
-    summary: `Indicadores financeiros consolidados para o mês de ${mesRef}.`,
+    summary: resumoTexto,
   };
 }
 
@@ -47,16 +59,16 @@ export async function consultarInadimplenciaJessi(
 
   let resumoTexto = "";
   if (totalRegistros === 0) {
-    resumoTexto = "Parabéns! Não encontrei nenhum valor em atraso ou pendência financeira no momento.";
+    resumoTexto = "🎉 **Inadimplência Zero**: Não encontrei nenhum valor em atraso ou pendência financeira no momento. Todas as contas estão em dia!";
   } else {
     const topDevedores = registros.slice(0, 5).map((r) => {
       const nome = r.clientes?.nome || "Cliente";
       const saldo = Number(r.valor_total || 0) - Number(r.valor_pago || 0);
       const desc = r.descricao ? ` (${r.descricao})` : "";
-      return `• ${nome}: ${brl(saldo)}${desc}`;
+      return `• **${nome}**: ${brl(saldo)}${desc}`;
     }).join("\n");
 
-    resumoTexto = `Temos ${totalRegistros} lançamento(s) pendente(s), totalizando ${brl(totalValorAtraso)}.\n\nPrincipais pendências:\n${topDevedores}`;
+    resumoTexto = `⚠️ **Auditoria de Pendências e Cobranças**:\nLocalizei **${totalRegistros} lançamento(s) em aberto**, totalizando **${brl(totalValorAtraso)}**.\n\n**Principais clientes com saldo pendente:**\n${topDevedores}\n\n💡 **Ação Recomendada**: Clique em *"Cobrar WhatsApp"* no card abaixo para gerar a abordagem com chave Pix e valor já calculados.`;
   }
 
   return {

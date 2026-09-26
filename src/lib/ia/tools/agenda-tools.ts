@@ -24,17 +24,24 @@ export async function consultarAgendaJessi(
 
   let resumoTexto = "";
   if (total === 0) {
-    resumoTexto = `Não há agendamentos marcados para ${dataRef}. A agenda está livre!`;
+    resumoTexto = `📅 **Agenda de ${dataRef}**: Não há agendamentos confirmados para este dia. A grade está 100% livre!\n\n💡 **Sugestão Jessi**: Você pode preencher esses horários acionando clientes inativos ou disparando convites pelo WhatsApp. Deseja que eu liste clientes sugeridos para hoje?`;
   } else {
+    const confirmados = lista.filter(a => a.status === "confirmado" || a.status === "finalizado").length;
+    const emAtendimento = lista.filter(a => a.status === "em_atendimento").length;
+    const levaTraz = lista.filter(a => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
+
     const itens = lista.slice(0, 8).map((a) => {
       const hora = a.hora ? String(a.hora).slice(0, 5) : "--:--";
       const pet = a.pets?.nome || "Pet";
       const tutor = a.clientes?.nome ? ` (${a.clientes.nome})` : "";
       const servico = a.servicos?.nome || "Atendimento";
-      const st = a.status ? ` - ${a.status}` : "";
-      return `• ${hora}: ${pet}${tutor} - ${servico}${st}`;
+      const st = a.status ? ` [${a.status}]` : "";
+      const lt = a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar" ? " 🚐" : "";
+      return `• **${hora}**: ${pet}${tutor} — ${servico}${lt}${st}`;
     }).join("\n");
-    resumoTexto = `Temos ${total} agendamento(s) para ${dataRef}:\n\n${itens}${total > 8 ? `\n...e mais ${total - 8} agendamento(s).` : ""}`;
+
+    const header = `📋 **Visão Executiva da Agenda (${dataRef})**:\n- **Total agendados**: ${total} (${confirmados} confirmados, ${emAtendimento} em atendimento)\n${levaTraz > 0 ? `- **Leva & Traz**: ${levaTraz} viagens programadas\n` : ""}\n`;
+    resumoTexto = `${header}**Atendimentos programados:**\n${itens}${total > 8 ? `\n...e mais ${total - 8} agendamento(s).` : ""}`;
   }
 
   return {
@@ -58,13 +65,44 @@ export async function consultarDisponibilidadeJessi(
     servico_id: params.servico_id,
   });
 
+  const slots: string[] = res.data?.vagas_disponiveis || [];
+  const total = slots.length;
+
+  const manha = slots.filter((s) => {
+    const hora = parseInt(s.split(":")[0], 10);
+    return hora < 12;
+  });
+
+  const tarde = slots.filter((s) => {
+    const hora = parseInt(s.split(":")[0], 10);
+    return hora >= 12;
+  });
+
+  let resumoTexto = "";
+  if (total === 0) {
+    resumoTexto = `📅 **Disponibilidade para ${dataRef}**:\nGrade completa! Não temos horários livres neste dia. Deseja registrar encaixe ou consultar o dia seguinte?`;
+  } else {
+    const manhaTxt = manha.length > 0 ? `☀️ **Manhã (${manha.length} vagas)**: ${manha.join(", ")}` : "☀️ **Manhã**: Sem vagas";
+    const tardeTxt = tarde.length > 0 ? `🌤️ **Tarde (${tarde.length} vagas)**: ${tarde.join(", ")}` : "🌤️ **Tarde**: Sem vagas";
+    
+    resumoTexto = `✨ **Horários Livres Encontrados (${dataRef})**:\nEncontrei **${total} horários disponíveis** na grade operacional:\n\n${manhaTxt}\n${tardeTxt}\n\n💡 **Recomendação Estratégica**: Clique em um horário no card abaixo para agendar imediatamente ou peça *"Sugerir encaixes"* para convidar clientes inativos via WhatsApp.`;
+  }
+
   return {
     success: res.success,
     source: "disponibilidade",
-    data: res.data,
+    data: {
+      tipo: "disponibilidade",
+      data: dataRef,
+      totalVagas: total,
+      vagas_disponiveis: slots,
+      manha,
+      tarde,
+      sugestao: res.data?.sugestao || slots.slice(0, 3),
+    },
     filters_applied: { data: dataRef },
     executed_at: new Date().toISOString(),
-    summary: `Disponibilidade verificada para ${dataRef}.`,
+    summary: resumoTexto,
   };
 }
 
