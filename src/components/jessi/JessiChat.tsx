@@ -10,6 +10,7 @@ import { AlertaCard } from "./cards/AlertaCard";
 import { LevaTrazCard } from "./cards/LevaTrazCard";
 import { ComunicacaoCard } from "./cards/ComunicacaoCard";
 import { ReativacaoCard } from "./cards/ReativacaoCard";
+import { AnalyticsCard } from "./cards/AnalyticsCard";
 import { ChevronDown, Sparkles, User, ArrowRight } from "lucide-react";
 
 
@@ -279,6 +280,8 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                         );
                       case "leva_traz":
                         return <LevaTrazCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                      case "analytics":
+                        return <AnalyticsCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       default:
                         return null;
                     }

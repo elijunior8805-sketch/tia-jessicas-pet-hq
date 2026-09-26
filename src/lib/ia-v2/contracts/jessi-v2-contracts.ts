@@ -20,6 +20,7 @@ export const JessiV2CardTypeSchema = z.enum([
   "comunicacao",
   "reativacao",
   "leva_traz",
+  "analytics",
 ]);
 
 export type JessiV2CardType = z.infer<typeof JessiV2CardTypeSchema>;

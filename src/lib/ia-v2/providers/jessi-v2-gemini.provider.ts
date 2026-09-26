@@ -774,6 +774,32 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("metricas da ia") ||
       textoLower.includes("taxa de acerto");
 
+    // Análise de Negócio e Cruzamento Estatístico Dinâmico
+    const ehAnaliseNegocio =
+      textoLower.includes("por porte") ||
+      textoLower.includes("por raça") ||
+      textoLower.includes("por raca") ||
+      textoLower.includes("qual porte") ||
+      textoLower.includes("qual raça") ||
+      textoLower.includes("qual raca") ||
+      textoLower.includes("por bairro") ||
+      textoLower.includes("qual bairro") ||
+      textoLower.includes("quais bairros") ||
+      textoLower.includes("concentração geográfica") ||
+      textoLower.includes("concentracao geografica") ||
+      textoLower.includes("por dia da semana") ||
+      textoLower.includes("dia mais fraco") ||
+      textoLower.includes("dia de pico") ||
+      textoLower.includes("pico de atendimentos") ||
+      textoLower.includes("taxa de cancelamento") ||
+      textoLower.includes("taxa de no-show") ||
+      textoLower.includes("no-show") ||
+      textoLower.includes("no show") ||
+      textoLower.includes("análise cruzada") ||
+      textoLower.includes("analise cruzada") ||
+      textoLower.includes("análise estatística") ||
+      textoLower.includes("analise estatistica");
+
     if (ehAgradecimentoDespedida) {
       dominio = "geral_conversacional";
       intencao = "agradecimento_despedida";
@@ -784,6 +810,13 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       intencao = "selecionar_candidato_ordinal";
       ferramentaSugerida = "buscar_clientes_pets";
       explicacao = `Seleção da opção ordinal "${matchOrdinal[1]}" da lista de desambiguação.`;
+    }
+    // Análises Estatísticas e Cruzamentos Dinâmicos
+    else if (ehAnaliseNegocio) {
+      dominio = "financeiro_relatorios";
+      intencao = "consultar_analise_negocio";
+      ferramentaSugerida = "consultar_analise_negocio";
+      explicacao = "Executando análise estatística cruzada de desempenho operacional.";
     }
     // Aniversariantes
     else if (ehAniversariantes) {

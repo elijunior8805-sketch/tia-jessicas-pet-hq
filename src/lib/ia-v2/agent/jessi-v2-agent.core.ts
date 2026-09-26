@@ -22,6 +22,7 @@ import { JESSI_V2_LIMITS } from "../config/jessi-v2-config";
 import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/lib/ia/tools/leva-traz-tools";
 import { consultarAniversariantesJessi } from "@/lib/ia/tools/comunicacao-tools";
 import { consultarResumoNegocioJessi, realizarAuditoriaIntegridadeJessi, consultarQualidadeIAJessi } from "@/lib/ia/tools/auditoria-tools";
+import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Autonomia Supervisionada)
@@ -1944,7 +1945,21 @@ export async function processarMensagemJessiV2Core(
         const totalPendente = aReceber + vencidos;
         const ticket = Number(dadosFin?.ticketMedio || 0);
 
-        if (intencao.intencao === "consultar_resumo_operacional" || intencao.intencao === "resumo_negocio") {
+        if (intencao.intencao === "consultar_analise_negocio" || intencao.intencao === "analise_cruzada_operacao") {
+          const resAnalytics = await AnalyticsAdapter.executarAnaliseDinamica(sb, textoLimpo);
+          const anData = resAnalytics.data;
+          if (anData) {
+            respostaTexto = `📊 **${anData.titulo}**\n${anData.insightEstrategico}\n\n• **Total Analisado**: ${anData.totalGeral} atendimentos\n• **Faturamento Geral**: ${brl(anData.faturamentoGeral)}\n• **Ticket Médio**: ${brl(anData.ticketMedioGeral)}\n\n💡 **Recomendação**: ${anData.acaoRecomendada.texto}.`;
+            cards.push({
+              type: "analytics",
+              title: anData.titulo,
+              subtitle: anData.subtitulo,
+              data: anData,
+            });
+          } else {
+            respostaTexto = resAnalytics.summary || "Análise analítica concluída.";
+          }
+        } else if (intencao.intencao === "consultar_resumo_operacional" || intencao.intencao === "resumo_negocio") {
           const resResumo = await consultarResumoNegocioJessi();
           const d: any = resResumo.data || {};
           respostaTexto = `📊 **Diagnóstico 360° da Operação**:\n• **Agendamentos de Hoje**: ${d.agendamentosHoje || 0}\n• **Faturamento do Mês**: ${brl(d.faturamentoMes || 0)}\n• **Clientes Cadastrados**: ${d.totalClientes || 0}\n• **Pets no Spa**: ${d.totalPets || 0}\n\n💡 **Saúde Operacional**: Operação fluindo dentro dos parâmetros ideais.`;

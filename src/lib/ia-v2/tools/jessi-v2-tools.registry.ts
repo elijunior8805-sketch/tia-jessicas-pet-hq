@@ -8,6 +8,7 @@ import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter
 import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
 import { MensagensWhatsAppAdapter, JessiV2WhatsAppPayload } from "../adapters/mensagens-whatsapp.adapter";
 import { ProativoAdapter } from "../adapters/proativo.adapter";
+import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 import { otimizarRotasLevaTrazJessi, sugerirEncaixesReativacaoJessi } from "@/lib/ia/tools/leva-traz-tools";
 import { processarComprovanteJessi, conciliarEBaixarComprovanteJessi } from "@/lib/ia/tools/comprovante-tools";
 import { gerarMensagensCobrancaJessi, consultarAniversariantesJessi, consultarReativacaoJessi, sugerirRespostaJessi } from "@/lib/ia/tools/comunicacao-tools";
@@ -826,6 +827,37 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  consultar_analise_negocio: {
+    nomeInterno: "consultar_analise_negocio",
+    descricao: "Consultas analíticas avançadas e cruzamento estatístico da operação",
+    intencoes: [
+      "consultar_analise_negocio",
+      "analise_cruzada_operacao",
+      "analise_porte_raca",
+      "analise_bairro",
+      "analise_ocupacao_semanal",
+      "analise_cancelamentos",
+    ],
+    area: "financeiro_relatorios",
+    parametros: {
+      tipo: {
+        tipo: "string",
+        obrigatorio: false,
+        descricao: "Tipo de análise desejada (porte_raca, bairro, dia_semana, cancelamentos)",
+      },
+    },
+    retorno: "Relatório analítico estruturado com rankings e insights",
+    permissoes: ["admin", "financeiro"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "AnalyticsAdapter.executarAnaliseDinamica",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 8000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
 };
 
 /**
@@ -953,6 +985,14 @@ export async function despacharFerramentaV2(
 
       case "qualidade_ia":
         return await consultarQualidadeIAJessi();
+
+      case "consultar_analise_negocio":
+      case "analise_cruzada_operacao":
+      case "analise_porte_raca":
+      case "analise_bairro":
+      case "analise_ocupacao_semanal":
+      case "analise_cancelamentos":
+        return await AnalyticsAdapter.executarAnaliseDinamica(sb, params.tipo || params.pergunta || params.termo || "");
 
       case "gerar_mensagem_whatsapp":
         return MensagensWhatsAppAdapter.gerarMensagemWhatsApp(params as JessiV2WhatsAppPayload);
