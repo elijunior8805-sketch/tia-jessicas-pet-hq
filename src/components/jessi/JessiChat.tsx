@@ -246,7 +246,7 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                       case "programa":
                         return <ProgramaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "comprovante":
-                        return <ComprovanteCard key={cIdx} data={card.data} />;
+                        return <ComprovanteCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "comunicacao":
                         return <ComunicacaoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "reativacao":
