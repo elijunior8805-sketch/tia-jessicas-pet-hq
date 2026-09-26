@@ -189,3 +189,11 @@ export function formatarTelefoneBR(raw: unknown): string {
   const v = normalizarTelefoneBR(raw);
   return v.ok ? v.formatado : String(raw ?? "");
 }
+
+/** Gera um link wa.me validado com suporte a qualquer tipo de entrada de telefone. */
+export function gerarLinkWhatsApp(rawTelefone: unknown, texto: string = ""): string | null {
+  const v = normalizarTelefoneBR(rawTelefone);
+  if (!v.ok) return null;
+  return montarWaUrl(v.e164, texto);
+}
+

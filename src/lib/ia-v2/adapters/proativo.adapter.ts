@@ -101,7 +101,7 @@ export class ProativoAdapter {
         const tutorNome = n.clientes?.nome || n.clienteNome || "Tutor";
         const tel = n.clientes?.telefone || n.telefone || "";
         const msg = `Olá, ${tutorNome}! 🎉 Hoje é o aniversário do(a) querido(a) ${petNome}! 🎂🐾 O Spa de Pet Tia Jéssica deseja muita saúde e alegrias!`;
-        const link = tel ? gerarLinkWhatsApp(tel, msg) : undefined;
+        const link = tel ? (gerarLinkWhatsApp(tel, msg) ?? undefined) : undefined;
         itensPrioritarios.push({
           id: `niver_${n.id}`,
           categoria: "sugestao_mensagem",
