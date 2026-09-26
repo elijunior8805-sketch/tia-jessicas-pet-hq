@@ -171,6 +171,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
     isListening,
     isContinuousMode,
     interimTranscript,
+    finalTranscript,
     isSpeaking,
     ttsEnabled,
     setTtsEnabled,

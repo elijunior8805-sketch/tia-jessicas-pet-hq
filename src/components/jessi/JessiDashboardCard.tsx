@@ -57,21 +57,21 @@ export function JessiDashboardCard() {
           supabase.from("produtos_estoque").select("id, quantidade, estoque_minimo").eq("ativo", true),
         ]);
 
-        const agends = agendRes.data || [];
+        const agends = agendRes?.data || [];
         const faturamento = agends.reduce((acc: number, curr: any) => {
-          const s = curr.servicos;
+          const s = curr?.servicos;
           if (Array.isArray(s)) return acc + s.reduce((a: number, x: any) => a + Number(x?.valor || 0), 0);
           return acc + Number(s?.valor || 0);
         }, 0);
 
-        const aguardando = agends.filter((a: any) => a.status === "agendado" || a.status === "aguardando").length;
-        const criticos = (estoqueRes.data || []).filter((p: any) => Number(p.quantidade) <= Number(p.estoque_minimo)).length;
+        const aguardando = agends.filter((a: any) => a?.status === "agendado" || a?.status === "aguardando").length;
+        const criticos = (estoqueRes?.data || []).filter((p: any) => Number(p?.quantidade || 0) <= Number(p?.estoque_minimo || 0)).length;
 
         setResumo({
           agendamentosHoje: agends.length,
           faturamentoPrevisto: faturamento,
-          pendenciasRecebimento: (pagamentosRes.data || []).length,
-          programasVencendo: (progRes.data || []).length,
+          pendenciasRecebimento: (pagamentosRes?.data || []).length,
+          programasVencendo: (progRes?.data || []).length,
           aguardandoConfirmacao: aguardando,
           estoqueCritico: criticos,
         });

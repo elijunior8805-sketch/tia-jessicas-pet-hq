@@ -562,9 +562,9 @@ function DashboardPage() {
             ) : (
               <div className="space-y-1.5">
                 {proximos.map((a: any) => {
-                  const st = STATUS_STYLE[a.status] ?? STATUS_STYLE.agendado;
-                  const dt = parseISO(a.data);
-                  const initial = (a.pets?.nome ?? "P").trim().charAt(0).toUpperCase();
+                  const st = (a.status && STATUS_STYLE[a.status]) ? STATUS_STYLE[a.status] : STATUS_STYLE.agendado;
+                  const dt = a.data ? parseISO(a.data) : new Date();
+                  const initial = ((a.pets?.nome ?? "P").trim().charAt(0) || "P").toUpperCase();
                   return (
                     <Link
                       key={a.id}
