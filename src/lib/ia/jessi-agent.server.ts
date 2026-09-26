@@ -22,7 +22,7 @@ export interface JessiProcessInput {
 export interface JessiProcessOutput {
   respostaTexto: string;
   cards: Array<{
-    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta";
+    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta" | "leva_traz";
     data: any;
   }>;
   pendingAction?: JessiPendingAction | null;
