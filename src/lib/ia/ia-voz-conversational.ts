@@ -47,29 +47,62 @@ export function humanizarRespostaParaVoz(
     return limparMarcacaoTexto(texto);
   }
 
-  // 5. Tratamento de Agenda / Atendimentos (quando há múltiplos itens)
+  // 5. Tratamento de Agenda / Atendimentos / Próximo Pet / Bancada
   const cardAgenda = (cards || []).find((c) => c.type === "agenda");
-  if (cardAgenda?.data?.itens && Array.isArray(cardAgenda.data.itens) && cardAgenda.data.itens.length > 0) {
-    const itens = cardAgenda.data.itens;
-    const qtd = itens.length;
-    const primeiro = itens[0];
-    const petPri = primeiro.pets?.nome || primeiro.petNome || "o próximo pet";
-    const horaPri = primeiro.hora ? `às ${primeiro.hora.slice(0, 5)}` : "";
-
-    if (qtd === 1) {
-      return `Você tem 1 atendimento hoje com o ${petPri} ${horaPri}. Detalhes na tela!`;
+  if (cardAgenda?.data) {
+    if (cardAgenda.data.tipo === "proximo_pet") {
+      const proximo = cardAgenda.data.proximo;
+      if (!proximo) {
+        return "Não há próximos atendimentos pendentes na grade de hoje.";
+      }
+      const pet = proximo.pets?.nome || "o pet";
+      const servico = proximo.servicos?.nome || "atendimento";
+      const hora = proximo.hora ? `às ${String(proximo.hora).slice(0, 5)}` : "";
+      const tutor = proximo.clientes?.nome ? `, do tutor ${proximo.clientes.nome.split(" ")[0]}` : "";
+      return `O próximo pet na fila é o ${pet} para ${servico} ${hora}${tutor}.`;
     }
-    return `Você tem ${qtd} atendimentos agendados para hoje. O próximo é o ${petPri} ${horaPri}.`;
+
+    if (cardAgenda.data.tipo === "em_atendimento") {
+      const itens = cardAgenda.data.itens || [];
+      if (itens.length === 0) {
+        return "No momento não há nenhum pet em atendimento na bancada.";
+      }
+      const nomes = itens.map((a: any) => a.pets?.nome || "Pet").join(", ");
+      return `Temos ${itens.length} pet(s) em atendimento agora: ${nomes}.`;
+    }
+
+    const itensAgenda = Array.isArray(cardAgenda.data)
+      ? cardAgenda.data
+      : Array.isArray(cardAgenda.data.itens)
+      ? cardAgenda.data.itens
+      : cardAgenda.data.todosAtivos || [];
+
+    if (itensAgenda.length > 0) {
+      const qtd = itensAgenda.length;
+      const primeiro = itensAgenda[0];
+      const petPri = primeiro.pets?.nome || primeiro.petNome || "o próximo pet";
+      const horaPri = primeiro.hora ? `às ${String(primeiro.hora).slice(0, 5)}` : "";
+
+      if (qtd === 1) {
+        return `Você tem 1 atendimento hoje com o ${petPri} ${horaPri}. Detalhes no painel!`;
+      }
+      return `Você tem ${qtd} atendimentos agendados para hoje. O próximo é o ${petPri} ${horaPri}.`;
+    }
+
+    if (texto.includes("grade está 100% livre") || texto.includes("Não há agendamentos") || texto.includes("não há nenhum atendimento")) {
+      return "Hoje a grade de atendimentos está livre, sem nenhum agendamento marcado.";
+    }
   }
 
   // 6. Tratamento de Financeiro / Faturamento
   const cardFin = (cards || []).find((c) => c.type === "financeiro");
   if (cardFin?.data) {
     const d = cardFin.data;
-    if (d.faturamento !== undefined || d.receitaBruta !== undefined) {
-      const fat = d.faturamento || d.receitaBruta || 0;
-      const rec = d.recebido || d.totalRecebido || 0;
-      return `Seu faturamento acumulado está em R$ ${fat.toLocaleString("pt-BR")}, com R$ ${rec.toLocaleString("pt-BR")} recebidos. Todos os detalhes estão na tela.`;
+    if (d.faturamento !== undefined || d.receitaBruta !== undefined || d.faturamentoBruto !== undefined) {
+      const fat = d.faturamento || d.receitaBruta || d.faturamentoBruto || 0;
+      const rec = d.recebido || d.totalRecebido || d.valoresRecebidos || 0;
+      const pend = d.pendente || d.valoresAReceber || 0;
+      return `O faturamento do mês está em R$ ${fat.toLocaleString("pt-BR")}, com R$ ${rec.toLocaleString("pt-BR")} recebidos e R$ ${pend.toLocaleString("pt-BR")} em aberto.`;
     }
   }
 

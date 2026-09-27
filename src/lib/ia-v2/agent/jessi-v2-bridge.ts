@@ -59,9 +59,6 @@ export async function despacharMensagemJessi(
   try {
     // 2. ai_v2_enabled=true: Execução primária no Motor Jessi V2 com validação por área
     const res = await processarMensagemJessiV2Core(sb, input, user);
-    if (ehCanalVoz && res.respostaTexto) {
-      res.respostaTexto = humanizarRespostaParaVoz(res.respostaTexto, res.cards, input.modoBancada, user?.nome);
-    }
     return res;
   } catch (err) {
     // 3. Fallback seguro antes de qualquer mutação física

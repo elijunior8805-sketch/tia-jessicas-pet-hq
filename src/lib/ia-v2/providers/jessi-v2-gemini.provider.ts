@@ -498,10 +498,16 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       "creditos", "créditos", "debito", "débito", "dinheiro", "spa", "pet", "pets", "cliente", "clientes",
       "tutor", "tutores", "agenda", "horario", "horário", "horarios", "horários", "conta", "contas", "receber",
       "pagar", "pagamento", "pagamentos", "tudo", "todos", "todas", "meu", "minha", "meus", "minhas", "nosso",
-      "nossa", "nossos", "nossas", "aqui", "agora", "valor", "valores", "indicadores", "qualidade", "ia",
+      "nossa", "nossos", "nossas", "seu", "sua", "seus", "suas", "aqui", "agora", "valor", "valores", "indicadores", "qualidade", "ia",
       "mensagem", "comprovante", "banho", "tosa", "servico", "serviço", "opcao", "opção", "primeiro", "segundo",
-      "terceiro", "quarto", "quinto", "qual", "quais", "quanto", "quantos", "quanto faturou", "para", "pro",
-      "pra", "de", "do", "da", "em", "no", "na", "os", "as", "um", "uma", "uns", "umas", "ola", "olá"
+      "terceiro", "quarto", "quinto", "qual", "quais", "quanto", "quantos", "quanta", "quantas", "quando", "onde",
+      "como", "esta", "está", "estao", "estão", "ta", "tá", "tao", "tão", "que", "quem", "tem", "tenho", "temos", "ter",
+      "ha", "há", "bom", "boa", "dia", "dias", "tarde", "noite", "oi", "ola", "olá", "opa", "eai", "ver", "veja",
+      "verificar", "verifique", "consultar", "consulte", "checar", "cheque", "mostrar", "mostra", "mostre", "abrir",
+      "abra", "olhar", "olha", "olhe", "dizer", "diz", "falar", "fala", "passar", "passa", "puxar", "puxa",
+      "proximo", "próximo", "proxima", "próxima", "proximos", "próximos", "proximas", "próximas", "ultimo", "último",
+      "ultima", "última", "grade", "bancada", "recepcao", "recepção", "fila", "lista", "para", "pro",
+      "pra", "de", "do", "da", "em", "no", "na", "os", "as", "um", "uma", "uns", "umas", "mais", "menos"
     ]);
 
     const ehNomeValido = (nomeStr?: string | null): boolean => {
@@ -511,7 +517,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       const partes = limpo.split(/\s+/);
       // Se todas as palavras forem stopwords, não é nome válido
       if (partes.every((p) => STOPWORDS_NAO_NOMES.has(p))) return false;
-      return !STOPWORDS_NAO_NOMES.has(limpo);
+      if (STOPWORDS_NAO_NOMES.has(limpo)) return false;
+      return true;
     };
 
     const extrairApenasNomeEntidade = (nomeBruto?: string | null): string => {
@@ -849,11 +856,98 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       textoLower.includes("resumo para os sócios") ||
       textoLower.includes("resumo para os socios");
 
+    // Saudação calorosa ("bom dia", "olá jessi", "oi", "e aí")
+    const ehSaudacao =
+      /^(bom dia|boa tarde|boa noite|ol[aá]|oi|opa|e ai|e aí|fala|fala jessi|e aí jessi|e ai jessi|oi jessi|ol[aá] jessi)(\s*jessi|\s*tudo bem|\s*como vai)?$/i.test(textoLimpoPont) ||
+      textoLimpoPont === "bom dia" ||
+      textoLimpoPont === "boa tarde" ||
+      textoLimpoPont === "boa noite" ||
+      textoLimpoPont === "ola" ||
+      textoLimpoPont === "olá" ||
+      textoLimpoPont === "oi" ||
+      textoLimpoPont === "oi jessi" ||
+      textoLimpoPont === "ola jessi" ||
+      textoLimpoPont === "olá jessi";
+
+    // Consulta de Próximo Pet / Próximo Atendimento
+    const ehConsultaProximoPet =
+      textoLower.includes("próximo pet") ||
+      textoLower.includes("proximo pet") ||
+      textoLower.includes("próximo atendimento") ||
+      textoLower.includes("proximo atendimento") ||
+      textoLower.includes("quem é o próximo") ||
+      textoLower.includes("quem e o proximo") ||
+      textoLower.includes("qual o próximo") ||
+      textoLower.includes("qual o proximo") ||
+      textoLower.includes("qual é o próximo") ||
+      textoLower.includes("qual e o proximo") ||
+      textoLower.includes("quem vem agora") ||
+      textoLower.includes("qual pet vem") ||
+      textoLower.includes("próximo da fila") ||
+      textoLower.includes("proximo da fila");
+
+    // Consulta de Pets em Atendimento na Bancada / Banho / Tosa Agora
+    const ehConsultaEmAtendimento =
+      textoLower.includes("quem está aí") ||
+      textoLower.includes("quem ta ai") ||
+      textoLower.includes("quem tá no spa") ||
+      textoLower.includes("quem ta no spa") ||
+      textoLower.includes("quem está no spa") ||
+      textoLower.includes("em atendimento") ||
+      textoLower.includes("sendo atendido") ||
+      textoLower.includes("na bancada") ||
+      textoLower.includes("quem está no banho") ||
+      textoLower.includes("quem tá no banho") ||
+      textoLower.includes("quem está na tosa") ||
+      textoLower.includes("quem tá na tosa") ||
+      textoLower.includes("banhos em andamento");
+
+    // Consulta de Agenda / Visão Geral do Dia
+    const ehConsultaAgendaDireta =
+      textoLower.includes("minha agenda") ||
+      textoLower.includes("como está a agenda") ||
+      textoLower.includes("como esta a agenda") ||
+      textoLower.includes("como tá a agenda") ||
+      textoLower.includes("como ta a agenda") ||
+      textoLower.includes("como está a grade") ||
+      textoLower.includes("como tá a grade") ||
+      textoLower.includes("o que tenho pra hoje") ||
+      textoLower.includes("o que tem pra hoje") ||
+      textoLower.includes("o que temos pra hoje") ||
+      textoLower.includes("o que tem hoje") ||
+      textoLower.includes("o que temos hoje") ||
+      textoLower.includes("atendimentos de hoje") ||
+      textoLower.includes("grade de hoje") ||
+      textoLower.includes("agenda de hoje") ||
+      textoLower.includes("como está o dia") ||
+      textoLower.includes("como tá o dia") ||
+      textoLower.includes("o que temos para fazer");
+
     if (ehAgradecimentoDespedida) {
       dominio = "geral_conversacional";
       intencao = "agradecimento_despedida";
       ferramentaSugerida = null;
       explicacao = "Agradecimento e encerramento amigável de conversa/atendimento.";
+    } else if (ehSaudacao) {
+      dominio = "geral_conversacional";
+      intencao = "saudacao";
+      ferramentaSugerida = null;
+      explicacao = "Saudação calorosa e acolhedora com resumo proativo da operação.";
+    } else if (ehConsultaProximoPet) {
+      dominio = "agenda";
+      intencao = "consultar_proximo_pet";
+      ferramentaSugerida = "consultar_agenda";
+      explicacao = "Consultando o próximo pet agendado na fila de hoje.";
+    } else if (ehConsultaEmAtendimento) {
+      dominio = "agenda";
+      intencao = "consultar_em_atendimento";
+      ferramentaSugerida = "consultar_agenda";
+      explicacao = "Consultando pets atualmente em atendimento na bancada do Spa.";
+    } else if (ehConsultaAgendaDireta) {
+      dominio = "agenda";
+      intencao = "consultar_agenda";
+      ferramentaSugerida = "consultar_agenda";
+      explicacao = "Consultando visão geral dos agendamentos e grade do dia.";
     } else if (matchOrdinal) {
       dominio = "clientes_pets";
       intencao = "selecionar_candidato_ordinal";

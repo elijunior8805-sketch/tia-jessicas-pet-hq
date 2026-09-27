@@ -1987,6 +1987,93 @@ export async function processarMensagemJessiV2Core(
               sugestao: livres.slice(0, 3),
             },
           });
+        } else if (intencao.intencao === "consultar_proximo_pet") {
+          const { data: agsHoje } = await sb
+            .from("agendamentos")
+            .select("id, data, hora, status, valor_previsto, observacoes, leva_traz_modalidade, pets(id, nome, raca, porte), clientes(id, nome, whatsapp, telefone), servicos(id, nome, valor)")
+            .eq("data", dataAlvo)
+            .neq("status", "cancelado")
+            .neq("status", "finalizado")
+            .order("hora", { ascending: true });
+
+          const proximo = agsHoje && agsHoje.length > 0 ? agsHoje[0] : null;
+
+          if (!proximo) {
+            respostaTexto = `🐾 Não há próximos pets na fila para hoje (${dataAlvo}). Todos os atendimentos agendados já foram concluídos ou a grade está livre!`;
+            cards.push({
+              type: "agenda",
+              title: "Próximo Pet na Fila",
+              subtitle: "Nenhum atendimento pendente",
+              data: {
+                tipo: "proximo_pet",
+                data: dataAlvo,
+                proximo: null,
+              },
+            });
+          } else {
+            const petNome = (proximo.pets as any)?.nome || "Pet";
+            const raca = (proximo.pets as any)?.raca || "Raça não informada";
+            const tutorNome = (proximo.clientes as any)?.nome || "Tutor não informado";
+            const servicoNome = (proximo.servicos as any)?.nome || "Atendimento";
+            const hora = proximo.hora ? String(proximo.hora).slice(0, 5) : "--:--";
+            const levaTraz = proximo.leva_traz_modalidade && proximo.leva_traz_modalidade !== "nao_utilizar" ? " (Com Leva & Traz 🚐)" : "";
+
+            respostaTexto = `🐾 **Próximo Pet na Fila**: **${petNome}** (${raca})\n• **Tutor(a)**: ${tutorNome}\n• **Serviço**: ${servicoNome}${levaTraz}\n• **Horário**: ${hora}\n• **Status**: ${proximo.status === "em_atendimento" ? "Em atendimento agora" : "Aguardando / Agendado"}`;
+
+            cards.push({
+              type: "agenda",
+              title: `Próximo: ${petNome} (${hora})`,
+              subtitle: `Tutor: ${tutorNome} • ${servicoNome}`,
+              data: {
+                tipo: "proximo_pet",
+                data: dataAlvo,
+                proximo,
+                restantesHoje: agsHoje.length,
+              },
+            });
+          }
+        } else if (intencao.intencao === "consultar_em_atendimento") {
+          const { data: agsEmAtendimento } = await sb
+            .from("agendamentos")
+            .select("id, data, hora, status, valor_previsto, observacoes, pets(id, nome, raca, porte), clientes(id, nome, whatsapp, telefone), servicos(id, nome, valor)")
+            .eq("data", dataAlvo)
+            .eq("status", "em_atendimento")
+            .order("hora", { ascending: true });
+
+          const lista = agsEmAtendimento || [];
+
+          if (lista.length === 0) {
+            respostaTexto = `🛁 No momento **não há nenhum pet em atendimento** na bancada ou banho.`;
+            cards.push({
+              type: "agenda",
+              title: "Pets em Atendimento",
+              subtitle: "Nenhum no momento",
+              data: {
+                tipo: "em_atendimento",
+                itens: [],
+              },
+            });
+          } else {
+            const itensTexto = lista.map((a) => {
+              const pNome = (a.pets as any)?.nome || "Pet";
+              const sNome = (a.servicos as any)?.nome || "Atendimento";
+              const tNome = (a.clientes as any)?.nome || "Tutor";
+              const h = a.hora ? String(a.hora).slice(0, 5) : "--:--";
+              return `• **${pNome}** (${sNome}) — Tutor: ${tNome} (Horário: ${h})`;
+            }).join("\n");
+
+            respostaTexto = `🛁 **Pets em Atendimento Agora (${lista.length})**:\n${itensTexto}`;
+
+            cards.push({
+              type: "agenda",
+              title: `Pets em Atendimento (${lista.length})`,
+              subtitle: `${lista.length} pet(s) na bancada/banho`,
+              data: {
+                tipo: "em_atendimento",
+                itens: lista,
+              },
+            });
+          }
         } else {
           const resAgenda = await AgendaAdapter.consultarAgendaPorData(sb, dataAlvo);
           const agendamentos: any[] = resAgenda.data || [];
@@ -2312,6 +2399,44 @@ export async function processarMensagemJessiV2Core(
         novoContexto.pet = null;
         novoContexto.petSelecionadoId = null;
         novoContexto.petSelecionadoNome = null;
+      } else if (intencao.intencao === "saudacao") {
+        const nomeOp = user?.nome ? user.nome.split(" ")[0] : "Eli";
+        const dataAlvo = contextoAtual.dataReferencia || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+        
+        const { data: agsHoje } = await sb
+          .from("agendamentos")
+          .select("id, data, hora, status, pets(id, nome, raca), clientes(id, nome), servicos(id, nome)")
+          .eq("data", dataAlvo)
+          .neq("status", "cancelado")
+          .order("hora", { ascending: true });
+
+        const lista = agsHoje || [];
+        const total = lista.length;
+
+        if (total === 0) {
+          respostaTexto = `Olá, ${nomeOp}! Hoje a grade de atendimentos está livre, sem agendamentos cadastrados no momento. Como posso te ajudar hoje?`;
+        } else {
+          const proximo = lista.find((a) => a.status !== "finalizado") || lista[0];
+          const petPri = (proximo.pets as any)?.nome || "Pet";
+          const servPri = (proximo.servicos as any)?.nome || "Atendimento";
+          const horaPri = proximo.hora ? String(proximo.hora).slice(0, 5) : "";
+          const tutorPri = (proximo.clientes as any)?.nome ? ` (${(proximo.clientes as any).nome})` : "";
+          
+          const horaStr = horaPri ? ` às ${horaPri}` : "";
+          respostaTexto = `Olá, ${nomeOp}! Hoje temos **${total} atendimento(s)** programado(s). O próximo é o **${petPri}**${tutorPri} (${servPri})${horaStr}. Como posso ajudar você agora?`;
+          
+          cards.push({
+            type: "agenda",
+            title: `Agenda de Hoje (${total} atendimento(s))`,
+            subtitle: `Próximo: ${petPri} ${horaStr}`,
+            data: {
+              tipo: "proximo_pet",
+              data: dataAlvo,
+              proximo,
+              totalHoje: total,
+            },
+          });
+        }
       } else {
         // Conversação Natural / Saudação Generativa via Gemini com Fallback
         try {
