@@ -1384,4 +1384,215 @@ export const obterDossieCobrancaAvancada = createServerFn({ method: "POST" })
     };
   });
 
+// ============= 2.0 AI Batch, Negotiation & Re-engagement =============
+
+export type LoteMensagemItemDTO = {
+  cobrancaId: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteWhatsapp: string | null;
+  petNome: string | null;
+  saldo: number;
+  diasAtraso: number;
+  tomSugerido: "cordial_vip" | "lembrete_amigavel" | "negociacao_acordo" | "firme";
+  mensagem: string;
+  chavePix: string;
+};
+
+export const gerarMensagensLoteIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ cobrancaIds: z.array(z.string().uuid()) }).parse(d))
+  .handler(async ({ data, context }): Promise<LoteMensagemItemDTO[]> => {
+    const { supabase } = context;
+
+    const { data: rows, error } = await supabase
+      .from("cobrancas")
+      .select(`
+        id, cliente_id, saldo, vencimento, tentativas,
+        clientes:cliente_id ( id, nome, whatsapp ),
+        atendimentos:atendimento_id ( data_inicio, pets:pet_id ( nome ) )
+      `)
+      .in("id", data.cobrancaIds)
+      .is("arquivada_em", null);
+
+    if (error) throw new Error(error.message);
+
+    // Chave PIX padrão da empresa
+    const { data: config } = await supabase.from("empresa_config").select("chave_pix, nome_empresa").maybeSingle();
+    const chavePix = (config as any)?.chave_pix || "contato@spadepettiajessica.com.br";
+    const nomeEmpresa = (config as any)?.nome_empresa || "Spa de Pet Tia Jéssica";
+
+    const hoje = new Date();
+    hoje.setUTCHours(0, 0, 0, 0);
+
+    const resultados: LoteMensagemItemDTO[] = [];
+
+    for (const r of rows ?? []) {
+      const v = new Date((r as any).vencimento + ((r as any).vencimento.includes("T") ? "" : "T00:00:00Z")).getTime();
+      const dias = Math.max(0, Math.floor((hoje.getTime() - v) / 86400000));
+      const saldo = Number((r as any).saldo ?? 0);
+      const clienteNome = (r as any).clientes?.nome || "Cliente";
+      const primeiroNome = clienteNome.split(" ")[0];
+      const petNome = (r as any).atendimentos?.pets?.nome || "seu pet";
+      const whatsapp = (r as any).clientes?.whatsapp || null;
+      const saldoBrl = saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      let tom: "cordial_vip" | "lembrete_amigavel" | "negociacao_acordo" | "firme" = "lembrete_amigavel";
+      let msg = "";
+
+      if (dias <= 3) {
+        tom = "cordial_vip";
+        msg = `Olá, ${primeiroNome}! Tudo bem? 🐾\n\nPassando com carinho para lembrar do valor de ${saldoBrl} referente ao atendimento do(a) ${petNome}.\n\n🔑 Chave PIX: ${chavePix}\n\nQualquer dúvida estamos à disposição no ${nomeEmpresa}! ✨`;
+      } else if (dias <= 7) {
+        tom = "lembrete_amigavel";
+        msg = `Olá, ${primeiroNome}! Como você e o(a) ${petNome} estão? 🐶\n\nConsta em aberto o pagamento de ${saldoBrl} (vencido há ${dias} dias). Segue nossa chave Pix para facilitar:\n\n🔑 PIX: ${chavePix}\n\nSe já realizou o pagamento, por favor desconsidere. Muito obrigado! 🐾`;
+      } else {
+        tom = "negociacao_acordo";
+        msg = `Olá, ${primeiroNome}! Aqui é da equipe do ${nomeEmpresa}.\n\nNotamos a pendência de ${saldoBrl} referente ao(à) ${petNome} há ${dias} dias. Gostaríamos de te ajudar a regularizar: podemos parcelar ou verificar uma condição especial à vista pelo Pix.\n\n🔑 Chave PIX: ${chavePix}\n\nPodemos conversar para resolver isso juntos? Aguardo seu retorno! 💬`;
+      }
+
+      resultados.push({
+        cobrancaId: (r as any).id,
+        clienteId: (r as any).cliente_id,
+        clienteNome,
+        clienteWhatsapp: whatsapp,
+        petNome,
+        saldo,
+        diasAtraso: dias,
+        tomSugerido: tom,
+        mensagem: msg,
+        chavePix,
+      });
+    }
+
+    return resultados;
+  });
+
+export const simularAcordoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    cobrancaId: z.string().uuid(),
+    descontoPixPct: z.number().min(0).max(50).default(5),
+    parcelasMax: z.number().min(1).max(6).default(3)
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: cob, error } = await supabase
+      .from("cobrancas")
+      .select("*, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(pets:pet_id(nome))")
+      .eq("id", data.cobrancaId)
+      .single();
+
+    if (error || !cob) throw new Error("Cobrança não encontrada");
+
+    const saldo = Number((cob as any).saldo || 0);
+    const valorComDesconto = Math.round(saldo * (1 - data.descontoPixPct / 100) * 100) / 100;
+    const valorParcela = Math.round((saldo / data.parcelasMax) * 100) / 100;
+    const primeiroNome = ((cob as any).clientes?.nome || "Cliente").split(" ")[0];
+    const petNome = (cob as any).atendimentos?.pets?.nome || "seu pet";
+
+    const { data: cfg } = await supabase.from("empresa_config").select("chave_pix, nome_empresa").maybeSingle();
+    const chavePix = (cfg as any)?.chave_pix || "contato@spadepettiajessica.com.br";
+
+    const propostaTexto = `Olá, ${primeiroNome}! Pensando no melhor para você e para o(a) ${petNome}, preparamos opções especiais para quitar sua pendência de ${saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}:\n\n` +
+      `1️⃣ *À vista com ${data.descontoPixPct}% de desconto:* ${valorComDesconto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} via Pix\n` +
+      `🔑 Chave PIX: ${chavePix}\n\n` +
+      `2️⃣ *Parcelado sem juros:* até ${data.parcelasMax}x de ${valorParcela.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} no cartão.\n\n` +
+      `Qual opção fica melhor para você? Responda aqui para confirmarmos! 🐾`;
+
+    return {
+      saldoOriginal: saldo,
+      descontoPct: data.descontoPixPct,
+      valorComDesconto,
+      parcelas: data.parcelasMax,
+      valorParcela,
+      propostaTexto,
+      chavePix
+    };
+  });
+
+export const quitarCobrancaComReativacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    cobrancaId: z.string().uuid(),
+    valorPago: z.number().positive().optional(),
+    forma: z.string().default("pix"),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, claims } = context;
+
+    const { data: cob, error: eCob } = await supabase
+      .from("cobrancas")
+      .select("id, pagamento_id, cliente_id, atendimento_id, saldo, valor_original, valor_pago, clientes:cliente_id(nome, whatsapp), atendimentos:atendimento_id(data_inicio, pets:pet_id(id, nome, raca))")
+      .eq("id", data.cobrancaId)
+      .single();
+
+    if (eCob || !cob) throw new Error("Cobrança não encontrada");
+
+    const total = Number(cob.valor_original ?? 0);
+    const pagoAntes = Number(cob.valor_pago ?? 0);
+    const saldo = Number(cob.saldo ?? 0);
+    const valorEfetivo = data.valorPago ?? saldo;
+    const pagoDepois = Math.min(total, pagoAntes + valorEfetivo);
+    const quitado = pagoDepois >= total;
+
+    // Atualiza pagamento oficial
+    await supabase
+      .from("pagamentos")
+      .update({
+        valor_pago: pagoDepois,
+        status: quitado ? "pago" : "parcial",
+        forma: data.forma,
+        data_pagamento: new Date().toISOString().slice(0, 10),
+      })
+      .eq("id", cob.pagamento_id);
+
+    // Atualiza cobrança
+    await supabase
+      .from("cobrancas")
+      .update({
+        valor_pago: pagoDepois,
+        saldo: Math.max(0, total - pagoDepois),
+        status: quitado ? "pago" : "pago_parcial",
+        pausada: false,
+      })
+      .eq("id", data.cobrancaId);
+
+    // Log evento
+    await logEvento(
+      supabase,
+      data.cobrancaId,
+      "pagamento",
+      { valor: valorEfetivo, quitado, forma: data.forma },
+      undefined,
+      (claims as any)?.email ?? null
+    );
+
+    const pet = (cob as any).atendimentos?.pets;
+    const clienteNome = (cob as any).clientes?.nome || "Cliente";
+    const primeiroNome = clienteNome.split(" ")[0];
+    const petNome = pet?.nome || "seu pet";
+    const dataAtend = (cob as any).atendimentos?.data_inicio;
+
+    let diasDesdeAtend = 0;
+    if (dataAtend) {
+      diasDesdeAtend = Math.max(0, Math.floor((Date.now() - new Date(dataAtend).getTime()) / 86400000));
+    }
+
+    const mensagemReativacao = `Olá, ${primeiroNome}! Pagamento confirmado com sucesso, muito obrigado! 🐾✨\n\n` +
+      `Notei que o último banho do(a) ${petNome} foi há ${diasDesdeAtend} dias. Que tal já garantirmos a próxima sessão para mantê-lo(a) cheiroso(a) e protegido(a)?\n\n` +
+      `Posso reservar um horário para esta semana? Me diga o melhor dia! 🐶🛁`;
+
+    return {
+      ok: true,
+      quitado,
+      clienteNome,
+      clienteWhatsapp: (cob as any).clientes?.whatsapp || null,
+      petNome,
+      diasDesdeAtendimento: diasDesdeAtend,
+      mensagemReativacao,
+    };
+  });
+
 
