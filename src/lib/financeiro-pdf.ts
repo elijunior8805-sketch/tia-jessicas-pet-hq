@@ -436,3 +436,4 @@ function drawTable(
   });
   y += 4;
   setY(y);
+}
