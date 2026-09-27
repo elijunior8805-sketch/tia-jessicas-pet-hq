@@ -59,6 +59,71 @@ function primeiroNome(v: string | null | undefined) {
   return (v ?? "").trim().split(/\s+/)[0] ?? "";
 }
 
+// ============= Auto-Reconciliação com Pagamentos =============
+export async function reconciliarCobrancasComPagamentos(supabase: any) {
+  try {
+    const { data: pagamentos, error: pagErr } = await supabase
+      .from("pagamentos")
+      .select("id, cliente_id, atendimento_id, valor_total, valor_pago, vencimento, status, is_teste, arquivado_em, categoria_receita")
+      .is("arquivado_em", null)
+      .or("is_teste.is.null,is_teste.eq.false");
+
+    if (pagErr || !pagamentos) return;
+
+    const pagMap = new Map(pagamentos.map((p: any) => [p.id, p]));
+
+    const { data: cobrancas, error: cobErr } = await supabase
+      .from("cobrancas")
+      .select("id, pagamento_id, status, saldo, valor_pago, valor_original")
+      .is("arquivada_em", null);
+
+    if (cobErr || !cobrancas) return;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    for (const c of cobrancas) {
+      const pag = pagMap.get(c.pagamento_id);
+      
+      if (!pag || pag.status === "cancelado" || pag.arquivado_em || pag.is_teste) {
+        await supabase.from("cobrancas").delete().eq("id", c.id);
+        continue;
+      }
+
+      const saldoReal = Math.max(0, Number(pag.valor_total || 0) - Number(pag.valor_pago || 0));
+      const valorPagoReal = Number(pag.valor_pago || 0);
+
+      if (pag.status === "pago" || saldoReal <= 0.005) {
+        if (c.status !== "pago" || Number(c.saldo) > 0) {
+          await supabase
+            .from("cobrancas")
+            .update({
+              status: "pago",
+              saldo: 0,
+              valor_pago: valorPagoReal,
+              pausada: false,
+            })
+            .eq("id", c.id);
+        }
+      } else {
+        if (c.status === "pago" || Math.abs(Number(c.saldo) - saldoReal) > 0.01) {
+          const novoStatus = valorPagoReal > 0 ? "pago_parcial" : (pag.vencimento && pag.vencimento < hoje ? "vencido" : "a_vencer");
+          await supabase
+            .from("cobrancas")
+            .update({
+              status: novoStatus,
+              saldo: saldoReal,
+              valor_pago: valorPagoReal,
+              valor_original: Number(pag.valor_total || 0),
+            })
+            .eq("id", c.id);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[reconciliarCobrancasComPagamentos] erro ao reconciliar:", err);
+  }
+}
+
 // ============= List =============
 const ListSchema = z.object({
   status: z.array(z.string()).optional(),
@@ -76,6 +141,8 @@ export const listarCobrancas = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => ListSchema.parse(data ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+
+    await reconciliarCobrancasComPagamentos(supabase);
 
     let q = supabase
       .from("cobrancas")
@@ -155,6 +222,9 @@ export const kpisCobrancas = createServerFn({ method: "GET" })
     const hoje = new Date();
     const iso = hoje.toISOString().slice(0, 10);
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10);
+
+    // Executa auto-reconciliação antes de calcular KPIs
+    await reconciliarCobrancasComPagamentos(supabase);
 
     const [abertas, recuperadas] = await Promise.all([
       supabase
@@ -872,6 +942,9 @@ export const filaDoDia = createServerFn({ method: "GET" })
     const hoje = new Date();
     const iso = hoje.toISOString().slice(0, 10);
 
+    // Reconcilia com pagamentos para garantir fila sempre atualizada
+    await reconciliarCobrancasComPagamentos(supabase);
+
     const { data: rows, error } = await supabase
       .from("cobrancas")
       .select(
@@ -1171,6 +1244,9 @@ export const filaPriorizada = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+
+    // Garante que cobranças estejam 100% sincronizadas com pagamentos
+    await reconciliarCobrancasComPagamentos(supabase);
 
     const { data: rows, error } = await supabase
       .from("cobrancas")

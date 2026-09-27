@@ -384,6 +384,32 @@ export const confirmarRecebimento = createServerFn({ method: "POST" })
       throw new Error(`Falha ao registrar recebimento: ${updErr.message}`);
     }
 
+    // Sincronização explícita com a tabela cobrancas para consistência imediata
+    try {
+      if (novoStatus === "pago") {
+        await supabase
+          .from("cobrancas")
+          .update({
+            valor_pago: novoValorPago,
+            saldo: 0,
+            status: "pago",
+            pausada: false,
+          })
+          .eq("pagamento_id", data.pagamentoId);
+      } else {
+        await supabase
+          .from("cobrancas")
+          .update({
+            valor_pago: novoValorPago,
+            saldo: saldoRestante,
+            status: "pago_parcial",
+          })
+          .eq("pagamento_id", data.pagamentoId);
+      }
+    } catch (eCob) {
+      console.warn("[pagamentos] aviso ao sincronizar cobrancas:", eCob);
+    }
+
     if (novoStatus === "pago" && atual.categoria_receita === "programa_cuidado" && atual.idempotency_key?.startsWith("programa_")) {
       const contratoId = atual.idempotency_key.replace("programa_", "");
       const { error: progErr } = await supabase
@@ -435,6 +461,13 @@ export const cancelarLancamento = createServerFn({ method: "POST" })
     if (updErr) {
       console.error("[pagamentos] cancelarLancamento erro:", updErr.message);
       throw new Error("Falha ao cancelar pagamento");
+    }
+
+    // Remover ou arquivar da tabela cobrancas
+    try {
+      await supabase.from("cobrancas").delete().eq("pagamento_id", data.pagamentoId);
+    } catch (eCob) {
+      console.warn("[pagamentos] aviso ao remover de cobrancas:", eCob);
     }
 
     let contratoCancelado = false;

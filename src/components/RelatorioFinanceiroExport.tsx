@@ -32,15 +32,13 @@ export function RelatorioFinanceiroExport({ from, to, kpis, auditNote }: Relator
       const [pagRes, parcRes] = await Promise.all([
         supabase
           .from("pagamentos")
-          .select("*, cliente:clientes(nome, telefone, whatsapp), atendimento:agendamentos(data_inicio, encerrado_em, finalizado, valor_executado, taxa_leva_traz, desconto, pet:pets(nome))")
-          .gte("vencimento", from)
-          .lte("vencimento", to)
-          .order("vencimento", { ascending: false }),
+          .select("*, cliente:clientes(nome, telefone, whatsapp), atendimento:atendimentos(data_inicio, encerrado_em, finalizado, valor_executado, taxa_leva_traz, desconto, pet:pets(nome))")
+          .or(`and(data_pagamento.gte.${from},data_pagamento.lte.${to}),and(vencimento.gte.${from},vencimento.lte.${to})`)
+          .order("data_pagamento", { ascending: false, nullsFirst: false }),
         supabase
           .from("compras_parcelas")
-          .select("*, compra:compras(descricao, numero_documento, fornecedor:fornecedor_id(nome, telefone, whatsapp), categoria:categoria_id(nome), centro_custo:centro_custo_id(nome))")
-          .gte("vencimento", from)
-          .lte("vencimento", to)
+          .select("*, compra:compras(descricao, numero_documento, fornecedor:fornecedores(id, nome, telefone, whatsapp), categoria:categorias_financeiras(id, nome), centro_custo:centros_custo(nome))")
+          .or(`and(data_pagamento.gte.${from},data_pagamento.lte.${to}),and(vencimento.gte.${from},vencimento.lte.${to})`)
           .order("vencimento", { ascending: false }),
       ]);
 

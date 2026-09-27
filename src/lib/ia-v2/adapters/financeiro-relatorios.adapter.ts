@@ -60,21 +60,45 @@ export class FinanceiroRelatoriosAdapter {
         day: "2-digit",
       }).format(agora);
 
-      // 1. Consulta transações financeiras confirmadas no período
-      const { data: transacoes, error } = await sb
-        .from("pagamentos")
-        .select("id, valor_total, valor_pago, status, forma, data_pagamento, created_at")
-        .is("arquivado_em", null)
-        .eq("is_teste", false)
-        .gte("created_at", inicioPeriodo);
+      const deStr = inicioPeriodo.slice(0, 10);
+      const ateStr = hojeDataStr;
 
-      if (error) throw error;
+      // 1. Consulta indicadores unificados da view oficial
+      const { data: indicadores, error: indError } = await sb
+        .from("vw_financeiro_indicadores")
+        .select("*")
+        .gte("data_referencia", deStr)
+        .lte("data_referencia", ateStr);
 
       let faturamentoBruto = 0;
       let valoresRecebidos = 0;
       let despesas = 0;
-      let estornos = 0;
       let totalEntradasCount = 0;
+
+      if (!indError && indicadores) {
+        indicadores.forEach((row: any) => {
+          const val = Number(row.valor || 0);
+          if (row.tipo === "receita_servico") {
+            faturamentoBruto += val;
+            totalEntradasCount += Number(row.quantidade_atendimentos || 0);
+          } else if (row.tipo === "receita_recebida") {
+            valoresRecebidos += val;
+          } else if (row.tipo === "despesa_paga") {
+            despesas += val;
+          }
+        });
+      }
+
+      // 2. Consulta transações por forma de pagamento no período
+      const { data: transacoes } = await sb
+        .from("pagamentos")
+        .select("id, valor_total, valor_pago, status, forma, data_pagamento")
+        .is("arquivado_em", null)
+        .or("is_teste.is.null,is_teste.eq.false")
+        .gte("data_pagamento", deStr)
+        .lte("data_pagamento", ateStr);
+
+      let estornos = 0;
       let totalPix = 0;
       let totalDinheiro = 0;
       let totalCartaoCredito = 0;
@@ -82,16 +106,10 @@ export class FinanceiroRelatoriosAdapter {
       let totalOutrasFormas = 0;
 
       (transacoes || []).forEach((t: any) => {
-        const valor = Number(t.valor_total) || 0;
-        const recebido = Number(t.valor_pago) || 0;
-        const ehConfirmado = t.status === "pago";
+        const valEfetivo = Number(t.valor_pago) || Number(t.valor_total) || 0;
+        const ehConfirmado = t.status === "pago" || t.status === "parcial";
 
-        faturamentoBruto += valor;
         if (ehConfirmado) {
-          const valEfetivo = recebido || valor;
-          valoresRecebidos += valEfetivo;
-          totalEntradasCount++;
-
           const forma = (t.forma || "").toLowerCase();
           if (forma.includes("pix")) totalPix += valEfetivo;
           else if (forma.includes("dinheiro")) totalDinheiro += valEfetivo;
@@ -100,7 +118,7 @@ export class FinanceiroRelatoriosAdapter {
           else totalOutrasFormas += valEfetivo;
         }
         if (t.status === "estornado" || t.status === "cancelado") {
-          estornos += valor;
+          estornos += Number(t.valor_total) || 0;
         }
       });
 

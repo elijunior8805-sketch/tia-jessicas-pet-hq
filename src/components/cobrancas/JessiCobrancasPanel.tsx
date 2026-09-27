@@ -201,11 +201,29 @@ export const JessiCobrancasPanel: React.FC<JessiCobrancasPanelProps> = ({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => handlePerguntar("Jessi, qual é a melhor abordagem amigável para cobrar clientes do Clubinho?")}
+            onClick={() => handlePerguntar("Jessi, gere uma mensagem humanizada com PIX Copia e Cola para lembrar clientes que esqueceram de pagar esta semana.")}
+            className="h-7 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 border-emerald-400/30 rounded-lg gap-1.5 shadow-2xs"
+          >
+            <Zap className="h-3 w-3 text-emerald-300" />
+            Lembrete com PIX
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handlePerguntar("Jessi, qual é a melhor abordagem amigável para cobrar clientes recorrentes ou do Clubinho?")}
             className="h-7 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-lg gap-1.5 shadow-2xs"
           >
             <Zap className="h-3 w-3 text-[#C8A951]" />
-            Dicas de abordagem cordial
+            Abordagem cordial VIP
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handlePerguntar("Jessi, como podemos reativar clientes que quitaram débitos antigos e não voltam há mais de 15 dias?")}
+            className="h-7 text-xs bg-[#C8A951]/20 hover:bg-[#C8A951]/30 text-[#F5E6BE] border-[#C8A951]/40 rounded-lg gap-1.5 shadow-2xs"
+          >
+            <Sparkles className="h-3 w-3 text-[#C8A951]" />
+            Reativação pós-pagamento
           </Button>
         </div>
 

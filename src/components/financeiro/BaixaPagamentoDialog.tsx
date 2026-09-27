@@ -76,7 +76,10 @@ export function BaixaPagamentoDialog({
       queryClient.invalidateQueries({ queryKey: ["cliente-pagamentos"] });
       queryClient.invalidateQueries({ queryKey: ["financeiro-lancamentos"] });
       queryClient.invalidateQueries({ queryKey: ["fin-resumo"] });
+      queryClient.invalidateQueries({ queryKey: ["fin-pag"] });
+      queryClient.invalidateQueries({ queryKey: ["fin-unified-metrics"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["cobrancas"] });
       queryClient.invalidateQueries({ queryKey: ["programas-ativos"] });
       queryClient.invalidateQueries({ queryKey: ["cliente-programas"] });
       

@@ -231,6 +231,14 @@ export async function generateFinanceiroPDF(d: FinPdfData) {
   y += 8;
 
   // ===== Entradas =====
+  const totalRecebidoEntradas = d.entradas
+    .filter((e) => e.status === "pago" || e.status === "parcial")
+    .reduce((s, e) => s + (Number(e.valor_pago) || Number(e.valor) || 0), 0);
+  const totalPendenteEntradas = d.entradas
+    .filter((e) => e.status !== "pago" && e.status !== "parcial" && e.status !== "cancelado")
+    .reduce((s, e) => s + (Number(e.valor) - (Number(e.valor_pago) || 0)), 0);
+  const totalGeralEntradas = totalRecebidoEntradas + totalPendenteEntradas;
+
   drawTable(
     doc,
     () => y,
@@ -250,13 +258,26 @@ export async function generateFinanceiroPDF(d: FinPdfData) {
       e.status,
       brl(e.valor_pago || e.valor),
     ]),
-    d.entradas.reduce((s, e) => s + (e.valor_pago || e.valor || 0), 0),
-    "Total entradas",
+    [
+      { label: "Total Recebido no Caixa:", value: totalRecebidoEntradas, isMain: true },
+      ...(totalPendenteEntradas > 0
+        ? [{ label: "Total a Receber no Período:", value: totalPendenteEntradas }]
+        : []),
+      { label: "Total Geral de Lançamentos:", value: totalGeralEntradas },
+    ],
   );
 
   y += 12;
 
   // ===== Saídas =====
+  const totalPagoSaidas = d.saidas
+    .filter((s) => s.status === "pago" || s.status === "parcial")
+    .reduce((s, e) => s + (Number(e.valor_pago) || Number(e.valor) || 0), 0);
+  const totalPendenteSaidas = d.saidas
+    .filter((s) => s.status !== "pago" && s.status !== "parcial" && s.status !== "cancelado")
+    .reduce((s, e) => s + (Number(e.valor) - (Number(e.valor_pago) || 0)), 0);
+  const totalGeralSaidas = totalPagoSaidas + totalPendenteSaidas;
+
   drawTable(
     doc,
     () => y,
@@ -276,8 +297,13 @@ export async function generateFinanceiroPDF(d: FinPdfData) {
       e.status,
       brl(e.valor_pago || e.valor),
     ]),
-    d.saidas.reduce((s, e) => s + (e.valor_pago || e.valor || 0), 0),
-    "Total saídas",
+    [
+      { label: "Total Despesas Pagas:", value: totalPagoSaidas, isMain: true },
+      ...(totalPendenteSaidas > 0
+        ? [{ label: "Total a Pagar no Período:", value: totalPendenteSaidas }]
+        : []),
+      { label: "Total Geral de Despesas:", value: totalGeralSaidas },
+    ],
   );
 
   // ===== Auditoria =====
@@ -321,8 +347,7 @@ function drawTable(
   headers: string[],
   widths: number[],
   rows: string[][],
-  total: number,
-  totalLabel: string,
+  subtotals: { label: string; value: number; isMain?: boolean }[],
 ) {
   ensureSpace(36);
   let y = getY();
@@ -389,18 +414,25 @@ function drawTable(
     setY(y);
   });
 
-  // Total row
-  ensureSpace(22);
-  y = getY();
-  doc.setDrawColor(...C.gold);
-  doc.setLineWidth(0.8);
-  doc.line(M, y, W - M, y);
+  // Subtotals rows
+  subtotals.forEach((st, idx) => {
+    ensureSpace(20);
+    y = getY();
+    if (idx === 0) {
+      doc.setDrawColor(...C.gold);
+      doc.setLineWidth(0.8);
+      doc.line(M, y, W - M, y);
+      y += 4;
+    }
+    doc.setFont("helvetica", st.isMain ? "bold" : "normal");
+    doc.setFontSize(st.isMain ? 9.5 : 8.5);
+    doc.setTextColor(st.isMain ? C.forest[0] : C.mute[0], st.isMain ? C.forest[1] : C.mute[1], st.isMain ? C.forest[2] : C.mute[2]);
+    doc.text(st.label, M + 4, y + 12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...C.ink);
+    doc.text(brl(st.value), W - M - 4, y + 12, { align: "right" });
+    y += 16;
+    setY(y);
+  });
   y += 4;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...C.forest);
-  doc.text(totalLabel, M + 4, y + 12);
-  doc.text(brl(total), W - M - 4, y + 12, { align: "right" });
-  y += 20;
   setY(y);
-}
