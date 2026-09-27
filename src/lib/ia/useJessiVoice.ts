@@ -9,7 +9,8 @@ import {
   pararFalaJessi,
 } from "./ia-voz";
 import { reproduzirFalaHumana, humanizarTextoParaVoz, ControladorFala } from "./ia-voz-tts";
-import { JessiBargeInDetector } from "./ia-barge-in";
+import { JessiBargeInDetector, ehDispositivoMovel } from "./ia-barge-in";
+import { humanizarRespostaParaVoz } from "./ia-voz-conversational";
 import { toast } from "sonner";
 
 export interface UseJessiVoiceReturn {
@@ -145,8 +146,8 @@ export function ehEcoDaPropriaIa(
   if (palavrasUsuario.length === 0) return false;
 
   for (const item of historicoIa) {
-    // Analisa apenas falas recentes da IA nos últimos 8 segundos
-    if (now - item.timestamp > 8000) continue;
+    // Analisa falas recentes da IA nos últimos 10 segundos
+    if (now - item.timestamp > 10000) continue;
 
     const textoIa = item.texto.toLowerCase().replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "").trim();
 
@@ -164,7 +165,7 @@ export function ehEcoDaPropriaIa(
     }
 
     const taxaSobreposicao = palavrasCorrespondentes / palavrasUsuario.length;
-    if (taxaSobreposicao >= 0.50 && palavrasCorrespondentes >= 2) {
+    if (taxaSobreposicao >= 0.40 && palavrasCorrespondentes >= 2) {
       return true;
     }
   }
@@ -184,12 +185,12 @@ export function useJessiVoice(
   const [audioLevel, setAudioLevel] = useState(0);
   const [isInterrupted, setIsInterrupted] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [isSupported, setIsSupported] = useState(false);
 
   const recognizerRef = useRef<VoiceRecognizer | null>(null);
   const onTranscriptFinalRef = useRef(onTranscriptFinal);
   const onAutoSendRef = useRef(onAutoSend);
   const isSpeakingRef = useRef(false);
+  const lastSpeakingEndTimeRef = useRef(0);
   const controladorFalaRef = useRef<ControladorFala | null>(null);
   const bargeInDetectorRef = useRef<JessiBargeInDetector | null>(null);
   const isContinuousModeRef = useRef(false);
@@ -266,7 +267,7 @@ export function useJessiVoice(
     recognizerRef.current = new VoiceRecognizer({
       silenceMs: 1500,
       onFinal: (texto) => {
-        if (isSpeakingRef.current) return;
+        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 650)) return;
         const humanizado = humanizarTranscricao(texto);
         setFinalTranscript(humanizado);
         setInterimTranscript("");
@@ -275,12 +276,12 @@ export function useJessiVoice(
         }
       },
       onInterim: (texto) => {
-        if (isSpeakingRef.current) return;
+        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 650)) return;
         setInterimTranscript(texto);
       },
       onUtteranceComplete: (utterance: VoiceUtterance) => {
-        // 1. Se a IA estiver falando, descarta imediatamente
-        if (isSpeakingRef.current) {
+        // 1. Se a IA estiver falando ou em cooldown pós-fala, descarta imediatamente (Anti-Eco Absoluto)
+        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 650)) {
           return;
         }
         const textoHumanizado = humanizarTranscricao(utterance.text);
@@ -309,13 +310,13 @@ export function useJessiVoice(
         console.warn("[Jessi Voice Error]:", erro);
         if (erro === "not-allowed" || erro === "permission-denied") {
           setIsContinuousMode(false);
-          toast.error("Permissão de microfone negada. Clique no ícone de cadeado do navegador para permitir o microfone.");
+          toast.error("Permissão de microfone negada. Toque no ícone de cadeado do navegador para permitir o microfone.");
         } else if (erro === "no-speech") {
           // Silencio regular
         } else if (erro === "network") {
-          toast.error("Reconhecimento de voz offline ou instável. Verifique sua conexão de rede.");
+          toast.error("Reconhecimento de voz offline ou instável. Verifique sua conexão.");
         } else if (erro === "audio-capture") {
-          toast.error("Nenhum microfone detectado ou o dispositivo de áudio está ocupado.");
+          toast.error("Nenhum microfone detectado ou microfone ocupado por outro app.");
         } else if (erro === "service-not-allowed") {
           toast.error("Reconhecimento de voz bloqueado pelo navegador.");
         }
@@ -431,14 +432,21 @@ export function useJessiVoice(
         return;
       }
 
-      const texto = typeof entrada === "string" ? entrada : entrada.texto;
+      const textoCru = typeof entrada === "string" ? entrada : entrada.texto;
+      // Garante que a fala seja enxuta, humana e nunca leia listas ou números de opções em voz alta
+      const texto = humanizarRespostaParaVoz(textoCru);
+      if (!texto.trim()) {
+        onFinish?.();
+        return;
+      }
 
-      // Cancela fala anterior se ainda estiver em andamento
+      // Cancela fala anterior e suspende escuta imediatamente
       pararTodoAudio();
       isSpeakingRef.current = true;
+      lastSpeakingEndTimeRef.current = 0;
       setIsSpeaking(true);
 
-      // CRÍTICO: Pausa o STT imediatamente enquanto a Jessi estiver falando pelo alto-falante
+      // CRÍTICO: Pausa o microfone com abort() antes de reproduzir áudio pelo alto-falante
       recognizerRef.current?.pauseListening();
       setInterimTranscript("");
 
@@ -449,18 +457,19 @@ export function useJessiVoice(
         ultimasFalasJessiRef.current.shift();
       }
 
-      // Em modo continuo, mantemos o detector de barge-in ativo e em escuta
-      if (isContinuousModeRef.current) {
+      // Em desktop continuo, mantemos o detector de barge-in ativo
+      if (isContinuousModeRef.current && !ehDispositivoMovel()) {
         bargeInDetectorRef.current?.resume();
       }
 
       const finalizarFala = () => {
         isSpeakingRef.current = false;
+        lastSpeakingEndTimeRef.current = Date.now();
         setIsSpeaking(false);
         controladorFalaRef.current = null;
         onFinish?.();
 
-        // Cooldown de 350ms para que o som do alto-falante se dissipe completamente antes de reabrir o microfone
+        // Cooldown de 400ms para que o som do alto-falante se dissipe completamente antes de reabrir o microfone
         if (isContinuousModeRef.current) {
           setTimeout(() => {
             if (isContinuousModeRef.current && !isSpeakingRef.current) {
@@ -468,7 +477,7 @@ export function useJessiVoice(
               setInterimTranscript("");
               recognizerRef.current?.resumeListening();
             }
-          }, 350);
+          }, 400);
         }
       };
 
@@ -476,6 +485,7 @@ export function useJessiVoice(
         ttsEnabled,
         onStart: () => {
           isSpeakingRef.current = true;
+          lastSpeakingEndTimeRef.current = 0;
           setIsSpeaking(true);
           recognizerRef.current?.pauseListening();
         },

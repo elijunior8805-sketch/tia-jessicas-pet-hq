@@ -24,6 +24,14 @@ export interface BargeInDetectorOptions {
   minVoiceDurationMs?: number;
 }
 
+export function ehDispositivoMovel(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i.test(navigator.userAgent) ||
+    (typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 1 && window.innerWidth <= 1024)
+  );
+}
+
 export class JessiBargeInDetector {
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
@@ -57,6 +65,11 @@ export class JessiBargeInDetector {
   public async start(isAiSpeakingCheck: () => boolean): Promise<boolean> {
     this.isAiSpeakingProvider = isAiSpeakingCheck;
     if (this.isRunning) return true;
+
+    // No mobile (iOS / Android), não abrimos getUserMedia concorrente para não bloquear o SpeechRecognition
+    if (ehDispositivoMovel()) {
+      return false;
+    }
 
     if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       return false;

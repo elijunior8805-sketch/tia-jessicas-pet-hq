@@ -24,15 +24,30 @@ export function humanizarRespostaParaVoz(
     const servico = d.servicoNome || d.servico?.nome || "o serviço";
     const data = d.data || "hoje";
     const hora = d.hora ? `às ${d.hora.slice(0, 5)}` : "";
-    return `Preparei o atendimento do ${pet} para ${servico} ${data} ${hora}. Posso confirmar?`;
+    return `Preparei o agendamento do ${pet} para ${servico} ${data} ${hora}. Posso confirmar?`;
   }
 
-  // 2. Se a resposta já for curta e conversacional (<= 160 caracteres e sem listas)
-  if (texto.length <= 160 && !texto.includes("\n-") && !texto.includes("\n•") && !texto.includes("|")) {
+  // 2. Tratamento de Desambiguação / Múltiplas Opções de Pets ou Tutores
+  if (texto.includes("Selecione") || texto.includes("candidatos") || texto.includes("opções") || texto.includes("opcoes") || texto.includes("mais de um")) {
+    if (texto.includes("pet") || texto.includes("pets")) {
+      return "Encontrei mais de um pet cadastrado. De qual deles você gostaria de cuidar?";
+    }
+    if (texto.includes("cliente") || texto.includes("tutor")) {
+      return "Encontrei mais de um tutor com esse nome. Deixei as opções na tela para você escolher.";
+    }
+  }
+
+  // 3. Tratamento de Lembretes / WhatsApp / Confirmações
+  if (texto.includes("lembrete") || texto.includes("WhatsApp") || texto.includes("confirmação de presença")) {
+    return "Preparei as mensagens de confirmação para os clientes na tela. Quer que eu envie?";
+  }
+
+  // 4. Se a resposta já for curta e conversacional (<= 140 caracteres e sem listas)
+  if (texto.length <= 140 && !texto.includes("\n-") && !texto.includes("\n•") && !texto.includes("|") && !texto.includes("1.")) {
     return limparMarcacaoTexto(texto);
   }
 
-  // 3. Tratamento de Agenda / Atendimentos (quando há múltiplos itens)
+  // 5. Tratamento de Agenda / Atendimentos (quando há múltiplos itens)
   const cardAgenda = (cards || []).find((c) => c.type === "agenda");
   if (cardAgenda?.data?.itens && Array.isArray(cardAgenda.data.itens) && cardAgenda.data.itens.length > 0) {
     const itens = cardAgenda.data.itens;
@@ -42,23 +57,23 @@ export function humanizarRespostaParaVoz(
     const horaPri = primeiro.hora ? `às ${primeiro.hora.slice(0, 5)}` : "";
 
     if (qtd === 1) {
-      return `Você tem 1 atendimento agendado para hoje com o ${petPri} ${horaPri}. Detalhes na tela!`;
+      return `Você tem 1 atendimento hoje com o ${petPri} ${horaPri}. Detalhes na tela!`;
     }
-    return `Você tem ${qtd} atendimentos agendados para hoje. O próximo é o ${petPri} ${horaPri}. Deixei a lista completa na tela.`;
+    return `Você tem ${qtd} atendimentos agendados para hoje. O próximo é o ${petPri} ${horaPri}.`;
   }
 
-  // 4. Tratamento de Financeiro / Faturamento
+  // 6. Tratamento de Financeiro / Faturamento
   const cardFin = (cards || []).find((c) => c.type === "financeiro");
   if (cardFin?.data) {
     const d = cardFin.data;
     if (d.faturamento !== undefined || d.receitaBruta !== undefined) {
       const fat = d.faturamento || d.receitaBruta || 0;
       const rec = d.recebido || d.totalRecebido || 0;
-      return `Seu faturamento acumulado está em R$ ${fat.toLocaleString("pt-BR")}, com R$ ${rec.toLocaleString("pt-BR")} já recebidos. Indicadores na tela.`;
+      return `Seu faturamento acumulado está em R$ ${fat.toLocaleString("pt-BR")}, com R$ ${rec.toLocaleString("pt-BR")} recebidos. Todos os detalhes estão na tela.`;
     }
   }
 
-  // 5. Tratamento Genérico: Extração das 1 ou 2 primeiras frases essenciais
+  // 7. Tratamento Genérico: Extração das 1 ou 2 primeiras frases essenciais
   const textoLimpo = limparMarcacaoTexto(texto);
 
   // Divide por frases terminadas em ponto, exclamação ou interrogação

@@ -7,6 +7,7 @@ import {
   checarFlagV2,
 } from "../config/jessi-v2-config";
 import { processarMensagemJessiV2Core } from "./jessi-v2-agent.core";
+import { humanizarRespostaParaVoz } from "../../ia/ia-voz-conversational";
 
 /**
  * Ponte Interna de Despacho e Seletor V1 / V2
@@ -22,6 +23,7 @@ export async function despacharMensagemJessi(
   const inicioMs = Date.now();
   const correlationId = input.correlationId || `jessi_bridge_${Date.now()}`;
   const flags = { ...JESSI_V2_FLAGS_DEFAULT, ...(flagsConfig || {}) };
+  const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
 
   // Verificação de Autorização Controlada: Somente Proprietário ou Administrador
   const cargoLower = (user?.cargo || "").toLowerCase();
@@ -38,9 +40,13 @@ export async function despacharMensagemJessi(
   if (!checarFlagV2(flags, "ai_v2_enabled") || !ehUsuarioAutorizadoV2) {
     const { processarMensagemJessiCore } = await import("../../ia/jessi-agent.server");
     const v1Result = await processarMensagemJessiCore(sb, input as any, user);
+    const respostaTextoFinal = ehCanalVoz
+      ? humanizarRespostaParaVoz(v1Result.respostaTexto, v1Result.cards, input.modoBancada, user?.nome)
+      : v1Result.respostaTexto;
+
     return {
       versao: "v1_fallback",
-      respostaTexto: v1Result.respostaTexto,
+      respostaTexto: respostaTextoFinal,
       cards: v1Result.cards as any,
       pendingAction: v1Result.pendingAction as any,
       novoContexto: v1Result.novoContexto as any,
@@ -52,7 +58,11 @@ export async function despacharMensagemJessi(
 
   try {
     // 2. ai_v2_enabled=true: Execução primária no Motor Jessi V2 com validação por área
-    return await processarMensagemJessiV2Core(sb, input, user);
+    const res = await processarMensagemJessiV2Core(sb, input, user);
+    if (ehCanalVoz && res.respostaTexto) {
+      res.respostaTexto = humanizarRespostaParaVoz(res.respostaTexto, res.cards, input.modoBancada, user?.nome);
+    }
+    return res;
   } catch (err) {
     // 3. Fallback seguro antes de qualquer mutação física
     console.warn("Falha de execução na Jessi V2. Acionando fallback automático para V1:", err);
@@ -60,9 +70,13 @@ export async function despacharMensagemJessi(
     try {
       const { processarMensagemJessiCore } = await import("../../ia/jessi-agent.server");
       const v1Result = await processarMensagemJessiCore(sb, input as any, user);
+      const respostaTextoFinal = ehCanalVoz
+        ? humanizarRespostaParaVoz(v1Result.respostaTexto, v1Result.cards, input.modoBancada, user?.nome)
+        : v1Result.respostaTexto;
+
       return {
         versao: "v1_fallback",
-        respostaTexto: v1Result.respostaTexto,
+        respostaTexto: respostaTextoFinal,
         cards: v1Result.cards as any,
         pendingAction: v1Result.pendingAction as any,
         novoContexto: v1Result.novoContexto as any,

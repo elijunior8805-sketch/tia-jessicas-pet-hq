@@ -279,14 +279,10 @@ export const JessiLayout: React.FC = () => {
 
       if (ttsEnabled && res.respostaTexto) {
         speakResponse(res.respostaTexto, () => {
-          if (isContinuousMode) {
-            if (ehEncerramento) {
-              stopContinuousMode();
-              setStatus("disponivel");
-              setStatusDetalhe(undefined);
-            } else {
-              resumeListening();
-            }
+          if (isContinuousMode && ehEncerramento) {
+            stopContinuousMode();
+            setStatus("disponivel");
+            setStatusDetalhe(undefined);
           }
         });
       } else if (isContinuousMode) {

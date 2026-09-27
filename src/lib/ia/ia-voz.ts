@@ -229,18 +229,16 @@ export class VoiceRecognizer {
     const palavras = textoAtual.split(/\s+/).filter(Boolean);
 
     // Detecção dinâmica de latência:
-    // 1. Respostas rápidas e confirmações ("sim", "pode confirmar", "cancela") -> 600ms
+    // 1. Respostas rápidas e confirmações ("sim", "pode confirmar", "cancela") -> 550ms
     const ehComandoCurto =
-      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|pode|autorizado|fechar|sair)$/i.test(textoAtual) ||
+      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|pode|autorizado|fechar|sair|agendar)$/i.test(textoAtual) ||
       palavras.length <= 2;
 
-    // 2. Frases completas ou perguntas (>= 3 palavras) -> 850ms
-    // 3. Ditados longos -> 1100ms
     let delayCalculado = this.silenceMs;
     if (ehComandoCurto && palavras.length <= 2) {
-      delayCalculado = 650;
+      delayCalculado = 550;
     } else if (palavras.length >= 3) {
-      delayCalculado = Math.min(this.silenceMs, 850);
+      delayCalculado = Math.min(this.silenceMs, 800);
     }
 
     this.silenceTimer = setTimeout(() => {
@@ -256,6 +254,12 @@ export class VoiceRecognizer {
   }
 
   private processarSilencioDetectado() {
+    if (this.isPaused) {
+      this.acumulado = "";
+      this.interimAtual = "";
+      return;
+    }
+
     const textoCompleto = consolidarTranscricao(`${this.acumulado} ${this.interimAtual}`);
 
     if (!ehFalaValida(textoCompleto)) {
@@ -274,12 +278,19 @@ export class VoiceRecognizer {
       this.ultimaFalaEnviada.toLowerCase() === textoCompleto.toLowerCase() &&
       agora - this.ultimoEnvioTimestamp < 2500
     ) {
+      this.acumulado = "";
+      this.interimAtual = "";
       return;
     }
 
     const utteranceId = `fala_${agora}_${Math.random().toString(36).substring(2, 7)}`;
     this.ultimaFalaEnviada = textoCompleto;
     this.ultimoEnvioTimestamp = agora;
+
+    // Limpa os buffers locais de texto para a próxima fala antes do envio
+    this.acumulado = "";
+    this.interimAtual = "";
+    this.options.onInterim("");
 
     // Notifica conclusão do comando de voz
     if (this.options.onUtteranceComplete) {
@@ -290,14 +301,11 @@ export class VoiceRecognizer {
         timestamp: agora,
       });
     }
-
-    // Limpa os buffers locais de texto para a próxima fala
-    this.acumulado = "";
-    this.interimAtual = "";
-    this.options.onInterim("");
   }
 
   private tentarReconectar() {
+    if (this.isPaused || this.pararSolicitado || !this.isContinuous) return;
+
     const agora = Date.now();
     if (agora - this.lastReconnectTime > 5000) {
       this.reconnectAttempts = 0;
@@ -306,15 +314,15 @@ export class VoiceRecognizer {
     this.reconnectAttempts++;
 
     // Prevenção de loop infinito de reconexão
-    if (this.reconnectAttempts > 8) {
+    if (this.reconnectAttempts > 10) {
       console.warn("[VoiceRecognizer] Limite de reconexões atingido.");
       this.isContinuous = false;
       this.setStatus("idle");
-      this.options.onError("Muitas desconexões seguidas no microfone. Clique no microfone para reativar.");
+      this.options.onError("Muitas desconexões seguidas no microfone. Toque no microfone para reativar.");
       return;
     }
 
-    const delay = this.reconnectAttempts > 3 ? 400 : 80;
+    const delay = this.reconnectAttempts > 3 ? 300 : 80;
     setTimeout(() => {
       if (this.isContinuous && !this.pararSolicitado && !this.isPaused) {
         try {
@@ -351,21 +359,26 @@ export class VoiceRecognizer {
     this.isPaused = false;
     this.pararSolicitado = true;
     this.limparTimerSilencio();
+    this.acumulado = "";
+    this.interimAtual = "";
 
     try {
-      this.recognition?.stop();
+      this.recognition?.abort();
     } catch {
       /* ignore */
     }
     this.setStatus("idle");
   }
 
-  /** Pausa o microfone enquanto a Jessi está gerando resposta ou falando TTS */
+  /** Pausa o microfone e descarta buffers imediatamente enquanto a Jessi responde / fala TTS */
   pauseListening() {
     this.isPaused = true;
     this.limparTimerSilencio();
+    this.acumulado = "";
+    this.interimAtual = "";
     try {
-      this.recognition?.stop();
+      // abort() encerra a captura instantaneamente e limpa o buffer do navegador
+      this.recognition?.abort();
     } catch {
       /* ignore */
     }
@@ -386,7 +399,7 @@ export class VoiceRecognizer {
       this.setStatus("listening");
       this.recognition?.start();
     } catch {
-      // Já está em escuta ou inicializando
+      // Se já estava em processo de inicialização, ignora erro
     }
   }
 
