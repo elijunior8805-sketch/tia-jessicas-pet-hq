@@ -2438,29 +2438,56 @@ export async function processarMensagemJessiV2Core(
           });
         }
       } else {
-        // Conversação Natural / Saudação Generativa via Gemini com Fallback
+        // Conversação Natural / IA Generativa Fluida via Gemini 1.5 com Contexto Operacional Rico
         try {
+          const cliId = novoContexto.cliente?.id || contextoAtual.cliente?.id || (input.contexto as any)?.clienteId || (input.contexto as any)?.cliente_id;
+          
+          // Coleta catálogo de serviços em paralelo com dados do cliente
+          const [servicosRes, cliDetalhesRes, clubinhoRes] = await Promise.all([
+            sb.from("servicos").select("id, nome, valor, duracao_min").eq("ativo", true).limit(30),
+            cliId
+              ? sb.from("clientes").select("id, nome, whatsapp, telefone, pets(id, nome, raca, porte, observacoes)").eq("id", cliId).maybeSingle()
+              : Promise.resolve({ data: null }),
+            cliId
+              ? sb.from("programas_contratados").select("id, nome_snapshot, data_de_validade, status_do_programa").eq("cliente_id", cliId).eq("status_do_programa", "ativo")
+              : Promise.resolve({ data: [] }),
+          ]);
+
+          const servicosCatalogo = (servicosRes.data || []).map((s: any) => `${s.nome}: R$ ${Number(s.valor || 0).toFixed(2)}`);
+          const dadosCliente = cliDetalhesRes.data as any;
+          const contratosClubinho = (clubinhoRes.data as any[]) || [];
+
           const genResp = await geminiProvider.gerarResposta({
             promptSistema: "",
             mensagemUsuario: textoLimpo,
             dadosOperacionais: {
               operador: user?.nome || "Eli Júnior",
               cargo: user?.cargo || "Administrador",
+              tabelaPrecosServicos: servicosCatalogo,
+              clienteEmFoco: dadosCliente ? {
+                nome: dadosCliente.nome,
+                whatsapp: dadosCliente.whatsapp || dadosCliente.telefone,
+                pets: dadosCliente.pets || [],
+                clubinhoAtivo: contratosClubinho.map((c: any) => c.nome_snapshot),
+              } : null,
               contexto: {
                 cliente: novoContexto.cliente || contextoAtual.cliente,
                 pet: novoContexto.pet || contextoAtual.pet,
                 dataReferencia: contextoAtual.dataReferencia,
+                kpisInbox: (input.contexto as any)?.kpisInbox,
               },
             },
             historico: (input.historico || []) as any,
           });
+
           if (genResp?.texto && genResp.texto.length > 5) {
             respostaTexto = genResp.texto;
           } else {
-            respostaTexto = `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com a agenda, clientes, pets, planos ou financeiro?`;
+            respostaTexto = `Olá! Sou a Jessi, assistente do Spa de Pet Tia Jéssica. Como posso ajudar você agora?`;
           }
-        } catch {
-          respostaTexto = `Olá! Sou a Jessi, assistente operacional do Spa de Pet Tia Jéssica. Como posso ajudar você hoje com a agenda, clientes, pets, planos ou financeiro?`;
+        } catch (err) {
+          console.warn("[JessiV2 Core] Erro na resposta generativa:", err);
+          respostaTexto = `Olá! Sou a Jessi, assistente do Spa de Pet Tia Jéssica. Como posso ajudar você agora?`;
         }
       }
     }

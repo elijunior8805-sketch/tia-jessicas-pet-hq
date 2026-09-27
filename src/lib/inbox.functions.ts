@@ -140,15 +140,15 @@ export const getThread = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    const [cli, pets, msgs, prox, estado] = await Promise.all([
+    const [cli, pets, msgs, prox, estado, ultimoAtendimento, clubinho] = await Promise.all([
       context.supabase
         .from("clientes")
-        .select("id, nome, telefone, whatsapp")
+        .select("id, nome, telefone, whatsapp, rua, numero, bairro, cidade")
         .eq("id", data.cliente_id)
         .maybeSingle(),
       context.supabase
         .from("pets")
-        .select("id, nome, porte")
+        .select("id, nome, raca, porte, observacoes")
         .eq("cliente_id", data.cliente_id)
         .eq("ativo", true)
         .order("created_at"),
@@ -160,7 +160,7 @@ export const getThread = createServerFn({ method: "GET" })
         .limit(500),
       context.supabase
         .from("agendamentos")
-        .select("id, data, hora, status, pets(nome)")
+        .select("id, data, hora, status, servicos:servico_id(nome), pets:pet_id(nome)")
         .eq("cliente_id", data.cliente_id)
         .in("status", ["agendado", "confirmado"])
         .gte("data", hoje.toISOString().slice(0, 10))
@@ -172,6 +172,20 @@ export const getThread = createServerFn({ method: "GET" })
         .select("cliente_id, responsavel_id, resolvida_em, responsavel_atribuido_em")
         .eq("cliente_id", data.cliente_id)
         .maybeSingle(),
+      context.supabase
+        .from("atendimentos")
+        .select("id, data_inicio, valor_total, servicos:servico_id(nome), pets:pet_id(nome)")
+        .eq("cliente_id", data.cliente_id)
+        .eq("finalizado", true)
+        .order("data_inicio", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      context.supabase
+        .from("programas_contratados")
+        .select("id, nome_snapshot, data_de_validade, status_do_programa")
+        .eq("cliente_id", data.cliente_id)
+        .eq("status_do_programa", "ativo")
+        .limit(5),
     ]);
     if (cli.error) throw new Error(cli.error.message);
     if (msgs.error) throw new Error(msgs.error.message);
@@ -180,6 +194,8 @@ export const getThread = createServerFn({ method: "GET" })
       pets: pets.data ?? [],
       mensagens: (msgs.data ?? []) as MensagemDTO[],
       proximo_agendamento: (prox.data && prox.data[0]) || null,
+      ultimo_atendimento: ultimoAtendimento.data || null,
+      programas_clubinho: clubinho.data ?? [],
       estado: estado.data,
     };
   });

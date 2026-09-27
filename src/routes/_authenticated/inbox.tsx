@@ -26,6 +26,13 @@ import {
   PawPrint,
   Users as UsersIcon,
   Loader2,
+  Copy,
+  DollarSign,
+  Crown,
+  Heart,
+  CalendarPlus,
+  AlertCircle,
+  Phone,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -66,7 +73,6 @@ import {
   abrirWhatsApp,
 } from "@/lib/whatsapp";
 import { JessiInboxPanel } from "@/components/inbox/JessiInboxPanel";
-import { JessiThreadSuggester } from "@/components/inbox/JessiThreadSuggester";
 
 type FiltroConversa =
   | "todas"
@@ -107,9 +113,9 @@ const STATUS_LABEL: Record<ThreadStatus, string> = {
 
 const STATUS_TONE: Record<ThreadStatus, string> = {
   aguardando_resposta:
-    "bg-amber-500/10 text-amber-700 border-amber-500/30",
-  respondida: "bg-blue-500/10 text-blue-700 border-blue-500/30",
-  resolvida: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+    "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  respondida: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
+  resolvida: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   sem_mensagens: "bg-muted text-muted-foreground border-border",
 };
 
@@ -118,6 +124,7 @@ function InboxPage() {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroConversa>("todas");
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [textoParaChat, setTextoParaChat] = useState<string | null>(null);
 
   const listarFn = useServerFn(listarThreads);
   const kpisFn = useServerFn(inboxKPIs);
@@ -144,6 +151,15 @@ function InboxPage() {
     [threads.data, selecionado]
   );
 
+  const clienteSelecionadoObj = useMemo(() => {
+    if (!thread) return null;
+    return {
+      id: thread.cliente_id,
+      nome: thread.cliente_nome,
+      pets: thread.pet_primeiro_nome ? [{ id: "pet_foco", nome: thread.pet_primeiro_nome }] : [],
+    };
+  }, [thread]);
+
   const aguardandoOrdenadas = useMemo(() => {
     if (!threads.data) return [] as ThreadDTO[];
     return [...threads.data]
@@ -152,17 +168,22 @@ function InboxPage() {
   }, [threads.data]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="mx-auto max-w-[1400px] px-4 py-6 space-y-4">
-        <header className="flex items-center justify-between gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-12">
+      <div className="mx-auto max-w-[1440px] px-4 py-6 space-y-4">
+        <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
               <InboxIcon className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Central de Mensagens</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                <span>Central de Mensagens & Atendimento</span>
+                <Badge className="bg-[#C8A951]/20 text-[#C8A951] border-[#C8A951]/40 text-xs">
+                  IA Jessi
+                </Badge>
+              </h1>
               <p className="text-sm text-muted-foreground">
-                Registre respostas do WhatsApp Web e mantenha o histórico por cliente. Envio automático depende da integração externa.
+                Atendimento consultivo, histórico do cliente, controle de créditos do Clubinho e integração WhatsApp.
               </p>
             </div>
           </div>
@@ -172,8 +193,9 @@ function InboxPage() {
             disabled={threads.isFetching || kpis.isFetching}
             onClick={async () => {
               await Promise.all([threads.refetch(), kpis.refetch()]);
-              toast.success("Conversas atualizadas");
+              toast.success("Conversas atualizadas!");
             }}
+            className="rounded-xl shadow-xs text-xs font-semibold"
           >
             {threads.isFetching || kpis.isFetching ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -184,9 +206,11 @@ function InboxPage() {
           </Button>
         </header>
 
-        {/* Painel Interativo da Jessi */}
+        {/* Copiloto Interativo da Jessi com Contexto do Cliente */}
         <JessiInboxPanel
           kpis={kpis.data}
+          clienteSelecionado={clienteSelecionadoObj}
+          onInserirNoChat={(texto) => setTextoParaChat(texto)}
           onFiltrarAguardando={() => setFiltro("aguardando")}
           onFiltrarNaoLidas={() => setFiltro("nao_lidas")}
           onRefresh={async () => {
@@ -195,6 +219,7 @@ function InboxPage() {
           isRefreshing={threads.isFetching || kpis.isFetching}
         />
 
+        {/* KPIs de Atendimento */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard
             icon={<Bell className="h-4 w-4" />}
@@ -230,11 +255,12 @@ function InboxPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[400px_1fr] gap-4">
-          {/* Threads list */}
+        {/* Layout Principal: Lista de Contatos + Painel 360° com Chat e Dossiê */}
+        <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-4">
+          {/* Coluna 1: Lista de Conversas / Clientes */}
           <Card
             className={cn(
-              "card-premium overflow-hidden",
+              "card-premium overflow-hidden border-border/70",
               selecionado && "hidden md:block"
             )}
           >
@@ -242,58 +268,59 @@ function InboxPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por cliente, pet ou texto…"
+                  placeholder="Buscar cliente, pet ou mensagem..."
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 text-xs rounded-xl h-9"
                 />
               </div>
               <Tabs value={filtro} onValueChange={(v) => setFiltro(v as FiltroConversa)}>
-                <TabsList className="grid grid-cols-3 w-full h-auto">
-                  <TabsTrigger value="todas" className="text-xs">Todas</TabsTrigger>
-                  <TabsTrigger value="aguardando" className="text-xs">Aguardando</TabsTrigger>
-                  <TabsTrigger value="resolvidas" className="text-xs">Resolvidas</TabsTrigger>
+                <TabsList className="grid grid-cols-3 w-full h-auto p-1 bg-muted/60 rounded-xl">
+                  <TabsTrigger value="todas" className="text-xs font-semibold rounded-lg">Todas</TabsTrigger>
+                  <TabsTrigger value="aguardando" className="text-xs font-semibold rounded-lg">Aguardando</TabsTrigger>
+                  <TabsTrigger value="resolvidas" className="text-xs font-semibold rounded-lg">Resolvidas</TabsTrigger>
                 </TabsList>
               </Tabs>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-400px)] min-h-[420px]">
+              <ScrollArea className="h-[calc(100vh-440px)] min-h-[460px]">
                 {threads.isLoading && (
-                  <div className="p-6 text-sm text-muted-foreground text-center">
-                    Carregando…
+                  <div className="p-8 text-sm text-muted-foreground text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                    Carregando conversas...
                   </div>
                 )}
                 {threads.data && threads.data.length === 0 && (
                   <div className="p-8 text-center text-sm text-muted-foreground">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    Nenhuma conversa no filtro atual.
+                    Nenhuma conversa no filtro selecionado.
                   </div>
                 )}
-                <ul className="divide-y">
+                <ul className="divide-y divide-border/40">
                   {threads.data?.map((t) => (
                     <li key={t.cliente_id}>
                       <button
                         onClick={() => setSelecionado(t.cliente_id)}
                         className={cn(
-                          "w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors",
-                          selecionado === t.cliente_id && "bg-primary/5"
+                          "w-full text-left px-4 py-3 hover:bg-muted/50 transition-all",
+                          selecionado === t.cliente_id && "bg-primary/10 border-l-4 border-l-primary"
                         )}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium truncate">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-sm truncate text-foreground">
                                 {t.cliente_nome}
                               </span>
                               {t.pet_primeiro_nome && (
-                                <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.2 rounded-md">
                                   <PawPrint className="h-3 w-3" />
                                   {t.pet_primeiro_nome}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <span className="text-[11px] text-muted-foreground shrink-0">
+                          <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
                             {timeAgo(t.ultima_em)}
                           </span>
                         </div>
@@ -305,7 +332,7 @@ function InboxPage() {
                           <Badge
                             variant="outline"
                             className={cn(
-                              "h-5 px-1.5 text-[10px]",
+                              "h-5 px-1.5 text-[10px] font-medium",
                               STATUS_TONE[t.status_conversa]
                             )}
                           >
@@ -337,10 +364,10 @@ function InboxPage() {
             </CardContent>
           </Card>
 
-          {/* Thread view */}
+          {/* Coluna 2: Chat com Dossiê 360° do Cliente & Pet */}
           <Card
             className={cn(
-              "card-premium overflow-hidden",
+              "card-premium overflow-hidden border-border/70",
               !selecionado && "hidden md:block"
             )}
           >
@@ -349,6 +376,8 @@ function InboxPage() {
                 clienteId={selecionado}
                 thread={thread}
                 atendentes={atendentes.data ?? []}
+                textoInjetado={textoParaChat}
+                onTextoInjetadoConsumido={() => setTextoParaChat(null)}
                 onBack={() => setSelecionado(null)}
                 onChange={() => {
                   qc.invalidateQueries({ queryKey: ["inbox-threads"] });
@@ -384,25 +413,25 @@ function KpiCard({
   onClick?: () => void;
 }) {
   const tones: Record<string, string> = {
-    amber: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-    blue: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    emerald: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-    violet: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20",
+    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-300 border-blue-500/20",
+    emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20",
+    violet: "bg-violet-500/10 text-violet-600 dark:text-violet-300 border-violet-500/20",
   };
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "text-left rounded-lg border bg-card transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring",
-        active && "ring-2 ring-primary shadow-md"
+        "text-left rounded-xl border bg-card p-3.5 transition-all hover:shadow-md focus:outline-none",
+        active && "ring-2 ring-primary shadow-sm"
       )}
     >
-      <div className="p-4 flex items-center gap-3">
+      <div className="flex items-center gap-3">
         <div className={cn("rounded-lg border p-2", tones[tone])}>{icon}</div>
         <div>
-          <div className="text-2xl font-bold leading-none">{value}</div>
-          <div className="text-xs text-muted-foreground mt-1">{label}</div>
+          <div className="text-xl font-bold leading-none text-foreground">{value}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{label}</div>
         </div>
       </div>
     </button>
@@ -417,46 +446,44 @@ function EmptyState({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="h-[calc(100vh-360px)] min-h-[420px] flex flex-col p-6">
-      <div className="text-center pb-4 border-b">
-        <MessageSquare className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-        <p className="text-sm text-muted-foreground">
-          Selecione uma conversa para ver o histórico
+    <div className="h-[calc(100vh-400px)] min-h-[460px] flex flex-col p-6">
+      <div className="text-center pb-6 border-b border-border/40">
+        <MessageSquare className="h-10 w-10 mx-auto mb-3 text-primary opacity-60" />
+        <h3 className="font-semibold text-sm text-foreground">Painel de Atendimento em Espera</h3>
+        <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+          Selecione uma conversa ao lado para visualizar o Dossiê 360° do Pet, histórico de banhos e opções de resposta.
         </p>
       </div>
       {aguardando.length > 0 && (
         <div className="flex-1 mt-4 flex flex-col min-h-0">
-          <div className="flex items-center gap-2 mb-2 text-sm font-medium">
-            <Clock className="h-4 w-4 text-amber-600" />
-            Aguardando resposta há mais tempo
+          <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+            <Clock className="h-4 w-4" />
+            Clientes aguardando resposta há mais tempo:
           </div>
           <ScrollArea className="flex-1 -mx-2 px-2">
-            <ul className="space-y-1">
-              {aguardando.slice(0, 12).map((t) => (
+            <ul className="space-y-1.5">
+              {aguardando.slice(0, 10).map((t) => (
                 <li key={t.cliente_id}>
                   <button
                     onClick={() => onSelect(t.cliente_id)}
-                    className="w-full text-left px-3 py-2 rounded-lg border hover:bg-muted/60 transition"
+                    className="w-full text-left p-3 rounded-xl border border-border/60 hover:bg-muted/60 transition flex items-center justify-between gap-3 bg-card"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {t.cliente_nome}
-                          {t.pet_primeiro_nome && (
-                            <span className="text-muted-foreground font-normal">
-                              {" "}
-                              · {t.pet_primeiro_nome}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {t.ultima_mensagem}
-                        </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-xs text-foreground truncate">
+                        {t.cliente_nome}
+                        {t.pet_primeiro_nome && (
+                          <span className="text-muted-foreground font-normal">
+                            {" "}· 🐾 {t.pet_primeiro_nome}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-[11px] text-amber-700 whitespace-nowrap">
-                        {timeAgo(t.ultima_em_in ?? t.ultima_em)}
-                      </span>
+                      <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                        {t.ultima_mensagem}
+                      </div>
                     </div>
+                    <span className="text-[10px] text-amber-600 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md whitespace-nowrap">
+                      {timeAgo(t.ultima_em_in ?? t.ultima_em)}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -472,12 +499,16 @@ function ThreadView({
   clienteId,
   thread,
   atendentes,
+  textoInjetado,
+  onTextoInjetadoConsumido,
   onBack,
   onChange,
 }: {
   clienteId: string;
   thread: ThreadDTO | undefined;
   atendentes: { id: string; nome: string | null; email: string | null; avatar_url: string | null }[];
+  textoInjetado?: string | null;
+  onTextoInjetadoConsumido?: () => void;
   onBack: () => void;
   onChange: () => void;
 }) {
@@ -499,6 +530,15 @@ function ThreadView({
   const [modo, setModo] = useState<"envio" | "nota">("envio");
   const [texto, setTexto] = useState("");
 
+  // Injeção de texto gerado pelo Copiloto Jessi
+  useEffect(() => {
+    if (textoInjetado) {
+      setTexto(textoInjetado);
+      setModo("envio");
+      onTextoInjetadoConsumido?.();
+    }
+  }, [textoInjetado, onTextoInjetadoConsumido]);
+
   // Auto marcar como lidas ao abrir
   useEffect(() => {
     let cancel = false;
@@ -513,7 +553,6 @@ function ThreadView({
     return () => {
       cancel = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId]);
 
   const envioMut = useMutation({
@@ -521,7 +560,7 @@ function ThreadView({
       envioFn({ data: { cliente_id: clienteId, corpo } }),
     onSuccess: () => {
       setTexto("");
-      toast.success("Envio registrado. Conversa marcada como respondida.");
+      toast.success("Envio registrado e conversa marcada como respondida!");
       detalhe.refetch();
       onChange();
     },
@@ -533,7 +572,7 @@ function ThreadView({
       notaFn({ data: { cliente_id: clienteId, corpo } }),
     onSuccess: () => {
       setTexto("");
-      toast.success("Nota interna adicionada.");
+      toast.success("Nota interna adicionada à ficha!");
       detalhe.refetch();
       onChange();
     },
@@ -577,16 +616,6 @@ function ThreadView({
     else notaMut.mutate(corpo);
   }
 
-  function sugerirComIA() {
-    const petNome = detalhe.data?.pets?.[0]?.nome ?? "";
-    const params = new URLSearchParams({
-      cliente_id: clienteId,
-      ...(petNome ? { pet_nome: petNome } : {}),
-      voltar_para: "inbox",
-    });
-    navigate({ to: `/comunicacao?${params.toString()}` as any });
-  }
-
   function abrirWa() {
     const tel = normalizarTelefoneBR(
       detalhe.data?.cliente?.whatsapp ?? detalhe.data?.cliente?.telefone
@@ -595,136 +624,140 @@ function ThreadView({
       toast.error(tel.motivo);
       return;
     }
-    abrirWhatsApp(montarWaUrl(tel.e164, ""));
+    abrirWhatsApp(montarWaUrl(tel.e164, texto || ""));
   }
 
-  // Trazer texto sugerido pela aba Comunicação de volta para o campo
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const key = `sugestao_inbox:${clienteId}`;
-      const stash = window.sessionStorage.getItem(key);
-      if (stash) {
-        setTexto(stash);
-        setModo("envio");
-        window.sessionStorage.removeItem(key);
-        toast.info("Sugestão da IA carregada no campo abaixo.");
-      }
-    } catch {}
-  }, [clienteId]);
+  function copiarChavePix() {
+    const nomeCli = detalhe.data?.cliente?.nome?.split(" ")[0] || "Cliente";
+    const ultimoServico = (detalhe.data?.ultimo_atendimento as any)?.servicos?.nome || "Atendimento";
+    const valor = Number((detalhe.data?.ultimo_atendimento as any)?.valor_total || 0).toFixed(2);
+    
+    const textoPix = `Olá, ${nomeCli}! 🐾 Seguem os dados para pagamento via Pix:\n\n🔑 Chave Pix: financeiro@spatiajessica.com.br (CNPJ / E-mail)\nFavorecido: Spa de Pet Tia Jéssica\n${Number(valor) > 0 ? `Valor: R$ ${valor} (${ultimoServico})\n\n` : "\n"}Assim que realizar a transferência, por favor nos envie o comprovante por aqui! ✨💚`;
+    
+    navigator.clipboard.writeText(textoPix);
+    toast.success("Dados do Pix copiados com sucesso!");
+  }
 
   const cli = detalhe.data?.cliente;
   const pets = detalhe.data?.pets ?? [];
   const prox = detalhe.data?.proximo_agendamento as any;
-  const estado = detalhe.data?.estado as any;
+  const ultimo = detalhe.data?.ultimo_atendimento as any;
+  const clubinho = (detalhe.data as any)?.programas_clubinho ?? [];
   const mensagens = detalhe.data?.mensagens ?? [];
   const status = thread?.status_conversa ?? "sem_mensagens";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-360px)] min-h-[560px]">
-      <CardHeader className="border-b space-y-3 py-3">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={onBack}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-base truncate flex items-center gap-2">
-              {cli?.nome ?? "Cliente"}
-              <Badge
-                variant="outline"
-                className={cn("text-[10px]", STATUS_TONE[status])}
-              >
-                {STATUS_LABEL[status]}
-              </Badge>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground truncate">
-              {pets.length > 0 && (
-                <>
-                  <PawPrint className="inline h-3 w-3 mr-1" />
-                  {pets.map((p: any) => p.nome).join(", ")} ·{" "}
-                </>
-              )}
-              {cli?.whatsapp
-                ? formatarTelefoneBR(cli.whatsapp)
-                : cli?.telefone
-                ? formatarTelefoneBR(cli.telefone)
-                : "Sem WhatsApp"}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={abrirWa}>
-            <ExternalLink className="h-4 w-4 mr-2" /> WhatsApp
-          </Button>
-        </div>
-
-        {/* Contexto do cliente */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-          <div className="rounded-md border bg-muted/30 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Próximo agendamento
-            </div>
-            <div className="font-medium flex items-center gap-1 mt-0.5">
-              <CalendarClock className="h-3.5 w-3.5 text-primary" />
-              {prox ? (
-                <>
-                  {new Date(prox.data).toLocaleDateString("pt-BR")} · {String(prox.hora).slice(0, 5)}
-                  {prox.pets?.nome ? ` · ${prox.pets.nome}` : ""}
-                </>
-              ) : (
-                <span className="text-muted-foreground font-normal">Nenhum</span>
-              )}
-            </div>
-          </div>
-          <Link
-            to="/clientes/$id"
-            params={{ id: clienteId }}
-            className="rounded-md border bg-muted/30 px-3 py-2 hover:bg-muted/60 transition"
-          >
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Cadastro
-            </div>
-            <div className="font-medium flex items-center gap-1 mt-0.5">
-              <FileText className="h-3.5 w-3.5" /> Abrir ficha do cliente
-            </div>
-          </Link>
-          {pets[0] ? (
-            <Link
-              to="/pets/$petId/historico"
-              params={{ petId: pets[0].id }}
-              className="rounded-md border bg-muted/30 px-3 py-2 hover:bg-muted/60 transition"
+    <div className="flex flex-col h-[calc(100vh-360px)] min-h-[580px]">
+      {/* Header do Cliente com Barra de Ações Rápidas */}
+      <CardHeader className="border-b space-y-3 py-3 bg-card/60">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-8 w-8"
+              onClick={onBack}
             >
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Histórico
-              </div>
-              <div className="font-medium flex items-center gap-1 mt-0.5">
-                <HistoryIcon className="h-3.5 w-3.5" /> Atendimentos de {pets[0].nome}
-              </div>
-            </Link>
-          ) : (
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-muted-foreground">
-              <div className="text-[10px] uppercase tracking-wide">Histórico</div>
-              <div className="mt-0.5">Sem pets cadastrados</div>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base truncate flex items-center gap-2">
+                <span>{cli?.nome ?? "Cliente"}</span>
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px] font-semibold", STATUS_TONE[status])}
+                >
+                  {STATUS_LABEL[status]}
+                </Badge>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground truncate">
+                {cli?.whatsapp
+                  ? formatarTelefoneBR(cli.whatsapp)
+                  : cli?.telefone
+                  ? formatarTelefoneBR(cli.telefone)
+                  : "Sem WhatsApp cadastrado"}
+              </p>
             </div>
-          )}
+          </div>
+
+          {/* Botões Rápidos */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copiarChavePix}
+              className="h-8 text-xs gap-1.5 font-medium border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+              title="Copiar dados do Pix para cobrança"
+            >
+              <DollarSign className="h-3.5 w-3.5" /> Chave Pix
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={abrirWa}
+              className="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5 shadow-xs"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Abrir no WhatsApp
+            </Button>
+          </div>
         </div>
 
-        {/* Ações da conversa */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Dossiê 360° do Cliente & Pet */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          {/* Card 1: Pets */}
+          <div className="rounded-xl border bg-muted/30 p-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1">
+              <PawPrint className="h-3 w-3 text-primary" /> Pets Vinculados
+            </div>
+            <div className="font-semibold text-foreground mt-0.5 truncate">
+              {pets.length > 0 ? pets.map((p: any) => `${p.nome} (${p.raca || "SRD"})`).join(", ") : "Nenhum pet"}
+            </div>
+          </div>
+
+          {/* Card 2: Clubinho */}
+          <div className="rounded-xl border bg-purple-500/10 border-purple-500/20 p-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
+              <Crown className="h-3 w-3" /> Clubinho / Plano
+            </div>
+            <div className="font-semibold text-foreground mt-0.5 truncate">
+              {clubinho.length > 0 ? clubinho[0].nome_snapshot : "Sem plano ativo"}
+            </div>
+          </div>
+
+          {/* Card 3: Última Visita */}
+          <div className="rounded-xl border bg-muted/30 p-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1">
+              <HistoryIcon className="h-3 w-3 text-blue-600" /> Última Visita
+            </div>
+            <div className="font-semibold text-foreground mt-0.5 truncate">
+              {ultimo ? `${new Date(ultimo.data_inicio).toLocaleDateString("pt-BR")} (R$ ${Number(ultimo.valor_total || 0).toFixed(0)})` : "Sem histórico"}
+            </div>
+          </div>
+
+          {/* Card 4: Próximo Horário */}
+          <div className="rounded-xl border bg-muted/30 p-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1">
+              <CalendarClock className="h-3 w-3 text-emerald-600" /> Próximo Agendamento
+            </div>
+            <div className="font-semibold text-foreground mt-0.5 truncate">
+              {prox ? `${new Date(prox.data).toLocaleDateString("pt-BR")} às ${String(prox.hora).slice(0, 5)}` : "Nenhum marcado"}
+            </div>
+          </div>
+        </div>
+
+        {/* Linha de Atribuição e Resolução */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
+              <Button variant="ghost" size="xs" className="h-7 text-xs text-muted-foreground">
+                <UsersIcon className="h-3.5 w-3.5 mr-1" />
                 {thread?.responsavel_nome
-                  ? `Resp.: ${thread.responsavel_nome.split(" ")[0]}`
-                  : "Atribuir responsável"}
+                  ? `Responsável: ${thread.responsavel_nome.split(" ")[0]}`
+                  : "Atribuir atendente"}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-72 overflow-auto">
-              <DropdownMenuLabel>Atribuir a…</DropdownMenuLabel>
+            <DropdownMenuContent align="start" className="max-h-60 overflow-auto">
+              <DropdownMenuLabel>Atribuir a...</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {atendentes.map((a) => (
                 <DropdownMenuItem
@@ -751,208 +784,127 @@ function ThreadView({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {status === "resolvida" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => resolvidaMut.mutate(false)}
-              disabled={resolvidaMut.isPending}
-            >
-              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reabrir
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => resolvidaMut.mutate(true)}
-              disabled={resolvidaMut.isPending}
-              className="text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/10"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Marcar resolvida
-            </Button>
-          )}
-
-          {estado?.resolvida_em && (
-            <span className="text-[11px] text-muted-foreground">
-              Resolvida em{" "}
-              {new Date(estado.resolvida_em).toLocaleString("pt-BR")}
-            </span>
-          )}
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => resolvidaMut.mutate(status !== "resolvida")}
+            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {status === "resolvida" ? (
+              <>
+                <RotateCcw className="h-3.5 w-3.5 mr-1 text-amber-600" /> Reabrir conversa
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" /> Marcar resolvida
+              </>
+            )}
+          </Button>
         </div>
       </CardHeader>
 
+      {/* Histórico da Conversa */}
       <ScrollArea className="flex-1 p-4">
         {detalhe.isLoading && (
-          <div className="text-center text-sm text-muted-foreground py-8">
-            Carregando…
+          <div className="py-12 text-center text-muted-foreground text-xs">
+            <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+            Carregando mensagens...
           </div>
         )}
         {mensagens.length === 0 && !detalhe.isLoading && (
-          <div className="text-center text-sm text-muted-foreground py-8">
-            Ainda sem mensagens registradas para este cliente.
+          <div className="py-12 text-center text-muted-foreground text-xs">
+            Nenhuma mensagem registrada nesta conversa ainda.
           </div>
         )}
-        <div className="space-y-2">
-          {mensagens.map((m) => (
-            <MessageBubble
-              key={m.id}
-              m={m}
-              onDelete={() => excluirMut.mutate(m.id)}
-            />
-          ))}
+        <div className="space-y-3">
+          {mensagens.map((m) => {
+            const ehMinha = m.direcao === "out";
+            const ehNota = m.tags?.includes("nota_interna");
+
+            return (
+              <div
+                key={m.id}
+                className={cn(
+                  "flex flex-col max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed shadow-2xs group relative",
+                  ehNota
+                    ? "bg-amber-500/15 border border-amber-500/30 text-amber-950 dark:text-amber-100 self-center max-w-[95%]"
+                    : ehMinha
+                    ? "bg-primary text-primary-foreground self-end rounded-tr-xs"
+                    : "bg-muted text-foreground self-start rounded-tl-xs"
+                )}
+              >
+                {ehNota && (
+                  <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <StickyNote className="h-3 w-3" /> Nota Interna da Equipe
+                  </span>
+                )}
+                <p className="whitespace-pre-wrap">{m.corpo}</p>
+                <span
+                  className={cn(
+                    "text-[9px] mt-1 self-end font-mono",
+                    ehMinha ? "text-primary-foreground/75" : "text-muted-foreground"
+                  )}
+                >
+                  {new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </ScrollArea>
 
-      {/* Sugestor Inteligente da Jessi */}
-      <div className="px-3 pt-2 bg-background border-t">
-        <JessiThreadSuggester
-          cliente={cli}
-          pets={pets}
-          proximoAgendamento={prox}
-          mensagensRecentes={mensagens}
-          onUsarMensagem={(msg) => {
-            setTexto(msg);
-            setModo("envio");
-          }}
-        />
-      </div>
+      {/* Caixa de Composição e Envio */}
+      <div className="p-3 border-t bg-card/70 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <Button
+              size="xs"
+              variant={modo === "envio" ? "default" : "ghost"}
+              onClick={() => setModo("envio")}
+              className="h-7 text-xs rounded-lg font-semibold"
+            >
+              Resposta WhatsApp
+            </Button>
+            <Button
+              size="xs"
+              variant={modo === "nota" ? "secondary" : "ghost"}
+              onClick={() => setModo("nota")}
+              className="h-7 text-xs rounded-lg font-semibold"
+            >
+              <StickyNote className="h-3 w-3 mr-1" /> Nota Interna
+            </Button>
+          </div>
+        </div>
 
-      <div className="border-t bg-muted/30 p-3 space-y-2">
-        <Tabs value={modo} onValueChange={(v) => setModo(v as any)}>
-          <TabsList className="grid grid-cols-2 w-full max-w-xs">
-            <TabsTrigger value="envio" className="text-xs">
-              <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-              Registrar envio
-            </TabsTrigger>
-            <TabsTrigger value="nota" className="text-xs">
-              <StickyNote className="h-3.5 w-3.5 mr-1.5" />
-              Nota interna
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="flex gap-2 items-end">
+        <div className="flex items-end gap-2">
           <Textarea
             placeholder={
               modo === "envio"
-                ? "Cole ou digite o que você enviou pelo WhatsApp Web…"
-                : "Anote uma observação interna sobre este cliente…"
+                ? `Escreva a resposta para ${cli?.nome || "o cliente"}... (ou use a Jessi acima para gerar)`
+                : "Escreva uma anotação interna sobre o pet ou cliente..."
             }
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            rows={2}
-            className="resize-none"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submeter();
               }
             }}
+            rows={2}
+            className="text-xs resize-none rounded-xl bg-background"
           />
-          <div className="flex flex-col gap-1 shrink-0">
-            <Button
-              onClick={submeter}
-              disabled={
-                !texto.trim() || envioMut.isPending || notaMut.isPending
-              }
-              size="sm"
-            >
-              <Send className="h-4 w-4 mr-1.5" /> Registrar
-            </Button>
-            {modo === "envio" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={sugerirComIA}
-                type="button"
-              >
-                <Sparkles className="h-4 w-4 mr-1.5" /> Sugerir com IA
-              </Button>
-            )}
-          </div>
-        </div>
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          <strong>Registrar envio</strong> é uma confirmação manual do que você já
-          enviou pelo WhatsApp Web — não dispara mensagem automática. Quando a
-          WhatsApp Business API estiver integrada, este formulário passará a
-          enviar direto do sistema.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function MessageBubble({
-  m,
-  onDelete,
-}: {
-  m: MensagemDTO;
-  onDelete: () => void;
-}) {
-  const isNota = m.tags?.includes("nota_interna");
-  const alignRight = m.direcao === "out" && !isNota;
-  const isSistema = m.canal === "sistema" || isNota;
-
-  if (isSistema) {
-    return (
-      <div className="flex justify-center my-2">
-        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 max-w-[85%] text-xs">
-          <div className="flex items-center gap-2 text-amber-700 font-medium mb-1">
-            <StickyNote className="h-3 w-3" /> Nota interna
-          </div>
-          <p className="whitespace-pre-wrap text-foreground">{m.corpo}</p>
-          <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-            <span>{new Date(m.created_at).toLocaleString("pt-BR")}</span>
-            <button
-              onClick={onDelete}
-              className="opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
-              title="Excluir"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("flex group", alignRight ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm",
-          alignRight
-            ? "bg-primary text-primary-foreground rounded-br-sm"
-            : "bg-muted rounded-bl-sm"
-        )}
-      >
-        <p className="whitespace-pre-wrap break-words">{m.corpo}</p>
-        <div
-          className={cn(
-            "flex items-center gap-2 mt-1 text-[10px] justify-end",
-            alignRight ? "text-primary-foreground/70" : "text-muted-foreground"
-          )}
-        >
-          <span>
-            {new Date(m.created_at).toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-          {m.tags?.[0] && m.tags[0] !== "nota_interna" && m.tags[0] !== "registro_manual" && (
-            <Badge
-              variant="outline"
-              className="h-4 px-1 text-[9px] border-current/30"
-            >
-              {m.tags[0].replace(/_/g, " ")}
-            </Badge>
-          )}
-          <button
-            onClick={onDelete}
-            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-            title="Excluir"
+          <Button
+            onClick={submeter}
+            disabled={!texto.trim() || envioMut.isPending || notaMut.isPending}
+            className="h-10 px-4 rounded-xl bg-primary text-primary-foreground font-bold shrink-0 shadow-xs"
           >
-            <Trash2 className="h-3 w-3" />
-          </button>
+            {envioMut.isPending || notaMut.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </div>
     </div>
