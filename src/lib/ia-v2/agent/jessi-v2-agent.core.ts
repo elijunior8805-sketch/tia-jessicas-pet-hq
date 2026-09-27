@@ -1912,7 +1912,7 @@ export async function processarMensagemJessiV2Core(
           } else if (intencao.intencao === "sentinela_atrasos") {
             const atrasos = sentData.atrasosDetectados;
             if (atrasos.length > 0) {
-              const itensAtr = atrasos.map((a) => `• **${a.petNome}** (${a.clienteNome}) — ${a.minutosAtraso} min de atraso (Agendado: ${a.horarioAgendado})`).join("\n");
+              const itensAtr = atrasos.map((a: (typeof atrasos)[number]) => `• **${a.petNome}** (${a.clienteNome}) — ${a.minutosAtraso} min de atraso (Agendado: ${a.horarioAgendado})`).join("\n");
               respostaTexto = `🚨 **Sentinela de Atrasos Operacionais**:\nDetectei **${atrasos.length} pet(s) em atraso**:\n\n${itensAtr}\n\n💡 Mensagens carinhosas prontas para envio com 1 clique no WhatsApp abaixo.`;
             } else {
               respostaTexto = `✅ **Sentinela de Atrasos**: Nenhum atraso registrado no momento! Todos os pets agendados já chegaram ou estão dentro do horário normal.`;

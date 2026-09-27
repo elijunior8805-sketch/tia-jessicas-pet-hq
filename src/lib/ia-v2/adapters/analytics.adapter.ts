@@ -37,7 +37,7 @@ export class AnalyticsAdapter {
    */
   static async analisarFaturamentoPorPorteERaca(
     sb: SupabaseClient<Database>
-  ): Promise<JessiV2QueryResult<AnalyticsResultPayload>> {
+   ): Promise<JessiV2QueryResult<AnalyticsResultPayload | null>> {
     const { data: agendamentos, error } = await sb
       .from("agendamentos")
       .select(`
@@ -51,11 +51,12 @@ export class AnalyticsAdapter {
           raca
         )
       `)
-      .in("status", ["confirmado", "concluido", "finalizado"]);
+       .in("status", ["confirmado", "finalizado"]);
 
     if (error || !agendamentos || agendamentos.length === 0) {
       return {
         success: false,
+        data: null,
         source: "analytics_porte_raca",
         summary: "Não foi possível carregar dados suficientes de atendimentos para a análise por porte e raça.",
         executed_at: new Date().toISOString(),
@@ -132,7 +133,7 @@ export class AnalyticsAdapter {
    */
   static async analisarDesempenhoPorBairro(
     sb: SupabaseClient<Database>
-  ): Promise<JessiV2QueryResult<AnalyticsResultPayload>> {
+   ): Promise<JessiV2QueryResult<AnalyticsResultPayload | null>> {
     const { data: agendamentos, error } = await sb
       .from("agendamentos")
       .select(`
@@ -145,11 +146,12 @@ export class AnalyticsAdapter {
           bairro
         )
       `)
-      .in("status", ["confirmado", "concluido", "finalizado"]);
+       .in("status", ["confirmado", "finalizado"]);
 
     if (error || !agendamentos || agendamentos.length === 0) {
       return {
         success: false,
+        data: null,
         source: "analytics_bairro",
         summary: "Não foi possível carregar os dados geográficos dos clientes.",
         executed_at: new Date().toISOString(),
@@ -219,15 +221,16 @@ export class AnalyticsAdapter {
    */
   static async analisarOcupacaoPorDiaSemana(
     sb: SupabaseClient<Database>
-  ): Promise<JessiV2QueryResult<AnalyticsResultPayload>> {
+   ): Promise<JessiV2QueryResult<AnalyticsResultPayload | null>> {
     const { data: agendamentos, error } = await sb
       .from("agendamentos")
       .select("id, data, valor_previsto, status")
-      .in("status", ["confirmado", "concluido", "finalizado", "agendado"]);
+       .in("status", ["confirmado", "finalizado", "agendado"]);
 
     if (error || !agendamentos || agendamentos.length === 0) {
       return {
         success: false,
+        data: null,
         source: "analytics_dia_semana",
         summary: "Dados de grade insuficientes para análise semanal.",
         executed_at: new Date().toISOString(),
@@ -305,7 +308,7 @@ export class AnalyticsAdapter {
    */
   static async analisarCancelamentosENoShow(
     sb: SupabaseClient<Database>
-  ): Promise<JessiV2QueryResult<AnalyticsResultPayload>> {
+   ): Promise<JessiV2QueryResult<AnalyticsResultPayload | null>> {
     const { data: todos, error } = await sb
       .from("agendamentos")
       .select("id, status, valor_previsto, created_at, observacoes");
@@ -313,6 +316,7 @@ export class AnalyticsAdapter {
     if (error || !todos || todos.length === 0) {
       return {
         success: false,
+        data: null,
         source: "analytics_cancelamentos",
         summary: "Sem dados suficientes para cálculo de taxa de cancelamento.",
         executed_at: new Date().toISOString(),
@@ -320,7 +324,7 @@ export class AnalyticsAdapter {
     }
 
     const cancelados = todos.filter((a) => a.status === "cancelado");
-    const concluidos = todos.filter((a) => a.status === "concluido" || a.status === "finalizado" || a.status === "confirmado");
+     const concluidos = todos.filter((a) => a.status === "finalizado" || a.status === "confirmado");
     const total = todos.length;
 
     const taxaCancelamento = total > 0 ? (cancelados.length / total) * 100 : 0;
@@ -376,7 +380,7 @@ export class AnalyticsAdapter {
   static async executarAnaliseDinamica(
     sb: SupabaseClient<Database>,
     perguntaOuTipo: string
-  ): Promise<JessiV2QueryResult<AnalyticsResultPayload>> {
+   ): Promise<JessiV2QueryResult<AnalyticsResultPayload | null>> {
     const t = perguntaOuTipo.toLowerCase();
 
     if (t.includes("bairro") || t.includes("região") || t.includes("regiao") || t.includes("endereço") || t.includes("endereco") || t.includes("geogr")) {

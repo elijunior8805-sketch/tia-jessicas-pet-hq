@@ -82,7 +82,7 @@ export interface JessiMessage {
   content: string;
   timestamp: string;
   cards?: Array<{
-    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta" | "leva_traz" | "comunicacao" | "reativacao" | "proativo";
+    type: "agenda" | "cliente" | "financeiro" | "programa" | "comprovante" | "confirmacao" | "alerta" | "leva_traz" | "comunicacao" | "reativacao" | "proativo" | "analytics" | "sentinela";
     data: any;
   }>;
   pendingAction?: JessiPendingAction | null;

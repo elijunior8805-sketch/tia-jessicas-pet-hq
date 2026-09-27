@@ -343,8 +343,8 @@ export class SentinelasAdapter {
 
       const agends = agendsRes.data || [];
       const totalAgends = agends.length;
-      const concluidos = agends.filter((a) => a.status === "concluido" || a.status === "finalizado").length;
-      const emAndamento = agends.filter((a) => a.status === "em_andamento" || a.status === "iniciado").length;
+      const concluidos = agends.filter((a) => a.status === "finalizado").length;
+      const emAndamento = agends.filter((a) => a.status === "em_atendimento").length;
       const pendentes = agends.filter((a) => a.status === "agendado" || a.status === "aguardando").length;
       const cancelados = agends.filter((a) => a.status === "cancelado").length;
 
@@ -354,7 +354,7 @@ export class SentinelasAdapter {
       agends.forEach((a: any) => {
         const val = Number(a.valor_previsto || (Array.isArray(a.servicos) ? a.servicos[0]?.valor : a.servicos?.valor) || 0);
         faturamentoBrutoPrevisto += val;
-        if (a.status === "concluido" || a.status === "finalizado") {
+        if (a.status === "finalizado") {
           faturamentoRealizado += val;
         }
       });
