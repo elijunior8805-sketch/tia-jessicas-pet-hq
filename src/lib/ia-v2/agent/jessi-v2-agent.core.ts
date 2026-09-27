@@ -35,6 +35,52 @@ import { humanizarRespostaParaVoz } from "@/lib/ia/ia-voz-conversational";
 const geminiProvider = new JessiV2GeminiProvider();
 const fallbackProvider = new JessiV2FallbackProvider();
 
+/**
+ * Síntese generativa fluida com Gemini 1.5, integrando dados reais do banco com IA consultiva
+ */
+async function sintetizarRespostaComGemini(params: {
+  perguntaUsuario: string;
+  fatosDoBanco: any;
+  respostaBaseFallback: string;
+  user?: { nome?: string; cargo?: string };
+  contexto?: any;
+}): Promise<string> {
+  const { perguntaUsuario, fatosDoBanco, respostaBaseFallback, user, contexto } = params;
+  if (!perguntaUsuario || perguntaUsuario.trim().length === 0) return respostaBaseFallback;
+
+  try {
+    const promptInstrucao = `Você é a Jessi, copiloto e assistente de IA de elite do Spa de Pet Tia Jéssica.
+O operador (${user?.nome || "Eli"}) perguntou/falou: "${perguntaUsuario}".
+
+DADOS REAIS DA OPERAÇÃO RECUPERADOS DO BANCO EM TEMPO REAL:
+${JSON.stringify(fatosDoBanco, null, 2)}
+
+DIRETRIZES DA SUA RESPOSTA:
+1. Responda em Português do Brasil com calor humano, linguagem ágil, natural e parceria profissional.
+2. Diga com clareza o que foi perguntado logo no início.
+3. Adicione contexto consultivo quando útil (ex: avisar sobre temperamento/observação do pet, alertar sobre horários ociosos na grade e como preenchê-los, sugerir cobrança com chave Pix para pendências financeiras).
+4. NUNCA use termos como "banco de dados", "payload", "json", "status pendente no sistema".
+5. Formate valores monetários em R$ (ex: R$ 80,00).`;
+
+    const resp = await geminiProvider.gerarResposta({
+      promptSistema: promptInstrucao,
+      mensagemUsuario: perguntaUsuario,
+      dadosOperacionais: {
+        operador: user?.nome || "Eli",
+        dadosConsultados: fatosDoBanco,
+        contexto: contexto || {},
+      },
+    });
+
+    if (resp?.texto && resp.texto.length > 5 && !resp.texto.includes("Síntese Assistida")) {
+      return resp.texto.trim();
+    }
+  } catch (err) {
+    console.warn("[JessiV2 Core] Síntese Gemini fallback:", err);
+  }
+  return respostaBaseFallback;
+}
+
 export async function processarMensagemJessiV2Core(
   sb: SupabaseClient<Database>,
   input: JessiV2ProcessInput,
@@ -1965,13 +2011,17 @@ export async function processarMensagemJessiV2Core(
           const manha = livres.filter((h) => parseInt(h.split(":")[0], 10) < 12);
           const tarde = livres.filter((h) => parseInt(h.split(":")[0], 10) >= 12);
 
-          if (livres.length > 0) {
-            const manhaTxt = manha.length > 0 ? `☀️ **Manhã (${manha.length} vagas)**: ${manha.join(", ")}` : "☀️ **Manhã**: Sem vagas livres";
-            const tardeTxt = tarde.length > 0 ? `🌤️ **Tarde (${tarde.length} vagas)**: ${tarde.join(", ")}` : "🌤️ **Tarde**: Sem vagas livres";
-            respostaTexto = `✨ **Horários Livres Encontrados (${dataAlvo})**:\nEncontrei **${livres.length} horários disponíveis** na grade operacional:\n\n${manhaTxt}\n${tardeTxt}\n\n💡 **Recomendação Estratégica**: Clique em um horário no card abaixo para agendar imediatamente ou peça *"Sugerir encaixes"* para convidar clientes inativos via WhatsApp.`;
-          } else {
-            respostaTexto = `📅 **Disponibilidade para ${dataAlvo}**:\nGrade completa! Não temos horários livres neste dia. Deseja registrar encaixe ou consultar o dia seguinte?`;
-          }
+          const fallback = livres.length > 0
+            ? `Encontrei ${livres.length} horários disponíveis na grade de ${dataAlvo} (${manha.length} pela manhã e ${tarde.length} à tarde). Você pode agendar imediatamente no painel!`
+            : `A grade de ${dataAlvo} está sem horários livres no momento.`;
+
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "horarios_livres", data: dataAlvo, totalVagas: livres.length, vagas: livres, manha, tarde },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
 
           cards.push({
             type: "agenda",
@@ -1990,7 +2040,7 @@ export async function processarMensagemJessiV2Core(
         } else if (intencao.intencao === "consultar_proximo_pet") {
           const { data: agsHoje } = await sb
             .from("agendamentos")
-            .select("id, data, hora, status, valor_previsto, observacoes, leva_traz_modalidade, pets(id, nome, raca, porte), clientes(id, nome, whatsapp, telefone), servicos(id, nome, valor)")
+            .select("id, data, hora, status, valor_previsto, observacoes, leva_traz_modalidade, pets(id, nome, raca, porte, observacoes), clientes(id, nome, whatsapp, telefone), servicos(id, nome, valor)")
             .eq("data", dataAlvo)
             .neq("status", "cancelado")
             .neq("status", "finalizado")
@@ -1999,7 +2049,15 @@ export async function processarMensagemJessiV2Core(
           const proximo = agsHoje && agsHoje.length > 0 ? agsHoje[0] : null;
 
           if (!proximo) {
-            respostaTexto = `🐾 Não há próximos pets na fila para hoje (${dataAlvo}). Todos os atendimentos agendados já foram concluídos ou a grade está livre!`;
+            const fallback = `Não há próximos pets na fila para hoje (${dataAlvo}). Todos os atendimentos agendados já foram concluídos ou a grade está livre!`;
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: { tipo: "proximo_pet", data: dataAlvo, proximo: null, totalHoje: 0 },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
+
             cards.push({
               type: "agenda",
               title: "Próximo Pet na Fila",
@@ -2016,9 +2074,26 @@ export async function processarMensagemJessiV2Core(
             const tutorNome = (proximo.clientes as any)?.nome || "Tutor não informado";
             const servicoNome = (proximo.servicos as any)?.nome || "Atendimento";
             const hora = proximo.hora ? String(proximo.hora).slice(0, 5) : "--:--";
-            const levaTraz = proximo.leva_traz_modalidade && proximo.leva_traz_modalidade !== "nao_utilizar" ? " (Com Leva & Traz 🚐)" : "";
+            const fallback = `O próximo pet na fila é o ${petNome} (${raca}) do tutor ${tutorNome}, agendado para ${servicoNome} às ${hora}.`;
 
-            respostaTexto = `🐾 **Próximo Pet na Fila**: **${petNome}** (${raca})\n• **Tutor(a)**: ${tutorNome}\n• **Serviço**: ${servicoNome}${levaTraz}\n• **Horário**: ${hora}\n• **Status**: ${proximo.status === "em_atendimento" ? "Em atendimento agora" : "Aguardando / Agendado"}`;
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: {
+                tipo: "proximo_pet",
+                data: dataAlvo,
+                petNome,
+                raca,
+                tutorNome,
+                servicoNome,
+                hora,
+                observacoesPet: (proximo.pets as any)?.observacoes,
+                status: proximo.status,
+                restantesHoje: agsHoje.length,
+              },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
 
             cards.push({
               type: "agenda",
@@ -2043,7 +2118,15 @@ export async function processarMensagemJessiV2Core(
           const lista = agsEmAtendimento || [];
 
           if (lista.length === 0) {
-            respostaTexto = `🛁 No momento **não há nenhum pet em atendimento** na bancada ou banho.`;
+            const fallback = `No momento não há nenhum pet em atendimento na bancada ou banho.`;
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: { tipo: "em_atendimento", total: 0, lista: [] },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
+
             cards.push({
               type: "agenda",
               title: "Pets em Atendimento",
@@ -2054,15 +2137,23 @@ export async function processarMensagemJessiV2Core(
               },
             });
           } else {
-            const itensTexto = lista.map((a) => {
-              const pNome = (a.pets as any)?.nome || "Pet";
-              const sNome = (a.servicos as any)?.nome || "Atendimento";
-              const tNome = (a.clientes as any)?.nome || "Tutor";
-              const h = a.hora ? String(a.hora).slice(0, 5) : "--:--";
-              return `• **${pNome}** (${sNome}) — Tutor: ${tNome} (Horário: ${h})`;
-            }).join("\n");
-
-            respostaTexto = `🛁 **Pets em Atendimento Agora (${lista.length})**:\n${itensTexto}`;
+            const fallback = `Temos ${lista.length} pet(s) em atendimento na bancada agora.`;
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: {
+                tipo: "em_atendimento",
+                total: lista.length,
+                pets: lista.map((a: any) => ({
+                  pet: a.pets?.nome,
+                  tutor: a.clientes?.nome,
+                  servico: a.servicos?.nome,
+                  hora: a.hora,
+                })),
+              },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
 
             cards.push({
               type: "agenda",
@@ -2080,7 +2171,15 @@ export async function processarMensagemJessiV2Core(
           const total = agendamentos.length;
 
           if (total === 0) {
-            respostaTexto = `📅 **Agenda de ${dataAlvo}**: Não há agendamentos confirmados para este dia. A grade está 100% livre!\n\n💡 **Sugestão Jessi**: Você pode preencher esses horários acionando clientes inativos ou disparando convites pelo WhatsApp. Deseja que eu liste clientes sugeridos para hoje?`;
+            const fallback = `Não há agendamentos confirmados para ${dataAlvo}. A grade está 100% livre!`;
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: { tipo: "agenda_dia", data: dataAlvo, total: 0, agendamentos: [] },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
+
             cards.push({
               type: "agenda",
               title: `Agenda de Atendimentos — ${dataAlvo}`,
@@ -2095,20 +2194,29 @@ export async function processarMensagemJessiV2Core(
           } else {
             const confirmados = agendamentos.filter((a) => a.status === "confirmado" || a.status === "finalizado").length;
             const emAtendimento = agendamentos.filter((a) => a.status === "em_atendimento").length;
-            const levaTraz = agendamentos.filter((a) => a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar").length;
+            const fallback = `Hoje temos ${total} atendimento(s) agendados (${confirmados} confirmados, ${emAtendimento} em atendimento).`;
 
-            const itens = agendamentos.slice(0, 8).map((a) => {
-              const hora = a.hora ? String(a.hora).slice(0, 5) : "--:--";
-              const pet = a.pets?.nome || "Pet";
-              const tutor = a.clientes?.nome ? ` (${a.clientes.nome})` : "";
-              const servico = a.servicos?.nome || "Atendimento";
-              const st = a.status ? ` [${a.status}]` : "";
-              const lt = a.leva_traz_modalidade && a.leva_traz_modalidade !== "nao_utilizar" ? " 🚐" : "";
-              return `• **${hora}**: ${pet}${tutor} — ${servico}${lt}${st}`;
-            }).join("\n");
-
-            const header = `📋 **Visão Executiva da Agenda (${dataAlvo})**:\n- **Total agendados**: ${total} (${confirmados} confirmados, ${emAtendimento} em atendimento)\n${levaTraz > 0 ? `- **Leva & Traz**: ${levaTraz} viagens programadas\n` : ""}\n`;
-            respostaTexto = `${header}**Atendimentos programados:**\n${itens}${total > 8 ? `\n...e mais ${total - 8} agendamento(s).` : ""}`;
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: {
+                tipo: "agenda_dia",
+                data: dataAlvo,
+                total,
+                confirmados,
+                emAtendimento,
+                lista: agendamentos.slice(0, 10).map((a: any) => ({
+                  hora: a.hora,
+                  pet: a.pets?.nome,
+                  raca: a.pets?.raca,
+                  tutor: a.clientes?.nome,
+                  servico: a.servicos?.nome,
+                  status: a.status,
+                })),
+              },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
 
             cards.push({
               type: "agenda",
@@ -2133,56 +2241,55 @@ export async function processarMensagemJessiV2Core(
         if (intencao.intencao === "consultar_analise_negocio" || intencao.intencao === "analise_cruzada_operacao") {
           const resAnalytics = await AnalyticsAdapter.executarAnaliseDinamica(sb, textoLimpo);
           const anData = resAnalytics.data;
+          const fallback = `Apresento a análise analítica da operação solicitada.`;
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "analytics", data: anData },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
+
           if (anData) {
-            respostaTexto = `📊 **${anData.titulo}**\n${anData.insightEstrategico}\n\n• **Total Analisado**: ${anData.totalGeral} atendimentos\n• **Faturamento Geral**: ${brl(anData.faturamentoGeral)}\n• **Ticket Médio**: ${brl(anData.ticketMedioGeral)}\n\n💡 **Recomendação**: ${anData.acaoRecomendada.texto}.`;
             cards.push({
               type: "analytics",
               title: anData.titulo,
               subtitle: anData.subtitulo,
               data: anData,
             });
-          } else {
-            respostaTexto = resAnalytics.summary || "Análise analítica concluída.";
           }
         } else if (intencao.intencao === "consultar_resumo_operacional" || intencao.intencao === "resumo_negocio") {
           const resResumo = await consultarResumoNegocioJessi();
           const d: any = resResumo.data || {};
-          respostaTexto = `📊 **Diagnóstico 360° da Operação**:\n• **Agendamentos de Hoje**: ${d.agendamentosHoje || 0}\n• **Faturamento do Mês**: ${brl(d.faturamentoMes || 0)}\n• **Clientes Cadastrados**: ${d.totalClientes || 0}\n• **Pets no Spa**: ${d.totalPets || 0}\n\n💡 **Saúde Operacional**: Operação fluindo dentro dos parâmetros ideais.`;
+          const fallback = `O diagnóstico 360° indica ${d.agendamentosHoje || 0} agendamentos hoje e faturamento mensal de ${brl(d.faturamentoMes || 0)}.`;
+
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "resumo_360", dados: d },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
+
           cards.push({
             type: "financeiro",
             title: "Diagnóstico 360° da Operação",
             subtitle: "Visão Executiva em Tempo Real",
             data: d,
           });
-        } else if (intencao.intencao === "auditoria_integridade") {
-          const resAudit = await realizarAuditoriaIntegridadeJessi(sb);
-          const d: any = resAudit.data || {};
-          respostaTexto = `🛡️ **Auditoria de Integridade Operacional**:\n• **Consistência de Dados**: ${resAudit.success ? "100% íntegra" : "Atenção requerida"}\n• **Inconsistências Detectadas**: ${d?.resumo?.alertas || 0}\n\n${resAudit.summary || ""}`;
-          cards.push({
-            type: "financeiro",
-            title: "Auditoria de Integridade",
-            subtitle: `Status: ${resAudit.success ? "Íntegro" : "Revisar"}`,
-            data: d,
-          });
-        } else if (intencao.intencao === "qualidade_ia") {
-          const resQual = await consultarQualidadeIAJessi();
-          const d: any = resQual.data || {};
-          respostaTexto = `🤖 **Métricas de Qualidade da Jessi**:\n• **Taxa de Assertividade**: ${Number(d?.taxa_sucesso || 99).toFixed(1)}%\n• **Operações Auditadas**: ${d?.total_chamadas || 0}\n• **Mutações Supervisionadas**: ${d?.mutacoes_executadas || 0}\n\n✨ Jessi operando em máxima conformidade com as regras de negócio!`;
-          cards.push({
-            type: "financeiro",
-            title: "Indicadores de Qualidade & Assertividade da IA",
-            data: d,
-          });
         } else if (intencao.intencao === "consultar_contas_a_receber" || intencao.intencao === "consultar_inadimplencia_devedores") {
           const devedores: any[] = dadosFin?.devedores || [];
-          if (devedores.length > 0) {
-            const itens = devedores.slice(0, 5).map(
-              (d) => `• **${d.clienteNome}**: ${brl(Number(d.valor || 0))} (Vencimento: ${new Date(`${d.vencimento}T12:00:00`).toLocaleDateString("pt-BR")})`
-            );
-            respostaTexto = `⚠️ **Auditoria de Pendências e Cobranças**:\nLocalizei **${devedores.length} cliente(s) com saldo em aberto**, totalizando **${brl(totalPendente)}**.\n\n**Principais clientes com saldo pendente:**\n${itens.join("\n")}\n\n💡 **Ação Recomendada**: Clique em *"Cobrar WhatsApp"* no card abaixo para gerar a abordagem com chave Pix e valor já calculados.`;
-          } else {
-            respostaTexto = `🎉 **Inadimplência Zero**: Ótima notícia! Não há nenhum cliente com pagamentos em atraso no momento. Todas as contas estão em dia!`;
-          }
+          const fallback = devedores.length > 0
+            ? `Localizei ${devedores.length} cliente(s) com saldo em aberto totalizando ${brl(totalPendente)}.`
+            : `Ótima notícia! Não há nenhum cliente com pagamentos em atraso no momento.`;
+
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "devedores_pendencias", totalPendente, devedores: devedores.slice(0, 8) },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
 
           cards.push({
             type: "financeiro",
@@ -2191,13 +2298,15 @@ export async function processarMensagemJessiV2Core(
             data: dadosFin,
           });
         } else {
-          let resumoTexto = `📊 **Diagnóstico Financeiro Consolidado (Oficial)**:\n- **Faturamento Realizado**: ${brl(recebido)}\n- **Valores em Aberto**: ${brl(totalPendente)}\n`;
-          if (ticket > 0) {
-            resumoTexto += `- **Ticket Médio**: ${brl(ticket)}\n`;
-          }
-          resumoTexto += `\n💡 **Visão Estratégica**: Os dados financeiros são lidos diretamente da view oficial. Você pode clicar no card abaixo para conciliar comprovantes Pix ou detalhar as cobranças pendentes.`;
+          const fallback = `O faturamento do mês está em ${brl(recebido)}, com ${brl(totalPendente)} em aberto e ticket médio de ${brl(ticket)}.`;
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "resumo_financeiro", faturamentoRealizado: recebido, emAberto: totalPendente, ticketMedio: ticket },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
 
-          respostaTexto = resumoTexto;
           cards.push({
             type: "financeiro",
             title: "Resumo Financeiro Consolidado (Oficial)",
@@ -2212,7 +2321,16 @@ export async function processarMensagemJessiV2Core(
 
         if (intencao.intencao === "consultar_programas_ativos" || (!cliId && !petId)) {
           const resProgGeral = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
-          respostaTexto = `📋 **Contratos Ativos do Clubinho**:\nLocalizei **${resProgGeral.total_count || 0} contrato(s) ativo(s)** de programas de cuidado.\n\n💡 **Regra de Equivalência**: Créditos de banho cobrem tanto Banho Essencial quanto Banho Premium integralmente.`;
+          const fallback = `Localizei ${resProgGeral.total_count || 0} contrato(s) ativo(s) do Clubinho.`;
+
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "programas_geral", totalContratos: resProgGeral.total_count, contratos: resProgGeral.data },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
+
           cards.push({
             type: "programa",
             title: "Contratos Ativos do Clubinho",
@@ -2223,13 +2341,16 @@ export async function processarMensagemJessiV2Core(
           const resCred = await ProgramasCreditosAdapter.consultarSaldoCreditos(sb, cliId || "", petId || undefined);
           const credData: any = resCred.data || {};
           const restam = credData.totalSessaoRestantes || 0;
-          const validadeStr = credData.validade ? ` até **${credData.validade}**` : "";
+          const validadeStr = credData.validade ? ` até ${credData.validade}` : "";
+          const fallback = `O pet ${petNome || "selecionado"} possui ${restam} crédito(s) ativo(s)${validadeStr}.`;
 
-          if (intencao.intencao === "consultar_validade_programa" && credData.validade) {
-            respostaTexto = `📅 O plano de cuidados do **${petNome || "pet"}** é válido${validadeStr} e restam **${restam}** sessão(ões) disponíveis.\n\n💡 **Equivalência**: 1 crédito de banho é válido tanto para Banho Essencial quanto Banho Premium.`;
-          } else {
-            respostaTexto = `🐾 **Saldo de Créditos — ${petNome || "Pet"}**:\nO pet possui **${restam} crédito(s) ativo(s)**${validadeStr}.\n\n💡 **Dica Operacional**: Crédito de banho cobre Banho Essencial e Banho Premium sem cobrança adicional.`;
-          }
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "saldo_creditos_pet", pet: petNome, tutor: novoContexto.cliente?.nome, restam, validade: credData.validade, detalhes: credData },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
 
           cards.push({
             type: "programa",
@@ -2242,23 +2363,23 @@ export async function processarMensagemJessiV2Core(
         if (intencao.intencao === "identificar_clientes_retorno") {
           const resRetorno = await ProativoAdapter.identificarClientesParaRetorno(sb);
           const lista = (resRetorno.data as any[]) || [];
+          const fallback = lista.length > 0
+            ? `Identifiquei ${lista.length} cliente(s) e pet(s) ausentes há mais de 25 dias com potencial de retorno.`
+            : `Não há clientes inativos sem agendamento no momento!`;
 
-          if (lista.length > 0) {
-            const itensTexto = lista.slice(0, 6).map((r) => {
-              const petStr = r.pet?.nome ? ` (Pet: **${r.pet.nome}**)` : "";
-              return `• **${r.cliente?.nome || "Cliente"}**${petStr} — ausente há **${r.diasInativo || 0} dias**`;
-            });
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "reativacao_inativos", total: lista.length, clientes: lista.slice(0, 8) },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
 
-            respostaTexto = `🎯 **Oportunidades de Reativação de Clientes**:\nIdentifiquei **${lista.length} cliente(s) e pet(s)** sumidos com alto potencial de retorno:\n\n${itensTexto.join("\n")}\n\n💡 **Ação Proativa**: Clique nos botões do card abaixo para enviar mensagens de convite personalizadas no WhatsApp com 1 clique.`;
-
-            cards.push({
-              type: "reativacao",
-              title: "Reativação de Clientes",
-              data: lista,
-            });
-          } else {
-            respostaTexto = `🎉 **Engajamento Máximo**: Não há clientes inativos sem agendamento no momento! Todos os pets cadastrados estão com visitas recentes ou horários marcados.`;
-          }
+          cards.push({
+            type: "reativacao",
+            title: "Reativação de Clientes",
+            data: lista,
+          });
         } else {
           const petIdCtx = novoContexto.pet?.id || contextoAtual.pet?.id;
           const clienteIdCtx = novoContexto.cliente?.id || contextoAtual.cliente?.id;
@@ -2266,7 +2387,16 @@ export async function processarMensagemJessiV2Core(
 
           if (petIdCtx && !(perguntaSobrePets && clienteIdCtx)) {
             const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petIdCtx);
-            respostaTexto = `🐾 **Ficha 360° do Pet — ${novoContexto.pet?.nome || contextoAtual.pet?.nome || "Pet"}**:\nRaça: **${resFicha.data?.raca || "SRD"}** • Porte: **${resFicha.data?.porte || "Médio"}**\nHistórico e preferências detalhados no card abaixo:`;
+            const fallback = `Ficha do pet ${novoContexto.pet?.nome || "Pet"}: raça ${resFicha.data?.raca || "SRD"}, porte ${resFicha.data?.porte || "Médio"}.`;
+
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: { tipo: "ficha_pet", pet: resFicha.data },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
+
             cards.push({
               type: "cliente",
               title: `Ficha Cadastral & Histórico`,
@@ -2276,27 +2406,19 @@ export async function processarMensagemJessiV2Core(
           } else if (clienteIdCtx) {
             const resCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteIdCtx);
             const dadosCli: any = resCli.data || {};
-            const nomeCli: string = dadosCli.nome || novoContexto.cliente?.nome || contextoAtual.cliente?.nome || "Cliente";
-            const petsCli: any[] = dadosCli.pets || [];
-            const telCli = dadosCli.whatsapp || dadosCli.telefone ? `Telefone: ${dadosCli.whatsapp || dadosCli.telefone}.` : "";
-            if (perguntaSobrePets) {
-              if (petsCli.length === 0) {
-                respostaTexto = `**${nomeCli}** ainda não possui nenhum pet cadastrado no sistema.`;
-              } else {
-                const nomes = petsCli.map((p: any) => `**${p.nome}**${p.raca ? ` (${p.raca})` : ""}`);
-                const listaNomes =
-                  nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
-                respostaTexto = `**${nomeCli}** possui ${petsCli.length} pet(s) cadastrado(s): ${listaNomes}.`;
-              }
-            } else {
-              const petsResumo = petsCli.length > 0
-                ? ` Pets vinculados: ${petsCli.map((p: any) => p.nome).join(", ")}.`
-                : " Nenhum pet vinculado ainda.";
-              respostaTexto = `Localizei o cadastro do cliente **${nomeCli}**! ${telCli}${petsResumo}`;
-            }
+            const nomeCli: string = dadosCli.nome || "Cliente";
+            const fallback = `Localizei o cadastro do cliente ${nomeCli}.`;
 
-            if (petsCli.length === 1) {
-              novoContexto.pet = { id: petsCli[0].id, nome: petsCli[0].nome, raca: petsCli[0].raca };
+            respostaTexto = await sintetizarRespostaComGemini({
+              perguntaUsuario: textoLimpo,
+              fatosDoBanco: { tipo: "ficha_cliente", cliente: dadosCli, pets: dadosCli.pets || [] },
+              respostaBaseFallback: fallback,
+              user,
+              contexto: contextoAtual,
+            });
+
+            if (dadosCli.pets && dadosCli.pets.length === 1) {
+              novoContexto.pet = { id: dadosCli.pets[0].id, nome: dadosCli.pets[0].nome, raca: dadosCli.pets[0].raca };
             }
 
             cards.push({
@@ -2306,26 +2428,33 @@ export async function processarMensagemJessiV2Core(
               data: resCli.data,
             });
           } else {
-            respostaTexto = `Não encontrei esse cliente no cadastro. Pode me passar o nome completo ou o WhatsApp dele para eu localizar?`;
+            respostaTexto = `Não encontrei esse cliente no cadastro. Pode me passar o nome ou WhatsApp dele para eu localizar?`;
           }
         }
       } else if (intencao.dominio === "comunicacao_mensagens") {
         if (intencao.intencao === "consultar_aniversariantes") {
           const resNiver = await consultarAniversariantesJessi(sb);
           const aniversariantes = (resNiver.data as any[]) || [];
-          if (aniversariantes.length > 0) {
-            const listaTxt = aniversariantes.map((a: any) => `• 🎂 **${a.petNome || a.clienteNome || "Pet"}** (Tutor: ${a.clienteNome || "Cliente"})`).join("\n");
-            respostaTexto = `🎉 **Aniversariantes Encontrados**:\nIdentifiquei **${aniversariantes.length} aniversariante(s)**:\n\n${listaTxt}\n\n💡 **Ação**: Clique no card abaixo para enviar uma mensagem carinhosa de parabéns no WhatsApp!`;
-          } else {
-            respostaTexto = `🎂 **Aniversários**: Não há aniversariantes registrados para a data de hoje ou nos próximos dias.`;
-          }
+          const fallback = aniversariantes.length > 0
+            ? `Identifiquei ${aniversariantes.length} aniversariante(s) no Spa de Pet.`
+            : `Não há aniversariantes registrados para hoje ou próximos dias.`;
+
+          respostaTexto = await sintetizarRespostaComGemini({
+            perguntaUsuario: textoLimpo,
+            fatosDoBanco: { tipo: "aniversariantes", aniversariantes },
+            respostaBaseFallback: fallback,
+            user,
+            contexto: contextoAtual,
+          });
+
           cards.push({
             type: "comunicacao",
             title: "Aniversariantes do Spa de Pet",
             subtitle: `${aniversariantes.length} aniversariante(s)`,
             data: resNiver.data,
           });
-        } else {
+        }
+ else {
           const clienteCtx = novoContexto.cliente || contextoAtual.cliente;
           const petCtx = novoContexto.pet || contextoAtual.pet;
           const nomeCliente = clienteCtx?.nome || intencao.entidades.clienteNome || "Cliente";

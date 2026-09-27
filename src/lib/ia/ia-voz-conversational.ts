@@ -1,9 +1,9 @@
 /**
  * Módulo de Formatação Conversacional para Canal de Voz (Estilo ChatGPT / Gemini Live)
  * 
- * Transforma respostas técnicas/estruturadas em diálogos falados curtos, ágeis,
- * empáticos e humanizados (máximo 1 a 2 frases diretas), deixando o detalhamento
- * para os cartões visuais exibidos na tela.
+ * Transforma respostas ricas da IA em diálogos falados naturais, ágeis,
+ * empáticos e humanizados para síntese de voz (TTS), mantendo a inteligência
+ * e conselhos operacionais sem engessar a fala.
  */
 
 export function humanizarRespostaParaVoz(
@@ -27,108 +27,30 @@ export function humanizarRespostaParaVoz(
     return `Preparei o agendamento do ${pet} para ${servico} ${data} ${hora}. Posso confirmar?`;
   }
 
-  // 2. Tratamento de Desambiguação / Múltiplas Opções de Pets ou Tutores
-  if (texto.includes("Selecione") || texto.includes("candidatos") || texto.includes("opções") || texto.includes("opcoes") || texto.includes("mais de um")) {
-    if (texto.includes("pet") || texto.includes("pets")) {
-      return "Encontrei mais de um pet cadastrado. De qual deles você gostaria de cuidar?";
-    }
-    if (texto.includes("cliente") || texto.includes("tutor")) {
-      return "Encontrei mais de um tutor com esse nome. Deixei as opções na tela para você escolher.";
-    }
-  }
+  // 2. Limpeza inteligente de formatação markdown e estruturação para leitura por voz
+  let fala = limparMarcacaoTexto(texto);
 
-  // 3. Tratamento de Lembretes / WhatsApp / Confirmações
-  if (texto.includes("lembrete") || texto.includes("WhatsApp") || texto.includes("confirmação de presença")) {
-    return "Preparei as mensagens de confirmação para os clientes na tela. Quer que eu envie?";
-  }
+  // Converte padrões de tópicos (• ou -) em fala contínua natural
+  fala = fala
+    .replace(/\s*[•*-]\s*/g, ", ")
+    .replace(/,\s*,/g, ",")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  // 4. Se a resposta já for curta e conversacional (<= 140 caracteres e sem listas)
-  if (texto.length <= 140 && !texto.includes("\n-") && !texto.includes("\n•") && !texto.includes("|") && !texto.includes("1.")) {
-    return limparMarcacaoTexto(texto);
-  }
-
-  // 5. Tratamento de Agenda / Atendimentos / Próximo Pet / Bancada
-  const cardAgenda = (cards || []).find((c) => c.type === "agenda");
-  if (cardAgenda?.data) {
-    if (cardAgenda.data.tipo === "proximo_pet") {
-      const proximo = cardAgenda.data.proximo;
-      if (!proximo) {
-        return "Não há próximos atendimentos pendentes na grade de hoje.";
-      }
-      const pet = proximo.pets?.nome || "o pet";
-      const servico = proximo.servicos?.nome || "atendimento";
-      const hora = proximo.hora ? `às ${String(proximo.hora).slice(0, 5)}` : "";
-      const tutor = proximo.clientes?.nome ? `, do tutor ${proximo.clientes.nome.split(" ")[0]}` : "";
-      return `O próximo pet na fila é o ${pet} para ${servico} ${hora}${tutor}.`;
-    }
-
-    if (cardAgenda.data.tipo === "em_atendimento") {
-      const itens = cardAgenda.data.itens || [];
-      if (itens.length === 0) {
-        return "No momento não há nenhum pet em atendimento na bancada.";
-      }
-      const nomes = itens.map((a: any) => a.pets?.nome || "Pet").join(", ");
-      return `Temos ${itens.length} pet(s) em atendimento agora: ${nomes}.`;
-    }
-
-    const itensAgenda = Array.isArray(cardAgenda.data)
-      ? cardAgenda.data
-      : Array.isArray(cardAgenda.data.itens)
-      ? cardAgenda.data.itens
-      : cardAgenda.data.todosAtivos || [];
-
-    if (itensAgenda.length > 0) {
-      const qtd = itensAgenda.length;
-      const primeiro = itensAgenda[0];
-      const petPri = primeiro.pets?.nome || primeiro.petNome || "o próximo pet";
-      const horaPri = primeiro.hora ? `às ${String(primeiro.hora).slice(0, 5)}` : "";
-
-      if (qtd === 1) {
-        return `Você tem 1 atendimento hoje com o ${petPri} ${horaPri}. Detalhes no painel!`;
-      }
-      return `Você tem ${qtd} atendimentos agendados para hoje. O próximo é o ${petPri} ${horaPri}.`;
-    }
-
-    if (texto.includes("grade está 100% livre") || texto.includes("Não há agendamentos") || texto.includes("não há nenhum atendimento")) {
-      return "Hoje a grade de atendimentos está livre, sem nenhum agendamento marcado.";
+  // Se a fala for muito longa (+450 caracteres), sintetiza para manter a agilidade na bancada sem perder o sentido
+  if (fala.length > 450) {
+    const sentencas = fala.match(/[^.!?]+[.!?]+/g) || [fala];
+    if (sentencas.length >= 3) {
+      // Fala as primeiras 2 a 3 frases essenciais
+      fala = sentencas.slice(0, 3).join(" ").trim();
     }
   }
 
-  // 6. Tratamento de Financeiro / Faturamento
-  const cardFin = (cards || []).find((c) => c.type === "financeiro");
-  if (cardFin?.data) {
-    const d = cardFin.data;
-    if (d.faturamento !== undefined || d.receitaBruta !== undefined || d.faturamentoBruto !== undefined) {
-      const fat = d.faturamento || d.receitaBruta || d.faturamentoBruto || 0;
-      const rec = d.recebido || d.totalRecebido || d.valoresRecebidos || 0;
-      const pend = d.pendente || d.valoresAReceber || 0;
-      return `O faturamento do mês está em R$ ${fat.toLocaleString("pt-BR")}, com R$ ${rec.toLocaleString("pt-BR")} recebidos e R$ ${pend.toLocaleString("pt-BR")} em aberto.`;
-    }
-  }
-
-  // 7. Tratamento Genérico: Extração das 1 ou 2 primeiras frases essenciais
-  const textoLimpo = limparMarcacaoTexto(texto);
-
-  // Divide por frases terminadas em ponto, exclamação ou interrogação
-  const frases = textoLimpo.match(/[^.!?]+[.!?]+/g) || [textoLimpo];
-  
-  if (frases.length <= 2) {
-    return frases.join(" ").trim();
-  }
-
-  // Pega a primeira frase (contexto) e a última se for uma pergunta de ação
-  const primeiraFrase = frases[0].trim();
-  const ultimaFrase = frases[frases.length - 1].trim();
-
-  if (ultimaFrase.endsWith("?")) {
-    return `${primeiraFrase} ${ultimaFrase}`;
-  }
-
-  return `${primeiraFrase} ${frases[1].trim()}`;
+  return fala;
 }
 
 /**
- * Remove marcações técnicas, markdown, asteriscos, emojis e quebras de linha
+ * Remove marcações técnicas, markdown, asteriscos, emojis e quebras de linha para áudio cristalino
  */
 export function limparMarcacaoTexto(texto: string): string {
   let t = texto;
@@ -137,24 +59,27 @@ export function limparMarcacaoTexto(texto: string): string {
   t = t.replace(/```[\s\S]*?```/g, "");
   t = t.replace(/`[^`]+`/g, "");
 
-  // Remove formatações markdown
+  // Remove formatações markdown (negrito, itálico, títulos)
   t = t.replace(/\*\*(.*?)\*\*/g, "$1");
   t = t.replace(/\*(.*?)\*/g, "$1");
   t = t.replace(/_{1,2}(.*?)_{1,2}/g, "$1");
   t = t.replace(/^#{1,6}\s+/gm, "");
-  t = t.replace(/^[•*\-–—]\s+/gm, "");
-  t = t.replace(/^\d+\.\s+/gm, "");
   t = t.replace(/\[id:[^\]]+\]/gi, "");
   t = t.replace(/\[(.*?)\]\([^)]+\)/g, "$1");
 
   // Remove tabelas markdown
   t = t.replace(/\|[^\n]+\|/g, "");
 
-  // Remove quebras de linha duplas
-  t = t.replace(/\n+/g, " ");
+  // Substitui emojis conhecidos por pausas ou remove se causarem ruído no TTS
+  t = t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "");
 
-  // Remove múltiplos espaços
+  // Normaliza quebras de linha para vírgulas/pausas naturais
+  t = t.replace(/\n+/g, ". ");
+
+  // Normaliza pontuação e múltiplos espaços
+  t = t.replace(/\s*([.,;?!])\s*/g, "$1 ");
   t = t.replace(/\s+/g, " ").trim();
 
   return t;
 }
+

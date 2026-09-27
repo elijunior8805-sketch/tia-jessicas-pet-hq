@@ -1347,14 +1347,16 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
   async gerarResposta(req: JessiV2GenerativeRequest): Promise<JessiV2GenerativeResponse> {
     try {
-      const systemMsg = `${JESSI_V2_SYSTEM_PROMPT}\n\nResponda sempre como a Jessi, de forma humana, calorosa, ágil e em português brasileiro.\nDiretrizes de resposta:\n- NUNCA use termos de programação ou banco de dados.\n- Seja direta e acolhedora, como quem trabalha com carinho pelos pets no Spa.\n- Formate valores em R$ (ex: R$ 80,00) e datas de forma amigável.\n\nDados Reais do Spa:\n${JSON.stringify(req.dadosOperacionais, null, 2)}`;
+      const systemMsg = req.promptSistema
+        ? `${req.promptSistema}\n\nDados Reais do Spa:\n${JSON.stringify(req.dadosOperacionais, null, 2)}`
+        : `${JESSI_V2_SYSTEM_PROMPT}\n\nResponda sempre como a Jessi, de forma humana, consultiva, calorosa, ágil e em português brasileiro.\nDiretrizes de resposta:\n- NUNCA use termos de programação ou banco de dados.\n- Seja direta e acolhedora, como uma parceira de trabalho do Spa.\n- Formate valores em R$ (ex: R$ 80,00) e datas de forma amigável.\n\nDados Reais do Spa:\n${JSON.stringify(req.dadosOperacionais, null, 2)}`;
 
       const messages = [
         { role: "system", content: systemMsg },
         { role: "user", content: req.mensagemUsuario },
       ];
 
-      const textoGerado = await this.executarRequisicaoIA(messages, false, 0.3);
+      const textoGerado = await this.executarRequisicaoIA(messages, false, 0.6);
 
       if (textoGerado && textoGerado.length > 5) {
         return {
@@ -1392,3 +1394,4 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     };
   }
 }
+
