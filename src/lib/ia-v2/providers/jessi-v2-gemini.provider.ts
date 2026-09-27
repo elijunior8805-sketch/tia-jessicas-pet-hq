@@ -507,7 +507,13 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       "abra", "olhar", "olha", "olhe", "dizer", "diz", "falar", "fala", "passar", "passa", "puxar", "puxa",
       "proximo", "próximo", "proxima", "próxima", "proximos", "próximos", "proximas", "próximas", "ultimo", "último",
       "ultima", "última", "grade", "bancada", "recepcao", "recepção", "fila", "lista", "para", "pro",
-      "pra", "de", "do", "da", "em", "no", "na", "os", "as", "um", "uma", "uns", "umas", "mais", "menos"
+      "pra", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "os", "as", "um", "uma", "uns", "umas", "mais", "menos",
+      "fazer", "faca", "faça", "faz", "fazendo", "quero", "queria", "quis", "gostaria", "preciso", "precisava",
+      "posso", "pode", "podemos", "buscar", "busque", "busca", "pesquisar", "pesquise", "pesquisa", "achar",
+      "ache", "acha", "localizar", "localize", "localiza", "procurar", "procure", "procura", "consulta",
+      "consultas", "cadastro", "cadastrar", "cadastre", "adicionar", "adicione", "novo", "nova", "novos", "novas",
+      "sobre", "com", "sem", "por", "favor", "dados", "ficha", "fichas", "informacao", "informações", "informacoes",
+      "detalhe", "detalhes", "historico", "histórico", "situacao", "situação", "status"
     ]);
 
     const ehNomeValido = (nomeStr?: string | null): boolean => {
@@ -515,9 +521,12 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       const limpo = nomeStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
       if (!limpo || limpo.length < 2) return false;
       const partes = limpo.split(/\s+/);
-      // Se todas as palavras forem stopwords, não é nome válido
       if (partes.every((p) => STOPWORDS_NAO_NOMES.has(p))) return false;
       if (STOPWORDS_NAO_NOMES.has(limpo)) return false;
+      const primeiraPalavra = partes[0];
+      if (["fazer", "quero", "queria", "gostaria", "preciso", "buscar", "pesquisar", "consultar", "procurar", "localizar", "ver", "mostrar"].includes(primeiraPalavra)) {
+        return false;
+      }
       return true;
     };
 
@@ -631,8 +640,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     // 7. Extrai termo livre para busca caso ainda não haja
     if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
       let termoLivre = texto
-        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|embarcar|embarque|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?|clientes?|reativar|reativação|reativacao|inativos?|sumidos?|saudade|não|nao|vêm|vem|mais|menos|há|ha|sem|visita|visitas|atendimento|atendimentos)\b/gi, "")
-        .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
+        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|embarcar|embarque|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|consulte|consulta|consultas|ver|buscar|busque|busca|pesquisar|pesquise|pesquisa|procurar|procure|procura|localizar|localize|fazer|faça|faca|faz|quero|queria|gostaria|preciso|precisava|posso|pode|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?|clientes?|tutor|tutores|reativar|reativação|reativacao|inativos?|sumidos?|saudade|não|nao|vêm|vem|mais|menos|há|ha|sem|visita|visitas|atendimento|atendimentos)\b/gi, "")
+        .replace(/\b(para o|para a|para|pro|pra|de|do|da|dos|das|o|a|os|as|no|na|nos|nas|em|às|as|um|uma|uns|umas)\b/gi, "")
         .replace(/\b(banho e tosa|banho essencial|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
         .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
         .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
@@ -1325,7 +1334,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       servicoNome: servicoResolvido,
       servicoId: req.contexto.servicoSelecionadoId || req.contexto.servico?.id || null,
       valor: req.contexto.servicoValor || 0,
-      termoBusca: termoBuscaEfetivo || petNomeResolvido || clienteNomeResolvido || texto,
+      termoBusca: termoBuscaEfetivo || (ehNomeValido(petNomeResolvido) ? petNomeResolvido : null) || (ehNomeValido(clienteNomeResolvido) ? clienteNomeResolvido : null) || null,
     };
 
     const provedorUtilizado = apiKey ? `${this.nome} (Online)` : `${this.nome} (Simulado/Determinístico)`;

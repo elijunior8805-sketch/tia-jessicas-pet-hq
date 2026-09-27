@@ -2428,7 +2428,96 @@ export async function processarMensagemJessiV2Core(
               data: resCli.data,
             });
           } else {
-            respostaTexto = `Não encontrei esse cliente no cadastro. Pode me passar o nome ou WhatsApp dele para eu localizar?`;
+            // Nenhum cliente ou pet em contexto ativo:
+            const termoParaBuscar = intencao.entidades.termoBusca;
+            if (termoParaBuscar && termoParaBuscar.trim().length >= 2) {
+              const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoParaBuscar);
+              if (resBusca.success && resBusca.data.candidatos.length > 0) {
+                const candidatos = resBusca.data.candidatos;
+                const fallback = `Localizei ${candidatos.length} opção(ões) para "${termoParaBuscar}". Selecione o cliente desejado:`;
+
+                respostaTexto = await sintetizarRespostaComGemini({
+                  perguntaUsuario: textoLimpo,
+                  fatosDoBanco: { tipo: "resultado_busca_clientes", termo: termoParaBuscar, total: candidatos.length, candidatos },
+                  respostaBaseFallback: fallback,
+                  user,
+                  contexto: contextoAtual,
+                });
+
+                cards.push({
+                  type: "cliente",
+                  title: `Resultados para "${termoParaBuscar}"`,
+                  subtitle: `Selecione para ver a ficha completa`,
+                  data: {
+                    exigeDesambiguacao: true,
+                    opcoes: candidatos.map((c: any) => ({
+                      id: c.id,
+                      tipo: c.tipo,
+                      nome: c.nomePrincipal,
+                      detalhe: c.detalheSecundario,
+                    })),
+                  },
+                });
+              } else {
+                const fallback = `Não localizei nenhum cliente ou pet cadastrado com o termo "${termoParaBuscar}". Pode conferir a grafia ou me passar o WhatsApp? Se preferir, podemos cadastrá-lo agora mesmo!`;
+                respostaTexto = await sintetizarRespostaComGemini({
+                  perguntaUsuario: textoLimpo,
+                  fatosDoBanco: { tipo: "cliente_nao_encontrado", termo: termoParaBuscar },
+                  respostaBaseFallback: fallback,
+                  user,
+                  contexto: contextoAtual,
+                });
+
+                cards.push({
+                  type: "cliente",
+                  title: `Cadastro não localizado: "${termoParaBuscar}"`,
+                  subtitle: "Deseja cadastrar novo cliente?",
+                  data: {
+                    naoEncontrado: true,
+                    termo: termoParaBuscar,
+                    sugestaoAcao: "Criar novo cadastro",
+                  },
+                });
+              }
+            } else {
+              // Consulta geral sem nome específico (ex: "Quero fazer uma consulta um cliente.")
+              const resRecentes = await ClientesPetsAdapter.buscarClientesPets(sb, "");
+              const candidatosRecentes = resRecentes.data.candidatos || [];
+              const fallback = `Com certeza! Qual é o nome do cliente, WhatsApp ou o nome do pet que você gostaria de consultar? Você também pode escolher um dos clientes recentes abaixo:`;
+
+              respostaTexto = await sintetizarRespostaComGemini({
+                perguntaUsuario: textoLimpo,
+                fatosDoBanco: {
+                  tipo: "consulta_geral_clientes",
+                  mensagem: "Operador iniciou uma consulta de cliente",
+                  clientesRecentes: candidatosRecentes.slice(0, 5).map((c: any) => ({
+                    id: c.id,
+                    nome: c.nomePrincipal,
+                    detalhe: c.detalheSecundario,
+                  })),
+                },
+                respostaBaseFallback: fallback,
+                user,
+                contexto: contextoAtual,
+              });
+
+              if (candidatosRecentes.length > 0) {
+                cards.push({
+                  type: "cliente",
+                  title: "Clientes Recentes Cadastrados",
+                  subtitle: "Selecione para abrir a ficha ou digite o nome/WhatsApp",
+                  data: {
+                    exigeDesambiguacao: true,
+                    opcoes: candidatosRecentes.slice(0, 5).map((c: any) => ({
+                      id: c.id,
+                      tipo: c.tipo,
+                      nome: c.nomePrincipal,
+                      detalhe: c.detalheSecundario,
+                    })),
+                  },
+                });
+              }
+            }
           }
         }
       } else if (intencao.dominio === "comunicacao_mensagens") {
