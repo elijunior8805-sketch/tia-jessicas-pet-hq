@@ -129,6 +129,49 @@ export function humanizarTranscricao(texto: string): string {
   return t;
 }
 
+/**
+ * Filtro Anti-Eco: Detecta se o texto transcrito pelo microfone é o eco
+ * da fala sintetizada da própria Jessi que acabou de sair pelo alto-falante.
+ */
+export function ehEcoDaPropriaIa(
+  textoUsuario: string,
+  historicoIa: Array<{ texto: string; timestamp: number }>
+): boolean {
+  if (!textoUsuario || !historicoIa || historicoIa.length === 0) return false;
+
+  const now = Date.now();
+  const textoLimpo = textoUsuario.toLowerCase().replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "").trim();
+  const palavrasUsuario = textoLimpo.split(/\s+/).filter((p) => p.length >= 3);
+  if (palavrasUsuario.length === 0) return false;
+
+  for (const item of historicoIa) {
+    // Analisa apenas falas recentes da IA nos últimos 8 segundos
+    if (now - item.timestamp > 8000) continue;
+
+    const textoIa = item.texto.toLowerCase().replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "").trim();
+
+    // Se o texto for idêntico ou substring
+    if (textoIa.includes(textoLimpo) || textoLimpo.includes(textoIa)) {
+      return true;
+    }
+
+    // Calcula sobreposição de palavras
+    let palavrasCorrespondentes = 0;
+    for (const p of palavrasUsuario) {
+      if (textoIa.includes(p)) {
+        palavrasCorrespondentes++;
+      }
+    }
+
+    const taxaSobreposicao = palavrasCorrespondentes / palavrasUsuario.length;
+    if (taxaSobreposicao >= 0.50 && palavrasCorrespondentes >= 2) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function useJessiVoice(
   onTranscriptFinal?: (texto: string) => void,
   onAutoSend?: (texto: string) => void
@@ -150,6 +193,7 @@ export function useJessiVoice(
   const controladorFalaRef = useRef<ControladorFala | null>(null);
   const bargeInDetectorRef = useRef<JessiBargeInDetector | null>(null);
   const isContinuousModeRef = useRef(false);
+  const ultimasFalasJessiRef = useRef<Array<{ texto: string; timestamp: number }>>([]);
 
   const pararTodoAudio = useCallback(() => {
     controladorFalaRef.current?.cancelar();
@@ -173,9 +217,15 @@ export function useJessiVoice(
     setIsInterrupted(true);
     setTimeout(() => setIsInterrupted(false), 1200);
 
-    // 2. Retoma instantaneamente o reconhecimento de fala para capturar a fala do usuário
-    recognizerRef.current?.resumeListening();
-    setVoiceStatus("listening");
+    // 2. Zera buffers e retoma reconhecimento com o microfone limpo
+    recognizerRef.current?.reset();
+    setInterimTranscript("");
+    setTimeout(() => {
+      if (isContinuousModeRef.current && !isSpeakingRef.current) {
+        recognizerRef.current?.resumeListening();
+        setVoiceStatus("listening");
+      }
+    }, 60);
   }, [pararTodoAudio]);
 
   useEffect(() => {
@@ -197,8 +247,8 @@ export function useJessiVoice(
       onAudioLevel: (level) => {
         setAudioLevel(level);
       },
-      sensitivityThreshold: 0.04,
-      minVoiceDurationMs: 110,
+      sensitivityThreshold: 0.045,
+      minVoiceDurationMs: 120,
     });
 
     // Pre-carrega vozes do navegador para disponibilidade imediata
@@ -216,6 +266,7 @@ export function useJessiVoice(
     recognizerRef.current = new VoiceRecognizer({
       silenceMs: 1500,
       onFinal: (texto) => {
+        if (isSpeakingRef.current) return;
         const humanizado = humanizarTranscricao(texto);
         setFinalTranscript(humanizado);
         setInterimTranscript("");
@@ -224,11 +275,26 @@ export function useJessiVoice(
         }
       },
       onInterim: (texto) => {
+        if (isSpeakingRef.current) return;
         setInterimTranscript(texto);
       },
       onUtteranceComplete: (utterance: VoiceUtterance) => {
+        // 1. Se a IA estiver falando, descarta imediatamente
+        if (isSpeakingRef.current) {
+          return;
+        }
         const textoHumanizado = humanizarTranscricao(utterance.text);
-        if (ehFalaValida(textoHumanizado) && onAutoSendRef.current) {
+        if (!ehFalaValida(textoHumanizado)) return;
+
+        // 2. Se a transcrição for o eco da própria IA, descarta!
+        if (ehEcoDaPropriaIa(textoHumanizado, ultimasFalasJessiRef.current)) {
+          console.warn("[Jessi Voice Guard] Eco da própria IA descartado:", textoHumanizado);
+          setInterimTranscript("");
+          setFinalTranscript("");
+          return;
+        }
+
+        if (onAutoSendRef.current) {
           pararTodoAudio();
           recognizerRef.current?.pauseListening();
           setInterimTranscript("");
@@ -292,7 +358,7 @@ export function useJessiVoice(
 
     // Ativa detector de interrupção full-duplex
     await bargeInDetectorRef.current?.start(() => isSpeakingRef.current);
-    toast.success("Modo Voz Contínuo Ativo! Você pode falar a qualquer momento, inclusive interromper a Jessi.");
+    toast.success("Modo Voz Contínuo Ativo! Fale seus comandos naturalmente.");
   }, []);
 
   const stopContinuousMode = useCallback(() => {
@@ -372,6 +438,17 @@ export function useJessiVoice(
       isSpeakingRef.current = true;
       setIsSpeaking(true);
 
+      // CRÍTICO: Pausa o STT imediatamente enquanto a Jessi estiver falando pelo alto-falante
+      recognizerRef.current?.pauseListening();
+      setInterimTranscript("");
+
+      // Registra no histórico de falas da IA para proteção anti-eco
+      const textoNorm = texto.toLowerCase().replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "").trim();
+      ultimasFalasJessiRef.current.push({ texto: textoNorm, timestamp: Date.now() });
+      if (ultimasFalasJessiRef.current.length > 5) {
+        ultimasFalasJessiRef.current.shift();
+      }
+
       // Em modo continuo, mantemos o detector de barge-in ativo e em escuta
       if (isContinuousModeRef.current) {
         bargeInDetectorRef.current?.resume();
@@ -382,8 +459,16 @@ export function useJessiVoice(
         setIsSpeaking(false);
         controladorFalaRef.current = null;
         onFinish?.();
+
+        // Cooldown de 350ms para que o som do alto-falante se dissipe completamente antes de reabrir o microfone
         if (isContinuousModeRef.current) {
-          recognizerRef.current?.resumeListening();
+          setTimeout(() => {
+            if (isContinuousModeRef.current && !isSpeakingRef.current) {
+              recognizerRef.current?.reset();
+              setInterimTranscript("");
+              recognizerRef.current?.resumeListening();
+            }
+          }, 350);
         }
       };
 
@@ -392,6 +477,7 @@ export function useJessiVoice(
         onStart: () => {
           isSpeakingRef.current = true;
           setIsSpeaking(true);
+          recognizerRef.current?.pauseListening();
         },
         onFinish: finalizarFala,
         onError: finalizarFala,

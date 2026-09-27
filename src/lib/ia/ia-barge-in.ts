@@ -131,19 +131,20 @@ export class JessiBargeInDetector {
       // Atualiza o piso de ruído ambiental de forma adaptativa
       this.backgroundNoiseLevel = this.backgroundNoiseLevel * 0.95 + rms * 0.05;
 
-      // Limiar dinâmico: deve superar o ruído de fundo com margem e o piso de sensibilidade
-      const thresholdEfetivo = Math.max(this.sensitivityThreshold, this.backgroundNoiseLevel * 1.8);
-      const isVoiceDetected = rms > thresholdEfetivo;
-
+      // Limiar dinâmico: durante a fala da IA, exige energia vocal humana nítida para não disparar com o alto-falante
       const aiSpeaking = this.isAiSpeakingProvider();
+      const baseSensibilidade = aiSpeaking ? Math.max(this.sensitivityThreshold, 0.065) : this.sensitivityThreshold;
+      const thresholdEfetivo = Math.max(baseSensibilidade, this.backgroundNoiseLevel * (aiSpeaking ? 2.2 : 1.6));
+      const isVoiceDetected = rms > thresholdEfetivo;
 
       if (isVoiceDetected) {
         this.voiceConsecutiveMs += dt;
 
-        // Se a IA estiver falando E o operador falar por tempo suficiente (> 120ms)
-        if (aiSpeaking && this.voiceConsecutiveMs >= this.minVoiceDurationMs) {
+        // Se a IA estiver falando E o operador falar por tempo suficiente (> 140ms)
+        const duracaoMinima = aiSpeaking ? Math.max(this.minVoiceDurationMs, 140) : this.minVoiceDurationMs;
+        if (aiSpeaking && this.voiceConsecutiveMs >= duracaoMinima) {
           const tempoDesdeUltimoBargeIn = now - this.lastBargeInTimestamp;
-          if (tempoDesdeUltimoBargeIn > 600) {
+          if (tempoDesdeUltimoBargeIn > 800) {
             this.lastBargeInTimestamp = now;
             this.voiceConsecutiveMs = 0;
             try {
@@ -155,7 +156,7 @@ export class JessiBargeInDetector {
         }
       } else {
         // Redução suave do acumulador para permitir micropausas normais de fala
-        this.voiceConsecutiveMs = Math.max(0, this.voiceConsecutiveMs - dt * 1.5);
+        this.voiceConsecutiveMs = Math.max(0, this.voiceConsecutiveMs - dt * 2.0);
       }
     }
 
