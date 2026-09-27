@@ -636,17 +636,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         clienteNomeDaMensagem = extrairApenasNomeEntidade(termoLivre);
       }
     }
-        .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
-        .replace(/\b(banho e tosa|banho essencial|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
-        .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
-        .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
-        .replace(/[^\w\sÀ-ú]/g, "")
-        .trim();
-
-      if (termoLivre && ehNomeValido(termoLivre)) {
-        clienteNomeDaMensagem = termoLivre;
-      }
-    }
 
     // 8. Resolução contextual de pet vs cliente
     let petNomeResolvido: string | null = null;
