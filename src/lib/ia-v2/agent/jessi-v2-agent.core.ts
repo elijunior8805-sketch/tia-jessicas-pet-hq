@@ -1238,6 +1238,66 @@ export async function processarMensagemJessiV2Core(
         if (!horaAlvo) camposFaltantes.push("Horário desejado");
 
         if (camposFaltantes.length > 0) {
+          // Se apenas o horário estiver faltando e temos cliente, pet, serviço e data: busca horários disponíveis na grade proativamente!
+          if (clienteNome && petNome && servicoNome && dataAlvo && !horaAlvo) {
+            const dataFmt = dataAlvo.includes("-") ? dataAlvo.split("-").reverse().join("/") : dataAlvo;
+            const resEncaixes = await AgendaAdapter.identificarEncaixesDisponiveis(sb, dataAlvo);
+            const livres: string[] = (resEncaixes.data as any)?.horariosSugeridos || [];
+
+            if (livres.length > 0) {
+              const sugestoesHorarios = livres.slice(0, 4);
+              respostaTexto = `Encontrei o pet **${petNome}** (Tutor: **${clienteNome}**). Para **${servicoNome}** no dia **${dataFmt}**, temos os seguintes horários disponíveis: **${sugestoesHorarios.join(", ")}**. Qual horário você prefere?`;
+
+              cards.push({
+                type: "agenda",
+                title: `Horários Livres em ${dataFmt}`,
+                subtitle: `Selecione um horário para ${petNome}`,
+                data: {
+                  tipo: "disponibilidade",
+                  data: dataAlvo,
+                  petNome,
+                  clienteNome,
+                  servicoNome,
+                  horariosSugeridos: livres,
+                  opcoes: livres.slice(0, 6).map((h: string) => ({
+                    id: `hora_${h}`,
+                    nome: `${h}`,
+                    detalhe: `${servicoNome} • ${dataFmt}`,
+                  })),
+                },
+              });
+            } else {
+              respostaTexto = `Encontrei o pet **${petNome}** (${clienteNome}) para **${servicoNome}**, mas a grade do dia **${dataFmt}** já está cheia. Gostaria de verificar outro dia ou tentar um encaixe?`;
+            }
+
+            return {
+              versao: "v2",
+              respostaTexto,
+              cards,
+              pendingAction: null,
+              novoContexto: {
+                ...contextoAtual,
+                ...novoContexto,
+                servicoSelecionadoNome: servicoNome,
+                dataAlvoPendente: dataAlvo,
+                cliente: { id: clienteId, nome: clienteNome },
+                pet: { id: petId, nome: petNome },
+                variaveisConversacao: {
+                  ...contextoAtual.variaveisConversacao,
+                  servicoNome,
+                  dataAlvo,
+                  clienteId,
+                  clienteNome,
+                  petId,
+                  petNome,
+                },
+              },
+              intencao,
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
+
           let textoOrientacao = `Para agendar, por favor me informe o **serviço desejado** (ex: Banho, Tosa) e a **data e horário**.`;
           if (clienteNome && petNome && !servicoNome && !dataAlvo && !horaAlvo) {
             textoOrientacao = `Combinado! Estou com o **${petNome}** (${clienteNome}) selecionado. Qual serviço você gostaria de agendar (ex: Banho, Tosa, Banho e Tosa) e para qual dia e horário?`;

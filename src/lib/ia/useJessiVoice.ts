@@ -81,6 +81,9 @@ const DICIONARIO_SPA: Record<string, string> = {
 
 /** Corrige vicios comuns do reconhecimento de voz e devolve frase fluida. */
 const CORRECOES_FALA: Array<[RegExp, string]> = [
+  [/\b(embarcar|embaque|desembarcar|enmarcar|eh marcar|e marcar)\b/gi, "marcar"],
+  [/\bagendar banho para\b/gi, "agendar banho para"],
+  [/\bmarcar banho para\b/gi, "marcar banho para"],
   [/\bvc\b/gi, "você"],
   [/\bpq\b/gi, "porque"],
   [/\btb\b/gi, "também"],

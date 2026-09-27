@@ -226,7 +226,7 @@ export function detectarServico(texto: string): string | null {
   return null;
 }
 
-const PALAVRAS_AGENDAR = /\b(agendar|agenda|agendamento|marcar|marca|marque|reservar|encaixar|encaixe)\b/;
+const PALAVRAS_AGENDAR = /\b(agendar|agenda|agendamento|marcar|marca|marque|reservar|encaixar|encaixe|embarcar|embarque)\b/;
 
 const STOP_NOME =
   /\b(dia|dias|para|pra|pro|no|na|em|as|às|a|de|do|da|hoje|amanha|depois|proxima|proximo|banho|tosa|hidratacao|spa|com|cliente|pet|horas?|h|hs|servico|servicos|leva|traz|transporte|segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/;

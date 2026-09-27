@@ -86,6 +86,18 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       return amanha.toISOString().split("T")[0];
     }
 
+    // 1. Procura padrão DD/MM ou DD/MM/YYYY primeiro (ex: "29/09", "dia 29/09", "29-09", "29/09/2026")
+    const matchBr = texto.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})(?:\s*[\/\-]\s*(\d{2,4}))?/);
+    if (matchBr) {
+      const dia = matchBr[1].padStart(2, "0");
+      const mes = matchBr[2].padStart(2, "0");
+      let ano = hoje.getFullYear();
+      if (matchBr[3]) {
+        ano = matchBr[3].length === 2 ? 2000 + parseInt(matchBr[3], 10) : parseInt(matchBr[3], 10);
+      }
+      return `${ano}-${mes}-${dia}`;
+    }
+
     // Padrão: "no dia 29", "dia 29 de setembro", "dia 29"
     const mesesNome: Record<string, number> = {
       janeiro: 1, fevereiro: 2, marco: 3, março: 3, abril: 4, maio: 5, junho: 6,
@@ -146,18 +158,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     const matchIso = texto.match(/(\d{4})-(\d{2})-(\d{2})/);
     if (matchIso) {
       return matchIso[0];
-    }
-
-    // Procura padrão DD/MM ou DD/MM/YYYY
-    const matchBr = texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-    if (matchBr) {
-      const dia = matchBr[1].padStart(2, "0");
-      const mes = matchBr[2].padStart(2, "0");
-      let ano = hoje.getFullYear();
-      if (matchBr[3]) {
-        ano = matchBr[3].length === 2 ? 2000 + parseInt(matchBr[3], 10) : parseInt(matchBr[3], 10);
-      }
-      return `${ano}-${mes}-${dia}`;
     }
 
     // "dia X" ou "dia X do mês"
@@ -514,67 +514,94 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       return !STOPWORDS_NAO_NOMES.has(limpo);
     };
 
+    const extrairApenasNomeEntidade = (nomeBruto?: string | null): string => {
+      if (!nomeBruto) return "";
+      const cortado = nomeBruto.split(
+        /\s+(?:no dia|na data|dia|em|às|as|para as|para às|para o dia|pro dia|pra data|hoje|amanhã|amanha|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo|banho|tosa|hidratação|hidratacao)\b/i
+      )[0];
+      return cortado.replace(/[^\w\sÀ-ú]/g, "").trim();
+    };
+
     let petNomeDaMensagem: string | null = null;
     let clienteNomeDaMensagem: string | null = null;
 
     // 1. Detecta combinação explícita "Pet do Tutor" (ex: "Thor do Eli", "Toddy da Jaqueline", "Mel da Irani", "Belinha da Cleusa")
     const matchPetDoTutor = texto.match(/(?:o|a|pro|pra|para o|para a|do|da|pet)?\s*([A-ZÀ-Úa-zà-ú]+)\s+(?:do|da|de|dos|das|lá do|la do|lá da|la da)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-    if (matchPetDoTutor && ehNomeValido(matchPetDoTutor[1]) && ehNomeValido(matchPetDoTutor[2])) {
-      const parte1 = matchPetDoTutor[1].trim();
-      const parte2 = matchPetDoTutor[2].trim();
-      if (!["banho", "tosa", "agenda", "horario", "amanha", "hoje", "sexta", "segunda", "terca", "quarta", "quinta", "sabado"].includes(parte1.toLowerCase())) {
-        petNomeDaMensagem = parte1;
-        clienteNomeDaMensagem = parte2;
+    if (matchPetDoTutor && ehNomeValido(matchPetDoTutor[1])) {
+      const parte1 = extrairApenasNomeEntidade(matchPetDoTutor[1]);
+      const parte2 = extrairApenasNomeEntidade(matchPetDoTutor[2]);
+      if (ehNomeValido(parte1) && ehNomeValido(parte2)) {
+        if (!["banho", "tosa", "agenda", "horario", "amanha", "hoje", "sexta", "segunda", "terca", "quarta", "quinta", "sabado"].includes(parte1.toLowerCase())) {
+          petNomeDaMensagem = parte1;
+          clienteNomeDaMensagem = parte2;
+        }
       }
     }
 
     // 2. Detecta menção a "pets do [Tutor]" ou "animais de [Tutor]"
     if (!clienteNomeDaMensagem) {
       const matchPetsDoTutor = texto.match(/(?:pets?|cachorros?|cães|caes|gatos?|animais)\s+(?:do|da|de|dos|das)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-      if (matchPetsDoTutor && matchPetsDoTutor[1] && ehNomeValido(matchPetsDoTutor[1])) {
-        clienteNomeDaMensagem = matchPetsDoTutor[1].trim();
+      if (matchPetsDoTutor && matchPetsDoTutor[1]) {
+        const nomeCli = extrairApenasNomeEntidade(matchPetsDoTutor[1]);
+        if (ehNomeValido(nomeCli)) {
+          clienteNomeDaMensagem = nomeCli;
+        }
       }
     }
 
     // 3. Detecta menção explícita a cliente/tutor ("para o cliente Eli Júnior", "tutor Eli", "dono Carlos")
     if (!clienteNomeDaMensagem) {
       const matchCliente = texto.match(/(?:cliente|tutor|tutora|proprietário|proprietario|dono|dona)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-      if (matchCliente && matchCliente[1] && ehNomeValido(matchCliente[1])) {
-        clienteNomeDaMensagem = matchCliente[1].trim();
+      if (matchCliente && matchCliente[1]) {
+        const nomeCli = extrairApenasNomeEntidade(matchCliente[1]);
+        if (ehNomeValido(nomeCli)) {
+          clienteNomeDaMensagem = nomeCli;
+        }
       }
     }
 
     // 4. Detecta correções de contexto ("não, é o bob", "na verdade é a mel")
     if (!petNomeDaMensagem) {
       const matchCorrecao = texto.match(/(?:não|na verdade|trocar para|mudar para|quis dizer)\s+(?:é\s+)?(?:o|a|do|da|para o|para a)?\s*([A-ZÀ-Úa-zà-ú]+)/i);
-      if (matchCorrecao && matchCorrecao[1] && ehNomeValido(matchCorrecao[1])) {
-        petNomeDaMensagem = matchCorrecao[1].charAt(0).toUpperCase() + matchCorrecao[1].slice(1).toLowerCase();
+      if (matchCorrecao && matchCorrecao[1]) {
+        const nomePet = extrairApenasNomeEntidade(matchCorrecao[1]);
+        if (ehNomeValido(nomePet)) {
+          petNomeDaMensagem = nomePet.charAt(0).toUpperCase() + nomePet.slice(1).toLowerCase();
+        }
       } else {
         // Detecta menção explícita de pet ("para o pet Jade", "o pet Thor", "pet Bob", "bichinho Thor", "o dog Bob")
         const matchPetExp = texto.match(/(?:pet|cachorro|gato|cão|cao|cadela|bicho|bichinho|dog|animal|filhote)\s+([A-ZÀ-Úa-zà-ú]+)/i);
-        if (matchPetExp && matchPetExp[1] && ehNomeValido(matchPetExp[1]) && !clienteNomeDaMensagem) {
-          petNomeDaMensagem = matchPetExp[1];
+        if (matchPetExp && matchPetExp[1] && !clienteNomeDaMensagem) {
+          const nomePet = extrairApenasNomeEntidade(matchPetExp[1]);
+          if (ehNomeValido(nomePet)) {
+            petNomeDaMensagem = nomePet;
+          }
         } else {
           const matchPet = texto.match(/(?:para o pet|para a pet|do pet|da pet|pro pet|pra pet|o bichinho do pet)\s+([A-ZÀ-Ú][a-zà-ú]+)/i);
-          if (matchPet && ehNomeValido(matchPet[1])) {
-            petNomeDaMensagem = matchPet[1];
+          if (matchPet) {
+            const nomePet = extrairApenasNomeEntidade(matchPet[1]);
+            if (ehNomeValido(nomePet)) {
+              petNomeDaMensagem = nomePet;
+            }
           }
         }
       }
     }
 
-    // 5. Detecta menção com preposição ("para Eli", "pro Thor", "do Eli", "da Mel", "lá do Eli", "aquele da Irani") se ainda não definiu
+    // 5. Detecta menção com preposição ("para Eli Júnior", "pro Thor", "do Eli", "da Mel", "lá do Eli", "aquele da Irani") se ainda não definiu
     if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
       const matchPrep = texto.match(/(?:para o|para a|para|pro|pra|ao|à|do|da|de|lá do|la do|lá da|la da|aquele do|aquela da|o bichinho do|a bichinha da|o cachorrinho do|a cachorrinha da|o dog do|o cão do|o cao do|a cadela da)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)*)/i);
-      if (matchPrep && matchPrep[1] && ehNomeValido(matchPrep[1])) {
-        const nomeCapturado = matchPrep[1].trim();
-        const nomeNorm = nomeCapturado.toLowerCase();
-        // Se for um nome comum de pet conhecido, define como pet; senão define como cliente ou termo livre
-        const NOMES_PETS_COMUNS = ["thor", "mel", "luna", "bob", "bidu", "jade", "amora", "theo", "théo", "nina", "belinha", "cacau", "toddy", "marley", "simba", "fred", "zeus", "pipoca", "paçoca"];
-        if (NOMES_PETS_COMUNS.includes(nomeNorm)) {
-          petNomeDaMensagem = nomeCapturado;
-        } else {
-          clienteNomeDaMensagem = nomeCapturado;
+      if (matchPrep && matchPrep[1]) {
+        const nomeCapturado = extrairApenasNomeEntidade(matchPrep[1]);
+        if (ehNomeValido(nomeCapturado)) {
+          const nomeNorm = nomeCapturado.toLowerCase();
+          // Se for um nome comum de pet conhecido, define como pet; senão define como cliente
+          const NOMES_PETS_COMUNS = ["thor", "mel", "luna", "bob", "bidu", "jade", "amora", "theo", "théo", "nina", "belinha", "cacau", "toddy", "marley", "simba", "fred", "zeus", "pipoca", "paçoca"];
+          if (NOMES_PETS_COMUNS.includes(nomeNorm)) {
+            petNomeDaMensagem = nomeCapturado;
+          } else {
+            clienteNomeDaMensagem = nomeCapturado;
+          }
         }
       }
     }
@@ -597,7 +624,18 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     // 7. Extrai termo livre para busca caso ainda não haja
     if (!clienteNomeDaMensagem && !petNomeDaMensagem) {
       let termoLivre = texto
-        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?|clientes?|reativar|reativação|reativacao|inativos?|sumidos?|saudade|não|nao|vêm|vem|mais|menos|há|ha|sem|visita|visitas|atendimento|atendimentos)\b/gi, "")
+        .replace(/\b(agendar|agende|agendo|agenda|agendem|agendamento|agendamentos|marcar|marque|marca|marco|marquem|marcando|embarcar|embarque|novo agendamento|criar agendamento|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|consultar|ver|buscar|faturamento|faturou|receber|pagamento|pagamentos|caixa|saldo|relatorio|relatório|contas|valores|valor|qual|quais|quanto|quantos|meu|minha|nosso|nossa|mes|mês|ano|dia|dias|hoje|amanha|amanhã|ontem|semana|ola|olá|bom dia|boa tarde|boa noite|comprovante|pix|dinheiro|cartao|cartão|pets?|clientes?|reativar|reativação|reativacao|inativos?|sumidos?|saudade|não|nao|vêm|vem|mais|menos|há|ha|sem|visita|visitas|atendimento|atendimentos)\b/gi, "")
+        .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
+        .replace(/\b(banho e tosa|banho essencial|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
+        .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
+        .replace(/\b([01]?\d|2[0-3])\s*h(?:oras?)?\b/gi, "")
+        .replace(/[^\w\sÀ-ú]/g, "")
+        .trim();
+
+      if (termoLivre && ehNomeValido(termoLivre)) {
+        clienteNomeDaMensagem = extrairApenasNomeEntidade(termoLivre);
+      }
+    }
         .replace(/\b(para o|para a|para|pro|pra|de|do|da|o|a|no|na|em|às|as)\b/gi, "")
         .replace(/\b(banho e tosa|banho essencial|banho simples|banho|tosa higiênica|tosa higienica|tosa na tesoura|tosa tesoura|tosa na máquina|tosa maquina|tosa|hidratação|hidratacao|desembolo|corte de unha|unhas|consulta)\b/gi, "")
         .replace(/\b([01]?\d|2[0-3]):[0-5]\d\b/g, "")
@@ -1057,9 +1095,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     }
     // Agenda / Agendamento (com suporte a gírias e expressões por voz)
     else if (
-      /\b(agenda|agendar|agende|agendo|agendem|agendando|agendamento|agendamentos|agendado|agendados|marcar|marque|marca|marco|marquem|marcando|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|horario|horarios|horário|horários|vaga|vagas|atendimento|atendimentos)\b/i.test(textoLower) ||
+      /\b(agenda|agendar|agende|agendo|agendem|agendando|agendamento|agendamentos|agendado|agendados|marcar|marque|marca|marco|marquem|marcando|embarcar|embarque|reagendar|reagende|reagenda|reagendamento|remarcar|remarque|remarca|desmarcar|desmarque|desmarca|cancelar|cancele|cancela|cancelamento|horario|horarios|horário|horários|vaga|vagas|atendimento|atendimentos)\b/i.test(textoLower) ||
       (servicoResolvido !== null && (dataResolvida !== null || horaResolvida !== null || petNomeResolvido !== null)) ||
-      /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova|encaixa|encaixar|jogar na grade|joga na grade|bota na agenda|coloca na agenda)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower)
+      /\b(criar|fazer|abrir|registrar|marcar|agendar|embarcar|colocar|botar|levar|novo|nova|encaixa|encaixar|jogar na grade|joga na grade|bota na agenda|coloca na agenda)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower)
     ) {
       dominio = "agenda";
       if (
@@ -1077,9 +1115,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         ferramentaSugerida = "reagendar_agendamento";
         explicacao = `Preparando reagendamento para ${petNomeResolvido || "o pet informado"}.`;
       } else if (
-        /\b(agendar|agende|agendo|agendem|agendando|marcar|marque|marca|marco|marquem|marcando|agenda ele|agenda ela|agenda aí|agenda ai|bota na agenda|coloca na agenda|joga na grade|coloca na grade|encaixa|encaixar|bota pra|coloca pra|novo agendamento|nova vaga|novo horário|novo horario)\b/i.test(textoLower) ||
-        /\b(criar|fazer|abrir|registrar|marcar|agendar|colocar|botar|levar|novo|nova)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower) ||
-        /\b(quero|gostaria de|preciso|vamos|pode)\s+(?:de\s+)?(?:um\s+)?(?:agendar|marcar|fazer um agendamento|fazer agendamento|criar agendamento|criar um agendamento)/i.test(textoLower) ||
+        /\b(agendar|agende|agendo|agendem|agendando|marcar|marque|marca|marco|marquem|marcando|embarcar|embarque|agenda ele|agenda ela|agenda aí|agenda ai|bota na agenda|coloca na agenda|joga na grade|coloca na grade|encaixa|encaixar|bota pra|coloca pra|novo agendamento|nova vaga|novo horário|novo horario)\b/i.test(textoLower) ||
+        /\b(criar|fazer|abrir|registrar|marcar|agendar|embarcar|colocar|botar|levar|novo|nova)\s+(?:um\s+)?(?:novo\s+|nova\s+)?(?:agendamento|horario|horário|vaga|atendimento|banho|tosa|serviço|servico)/i.test(textoLower) ||
+        /\b(quero|gostaria de|preciso|vamos|pode)\s+(?:de\s+)?(?:um\s+)?(?:agendar|marcar|embarcar|fazer um agendamento|fazer agendamento|criar agendamento|criar um agendamento)/i.test(textoLower) ||
         /\bagendamento\s+(?:para|pro|pra|de|do|da|no dia|dia)\b/i.test(textoLower) ||
         (servicoResolvido !== null && (dataResolvida !== null || petNomeResolvido !== null || clienteNomeResolvido !== null)) ||
         ((clienteNomeResolvido !== null || petNomeResolvido !== null) && (dataResolvida !== null || horaResolvida !== null) && !/\b(ver|consultar|listar|como está|como ta|quais|quanto|qual|tem vaga|livre)\b/i.test(textoLower))
