@@ -1270,10 +1270,40 @@ function TemplateEditor({
 // ===================================================================
 function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
   const filaFn = useServerFn(filaPriorizada);
+  const marcarPagoFn = useServerFn(marcarPagamento);
+  const excluirFn = useServerFn(excluirCobranca);
+  const qc = useQueryClient();
+
   const q = useQuery({
     queryKey: ["cobrancas", "fila-priorizada"],
     queryFn: () => filaFn(),
     refetchInterval: 60_000,
+  });
+
+  const marcarPagoMut = useMutation({
+    mutationFn: async (c: FilaItemDTO) => {
+      return marcarPagoFn({ data: { cobrancaId: c.id, valor: c.saldo, integral: true } });
+    },
+    onSuccess: () => {
+      toast.success("Pagamento quitado com sucesso!");
+      qc.invalidateQueries({ queryKey: ["cobrancas"] });
+      qc.invalidateQueries({ queryKey: ["fin-pag"] });
+      qc.invalidateQueries({ queryKey: ["fin-unified-metrics"] });
+      q.refetch();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao quitar"),
+  });
+
+  const excluirMut = useMutation({
+    mutationFn: async (cobrancaId: string) => {
+      return excluirFn({ data: { cobrancaId } });
+    },
+    onSuccess: () => {
+      toast.success("Cobrança movida para lixeira");
+      qc.invalidateQueries({ queryKey: ["cobrancas"] });
+      q.refetch();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao mover para lixeira"),
   });
 
   const [buscaFila, setBuscaFila] = useState("");
@@ -1472,6 +1502,38 @@ function FilaDoDiaTab({ onSelect }: { onSelect: (c: CobrancaDTO) => void }) {
                           {c.prioridade_justificativa}
                         </p>
                       )}
+
+                      {/* Ações Rápidas do Card */}
+                      <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-border/40">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[10px] text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
+                          title="Mover para lixeira"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Enviar cobrança de ${c.cliente_nome} para a lixeira?`)) {
+                              await excluirMut.mutateAsync(c.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Lixeira
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 px-2 text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                          title="Dar baixa integral como recebido"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await marcarPagoMut.mutateAsync(c);
+                          }}
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Quitar
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
