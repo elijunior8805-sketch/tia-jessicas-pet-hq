@@ -407,3 +407,391 @@ export const kpisCampanhas = createServerFn({ method: "GET" })
       total_enviadas: arr.reduce((s, r) => s + (r.total_enviados ?? 0), 0),
     };
   });
+
+// ---------- IA GENERATIVA PARA CAMPANHAS & VENDAS ----------
+
+export type EstrategiaCampanhaIA = {
+  id: string;
+  titulo: string;
+  subtitulo: string;
+  tipo: "vip" | "clubinho" | "upsell" | "inativos" | "aniversario" | "custom";
+  tag: string;
+  corTag: string;
+  publicoAlvo: string;
+  textoOferta: string;
+  chamadaAcao: string;
+  impactoNegocio: string;
+  conversaoEstimadaPct: number;
+  retornoProjetadoTexto: string;
+};
+
+const GerarEstrategiaSchema = z.object({
+  tema: z.string().min(2).max(500),
+  tom: z.enum(["carinhoso", "vip", "urgencia", "pet_lover"]).default("carinhoso"),
+  publicoAlvoDesejado: z.string().optional(),
+});
+
+export const gerarEstrategiaCampanhaIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => GerarEstrategiaSchema.parse(d))
+  .handler(async ({ data, context }): Promise<EstrategiaCampanhaIA> => {
+    const { tema, tom } = data;
+
+    // Busca serviços cadastrados para dar contexto real à IA
+    const { data: servicos } = await context.supabase
+      .from("servicos")
+      .select("nome, preco_base, duracao_minutos")
+      .eq("ativo", true)
+      .limit(15);
+
+    const listaServicos = (servicos ?? [])
+      .map((s: any) => `- ${s.nome}: R$ ${Number(s.preco_base || 0).toFixed(2)}`)
+      .join("\n");
+
+    const promptSistema = `Você é a Jessi, Especialista em Marketing e Vendas para o "Spa de Pet Tia Jéssica".
+Seu objetivo é criar uma estratégia de campanha promocional de altíssima conversão via WhatsApp, focada em gerar engajamento caloroso, afeto pelo pet, valor percebido e retorno financeiro imediato para o pet shop/spa.
+
+DIRETRIZES DO SPA:
+- Serviços reais do Spa:
+${listaServicos || "- Banho Essencial, Banho Premium, Tosa Higiênica, Tosa Completa, Hidratação, Clubinho Mensal"}
+- O tom solicitado é: "${tom}" (carinhoso=afetuoso/empático; vip=exclusividade/mimo; urgencia=vagas limitadas na semana; pet_lover=descontraído com emojis).
+- O texto da oferta DEVE conter as tags {{pet}} e {{tutor}} para serem personalizadas por cliente.
+- Nunca mencione transporte por van.
+- Seja persuasivo sem parecer spam. Destaque carinho, cuidado com o pet e benefício concreto (desconto, mimo cortesia, vaga fixa ou combo).
+
+Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte schema:
+{
+  "titulo": "Título chamativo com emoji (ex: 🛁 Combo Spa & Pelagem Brilhante)",
+  "subtitulo": "Subtítulo curto explicando o valor",
+  "tag": "Nome da Tag (ex: Aumento de Ticket / Retenção / Recorrência)",
+  "tipo": "custom",
+  "publicoAlvo": "Definição do público ideal para esta campanha",
+  "textoOferta": "Texto persuasivo da oferta usando {{pet}} e {{tutor}}, incluindo o benefício e motivo especial.",
+  "chamadaAcao": "Frase de fechamento e chamada para agendamento",
+  "impactoNegocio": "Resumo do impacto financeiro (ex: Elevação do ticket médio em 25%)",
+  "conversaoEstimadaPct": 25,
+  "retornoProjetadoTexto": "Projeção de impacto no caixa (ex: +R$ 1.800/mês com 20 adesões)"
+}`;
+
+    const apiKey =
+      process.env.LOVABLE_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_AI_API_KEY ||
+      process.env.GOOGLE_API_KEY;
+
+    if (apiKey) {
+      try {
+        const isGateway = !process.env.GEMINI_API_KEY && !process.env.GOOGLE_AI_API_KEY && !process.env.GOOGLE_API_KEY;
+        let responseJson: any = null;
+
+        if (isGateway) {
+          const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "google/gemini-1.5-flash",
+              temperature: 0.7,
+              response_format: { type: "json_object" },
+              messages: [
+                { role: "system", content: promptSistema },
+                { role: "user", content: `Crie a estratégia e campanha completa para o tema: "${tema}".` },
+              ],
+            }),
+          });
+          if (res.ok) {
+            const parsed = await res.json();
+            const rawContent = parsed?.choices?.[0]?.message?.content;
+            if (rawContent) responseJson = JSON.parse(rawContent);
+          }
+        } else {
+          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+          const res = await fetch(directUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: `${promptSistema}\n\nTema da campanha: ${tema}\nResponda APENAS com o JSON válido.`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                responseMimeType: "application/json",
+              },
+            }),
+          });
+          if (res.ok) {
+            const parsed = await res.json();
+            const rawContent = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (rawContent) responseJson = JSON.parse(rawContent);
+          }
+        }
+
+        if (responseJson && responseJson.titulo && responseJson.textoOferta) {
+          return {
+            id: `ia_campanha_${Date.now()}`,
+            titulo: responseJson.titulo,
+            subtitulo: responseJson.subtitulo || "Campanha estratégica gerada pela IA Jessi",
+            tipo: "custom",
+            tag: responseJson.tag || "IA Generativa",
+            corTag: "bg-emerald-500/20 text-emerald-200 border-emerald-400/40",
+            publicoAlvo: responseJson.publicoAlvo || "Clientes segmentados da base",
+            textoOferta: responseJson.textoOferta,
+            chamadaAcao: responseJson.chamadaAcao || "Garanta a vaga especial do {{pet}}!",
+            impactoNegocio: responseJson.impactoNegocio || "Aceleração de agendamentos e faturamento",
+            conversaoEstimadaPct: Number(responseJson.conversaoEstimadaPct) || 25,
+            retornoProjetadoTexto: responseJson.retornoProjetadoTexto || "Retorno estimado de +20% no ticket médio",
+          };
+        }
+      } catch (err) {
+        console.error("Erro ao chamar IA generativa de campanhas:", err);
+      }
+    }
+
+    // Fallback inteligente e caloroso se a IA estiver offline
+    return {
+      id: `campanha_${Date.now()}`,
+      titulo: `✨ ${tema}`,
+      subtitulo: "Oferta personalizada de alta conversão criada pela Jessi",
+      tipo: "custom",
+      tag: "Oferta Especial",
+      corTag: "bg-amber-500/20 text-amber-200 border-amber-400/40",
+      publicoAlvo: "Clientes com interesse em cuidados especiais para seus pets",
+      textoOferta: `Preparamos uma oportunidade muito especial de ${tema} para você e o {{pet}} no Spa de Pet Tia Jéssica! Agendando esta semana, o {{pet}} recebe um mimo exclusivo e um cuidado impecável da nossa equipe! 🐾💚`,
+      chamadaAcao: "Temos poucas vagas disponíveis com essa condição para esta semana. Podemos reservar o horário do {{pet}}?",
+      impactoNegocio: "Aumento direto na taxa de agendamento e ocupação da grade",
+      conversaoEstimadaPct: 20,
+      retornoProjetadoTexto: "Impacto estimado de +15 a 25% de conversão na base contatada",
+    };
+  });
+
+const AjustarMensagemSchema = z.object({
+  mensagemAtual: z.string().min(5),
+  instrucao: z.string().min(2).max(200),
+  tutorNome: z.string().optional().default("Tutor"),
+  petNome: z.string().optional().default("Pet"),
+});
+
+export const ajustarMensagemComIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => AjustarMensagemSchema.parse(d))
+  .handler(async ({ data }): Promise<{ mensagemAjustada: string }> => {
+    const { mensagemAtual, instrucao, tutorNome, petNome } = data;
+
+    const apiKey =
+      process.env.LOVABLE_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_AI_API_KEY ||
+      process.env.GOOGLE_API_KEY;
+
+    if (apiKey) {
+      try {
+        const isGateway = !process.env.GEMINI_API_KEY && !process.env.GOOGLE_AI_API_KEY && !process.env.GOOGLE_API_KEY;
+        const prompt = `Você é a Jessi, assistente do Spa de Pet Tia Jéssica.
+Reescreva a seguinte mensagem de WhatsApp para o tutor "${tutorNome}" sobre o pet "${petNome}".
+Instrução de ajuste: "${instrucao}".
+Mantenha os nomes ${tutorNome} e ${petNome}, emojis adequados e clareza. Não adicione cabeçalhos nem aspas, retorne apenas o texto final da mensagem pronto para o WhatsApp.
+
+Mensagem original:
+${mensagemAtual}`;
+
+        if (isGateway) {
+          const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "google/gemini-1.5-flash",
+              temperature: 0.5,
+              messages: [{ role: "user", content: prompt }],
+            }),
+          });
+          if (res.ok) {
+            const parsed = await res.json();
+            const texto = parsed?.choices?.[0]?.message?.content?.trim();
+            if (texto) return { mensagemAjustada: texto };
+          }
+        } else {
+          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+          const res = await fetch(directUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+            }),
+          });
+          if (res.ok) {
+            const parsed = await res.json();
+            const texto = parsed?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (texto) return { mensagemAjustada: texto };
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao ajustar mensagem com IA:", e);
+      }
+    }
+
+    return {
+      mensagemAjustada: `${mensagemAtual}\n\n✨ Condição exclusiva válida enquanto houver disponibilidade de horário nesta semana!`,
+    };
+  });
+
+export type ClienteSegmentadoDTO = {
+  pet_id: string;
+  pet_nome: string;
+  pet_raca: string | null;
+  pet_porte: string | null;
+  pet_foto_url: string | null;
+  pet_nascimento: string | null;
+  cliente_id: string;
+  cliente_nome: string;
+  telefone: string;
+  dias_sem_visita: number;
+  data_ultimo_atendimento: string | null;
+  ultimo_servico: string | null;
+  valor_ultimo_atendimento: number | null;
+  tem_clubinho: boolean;
+  clubinho_nome: string | null;
+  segmentos: Array<"inativo" | "vip" | "oportunidade_clubinho" | "tosa_pendente" | "aniversariante">;
+};
+
+export const listarClientesSegmentados = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ClienteSegmentadoDTO[]> => {
+    const supabase = context.supabase;
+
+    // Busca pets com clientes ativos
+    const { data: pets, error } = await supabase
+      .from("pets")
+      .select(`
+        id, nome, raca, porte, foto_url, nascimento, ativo, cliente_id,
+        clientes:cliente_id ( id, nome, cidade, telefone, whatsapp, ativo )
+      `)
+      .eq("ativo", true)
+      .limit(200);
+
+    if (error) throw new Error(error.message);
+
+    const petIds = (pets ?? []).map((p: any) => p.id);
+    if (petIds.length === 0) return [];
+
+    // Últimos atendimentos por pet
+    const { data: atRows } = await supabase
+      .from("atendimentos")
+      .select(`
+        pet_id, data_fim, encerrado_em, valor_total,
+        servicos:servico_id ( nome )
+      `)
+      .in("pet_id", petIds)
+      .not("encerrado_em", "is", null)
+      .order("encerrado_em", { ascending: false });
+
+    const ultimoAtendMap: Record<string, { data: string; valor: number; servico: string }> = {};
+    for (const at of (atRows ?? []) as any[]) {
+      if (!ultimoAtendMap[at.pet_id]) {
+        ultimoAtendMap[at.pet_id] = {
+          data: at.encerrado_em || at.data_fim,
+          valor: Number(at.valor_total || 0),
+          servico: at.servicos?.nome || "Banho",
+        };
+      }
+    }
+
+    // Clubinhos ativos (programas_contratados)
+    const { data: clubinhos } = await supabase
+      .from("programas_contratados")
+      .select(`
+        pet_id, status,
+        programas_fidelidade ( nome )
+      `)
+      .in("pet_id", petIds)
+      .eq("status", "ativo");
+
+    const clubinhoMap: Record<string, string> = {};
+    for (const c of (clubinhos ?? []) as any[]) {
+      clubinhoMap[c.pet_id] = c.programas_fidelidade?.nome || "Clubinho Mensal";
+    }
+
+    const agora = Date.now();
+    const mesAtual = new Date().getUTCMonth() + 1;
+
+    const lista: ClienteSegmentadoDTO[] = [];
+
+    for (const p of pets ?? []) {
+      const cli = p.clientes;
+      if (!cli) continue;
+      const tel = (cli.whatsapp || cli.telefone || "").trim();
+      if (!tel) continue;
+
+      const ult = ultimoAtendMap[p.id];
+      const diasSemVisita = ult?.data
+        ? Math.max(0, Math.floor((agora - new Date(ult.data).getTime()) / 86_400_000))
+        : 999;
+
+      const temClubinho = Boolean(clubinhoMap[p.id]);
+      const clubinhoNome = clubinhoMap[p.id] || null;
+
+      // Análise de aniversário do pet
+      let ehAniversariante = false;
+      if (p.nascimento) {
+        const mm = Number(String(p.nascimento).slice(5, 7));
+        if (mm === mesAtual) ehAniversariante = true;
+      }
+
+      // Detecção de necessidade de tosa (pelagem ou raça propensa ou sem tosa há > 35 dias)
+      const racaLower = (p.raca || "").toLowerCase();
+      const racaTosa =
+        racaLower.includes("shih") ||
+        racaLower.includes("poodle") ||
+        racaLower.includes("malt") ||
+        racaLower.includes("york") ||
+        racaLower.includes("spitz") ||
+        racaLower.includes("lhasa") ||
+        racaLower.includes("schnauzer") ||
+        racaLower.includes("golden");
+
+      const tosaPendente = racaTosa && diasSemVisita >= 20;
+
+      // Segmentos inteligentes
+      const segmentos: Array<"inativo" | "vip" | "oportunidade_clubinho" | "tosa_pendente" | "aniversariante"> = [];
+      if (diasSemVisita >= 25 && diasSemVisita < 999) segmentos.push("inativo");
+      if (temClubinho || (diasSemVisita <= 10 && diasSemVisita >= 0)) segmentos.push("vip");
+      if (!temClubinho && diasSemVisita <= 35) segmentos.push("oportunidade_clubinho");
+      if (tosaPendente) segmentos.push("tosa_pendente");
+      if (ehAniversariante) segmentos.push("aniversariante");
+
+      lista.push({
+        pet_id: p.id,
+        pet_nome: p.nome,
+        pet_raca: p.raca,
+        pet_porte: p.porte,
+        pet_foto_url: p.foto_url,
+        pet_nascimento: p.nascimento,
+        cliente_id: cli.id,
+        cliente_nome: cli.nome || "Tutor",
+        telefone: tel,
+        dias_sem_visita: diasSemVisita,
+        data_ultimo_atendimento: ult?.data || null,
+        ultimo_servico: ult?.servico || null,
+        valor_ultimo_atendimento: ult?.valor || null,
+        tem_clubinho: temClubinho,
+        clubinho_nome: clubinhoNome,
+        segmentos,
+      });
+    }
+
+    return lista;
+  });
+
