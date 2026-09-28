@@ -25,20 +25,23 @@ export const processarMensagemJessi = createServerFn({ method: "POST" })
       const { supabase, userId } = context;
       const { despacharMensagemJessi } = await import("@/lib/ia-v2/agent/jessi-v2-bridge");
 
-      // Busca dados do perfil do usuário para contexto
+      // Busca dados do perfil do usuário para contexto humano real
       const { data: profile } = await supabase
         .from("profiles")
-        .select("nome, cargo")
+        .select("nome, cargo, email")
         .eq("id", userId)
         .maybeSingle();
+
+      const nomeReal = (profile as any)?.nome?.trim() || "Eli Júnior";
+      const cargoReal = (profile as any)?.cargo || "Administrador";
 
       const resultado = await despacharMensagemJessi(
         supabase,
         data as any,
         {
           id: userId,
-          nome: (profile as any)?.nome || "Proprietário",
-          cargo: (profile as any)?.cargo || "Administrador",
+          nome: nomeReal,
+          cargo: cargoReal,
         }
       );
 

@@ -121,7 +121,7 @@ export function criarSessaoV2(
       conversationId: convId,
       userId: uid,
       perfil: {
-        nome: perfil?.nome || "Proprietário",
+        nome: perfil?.nome || "Eli Júnior",
         cargo: perfil?.cargo || "Administrador",
         permissoes: perfil?.permissoes || ["admin", "agenda", "financeiro", "clientes"],
       },

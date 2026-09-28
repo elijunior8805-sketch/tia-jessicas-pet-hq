@@ -33,7 +33,7 @@ export async function processarMensagemJessiV2Core(
   let respostaTexto = "";
 
   const sessaoBase = criarSessaoV2(undefined, user?.id, {
-    nome: user?.nome || "Proprietário",
+    nome: user?.nome || "Eli Júnior",
     cargo: user?.cargo || "Administrador",
     permissoes: user?.permissoes || ["admin", "agenda", "financeiro", "clientes"],
   });

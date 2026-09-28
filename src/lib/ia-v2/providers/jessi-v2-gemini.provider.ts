@@ -605,6 +605,7 @@ CONTEXTO TEMPORAL E OPERACIONAL ATUAL:
 - Data de Referência do Sistema: ${hojeStr}
 - Hora Local Atual (São Paulo): ${horaAtualStr}
 - Operador Ativo: ${user?.nome || "Eli Júnior"} (${user?.cargo || "Administrador"})
+IMPORTANTE: Chame o operador sempre pelo nome próprio ("${user?.nome || 'Eli'}"). NUNCA se dirija a ele como "Proprietário", "Usuário" ou "Admin". Trate-o como parceiro executivo próximo e respeitoso.
 ${contexto.pet?.nome ? `- Pet Selecionado no Contexto: ${contexto.pet.nome} (ID: ${contexto.pet.id || "N/A"})` : ""}
 ${contexto.cliente?.nome ? `- Cliente/Tutor no Contexto: ${contexto.cliente.nome} (ID: ${contexto.cliente.id || "N/A"})` : ""}
 
@@ -993,6 +994,30 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
     operadorNome: string
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any } | null> {
     const msg = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    // 0. Saudações e Conversação Natural Humanizada
+    if (
+      msg === "boa noite" ||
+      msg.startsWith("boa noite") ||
+      msg === "bom dia" ||
+      msg.startsWith("bom dia") ||
+      msg === "boa tarde" ||
+      msg.startsWith("boa tarde") ||
+      msg === "oi" ||
+      msg === "ola" ||
+      msg.startsWith("oi ") ||
+      msg.startsWith("ola ") ||
+      msg.includes("tudo bem") ||
+      msg.includes("como vai") ||
+      msg.includes("como voce esta") ||
+      msg.includes("como você está")
+    ) {
+      const hora = new Date().getHours();
+      const saudacaoHorario = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+      return {
+        texto: `${saudacaoHorario}, ${operadorNome || "Eli"}! Tudo ótimo por aqui no Spa. Estou 100% pronta para te ajudar com a agenda, financeiro, clientes ou qualquer detalhe da operação. O que faremos agora?`,
+      };
+    }
 
     // 1. Financeiro / Valores a Receber / Faturamento / Caixa
     if (
