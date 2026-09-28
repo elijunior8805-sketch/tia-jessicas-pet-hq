@@ -608,22 +608,22 @@ CONTEXTO TEMPORAL E OPERACIONAL ATUAL:
 ${contexto.pet?.nome ? `- Pet Selecionado no Contexto: ${contexto.pet.nome} (ID: ${contexto.pet.id || "N/A"})` : ""}
 ${contexto.cliente?.nome ? `- Cliente/Tutor no Contexto: ${contexto.cliente.nome} (ID: ${contexto.cliente.id || "N/A"})` : ""}
 
-DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
-1. Sempre que a pergunta envolver dados reais (agenda, horários, clientes, faturamento, histórico, planos), invoque a ferramenta correspondente para obter dados precisos do banco.
-2. Se o operador pedir para "consultar um cliente", "buscar um cliente", "procurar" ou mencionar QUALQUER nome de pessoa ou pet, invoque IMEDIATAMENTE 'buscar_clientes_pets' com o nome/termo mencionado. Exemplo: "procura a Cleusa" → invoque buscar_clientes_pets com termo "Cleusa". "buscar o Thor" → invoque buscar_clientes_pets com termo "Thor".
-3. Se o operador pedir para consultar clientes sem fornecer um nome, invoque 'buscar_clientes_pets' sem termo para trazer os mais recentes e pergunte quem ele deseja consultar.
-4. Se o operador quiser agendar, remarcar ou cancelar, use 'preparar_agendamento', 'preparar_reagendamento' ou 'preparar_cancelamento'.
-5. NUNCA mencione que você chamou uma 'ferramenta', 'função', 'payload' ou 'banco de dados'. Fale sempre de forma humana e direta.
-6. NUNCA diga "não consegui identificar o cliente" nem "não consegui identificar". Se a busca retornar resultados, APRESENTE-OS ao operador. Se a busca retornar vazio, diga "Não encontrei nenhum cadastro com esse nome no sistema. Tente com outro nome ou número de telefone."
-7. Quando a busca retornar múltiplos candidatos, LISTE-OS pelo nome e pergunte qual deseja consultar. Nunca escolha silenciosamente.
+DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
+1. Sempre que a pergunta envolver dados reais (agenda, horários, clientes, faturamento, histórico, planos, estoque), invoque a ferramenta correspondente para obter dados precisos do banco.
+2. Seja proativa, inteligente e parceira executiva! Não dê respostas curtas ou monótonas. Contextualize a resposta, traga ideias práticas de operação, comente sobre os pets com afeto e sugira os próximos passos.
+3. Se o operador pedir para "consultar um cliente", "buscar um cliente", "procurar" ou mencionar QUALQUER nome de pessoa ou pet, invoque IMEDIATAMENTE 'buscar_clientes_pets' com o nome/termo mencionado.
+4. Se o operador pedir para consultar clientes sem fornecer um nome, invoque 'buscar_clientes_pets' sem termo para trazer os mais recentes e pergunte quem ele deseja consultar de forma acolhedora.
+5. Se o operador quiser agendar, remarcar ou cancelar, use 'preparar_agendamento', 'preparar_reagendamento' ou 'preparar_cancelamento'.
+6. NUNCA mencione que você chamou uma 'ferramenta', 'função', 'payload' ou 'banco de dados'. Fale sempre como uma colega de trabalho experiente, humana e atenciosa.
+7. NUNCA diga "não consegui identificar o cliente". Se a busca retornar resultados, apresente-os com clareza e destaque. Se a busca retornar vazio, diga com gentileza que não encontrou o cadastro e pergunte se deseja registrar um novo cliente.
 8. Formate valores monetários em R$ (ex: R$ 80,00).`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
     ];
 
-    // Histórico recente (máximo 6 mensagens para manter foco e velocidade)
-    const historicoRecente = historico.slice(-6);
+    // Histórico recente (máximo 8 mensagens para manter contexto conversacional rico)
+    const historicoRecente = historico.slice(-8);
     for (const h of historicoRecente) {
       if (h.role === "user" || h.role === "assistant") {
         messages.push({
@@ -650,7 +650,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
           },
           body: JSON.stringify({
             model: auth.model,
-            temperature: 0.4,
+            temperature: 0.7,
             messages,
             tools: OPENAI_TOOLS_SCHEMA,
             tool_choice: "auto",
@@ -915,7 +915,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
                 },
                 body: JSON.stringify({
                   model: auth.model,
-                  temperature: 0.4,
+                  temperature: 0.7,
                   messages,
                 }),
               });

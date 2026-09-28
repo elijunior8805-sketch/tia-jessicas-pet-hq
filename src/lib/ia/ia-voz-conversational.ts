@@ -42,15 +42,6 @@ export function humanizarRespostaParaVoz(
     .replace(/\s+/g, " ")
     .trim();
 
-  // Se a fala for muito longa (+450 caracteres), sintetiza para manter a agilidade na bancada sem perder o sentido
-  if (fala.length > 450) {
-    const sentencas = fala.match(/[^.!?]+[.!?]+/g) || [fala];
-    if (sentencas.length >= 3) {
-      // Fala as primeiras 2 a 3 frases essenciais
-      fala = sentencas.slice(0, 3).join(" ").trim();
-    }
-  }
-
   return fala;
 }
 
