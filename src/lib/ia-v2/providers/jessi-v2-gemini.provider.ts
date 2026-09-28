@@ -411,10 +411,14 @@ ${contexto.cliente?.nome ? `- Cliente/Tutor no Contexto: ${contexto.cliente.nome
 
 DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
 1. Sempre que a pergunta envolver dados reais (agenda, horários, clientes, faturamento, histórico, planos), invoque a ferramenta correspondente para obter dados precisos do banco.
-2. Se o operador pedir para "consultar um cliente" ou perguntar por clientes sem fornecer um nome, invoque 'buscar_clientes_pets' sem termo para trazer os mais recentes e pergunte gentilmente quem ele deseja consultar.
-3. Se o operador quiser agendar, remarcar ou cancelar, use 'preparar_agendamento', 'preparar_reagendamento' ou 'preparar_cancelamento'.
-4. NUNCA mencione que você chamou uma 'ferramenta', 'função', 'payload' ou 'banco de dados'. Fale sempre de forma humana e direta.
-5. Formate valores monetários em R$ (ex: R$ 80,00).`;
+2. Se o operador pedir para "consultar um cliente", "buscar um cliente", "procurar" ou mencionar QUALQUER nome de pessoa ou pet, invoque IMEDIATAMENTE 'buscar_clientes_pets' com o nome/termo mencionado. Exemplo: "procura a Cleusa" → invoque buscar_clientes_pets com termo "Cleusa". "buscar o Thor" → invoque buscar_clientes_pets com termo "Thor".
+3. Se o operador pedir para consultar clientes sem fornecer um nome, invoque 'buscar_clientes_pets' sem termo para trazer os mais recentes e pergunte quem ele deseja consultar.
+4. Se o operador quiser agendar, remarcar ou cancelar, use 'preparar_agendamento', 'preparar_reagendamento' ou 'preparar_cancelamento'.
+5. NUNCA mencione que você chamou uma 'ferramenta', 'função', 'payload' ou 'banco de dados'. Fale sempre de forma humana e direta.
+6. NUNCA diga "não consegui identificar o cliente" nem "não consegui identificar". Se a busca retornar resultados, APRESENTE-OS ao operador. Se a busca retornar vazio, diga "Não encontrei nenhum cadastro com esse nome no sistema. Tente com outro nome ou número de telefone."
+7. Quando a busca retornar múltiplos candidatos, LISTE-OS pelo nome e pergunte qual deseja consultar. Nunca escolha silenciosamente.
+8. Formate valores monetários em R$ (ex: R$ 80,00).`;
+
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
@@ -785,26 +789,36 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
       };
     }
 
-    // 4. Clientes / Pets / Tutores
+    // 4. Clientes / Pets / Tutores — Extração inteligente do nome para busca
     if (
       msg.includes("cliente") ||
       msg.includes("pet") ||
       msg.includes("tutor") ||
       msg.includes("buscar") ||
       msg.includes("procurar") ||
-      msg.includes("ficha")
+      msg.includes("ficha") ||
+      msg.includes("cadastro") ||
+      msg.includes("quem e") ||
+      msg.includes("localizar")
     ) {
-      // Extrai possível termo
-      const termo = msg.replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|de|o|a)\b/gi, "").trim();
+      // Extrai o termo de busca removendo palavras-chave de comando
+      const termo = mensagemUsuario
+        .replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
       const resBusca = await despacharFerramentaV2(sb, "buscar_clientes_pets", { termo: termo || "" });
       const d = resBusca?.data || resBusca;
       const candidatos = d?.candidatos || (Array.isArray(d) ? d : []);
 
-      let texto = `Encontrei ${candidatos.length} registro(s) no sistema.`;
-      if (candidatos.length > 0) {
-        texto = `Localizei ${candidatos.length} cliente(s) no sistema. Toque no card para abrir a ficha completa.`;
+      let texto: string;
+      if (candidatos.length === 1) {
+        const c = candidatos[0];
+        texto = `Encontrei! ${c.nomePrincipal || c.nome} — ${c.detalheSecundario || ""}. Toque no card para abrir a ficha completa.`;
+      } else if (candidatos.length > 1) {
+        const nomes = candidatos.slice(0, 4).map((c: any) => c.nomePrincipal || c.nome).join(", ");
+        texto = `Encontrei ${candidatos.length} resultado(s) para "${termo || "clientes recentes"}": ${nomes}. Qual deles você quer ver?`;
       } else {
-        texto = `Não encontrei nenhum cliente com esse nome. Deseja cadastrar um novo cliente?`;
+        texto = `Não encontrei nenhum registro para "${termo}" no sistema. Tente com outro nome, telefone ou o nome do pet.`;
       }
 
       return {
@@ -814,7 +828,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
           title: termo ? `Resultados para "${termo}"` : "Clientes Recentes",
           subtitle: "Selecione para abrir a ficha completa",
           data: {
-            exigeDesambiguacao: true,
+            exigeDesambiguacao: candidatos.length > 1,
             opcoes: candidatos.slice(0, 6).map((c: any) => ({
               id: c.id,
               tipo: c.tipo || "cliente",
@@ -913,7 +927,15 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
       }
       case "buscar_clientes_pets": {
         const lista = dados?.candidatos || (Array.isArray(dados) ? dados : []);
-        return `Encontrei ${lista.length} cadastro(s) no sistema. Toque na opção desejada para abrir a ficha.`;
+        if (lista.length === 0) {
+          return `Não encontrei nenhum cadastro com esse termo no sistema. Tente buscar com outro nome ou telefone.`;
+        }
+        if (lista.length === 1) {
+          const c = lista[0];
+          return `Encontrei: ${c.nomePrincipal || c.nome} — ${c.detalheSecundario || ""}. Toque no card para ver a ficha completa.`;
+        }
+        const nomes = lista.slice(0, 4).map((c: any) => c.nomePrincipal || c.nome).join(", ");
+        return `Encontrei ${lista.length} resultado(s): ${nomes}. Qual deles você quer consultar?`;
       }
       case "consultar_horarios_disponiveis": {
         const vagas = dados?.horariosSugeridos || dados?.vagas || [];
