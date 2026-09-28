@@ -268,9 +268,9 @@ export function useJessiVoice(
     }
 
     recognizerRef.current = new VoiceRecognizer({
-      silenceMs: 1500,
+      silenceMs: 1200,
       onFinal: (texto) => {
-        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 650)) return;
+        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 300)) return;
         const humanizado = humanizarTranscricao(texto);
         setFinalTranscript(humanizado);
         setInterimTranscript("");
@@ -279,12 +279,12 @@ export function useJessiVoice(
         }
       },
       onInterim: (texto) => {
-        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 650)) return;
+        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 300)) return;
         setInterimTranscript(texto);
       },
       onUtteranceComplete: (utterance: VoiceUtterance) => {
         // 1. Se a IA estiver falando ou em cooldown pós-fala, descarta imediatamente (Anti-Eco Absoluto)
-        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 650)) {
+        if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 300)) {
           return;
         }
         const textoHumanizado = humanizarTranscricao(utterance.text);
@@ -472,7 +472,7 @@ export function useJessiVoice(
         controladorFalaRef.current = null;
         onFinish?.();
 
-        // Cooldown de 400ms para que o som do alto-falante se dissipe completamente antes de reabrir o microfone
+        // Cooldown de 150ms para que o som do alto-falante se dissipe completamente antes de reabrir o microfone
         if (isContinuousModeRef.current) {
           setTimeout(() => {
             if (isContinuousModeRef.current && !isSpeakingRef.current) {
@@ -480,7 +480,7 @@ export function useJessiVoice(
               setInterimTranscript("");
               recognizerRef.current?.resumeListening();
             }
-          }, 400);
+          }, 150);
         }
       };
 

@@ -50,26 +50,24 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({ data, onActionClick })
   }
 
   const clientes = React.useMemo(() => {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.clientes)) return data.clientes;
-    if (data?.cliente && typeof data.cliente === "object") {
-      const cli = { ...data.cliente };
-      if (!cli.pets && (data.nome || data.id)) {
-        cli.pets = [{ id: data.id, nome: data.nome, raca: data.raca, porte: data.porte }];
+    let list: any[] = [];
+    if (Array.isArray(data)) list = data;
+    else if (Array.isArray(data?.clientes)) list = data.clientes;
+    else if (Array.isArray(data?.candidatos)) list = data.candidatos;
+    else if (Array.isArray(data?.opcoes)) list = data.opcoes;
+    else if (data?.cliente && typeof data.cliente === "object") list = [data.cliente];
+    else if (data?.clientes && typeof data.clientes === "object") list = [data.clientes];
+    else if (data?.id && (data?.nome || data?.nomePrincipal)) list = [data];
+
+    return list.map(cli => {
+      const c = { ...cli };
+      if (c.nomePrincipal && !c.nome) c.nome = c.nomePrincipal;
+      if (c.detalheSecundario && !c.telefone) c.telefone = c.detalheSecundario;
+      if (!c.pets && data?.raca) {
+        c.pets = [{ id: c.id, nome: c.nome, raca: data.raca, porte: data.porte }];
       }
-      return [cli];
-    }
-    if (data?.clientes && typeof data.clientes === "object") {
-      const cli = { ...data.clientes };
-      if (!cli.pets && (data.nome || data.id)) {
-        cli.pets = [{ id: data.id, nome: data.nome, raca: data.raca, porte: data.porte }];
-      }
-      return [cli];
-    }
-    if (data?.id && (data?.nome || data?.nomePrincipal)) {
-      return [data];
-    }
-    return [];
+      return c;
+    });
   }, [data]);
 
   if (!clientes.length) {

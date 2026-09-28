@@ -236,9 +236,9 @@ export class VoiceRecognizer {
 
     let delayCalculado = this.silenceMs;
     if (ehComandoCurto && palavras.length <= 2) {
-      delayCalculado = 550;
+      delayCalculado = 700;
     } else if (palavras.length >= 3) {
-      delayCalculado = Math.min(this.silenceMs, 800);
+      delayCalculado = Math.min(this.silenceMs, 1200);
     }
 
     this.silenceTimer = setTimeout(() => {
