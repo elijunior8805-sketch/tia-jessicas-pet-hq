@@ -61,7 +61,7 @@ export const JessiInputBar: React.FC<JessiInputBarProps> = ({
             type="button"
             variant="ghost"
             size="icon"
-            onClick={onCancelVoice}
+            onClick={typeof onCancelVoice === 'function' ? onCancelVoice : undefined}
             aria-label="Cancelar gravação"
             title="Cancelar gravação"
             className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
