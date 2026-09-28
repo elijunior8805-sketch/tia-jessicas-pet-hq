@@ -165,4 +165,9 @@ describe("Síntese de Voz Humanizada (TTS)", () => {
     expect(frases[1]).toBe("Preparei a sua agenda.");
     expect(frases[2]).toBe("Temos 4 atendimentos hoje.");
   });
+
+  it("não corta números decimais nem horários no meio da fala", () => {
+    expect(segmentarEmFrases("O valor é 75.50 reais. Pode confirmar às 14:30?"))
+      .toEqual(["O valor é 75.50 reais.", "Pode confirmar às 14:30?"]);
+  });
 });
