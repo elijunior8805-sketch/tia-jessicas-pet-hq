@@ -20,9 +20,16 @@ import { AssistenteIaBotao } from "@/components/ia/AssistenteIaBotao";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data?.user) throw redirect({ to: "/auth" });
+      return { user: data.user };
+    } catch (err: any) {
+      if (err && typeof err === 'object' && ('to' in err || 'isRedirect' in err || 'statusCode' in err)) {
+        throw err;
+      }
+      throw redirect({ to: "/auth" });
+    }
   },
   component: AuthenticatedLayout,
 });

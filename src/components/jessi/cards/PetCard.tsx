@@ -85,14 +85,14 @@ export const PetCard: React.FC<PetCardProps> = ({ data, onActionClick }) => {
               )}
 
               {/* Programs */}
-              {p.programasAtivos && p.programasAtivos.length > 0 && (
+              {Array.isArray(p.programasAtivos) && p.programasAtivos.length > 0 && (
                 <div className="p-2.5 rounded-lg bg-[#FDF9EC] border border-[#C8A951]/40 text-xs">
                   <div className="font-semibold text-[#8C6D1F] flex items-center gap-1 mb-1">
                     <Gift className="h-3.5 w-3.5 text-[#C8A951]" />
                     <span>Programas Ativos ({p.programasAtivos.length})</span>
                   </div>
                   <div className="text-foreground font-medium">
-                    {p.programasAtivos.map((prog: any) => prog.nome).join(", ")}
+                    {p.programasAtivos.map((prog: any) => prog?.nome_snapshot || prog?.nome || "Clubinho").join(", ")}
                   </div>
                 </div>
               )}
@@ -102,7 +102,7 @@ export const PetCard: React.FC<PetCardProps> = ({ data, onActionClick }) => {
                 <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3 text-emerald-700" />
                   <span>
-                    Último atendimento: {lastAppt.data || lastAppt.dataAtendimento} - {lastAppt.servico || lastAppt.tipoServico}
+                    Último atendimento: {lastAppt?.data || lastAppt?.dataAtendimento || "Recente"} - {(typeof lastAppt?.servicos === 'object' ? lastAppt?.servicos?.nome : lastAppt?.servico) || "Banho"}
                   </span>
                 </div>
               )}
