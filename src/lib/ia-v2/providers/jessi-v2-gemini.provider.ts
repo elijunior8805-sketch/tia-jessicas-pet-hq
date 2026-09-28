@@ -271,35 +271,36 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   /**
    * Obtém a chave de API estritamente do ambiente do servidor ou Vite env
    */
+  /**
+   * Obtém a chave de API do ambiente do servidor ou Vite env
+   */
   public obterApiKeyServidor(): { key: string; isGateway: boolean } | null {
     if (typeof process !== "undefined" && process.env) {
-      if (process.env.LOVABLE_API_KEY) {
-        return { key: process.env.LOVABLE_API_KEY, isGateway: true };
-      }
-      if (process.env.OPENAI_API_KEY) {
-        return { key: process.env.OPENAI_API_KEY, isGateway: true };
-      }
-      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
-        return {
-          key: (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY)!,
-          isGateway: false,
-        };
+      const k =
+        process.env.LOVABLE_API_KEY ||
+        process.env.OPENAI_API_KEY ||
+        process.env.GEMINI_API_KEY ||
+        process.env.GOOGLE_AI_API_KEY ||
+        process.env.GOOGLE_API_KEY ||
+        process.env.GROQ_API_KEY;
+      if (k) {
+        return { key: k, isGateway: true };
       }
     }
 
     if (typeof import.meta !== "undefined" && (import.meta as any).env) {
       const env = (import.meta as any).env;
-      if (env.VITE_LOVABLE_API_KEY || env.LOVABLE_API_KEY) {
-        return { key: env.VITE_LOVABLE_API_KEY || env.LOVABLE_API_KEY, isGateway: true };
-      }
-      if (env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || env.VITE_GOOGLE_AI_API_KEY || env.GOOGLE_AI_API_KEY) {
-        return {
-          key: env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || env.VITE_GOOGLE_AI_API_KEY || env.GOOGLE_AI_API_KEY,
-          isGateway: false,
-        };
-      }
-      if (env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY) {
-        return { key: env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY, isGateway: true };
+      const k =
+        env.VITE_LOVABLE_API_KEY ||
+        env.LOVABLE_API_KEY ||
+        env.VITE_OPENAI_API_KEY ||
+        env.OPENAI_API_KEY ||
+        env.VITE_GEMINI_API_KEY ||
+        env.GEMINI_API_KEY ||
+        env.VITE_GOOGLE_AI_API_KEY ||
+        env.GOOGLE_AI_API_KEY;
+      if (k) {
+        return { key: k, isGateway: true };
       }
     }
 
@@ -316,7 +317,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   ): Promise<string> {
     const auth = this.obterApiKeyServidor();
     if (!auth) {
-      throw new Error("Nenhuma chave de API (LOVABLE_API_KEY / GEMINI_API_KEY) configurada no ambiente do servidor.");
+      throw new Error("Nenhuma chave de API configurada no ambiente.");
     }
 
     for (let tentativa = 1; tentativa <= GEMINI_CONFIG.MAX_RETRIES; tentativa++) {
@@ -324,45 +325,24 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       const timer = setTimeout(() => controller.abort(), GEMINI_CONFIG.TIMEOUT_MS);
 
       try {
-        let resp: Response;
-
-        if (auth.isGateway) {
-          const body: any = {
-            model: GEMINI_CONFIG.MODEL,
-            temperature,
-            messages,
-          };
-          if (jsonFormat) {
-            body.response_format = { type: "json_object" };
-          }
-
-          resp = await fetch(LOVABLE_GATEWAY, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${auth.key}`,
-            },
-            body: JSON.stringify(body),
-            signal: controller.signal,
-          });
-        } else {
-          const promptCombined = messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
-          const directUrl = `${GEMINI_CONFIG.DIRECT_ENDPOINT_BASE}/gemini-1.5-flash:generateContent?key=${auth.key}`;
-
-          resp = await fetch(directUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: promptCombined }] }],
-              generationConfig: {
-                temperature,
-                maxOutputTokens: 1200,
-                responseMimeType: jsonFormat ? "application/json" : "text/plain",
-              },
-            }),
-            signal: controller.signal,
-          });
+        const body: any = {
+          model: GEMINI_CONFIG.MODEL,
+          temperature,
+          messages,
+        };
+        if (jsonFormat) {
+          body.response_format = { type: "json_object" };
         }
+
+        const resp = await fetch(LOVABLE_GATEWAY, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.key}`,
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
 
         clearTimeout(timer);
 
@@ -372,13 +352,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         }
 
         const data: any = await resp.json();
-        if (auth.isGateway) {
-          const texto = data?.choices?.[0]?.message?.content?.trim();
-          if (texto) return texto;
-        } else {
-          const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (texto) return texto;
-        }
+        const texto = data?.choices?.[0]?.message?.content?.trim();
+        if (texto) return texto;
 
         throw new Error("Provedor retornou resposta vazia.");
       } catch (err: any) {
@@ -462,7 +437,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
     let pendingAction: JessiV2PendingAction | null = null;
     let novoContexto: Partial<JessiV2ContextState> = {};
 
-    if (auth && auth.isGateway) {
+    if (auth?.key) {
       try {
         // PASSADA 1: Envia com Tools disponíveis
         const resPass1 = await fetch(LOVABLE_GATEWAY, {
@@ -488,9 +463,12 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
           // Se a IA decidiu chamar ferramentas
           if (msgAssistant?.tool_calls && msgAssistant.tool_calls.length > 0) {
             messages.push(msgAssistant);
+            let dadosUltimaTool: any = null;
+            let nomeUltimaTool: string = "";
 
             for (const tCall of msgAssistant.tool_calls) {
               const toolNome = tCall.function.name;
+              nomeUltimaTool = toolNome;
               let toolArgs: any = {};
               try {
                 toolArgs = JSON.parse(tCall.function.arguments || "{}");
@@ -601,6 +579,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
 
               // Executa a ferramenta de consulta diretamente no Supabase
               const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
+              dadosUltimaTool = resTool?.data || resTool;
 
               // Converte o resultado em Card visual adequado
               this.anexarCardVisual(cards, toolNome, resTool, toolArgs);
@@ -629,31 +608,44 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
             }
 
             // PASSADA 2: IA sintetiza os dados reais do banco com calor humano
-            const resPass2 = await fetch(LOVABLE_GATEWAY, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${auth.key}`,
-              },
-              body: JSON.stringify({
-                model: GEMINI_CONFIG.MODEL,
-                temperature: 0.4,
-                messages,
-              }),
-            });
+            try {
+              const resPass2 = await fetch(LOVABLE_GATEWAY, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${auth.key}`,
+                },
+                body: JSON.stringify({
+                  model: GEMINI_CONFIG.MODEL,
+                  temperature: 0.4,
+                  messages,
+                }),
+              });
 
-            if (resPass2.ok) {
-              const dataPass2: any = await resPass2.json();
-              const finalContent = dataPass2?.choices?.[0]?.message?.content?.trim();
-              if (finalContent) {
-                return {
-                  respostaTexto: finalContent,
-                  cards,
-                  pendingAction,
-                  novoContexto,
-                };
+              if (resPass2.ok) {
+                const dataPass2: any = await resPass2.json();
+                const finalContent = dataPass2?.choices?.[0]?.message?.content?.trim();
+                if (finalContent) {
+                  return {
+                    respostaTexto: finalContent,
+                    cards,
+                    pendingAction,
+                    novoContexto,
+                  };
+                }
               }
+            } catch (errPass2) {
+              console.warn("[JessiV2] Falha na passada 2 do Gateway, gerando síntese local:", errPass2);
             }
+
+            // Síntese local resiliente dos dados recuperados da ferramenta
+            const resLocal = this.sintetizarResultadoLocal(nomeUltimaTool, dadosUltimaTool, user?.nome || "Eli");
+            return {
+              respostaTexto: resLocal,
+              cards,
+              pendingAction,
+              novoContexto,
+            };
           } else if (msgAssistant?.content) {
             // IA respondeu diretamente (conversa natural, conselho ou esclarecimento)
             return {
@@ -665,28 +657,278 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
           }
         }
       } catch (errGateway) {
-        console.warn("[JessiV2 Autonomous Agent] Erro no gateway, acionando síntese resiliente:", errGateway);
+        console.warn("[JessiV2 Autonomous Agent] Erro no gateway, acionando despacho resiliente:", errGateway);
       }
     }
 
-    // Fallback conversacional generativo caso a API de tools falhe
-    const fallbackGenerativo = await this.gerarResposta({
-      promptSistema: systemPrompt,
-      mensagemUsuario,
-      dadosOperacionais: {
-        operador: user?.nome || "Eli",
-        dataReferencia: hojeStr,
-        contexto,
-      },
-      historico: historico as any,
-    });
+    // DISPATCHER RESILIENTE DIRETO DE FERRAMENTAS
+    // Garante que mesmo offline ou sem resposta do gateway, o comando é executado e os dados reais são mostrados e falados!
+    const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli");
+    if (despachoResiliente) {
+      if (despachoResiliente.card) {
+        cards.push(despachoResiliente.card);
+      }
+      return {
+        respostaTexto: despachoResiliente.texto,
+        cards,
+        pendingAction: null,
+        novoContexto: despachoResiliente.novoContexto || {},
+      };
+    }
 
     return {
-      respostaTexto: fallbackGenerativo.texto,
+      respostaTexto: `Olá, ${user?.nome || "Eli"}! Estou pronta para te ajudar. Você pode me pedir para ver a agenda de hoje, consultar valores a receber, verificar vagas ou buscar a ficha de qualquer cliente ou pet!`,
       cards,
       pendingAction: null,
       novoContexto: {},
     };
+  }
+
+  /**
+   * Executa despacho determinístico resiliente quando o gateway de IA não estiver disponível
+   */
+  private async executarDespachoResiliente(
+    sb: SupabaseClient<Database>,
+    mensagemUsuario: string,
+    hojeStr: string,
+    operadorNome: string
+  ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any } | null> {
+    const msg = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    // 1. Financeiro / Valores a Receber / Faturamento / Caixa
+    if (
+      msg.includes("receber") ||
+      msg.includes("financeiro") ||
+      msg.includes("faturamento") ||
+      msg.includes("faturou") ||
+      msg.includes("quanto entrou") ||
+      msg.includes("caixa") ||
+      msg.includes("pagamento")
+    ) {
+      const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
+      const resFin = await despacharFerramentaV2(sb, "consultar_financeiro_consolidado", { periodo });
+      const d = resFin?.data || resFin;
+      const totalRecebido = d?.totalRecebido || d?.faturamento || 0;
+      const totalPendente = d?.totalPendente || d?.valoresAReceber || 0;
+      const ticketMedio = d?.ticketMedio || 0;
+
+      const texto = `Aqui está o resumo financeiro do ${periodo === "hoje" ? "dia" : periodo === "semana" ? "período desta semana" : "mês"}: já foram recebidos R$ ${Number(totalRecebido).toFixed(2).replace(".", ",")} e temos R$ ${Number(totalPendente).toFixed(2).replace(".", ",")} pendentes a receber, com ticket médio de R$ ${Number(ticketMedio).toFixed(2).replace(".", ",")}.`;
+
+      return {
+        texto,
+        card: {
+          type: "financeiro",
+          title: "Resumo Financeiro Consolidado",
+          subtitle: `Período: ${periodo.toUpperCase()}`,
+          data: d,
+        },
+      };
+    }
+
+    // 2. Horários Disponíveis / Vagas / Grade Livre
+    if (
+      msg.includes("horario") ||
+      msg.includes("vaga") ||
+      msg.includes("livre") ||
+      msg.includes("encaixe") ||
+      msg.includes("disponiv")
+    ) {
+      const resVagas = await despacharFerramentaV2(sb, "consultar_horarios_disponiveis", { data: hojeStr });
+      const d = resVagas?.data || resVagas;
+      const vagas = d?.horariosSugeridos || d?.vagas || [];
+
+      let texto = `Temos ${vagas.length} horário(s) disponível(is) na grade de hoje: ${vagas.slice(0, 5).join(", ")}.`;
+      if (vagas.length === 0) {
+        texto = `A grade de hoje está com horários preenchidos. Quer que eu verifique a grade de amanhã?`;
+      }
+
+      return {
+        texto,
+        card: {
+          type: "agenda",
+          title: `Vagas Disponíveis (${vagas.length})`,
+          subtitle: `Data: ${hojeStr}`,
+          data: d,
+        },
+      };
+    }
+
+    // 3. Agenda de Atendimentos / Grade do Dia
+    if (
+      msg.includes("agenda") ||
+      msg.includes("atendimento") ||
+      msg.includes("marcado") ||
+      msg.includes("banho") ||
+      msg.includes("tosa")
+    ) {
+      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: hojeStr });
+      const d = resAgenda?.data || resAgenda;
+      const lista = Array.isArray(d) ? d : d?.agendamentos || [];
+
+      let texto = `Encontrei ${lista.length} atendimento(s) agendado(s) para hoje.`;
+      if (lista.length > 0) {
+        const primeiros = lista
+          .slice(0, 3)
+          .map((a: any) => `${a.petNome || a.pet_nome || "Pet"} às ${(a.hora || a.horario || "horário").slice(0, 5)}`)
+          .join(", ");
+        texto += ` Próximos: ${primeiros}.`;
+      }
+
+      return {
+        texto,
+        card: {
+          type: "agenda",
+          title: `Agenda (${lista.length} atendimentos)`,
+          subtitle: `Data: ${hojeStr}`,
+          data: { itens: lista, total: lista.length },
+        },
+      };
+    }
+
+    // 4. Clientes / Pets / Tutores
+    if (
+      msg.includes("cliente") ||
+      msg.includes("pet") ||
+      msg.includes("tutor") ||
+      msg.includes("buscar") ||
+      msg.includes("procurar") ||
+      msg.includes("ficha")
+    ) {
+      // Extrai possível termo
+      const termo = msg.replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|de|o|a)\b/gi, "").trim();
+      const resBusca = await despacharFerramentaV2(sb, "buscar_clientes_pets", { termo: termo || "" });
+      const d = resBusca?.data || resBusca;
+      const candidatos = d?.candidatos || (Array.isArray(d) ? d : []);
+
+      let texto = `Encontrei ${candidatos.length} registro(s) no sistema.`;
+      if (candidatos.length > 0) {
+        texto = `Localizei ${candidatos.length} cliente(s) no sistema. Toque no card para abrir a ficha completa.`;
+      } else {
+        texto = `Não encontrei nenhum cliente com esse nome. Deseja cadastrar um novo cliente?`;
+      }
+
+      return {
+        texto,
+        card: {
+          type: "cliente",
+          title: termo ? `Resultados para "${termo}"` : "Clientes Recentes",
+          subtitle: "Selecione para abrir a ficha completa",
+          data: {
+            exigeDesambiguacao: true,
+            opcoes: candidatos.slice(0, 6).map((c: any) => ({
+              id: c.id,
+              tipo: c.tipo || "cliente",
+              nome: c.nomePrincipal || c.nome,
+              detalhe: c.detalheSecundario || c.telefone || "",
+            })),
+          },
+        },
+      };
+    }
+
+    // 5. Clientes Ausentes / Reativação
+    if (msg.includes("reativa") || msg.includes("retorno") || msg.includes("ausente") || msg.includes("sumido")) {
+      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
+      const d = resRet?.data || resRet;
+      const lista = Array.isArray(d) ? d : d?.clientes || [];
+
+      return {
+        texto: `Identifiquei ${lista.length} cliente(s) que não vêm ao Spa há mais de 25 dias. Podemos disparar uma mensagem de carinho e retorno!`,
+        card: {
+          type: "reativacao",
+          title: "Clientes Ausentes com Potencial de Retorno",
+          subtitle: `${lista.length} clientes identificados`,
+          data: lista,
+        },
+      };
+    }
+
+    // 6. Aniversariantes
+    if (msg.includes("aniversari") || msg.includes("parabens") || msg.includes("niver")) {
+      const resAniv = await despacharFerramentaV2(sb, "consultar_aniversariantes", {});
+      const d = resAniv?.data || resAniv;
+      const lista = Array.isArray(d) ? d : d?.aniversariantes || [];
+
+      return {
+        texto: `Temos ${lista.length} aniversariante(s) registrado(s) para este período. É uma ótima oportunidade de encantamento!`,
+        card: {
+          type: "comunicacao",
+          title: "Aniversariantes do Pet Spa",
+          subtitle: "Ações de Encantamento",
+          data: d,
+        },
+      };
+    }
+
+    // 7. Cobrança Pix
+    if (msg.includes("cobranca") || msg.includes("devedor") || msg.includes("inadimplente") || msg.includes("cobrar")) {
+      const resCob = await despacharFerramentaV2(sb, "gerar_mensagens_cobranca", {});
+      const d = resCob?.data || resCob;
+
+      return {
+        texto: `Preparei a lista de cobrança cordial com chave Pix pronta para envio no WhatsApp.`,
+        card: {
+          type: "financeiro",
+          title: "Cobrança Cordial via Pix",
+          subtitle: "Pendências financeiras",
+          data: d,
+        },
+      };
+    }
+
+    // 8. Clubinho & Planos
+    if (msg.includes("clubinho") || msg.includes("plano") || msg.includes("pacote") || msg.includes("credito")) {
+      const resProg = await despacharFerramentaV2(sb, "consultar_programas_ativos_geral", {});
+      const d = resProg?.data || resProg;
+
+      return {
+        texto: `Aqui está o panorama dos contratos e créditos ativos do Clubinho no Spa de Pet.`,
+        card: {
+          type: "programa",
+          title: "Clubinho & Planos Mensais",
+          subtitle: "Contratos ativos",
+          data: d,
+        },
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Sintetiza uma resposta natural em português a partir dos dados retornados por uma ferramenta
+   */
+  private sintetizarResultadoLocal(toolNome: string, dados: any, operadorNome: string): string {
+    if (!dados) return "Prontinho! Consultei as informações no sistema.";
+
+    switch (toolNome) {
+      case "consultar_financeiro_consolidado": {
+        const recebido = dados?.totalRecebido || dados?.faturamento || 0;
+        const pendente = dados?.totalPendente || dados?.valoresAReceber || 0;
+        return `Aqui está o resumo financeiro: R$ ${Number(recebido).toFixed(2).replace(".", ",")} recebidos e R$ ${Number(pendente).toFixed(2).replace(".", ",")} pendentes a receber.`;
+      }
+      case "consultar_agenda": {
+        const lista = Array.isArray(dados) ? dados : dados?.agendamentos || [];
+        return `Encontrei ${lista.length} atendimento(s) na agenda. Os dados detalhados estão no card na tela.`;
+      }
+      case "buscar_clientes_pets": {
+        const lista = dados?.candidatos || (Array.isArray(dados) ? dados : []);
+        return `Encontrei ${lista.length} cadastro(s) no sistema. Toque na opção desejada para abrir a ficha.`;
+      }
+      case "consultar_horarios_disponiveis": {
+        const vagas = dados?.horariosSugeridos || dados?.vagas || [];
+        return `Temos ${vagas.length} vaga(s) disponível(is) na grade: ${vagas.slice(0, 4).join(", ")}.`;
+      }
+      case "identificar_clientes_retorno": {
+        const lista = Array.isArray(dados) ? dados : dados?.clientes || [];
+        return `Identifiquei ${lista.length} cliente(s) ausente(s) com potencial de retorno.`;
+      }
+      case "consultar_aniversariantes": {
+        return `Consultei os aniversariantes do Pet Spa. Os dados estão disponíveis no card.`;
+      }
+      default:
+        return "Prontinho! Operação realizada e dados sincronizados com a grade.";
+    }
   }
 
   /**
