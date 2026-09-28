@@ -133,8 +133,8 @@ describe("Síntese de Voz Humanizada (TTS)", () => {
   });
 
   it("converte horários e datas para prosódia fluida", () => {
-    expect(humanizarTextoParaVoz("Agendado para 14:30")).toBe("Agendado para 14 e meia.");
-    expect(humanizarTextoParaVoz("Próximo cliente às 09:00")).toBe("Próximo cliente às 09 horas.");
+    expect(humanizarTextoParaVoz("Agendado para 14:30")).toBe("Agendado para 2 e meia da tarde.");
+    expect(humanizarTextoParaVoz("Próximo cliente às 09:00")).toBe("Próximo cliente às 9 da manhã.");
     expect(humanizarTextoParaVoz("Data do atendimento: 12/09")).toBe("Data do atendimento: 12 de setembro.");
   });
 
@@ -164,5 +164,10 @@ describe("Síntese de Voz Humanizada (TTS)", () => {
     expect(frases[0]).toBe("Olá, Eli!");
     expect(frases[1]).toBe("Preparei a sua agenda.");
     expect(frases[2]).toBe("Temos 4 atendimentos hoje.");
+  });
+
+  it("não corta números decimais nem horários no meio da fala", () => {
+    expect(segmentarEmFrases("O valor é 75.50 reais. Pode confirmar às 14:30?"))
+      .toEqual(["O valor é 75.50 reais.", "Pode confirmar às 14:30?"]);
   });
 });

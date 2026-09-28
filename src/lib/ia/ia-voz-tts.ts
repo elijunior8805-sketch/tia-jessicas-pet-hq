@@ -241,7 +241,9 @@ export function segmentarEmFrases(texto: string): string[] {
   if (!texto) return [];
 
   // Quebra por pontos finais, interrogações e exclamações, preservando a frase inteira
-  const regex = /([^.?!]+[.?!]+)/g;
+  // Só encerra a frase quando a pontuação precede um espaço ou o fim do texto;
+  // um ponto entre dígitos (75.50) pertence ao número, não à pausa.
+  const regex = /[\s\S]*?[.!?](?=\s|$)/g;
   const matches = texto.match(regex);
 
   if (!matches || matches.length === 0) {
@@ -329,9 +331,9 @@ export function reproduzirFalaHumana(
       // Ritmo fluido, dinâmico e conversacional (evita voz lenta/arrastada)
       const ehLonga = fraseAtual.length > 120;
       const ehPergunta = /\?\s*$/.test(fraseAtual);
-      utterance.rate = ehLonga ? 1.02 : 1.05;
+       utterance.rate = ehLonga ? 0.96 : 0.99;
       // Perguntas ganham entonação ascendente calorosa; afirmativas soam firmes e empáticas
-      utterance.pitch = ehPergunta ? 1.08 : 1.02;
+       utterance.pitch = ehPergunta ? 1.06 : 1.02;
       utterance.volume = 1.0;
 
       if (melhorVoz) {
