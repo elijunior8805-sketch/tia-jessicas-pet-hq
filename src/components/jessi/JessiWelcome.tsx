@@ -22,7 +22,10 @@ import {
   Share2,
   BarChart3,
   Headphones,
-  Mic
+  Mic,
+  Sun,
+  Receipt,
+  Bell
 } from "lucide-react";
 import { JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { Button } from "@/components/ui/button";
@@ -68,25 +71,46 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 max-w-5xl mx-auto w-full">
+    <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-8 pb-36 sm:pb-8 space-y-4 sm:space-y-6 max-w-5xl mx-auto w-full">
+      {/* Quick Nav Tabs para Mobile */}
+      <div className="flex sm:hidden overflow-x-auto gap-2 pb-1 -mx-3 px-3 scrollbar-hide snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {[
+          { id: "rotina", label: "Minha Rotina", icon: Sun, cmd: "consultar minha rotina de hoje" },
+          { id: "agenda", label: "Agenda", icon: Calendar, cmd: "consultar agenda de hoje" },
+          { id: "clientes", label: "Clientes", icon: Users, cmd: "buscar clientes" },
+          { id: "financeiro", label: "Financeiro", icon: DollarSign, cmd: "consultar financeiro" },
+          { id: "comprovantes", label: "Comprovantes", icon: Receipt, cmd: "enviar comprovante" },
+          { id: "alertas", label: "Alertas", icon: Bell, cmd: "verificar pendencias" },
+        ].map((mod) => (
+          <button
+            key={mod.id}
+            onClick={() => onQuickAction(mod.cmd)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-card border border-border/60 rounded-full shrink-0 snap-start active:scale-95 transition-transform"
+          >
+            <mod.icon className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="text-xs font-medium text-foreground whitespace-nowrap">{mod.label}</span>
+          </button>
+        ))}
+      </div>
+
       {/* 1. Header com Saudação Contextual da Jessi */}
-      <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1B5E20] via-[#144718] to-[#0D3311] text-white p-4 sm:p-5 md:p-7 shadow-lg border border-[#C8A951]/30 relative overflow-hidden">
+      <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1B5E20] via-[#144718] to-[#0D3311] text-white p-3.5 sm:p-5 md:p-7 shadow-lg border border-[#C8A951]/30 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10 pointer-events-none">
           <Sparkles className="w-48 h-48 sm:w-64 sm:h-64 text-[#C8A951]" />
         </div>
 
-        <div className="relative z-10 space-y-2.5 sm:space-y-3">
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-[#C8A951]/20 text-[#F5E6BE] border border-[#C8A951]/40 text-[11px] sm:text-xs font-semibold backdrop-blur-xs">
+        <div className="relative z-10 space-y-2 sm:space-y-3">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-[#C8A951]/20 text-[#F5E6BE] border border-[#C8A951]/40 text-[10px] sm:text-xs font-semibold backdrop-blur-xs">
             <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#C8A951] animate-pulse" />
-            <span>Jessi V2 · Central Operacional Inteligente</span>
+            <span className="truncate">Jessi V2 · Central Operacional</span>
           </div>
 
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold font-display tracking-tight leading-snug">
-            {centralData?.saudacaoPersonalizada || `Olá, Eli. Preparei sua central operacional. Por onde você quer começar hoje?`}
+          <h1 className="text-base sm:text-xl md:text-2xl font-bold font-display tracking-tight leading-snug">
+            {centralData?.saudacaoPersonalizada || `Olá, Eli. Preparei sua central operacional.`}
           </h1>
 
-          <p className="text-[11px] sm:text-xs md:text-sm text-white/80 capitalize">
-            {hojeFormatado} • Spa de Pet Tia Jéssica
+          <p className="text-[10px] sm:text-xs md:text-sm text-white/80 capitalize line-clamp-1">
+            {hojeFormatado} • Spa de Pet
           </p>
         </div>
       </div>
@@ -186,7 +210,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
               <Button
                 size="sm"
                 onClick={() => onQuickAction(`Localize o cliente ${centralData.hoje.proximoAtendimento?.tutor}`)}
-                className="h-7 px-2 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg shrink-0"
+                className="h-9 sm:h-8 px-3 text-[11px] bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg shrink-0"
               >
                 Abrir Ficha
               </Button>
@@ -351,7 +375,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
                       size="sm"
                       variant="outline"
                       onClick={() => onQuickAction(item.comando)}
-                      className="h-6 px-2 text-[11px] border-amber-300 text-amber-900 hover:bg-amber-100 rounded-lg shrink-0 font-medium"
+                      className="h-9 sm:h-8 px-3 text-[11px] border-amber-300 text-amber-900 hover:bg-amber-100 rounded-lg shrink-0 font-medium"
                     >
                       Resolver
                     </Button>
@@ -425,7 +449,7 @@ export const JessiWelcome: React.FC<JessiWelcomeProps> = ({
                       size="sm"
                       variant="outline"
                       onClick={() => onQuickAction(op.comando)}
-                      className="h-6 px-2 text-[11px] border-purple-300 text-purple-900 hover:bg-purple-100 rounded-lg shrink-0 font-medium"
+                      className="h-9 sm:h-8 px-3 text-[11px] border-purple-300 text-purple-900 hover:bg-purple-100 rounded-lg shrink-0 font-medium"
                     >
                       Aproveitar
                     </Button>

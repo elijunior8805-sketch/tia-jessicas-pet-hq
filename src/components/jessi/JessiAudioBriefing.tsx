@@ -158,7 +158,7 @@ export const JessiAudioBriefing: React.FC<JessiAudioBriefingProps> = ({ centralD
         </div>
 
         {/* Controles de Reprodução e Equalizador Animado */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
           {isPlaying && (
             <div className="flex items-center gap-0.5 px-2 py-1 bg-black/30 rounded-lg border border-white/10 mr-1">
               <span className="w-1 h-3 bg-[#C8A951] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />

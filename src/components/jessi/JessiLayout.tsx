@@ -474,23 +474,23 @@ export const JessiLayout: React.FC = () => {
       {/* Area Central de Conversacao */}
       <main className="w-full flex-1 flex flex-col h-full bg-background md:border-r border-border/70 overflow-hidden min-w-0">
         {/* Header da Jessi */}
-        <header className="h-14 border-b border-border/70 bg-card/70 backdrop-blur-xs px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-emerald-800 text-white flex items-center justify-center shadow-xs">
-              <Sparkles className="h-5 w-5" />
+        <header className="h-14 border-b border-border/70 bg-card/70 backdrop-blur-xs px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-emerald-800 text-white flex items-center justify-center shadow-xs shrink-0">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 font-display">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 font-display truncate">
                 <span>Jessi</span>
-                <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                <span className="hidden sm:inline-block text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
                   IA V2 Operacional
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">Spa de Pet Tia Jéssica</p>
+              <p className="hidden sm:block text-[11px] text-muted-foreground truncate">Spa de Pet Tia Jéssica</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <Button
               variant="default"
               size="sm"
@@ -502,9 +502,9 @@ export const JessiLayout: React.FC = () => {
                 setTtsEnabled(true);
               }}
               title="Ativar Modo Bancada Mãos-Livres para Banho e Tosa"
-              className="h-8 px-3 text-xs font-bold gap-1.5 rounded-lg bg-[#123F2A] hover:bg-[#1A5C3D] text-[#F5E6BE] border border-[#C8A951]/50 shadow-xs cursor-pointer"
+              className="h-8 px-2 sm:px-3 text-xs font-bold gap-1 sm:gap-1.5 rounded-lg bg-[#123F2A] hover:bg-[#1A5C3D] text-[#F5E6BE] border border-[#C8A951]/50 shadow-xs cursor-pointer"
             >
-              <Headphones className="h-3.5 w-3.5 text-[#C8A951] animate-pulse" />
+              <Headphones className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#C8A951] animate-pulse" />
               <span className="hidden sm:inline">Modo Bancada</span>
             </Button>
 
@@ -513,13 +513,13 @@ export const JessiLayout: React.FC = () => {
               size="sm"
               onClick={toggleContinuousMode}
               title={isContinuousMode ? "Desativar modo de conversa contínua" : "Ativar Modo de Conversa por Voz Contínua"}
-              className={`h-8 px-2.5 text-xs font-semibold gap-1.5 rounded-lg transition-all ${
+              className={`h-8 px-2 sm:px-2.5 text-xs font-semibold gap-1 sm:gap-1.5 rounded-lg transition-all ${
                 isContinuousMode
                   ? "bg-red-600 hover:bg-red-700 text-white shadow-xs animate-pulse"
                   : "text-emerald-800 border-emerald-300 hover:bg-emerald-50"
               }`}
             >
-              <Mic className="h-3.5 w-3.5" />
+              <Mic className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">{isContinuousMode ? "Voz Contínua ON" : "Ativar Voz"}</span>
             </Button>
             <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
