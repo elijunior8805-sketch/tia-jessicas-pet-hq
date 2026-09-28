@@ -12,6 +12,7 @@ import { ComunicacaoCard } from "./cards/ComunicacaoCard";
 import { ReativacaoCard } from "./cards/ReativacaoCard";
 import { AnalyticsCard } from "./cards/AnalyticsCard";
 import { SentinelaCard } from "./cards/SentinelaCard";
+import { PetCard } from "./cards/PetCard";
 import { ChevronDown, Sparkles, User, ArrowRight } from "lucide-react";
 
 
@@ -285,6 +286,8 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                         return <AnalyticsCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       case "sentinela":
                         return <SentinelaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                      case "pet":
+                        return <PetCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                       default:
                         return null;
                     }

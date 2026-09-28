@@ -25,19 +25,8 @@ export async function despacharMensagemJessi(
   const flags = { ...JESSI_V2_FLAGS_DEFAULT, ...(flagsConfig || {}) };
   const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
 
-  // Verificação de Autorização Controlada: Somente Proprietário ou Administrador
-  const cargoLower = (user?.cargo || "").toLowerCase();
-  const nomeLower = (user?.nome || "").toLowerCase();
-  const ehUsuarioAutorizadoV2 =
-    !user ||
-    cargoLower.includes("propriet") ||
-    cargoLower.includes("admin") ||
-    cargoLower.includes("geren") ||
-    nomeLower.includes("propriet") ||
-    nomeLower.includes("eli");
-
-  // 1. ai_v2_enabled=false ou usuário não autorizado: utilizar estritamente a Jessi atual (V1)
-  if (!checarFlagV2(flags, "ai_v2_enabled") || !ehUsuarioAutorizadoV2) {
+  // 1. ai_v2_enabled=false: utilizar fallback V1 se desativado por flag
+  if (!checarFlagV2(flags, "ai_v2_enabled")) {
     const { processarMensagemJessiCore } = await import("../../ia/jessi-agent.server");
     const v1Result = await processarMensagemJessiCore(sb, input as any, user);
     const respostaTextoFinal = ehCanalVoz

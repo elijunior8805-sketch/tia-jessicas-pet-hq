@@ -263,34 +263,213 @@ export const OPENAI_TOOLS_SCHEMA: any[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "gerar_central_proativa",
+      description: "Gera o panorama proativo em tempo real do Spa: alertas críticos, encaixes do dia, aniversariantes e oportunidades de retorno.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_resumo_operacional",
+      description: "Consulta o resumo executivo operacional do negócio: ocupação, faturamento consolidado, status de banho e tosa.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "identificar_horarios_vagos",
+      description: "Identifica horários ociosos na grade de banho e tosa para ofertar encaixes ou promoções de preenchimento.",
+      parameters: {
+        type: "object",
+        properties: {
+          data: { type: "string", description: "Data no formato YYYY-MM-DD" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "sugerir_encaixes_reativacao",
+      description: "Cruza clientes com saudades/ausentes com horários vagos de hoje/amanhã para sugerir convites de encaixe.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "processar_comprovante",
+      description: "Analisa comprovante de transferência Pix ou depósito bancário para validação de dados.",
+      parameters: {
+        type: "object",
+        properties: {
+          textoComprovante: { type: "string", description: "Texto extraído do comprovante ou OCR" },
+          valor: { type: "number", description: "Valor monetário do comprovante" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "conciliar_comprovante",
+      description: "Localiza a pendência financeira correspondente e concilia o pagamento com o comprovante apresentado.",
+      parameters: {
+        type: "object",
+        properties: {
+          comprovanteId: { type: "string", description: "ID do comprovante ou dados de conciliação" },
+          clienteId: { type: "string", description: "UUID do cliente" },
+          valor: { type: "number", description: "Valor pago" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "gerar_mensagem_whatsapp",
+      description: "Gera mensagem humanizada e cordial pronta para disparo no WhatsApp do tutor.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: {
+            type: "string",
+            enum: ["cobranca", "lembrete_horario", "aniversario", "saudade_reativacao", "pronto_retirada"],
+            description: "Finalidade da mensagem",
+          },
+          clienteNome: { type: "string", description: "Nome do cliente/tutor" },
+          petNome: { type: "string", description: "Nome do pet" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "sugerir_resposta",
+      description: "Sugere resposta empática para dúvidas ou mensagens enviadas por clientes no canal de atendimento.",
+      parameters: {
+        type: "object",
+        properties: {
+          mensagemCliente: { type: "string", description: "Mensagem recebida do cliente" },
+          clienteNome: { type: "string", description: "Nome do cliente" },
+        },
+        required: ["mensagemCliente"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "auditoria_integridade",
+      description: "Realiza checagem de integridade relacional entre clientes, pets, agendamentos e contratos.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "qualidade_ia",
+      description: "Consulta métricas de qualidade, taxa de acerto e tempo médio de resposta da Jessi.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "preparar_cadastro_cliente",
+      description: "Prepara a criação de um novo cadastro de cliente/tutor no Spa para confirmação supervisionada.",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: { type: "string", description: "Nome completo do tutor" },
+          telefone: { type: "string", description: "Número de WhatsApp ou telefone" },
+          email: { type: "string", description: "E-mail do cliente (opcional)" },
+        },
+        required: ["nome"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "preparar_consumo_credito",
+      description: "Prepara a baixa/consumo de 1 banho ou serviço do pacote do Clubinho para confirmação.",
+      parameters: {
+        type: "object",
+        properties: {
+          clienteId: { type: "string", description: "UUID do cliente" },
+          petId: { type: "string", description: "UUID do pet" },
+          contratoId: { type: "string", description: "UUID do contrato ativo" },
+        },
+        required: ["petId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "preparar_estorno",
+      description: "Prepara o estorno de um pagamento registrado para confirmação supervisionada.",
+      parameters: {
+        type: "object",
+        properties: {
+          pagamentoId: { type: "string", description: "ID do pagamento a estornar" },
+          motivo: { type: "string", description: "Motivo do estorno" },
+        },
+        required: ["pagamentoId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "gerar_termo_programa_pdf",
+      description: "Gera o termo de adesão em PDF do Clubinho para impressão ou envio digital.",
+      parameters: {
+        type: "object",
+        properties: {
+          contratoId: { type: "string", description: "UUID do contrato do Clubinho" },
+        },
+        required: ["contratoId"],
+      },
+    },
+  },
 ];
 
 export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   readonly nome = "Gemini-1.5-Flash-Autonomous-Agent";
 
   /**
-   * Obtém a chave de API estritamente do ambiente do servidor ou Vite env
+   * Obtém a chave de API do ambiente do servidor, Vite env ou variáveis de runtime
    */
-  /**
-   * Obtém a chave de API do ambiente do servidor ou Vite env
-   */
-  public obterApiKeyServidor(): { key: string; isGateway: boolean } | null {
+  public obterApiKeyServidor(): {
+    key: string;
+    isGateway: boolean;
+    endpoint: string;
+    model: string;
+  } | null {
+    let chave = "";
+
     if (typeof process !== "undefined" && process.env) {
-      const k =
+      chave =
         process.env.LOVABLE_API_KEY ||
         process.env.OPENAI_API_KEY ||
         process.env.GEMINI_API_KEY ||
         process.env.GOOGLE_AI_API_KEY ||
         process.env.GOOGLE_API_KEY ||
-        process.env.GROQ_API_KEY;
-      if (k) {
-        return { key: k, isGateway: true };
-      }
+        process.env.GROQ_API_KEY ||
+        "";
     }
 
-    if (typeof import.meta !== "undefined" && (import.meta as any).env) {
+    if (!chave && typeof import.meta !== "undefined" && (import.meta as any).env) {
       const env = (import.meta as any).env;
-      const k =
+      chave =
         env.VITE_LOVABLE_API_KEY ||
         env.LOVABLE_API_KEY ||
         env.VITE_OPENAI_API_KEY ||
@@ -298,13 +477,33 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         env.VITE_GEMINI_API_KEY ||
         env.GEMINI_API_KEY ||
         env.VITE_GOOGLE_AI_API_KEY ||
-        env.GOOGLE_AI_API_KEY;
-      if (k) {
-        return { key: k, isGateway: true };
-      }
+        env.GOOGLE_AI_API_KEY ||
+        "";
     }
 
-    return null;
+    if (!chave && typeof globalThis !== "undefined") {
+      chave = (globalThis as any).__JESSI_API_KEY__ || "";
+    }
+
+    if (!chave) return null;
+
+    // Se a chave for do Google AI Studio direta (começa com AIzaSy)
+    if (chave.startsWith("AIzaSy")) {
+      return {
+        key: chave,
+        isGateway: false,
+        endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        model: "gemini-1.5-flash",
+      };
+    }
+
+    // Padrão Lovable Gateway
+    return {
+      key: chave,
+      isGateway: true,
+      endpoint: LOVABLE_GATEWAY,
+      model: GEMINI_CONFIG.MODEL,
+    };
   }
 
   /**
@@ -326,7 +525,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
       try {
         const body: any = {
-          model: GEMINI_CONFIG.MODEL,
+          model: auth.model,
           temperature,
           messages,
         };
@@ -334,7 +533,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
           body.response_format = { type: "json_object" };
         }
 
-        const resp = await fetch(LOVABLE_GATEWAY, {
+        const resp = await fetch(auth.endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -419,7 +618,6 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
 7. Quando a busca retornar múltiplos candidatos, LISTE-OS pelo nome e pergunte qual deseja consultar. Nunca escolha silenciosamente.
 8. Formate valores monetários em R$ (ex: R$ 80,00).`;
 
-
     const messages: any[] = [
       { role: "system", content: systemPrompt },
     ];
@@ -444,14 +642,14 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
     if (auth?.key) {
       try {
         // PASSADA 1: Envia com Tools disponíveis
-        const resPass1 = await fetch(LOVABLE_GATEWAY, {
+        const resPass1 = await fetch(auth.endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${auth.key}`,
           },
           body: JSON.stringify({
-            model: GEMINI_CONFIG.MODEL,
+            model: auth.model,
             temperature: 0.4,
             messages,
             tools: OPENAI_TOOLS_SCHEMA,
@@ -581,6 +779,102 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
                 continue;
               }
 
+              if (toolNome === "preparar_cadastro_cliente") {
+                const actionId = `action_cli_${Date.now()}`;
+                pendingAction = {
+                  id: actionId,
+                  type: "cadastro_cliente",
+                  tool: "executar_cadastro_cliente",
+                  title: "Confirmar Cadastro de Cliente",
+                  summary: `Cadastrar cliente ${toolArgs.nome}${toolArgs.telefone ? ` (${toolArgs.telefone})` : ""}`,
+                  riskLevel: "baixo",
+                  params: toolArgs,
+                  created_at: new Date().toISOString(),
+                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+                };
+
+                cards.push({
+                  type: "confirmacao",
+                  title: "Proposta de Novo Cliente",
+                  subtitle: `${toolArgs.nome} • Tel: ${toolArgs.telefone || "Não informado"}`,
+                  data: { pendingAction, ...toolArgs },
+                });
+
+                messages.push({
+                  role: "tool",
+                  tool_call_id: tCall.id,
+                  content: JSON.stringify({
+                    status: "proposta_cadastro_criada",
+                    detalhes: toolArgs,
+                  }),
+                });
+                continue;
+              }
+
+              if (toolNome === "preparar_consumo_credito") {
+                const actionId = `action_cred_${Date.now()}`;
+                pendingAction = {
+                  id: actionId,
+                  type: "consumo_credito",
+                  tool: "executar_consumo_credito",
+                  title: "Confirmar Uso de Crédito do Clubinho",
+                  summary: `Abater 1 serviço do pacote do Clubinho`,
+                  riskLevel: "baixo",
+                  params: toolArgs,
+                  created_at: new Date().toISOString(),
+                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+                };
+
+                cards.push({
+                  type: "confirmacao",
+                  title: "Consumo de Crédito do Clubinho",
+                  subtitle: "Abatimento de 1 banho no plano",
+                  data: { pendingAction, ...toolArgs },
+                });
+
+                messages.push({
+                  role: "tool",
+                  tool_call_id: tCall.id,
+                  content: JSON.stringify({
+                    status: "proposta_credito_criada",
+                    detalhes: toolArgs,
+                  }),
+                });
+                continue;
+              }
+
+              if (toolNome === "preparar_estorno") {
+                const actionId = `action_est_${Date.now()}`;
+                pendingAction = {
+                  id: actionId,
+                  type: "estorno",
+                  tool: "executar_estorno",
+                  title: "Confirmar Estorno Financeiro",
+                  summary: `Estornar pagamento: ${toolArgs.motivo || "A pedido do cliente"}`,
+                  riskLevel: "alto",
+                  params: toolArgs,
+                  created_at: new Date().toISOString(),
+                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+                };
+
+                cards.push({
+                  type: "confirmacao",
+                  title: "Proposta de Estorno",
+                  subtitle: `Motivo: ${toolArgs.motivo || "Não informado"}`,
+                  data: { pendingAction, ...toolArgs },
+                });
+
+                messages.push({
+                  role: "tool",
+                  tool_call_id: tCall.id,
+                  content: JSON.stringify({
+                    status: "proposta_estorno_criada",
+                    detalhes: toolArgs,
+                  }),
+                });
+                continue;
+              }
+
               // Executa a ferramenta de consulta diretamente no Supabase
               const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
               dadosUltimaTool = resTool?.data || resTool;
@@ -613,14 +907,14 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
 
             // PASSADA 2: IA sintetiza os dados reais do banco com calor humano
             try {
-              const resPass2 = await fetch(LOVABLE_GATEWAY, {
+              const resPass2 = await fetch(auth.endpoint, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${auth.key}`,
                 },
                 body: JSON.stringify({
-                  model: GEMINI_CONFIG.MODEL,
+                  model: auth.model,
                   temperature: 0.4,
                   messages,
                 }),
@@ -664,6 +958,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING):
         console.warn("[JessiV2 Autonomous Agent] Erro no gateway, acionando despacho resiliente:", errGateway);
       }
     }
+
 
     // DISPATCHER RESILIENTE DIRETO DE FERRAMENTAS
     // Garante que mesmo offline ou sem resposta do gateway, o comando é executado e os dados reais são mostrados e falados!

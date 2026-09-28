@@ -20,11 +20,16 @@ export function humanizarRespostaParaVoz(
   const cardConfirmacao = (cards || []).find((c) => c.type === "confirmacao" || c.type === "confirmacao_agendamento");
   if (cardConfirmacao?.data) {
     const d = cardConfirmacao.data;
-    const pet = d.petNome || d.pet?.nome || "o pet";
-    const servico = d.servicoNome || d.servico?.nome || "o serviço";
-    const data = d.data || "hoje";
-    const hora = d.hora ? `às ${d.hora.slice(0, 5)}` : "";
-    return `Preparei o agendamento do ${pet} para ${servico} ${data} ${hora}. Posso confirmar?`;
+    // Se a ação já foi executada com sucesso, não repetir a pergunta de confirmação
+    if (d.executado === true || d.pendingAction?.executado === true) {
+      // Deixa o texto original da resposta (ex: "Agendamento confirmado!") ser falado
+    } else {
+      const pet = d.petNome || d.pet?.nome || d.pendingAction?.params?.petNome || "o pet";
+      const servico = d.servicoNome || d.servico?.nome || d.pendingAction?.params?.servicoNome || "o serviço";
+      const data = d.data || d.pendingAction?.params?.data || "hoje";
+      const hora = (d.hora || d.pendingAction?.params?.hora) ? `às ${(d.hora || d.pendingAction?.params?.hora).slice(0, 5)}` : "";
+      return `Preparei o agendamento do ${pet} para ${servico} ${data} ${hora}. Posso confirmar?`;
+    }
   }
 
   // 2. Limpeza inteligente de formatação markdown e estruturação para leitura por voz
