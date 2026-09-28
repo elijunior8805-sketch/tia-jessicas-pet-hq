@@ -70,7 +70,18 @@ export async function reconciliarCobrancasComPagamentos(supabase: any) {
 
     if (pagErr || !pagamentos) return;
 
-    const pagMap = new Map(pagamentos.map((p: any) => [p.id, p]));
+    type PagamentoConciliacao = {
+      id: string;
+      status: string;
+      arquivado_em: string | null;
+      is_teste: boolean | null;
+      valor_total: number | null;
+      valor_pago: number | null;
+      vencimento: string | null;
+    };
+    const pagMap = new Map<string, PagamentoConciliacao>(
+      (pagamentos as PagamentoConciliacao[]).map((p) => [p.id, p]),
+    );
 
     const { data: cobrancas, error: cobErr } = await supabase
       .from("cobrancas")
