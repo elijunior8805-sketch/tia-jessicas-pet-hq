@@ -610,31 +610,62 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       minute: "2-digit",
     }).format(new Date());
 
+    // 1. CARREGA SNAPSHOT OPERACIONAL EM TEMPO REAL DO SPA
+    let snapshotTexto = "";
+    let totalAgendadosHoje = 0;
+    let vagasHojeTexto = "";
+    let faturamentoMes = 0;
+    let listaInativosQtd = 0;
+
+    try {
+      const [resAgendaHoje, resFinHoje, resVagasHoje, resInativos] = await Promise.all([
+        sb.from("agendamentos").select("id, hora, status, pets(nome), clientes(nome), servicos(nome), leva_traz_modalidade").eq("data", hojeStr).order("hora", { ascending: true }),
+        sb.from("pagamentos").select("valor, status").gte("data_pagamento", `${hojeStr.slice(0, 7)}-01`),
+        AgendaAdapter.identificarEncaixesDisponiveis(sb, hojeStr).catch(() => null),
+        sb.from("clientes").select("id, nome, pets(nome)").limit(10),
+      ]);
+
+      totalAgendadosHoje = resAgendaHoje?.data?.length || 0;
+      const proximosHoje = (resAgendaHoje?.data || [])
+        .map((a: any) => `${(a.pets as any)?.nome || "Pet"} às ${(a.hora || "").slice(0, 5)} (${(a.servicos as any)?.nome || "Banho"}, tutor: ${(a.clientes as any)?.nome || "Tutor"})`)
+        .join("; ");
+      vagasHojeTexto = (resVagasHoje as any)?.data?.horariosSugeridos?.slice(0, 5).join(", ") || "vagas livres a consultar";
+      faturamentoMes = (resFinHoje?.data || []).reduce((acc: number, p: any) => acc + Number(p.valor || 0), 0);
+      listaInativosQtd = resInativos?.data?.length || 0;
+
+      snapshotTexto = `
+DADOS OPERACIONAIS EM TEMPO REAL DO SPA:
+- Data de Referência: ${hojeStr} (${horaAtualStr})
+- Atendimentos agendados hoje (${totalAgendadosHoje}): ${proximosHoje || "Nenhum agendamento agendado até o momento para hoje"}
+- Horários livres hoje na grade: ${vagasHojeTexto}
+- Faturamento do mês: R$ ${faturamentoMes.toFixed(2)}
+- Clientes com potencial de reativação: ${listaInativosQtd} tutores disponíveis
+`;
+    } catch (errSnap) {
+      console.warn("[JessiV2] Aviso ao carregar snapshot em tempo real:", errSnap);
+    }
+
     const systemPrompt = `${JESSI_V2_SYSTEM_PROMPT}
 
 CONTEXTO TEMPORAL E OPERACIONAL ATUAL:
-- Data de Referência do Sistema: ${hojeStr}
-- Hora Local Atual (São Paulo): ${horaAtualStr}
 - Operador Ativo: ${user?.nome || "Eli Júnior"} (${user?.cargo || "Administrador"})
-IMPORTANTE: Chame o operador sempre pelo nome próprio ("${user?.nome || 'Eli'}"). NUNCA se dirija a ele como "Proprietário", "Usuário" ou "Admin". Trate-o como parceiro executivo próximo e respeitoso.
+IMPORTANTE: Chame o operador sempre pelo primeiro nome ("${user?.nome?.split(" ")[0] || "Eli"}"). NUNCA se dirija a ele como "Proprietário", "Usuário" ou "Admin". Trate-o como parceiro executivo próximo, dinâmico e inteligente.
 ${contexto.pet?.nome ? `- Pet Selecionado no Contexto: ${contexto.pet.nome} (ID: ${contexto.pet.id || "N/A"})` : ""}
 ${contexto.cliente?.nome ? `- Cliente/Tutor no Contexto: ${contexto.cliente.nome} (ID: ${contexto.cliente.id || "N/A"})` : ""}
+${snapshotTexto}
 
-DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
-1. Sempre que a pergunta envolver dados reais (agenda, horários, clientes, faturamento, histórico, planos, estoque), invoque a ferramenta correspondente para obter dados precisos do banco.
-2. Seja proativa, inteligente e parceira executiva! Não dê respostas curtas ou monótonas. Contextualize a resposta, traga ideias práticas de operação, comente sobre os pets com afeto e sugira os próximos passos.
-3. Se o operador pedir para "consultar um cliente", "buscar um cliente", "procurar" ou mencionar QUALQUER nome de pessoa ou pet, invoque IMEDIATAMENTE 'buscar_clientes_pets' com o nome/termo mencionado.
-4. Se o operador pedir para consultar clientes sem fornecer um nome, invoque 'buscar_clientes_pets' sem termo para trazer os mais recentes e pergunte quem ele deseja consultar de forma acolhedora.
-5. Se o operador quiser agendar, remarcar ou cancelar, use 'preparar_agendamento', 'preparar_reagendamento' ou 'preparar_cancelamento'.
-6. NUNCA mencione que você chamou uma 'ferramenta', 'função', 'payload' ou 'banco de dados'. Fale sempre como uma colega de trabalho experiente, humana e atenciosa.
-7. NUNCA diga "não consegui identificar o cliente". Se a busca retornar resultados, apresente-os com clareza e destaque. Se a busca retornar vazio, diga com gentileza que não encontrou o cadastro e pergunte se deseja registrar um novo cliente.
-8. Formate valores monetários em R$ (ex: R$ 80,00).`;
+DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
+1. Responda a QUALQUER pergunta, conselho, brincadeira, lembrete (ex: beber água, pausas, dicas de gestão), saudação ou dúvida de forma fluida, natural, inteligente e humana (estilo Gemini Live / ChatGPT).
+2. Não seja robótica, rígida ou travada. Demonstre proatividade e afeto com os pets.
+3. Se o usuário pedir para buscar um cliente/pet, sugerir clientes inativos para encaixe, agendar, cancelar, ver financeiro ou qualquer ação no sistema, inclua no final da sua resposta uma tag de ação estruturada:
+<<<ACTION:{"tool":"identificar_clientes_retorno"|"buscar_clientes_pets"|"consultar_agenda"|"consultar_financeiro_consolidado"|"consultar_horarios_disponiveis"|"preparar_agendamento"|"preparar_cancelamento"|"gerar_mensagens_cobranca", "params":{...}}>>>
+4. Formate valores monetários em R$ (ex: R$ 80,00).`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
     ];
 
-    // Histórico recente (máximo 8 mensagens para manter contexto conversacional rico)
+    // Histórico recente
     const historicoRecente = historico.slice(-8);
     for (const h of historicoRecente) {
       if (h.role === "user" || h.role === "assistant") {
@@ -651,357 +682,70 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
     let pendingAction: JessiV2PendingAction | null = null;
     let novoContexto: Partial<JessiV2ContextState> = {};
 
+    // Tenta chamada direta ao LLM (Gemini 1.5 Flash via Lovable Gateway)
     if (auth?.key) {
       try {
-        // PASSADA 1: Envia com Tools disponíveis
-        const resPass1 = await fetch(auth.endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${auth.key}`,
-          },
-          body: JSON.stringify({
-            model: auth.model,
-            temperature: 0.7,
-            messages,
-            tools: OPENAI_TOOLS_SCHEMA,
-            tool_choice: "auto",
-          }),
-        });
+        const textoGerado = await this.executarRequisicaoIA(messages, false, 0.7);
 
-        if (resPass1.ok) {
-          const dataPass1: any = await resPass1.json();
-          const choice = dataPass1?.choices?.[0];
-          const msgAssistant = choice?.message;
+        if (textoGerado && textoGerado.trim().length > 0) {
+          let textoLimpo = textoGerado.trim();
 
-          // Se a IA decidiu chamar ferramentas
-          if (msgAssistant?.tool_calls && msgAssistant.tool_calls.length > 0) {
-            messages.push(msgAssistant);
-            let dadosUltimaTool: any = null;
-            let nomeUltimaTool: string = "";
+          // Extrai tag de ação <<<ACTION:{...}>>> se o Gemini gerou
+          const actionMatch = textoLimpo.match(/<<<ACTION:([\s\S]*?)>>>/);
+          let toolAlvo: string | null = null;
+          let toolParams: any = {};
 
-            for (const tCall of msgAssistant.tool_calls) {
-              const toolNome = tCall.function.name;
-              nomeUltimaTool = toolNome;
-              let toolArgs: any = {};
-              try {
-                toolArgs = JSON.parse(tCall.function.arguments || "{}");
-              } catch {
-                toolArgs = {};
-              }
-
-              // Tratamento de propostas de mutação supervisionada
-              if (toolNome === "preparar_agendamento") {
-                const actionId = `action_agenda_${Date.now()}`;
-                pendingAction = {
-                  id: actionId,
-                  type: "agendamento",
-                  tool: "criar_agendamento",
-                  title: "Confirmar Agendamento",
-                  summary: `Agendar ${toolArgs.servicoNome || "Banho"} para ${toolArgs.petNome || "Pet"} no dia ${toolArgs.data || hojeStr} às ${toolArgs.hora}`,
-                  riskLevel: "medio",
-                  params: toolArgs,
-                  created_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                };
-
-                cards.push({
-                  type: "confirmacao",
-                  title: "Proposta de Agendamento",
-                  subtitle: `${toolArgs.petNome || "Pet"} • ${toolArgs.data || hojeStr} às ${toolArgs.hora}`,
-                  data: {
-                    pendingAction,
-                    ...toolArgs,
-                  },
-                });
-
-                messages.push({
-                  role: "tool",
-                  tool_call_id: tCall.id,
-                  content: JSON.stringify({
-                    status: "proposta_criada",
-                    mensagem: "Proposta de agendamento montada na tela para confirmação do operador.",
-                    detalhes: toolArgs,
-                  }),
-                });
-                continue;
-              }
-
-              if (toolNome === "preparar_cancelamento") {
-                const actionId = `action_canc_${Date.now()}`;
-                pendingAction = {
-                  id: actionId,
-                  type: "cancelamento",
-                  tool: "cancelar_agendamento",
-                  title: "Confirmar Cancelamento",
-                  summary: `Cancelar agendamento de ${toolArgs.petNome || "Pet"}`,
-                  riskLevel: "alto",
-                  params: toolArgs,
-                  created_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                };
-
-                cards.push({
-                  type: "confirmacao",
-                  title: "Proposta de Cancelamento",
-                  subtitle: `Pet: ${toolArgs.petNome || "Pet"}`,
-                  data: { pendingAction, ...toolArgs },
-                });
-
-                messages.push({
-                  role: "tool",
-                  tool_call_id: tCall.id,
-                  content: JSON.stringify({
-                    status: "proposta_cancelamento_criada",
-                    detalhes: toolArgs,
-                  }),
-                });
-                continue;
-              }
-
-              if (toolNome === "preparar_reagendamento") {
-                const actionId = `action_reag_${Date.now()}`;
-                pendingAction = {
-                  id: actionId,
-                  type: "reagendamento",
-                  tool: "reagendar_agendamento",
-                  title: "Confirmar Remarcação",
-                  summary: `Remarcar ${toolArgs.petNome || "Pet"} para ${toolArgs.novaData} às ${toolArgs.novaHora}`,
-                  riskLevel: "medio",
-                  params: toolArgs,
-                  created_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                };
-
-                cards.push({
-                  type: "confirmacao",
-                  title: "Proposta de Remarcação",
-                  subtitle: `Novo horário: ${toolArgs.novaData} às ${toolArgs.novaHora}`,
-                  data: { pendingAction, ...toolArgs },
-                });
-
-                messages.push({
-                  role: "tool",
-                  tool_call_id: tCall.id,
-                  content: JSON.stringify({
-                    status: "proposta_reagendamento_criada",
-                    detalhes: toolArgs,
-                  }),
-                });
-                continue;
-              }
-
-              if (toolNome === "preparar_cadastro_cliente") {
-                const actionId = `action_cli_${Date.now()}`;
-                pendingAction = {
-                  id: actionId,
-                  type: "cadastro_cliente",
-                  tool: "executar_cadastro_cliente",
-                  title: "Confirmar Cadastro de Cliente",
-                  summary: `Cadastrar cliente ${toolArgs.nome}${toolArgs.telefone ? ` (${toolArgs.telefone})` : ""}`,
-                  riskLevel: "baixo",
-                  params: toolArgs,
-                  created_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                };
-
-                cards.push({
-                  type: "confirmacao",
-                  title: "Proposta de Novo Cliente",
-                  subtitle: `${toolArgs.nome} • Tel: ${toolArgs.telefone || "Não informado"}`,
-                  data: { pendingAction, ...toolArgs },
-                });
-
-                messages.push({
-                  role: "tool",
-                  tool_call_id: tCall.id,
-                  content: JSON.stringify({
-                    status: "proposta_cadastro_criada",
-                    detalhes: toolArgs,
-                  }),
-                });
-                continue;
-              }
-
-              if (toolNome === "preparar_consumo_credito") {
-                const actionId = `action_cred_${Date.now()}`;
-                pendingAction = {
-                  id: actionId,
-                  type: "consumo_credito",
-                  tool: "executar_consumo_credito",
-                  title: "Confirmar Uso de Crédito do Clubinho",
-                  summary: `Abater 1 serviço do pacote do Clubinho`,
-                  riskLevel: "baixo",
-                  params: toolArgs,
-                  created_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                };
-
-                cards.push({
-                  type: "confirmacao",
-                  title: "Consumo de Crédito do Clubinho",
-                  subtitle: "Abatimento de 1 banho no plano",
-                  data: { pendingAction, ...toolArgs },
-                });
-
-                messages.push({
-                  role: "tool",
-                  tool_call_id: tCall.id,
-                  content: JSON.stringify({
-                    status: "proposta_credito_criada",
-                    detalhes: toolArgs,
-                  }),
-                });
-                continue;
-              }
-
-              if (toolNome === "preparar_estorno") {
-                const actionId = `action_est_${Date.now()}`;
-                pendingAction = {
-                  id: actionId,
-                  type: "estorno",
-                  tool: "executar_estorno",
-                  title: "Confirmar Estorno Financeiro",
-                  summary: `Estornar pagamento: ${toolArgs.motivo || "A pedido do cliente"}`,
-                  riskLevel: "alto",
-                  params: toolArgs,
-                  created_at: new Date().toISOString(),
-                  expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                };
-
-                cards.push({
-                  type: "confirmacao",
-                  title: "Proposta de Estorno",
-                  subtitle: `Motivo: ${toolArgs.motivo || "Não informado"}`,
-                  data: { pendingAction, ...toolArgs },
-                });
-
-                messages.push({
-                  role: "tool",
-                  tool_call_id: tCall.id,
-                  content: JSON.stringify({
-                    status: "proposta_estorno_criada",
-                    detalhes: toolArgs,
-                  }),
-                });
-                continue;
-              }
-
-              // Executa a ferramenta de consulta diretamente no Supabase
-              const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
-              dadosUltimaTool = resTool?.data || resTool;
-
-              // Converte o resultado em Card visual adequado
-              this.anexarCardVisual(cards, toolNome, resTool, toolArgs);
-
-              // Atualiza contexto caso cliente/pet tenham sido selecionados
-              if (toolNome === "obter_ficha_pet" && resTool?.data) {
-                novoContexto.pet = {
-                  id: resTool.data.id,
-                  nome: resTool.data.nome,
-                  raca: resTool.data.raca,
-                  porte: resTool.data.porte,
-                };
-              } else if (toolNome === "obter_ficha_cliente" && resTool?.data) {
-                novoContexto.cliente = {
-                  id: resTool.data.id,
-                  nome: resTool.data.nome,
-                  telefone: resTool.data.telefone,
-                };
-              }
-
-              messages.push({
-                role: "tool",
-                tool_call_id: tCall.id,
-                content: JSON.stringify(resTool?.data || resTool || { ok: true }),
-              });
-            }
-
-            // PASSADA 2: IA sintetiza os dados reais do banco com calor humano
+          if (actionMatch && actionMatch[1]) {
             try {
-              const resPass2 = await fetch(auth.endpoint, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${auth.key}`,
-                },
-                body: JSON.stringify({
-                  model: auth.model,
-                  temperature: 0.7,
-                  messages,
-                }),
-              });
-
-              if (resPass2.ok) {
-                const dataPass2: any = await resPass2.json();
-                const finalContent = dataPass2?.choices?.[0]?.message?.content?.trim();
-                if (finalContent) {
-                  return {
-                    respostaTexto: finalContent,
-                    cards,
-                    pendingAction,
-                    novoContexto,
-                  };
-                }
-              }
-            } catch (errPass2) {
-              console.warn("[JessiV2] Falha na passada 2 do Gateway, gerando síntese local:", errPass2);
+              const parsedAction = JSON.parse(actionMatch[1].trim());
+              toolAlvo = parsedAction.tool;
+              toolParams = parsedAction.params || {};
+              textoLimpo = textoLimpo.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim();
+            } catch {
+              // ignore json parse error
             }
-
-            // Síntese local resiliente dos dados recuperados da ferramenta
-            const resLocal = this.sintetizarResultadoLocal(nomeUltimaTool, dadosUltimaTool, user?.nome || "Eli");
-            return {
-              respostaTexto: resLocal,
-              cards,
-              pendingAction,
-              novoContexto,
-            };
-          } else if (msgAssistant?.content) {
-            // IA respondeu diretamente (conversa natural, conselho ou esclarecimento)
-            return {
-              respostaTexto: msgAssistant.content.trim(),
-              cards,
-              pendingAction,
-              novoContexto,
-            };
           }
-        } else {
-          // Passada 1 com tools retornou erro HTTP: tenta chamada conversacional direta ao LLM com dados do contexto
-          const errText = await resPass1.text().catch(() => "");
-          console.warn(`[JessiV2] Gateway retornou HTTP ${resPass1.status} (${errText.slice(0, 80)}). Tentando síntese LLM direta.`);
-          
-          try {
-            const resDireto = await fetch(auth.endpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${auth.key}`,
-              },
-              body: JSON.stringify({
-                model: auth.model,
-                temperature: 0.7,
-                messages,
-              }),
-            });
 
-            if (resDireto.ok) {
-              const dataDireto: any = await resDireto.json();
-              const conteudo = dataDireto?.choices?.[0]?.message?.content?.trim();
-              if (conteudo) {
-                return {
-                  respostaTexto: conteudo,
-                  cards,
-                  pendingAction,
-                  novoContexto,
-                };
-              }
+          // Detecção complementar de intenção de ação se o usuário pediu dados específicos
+          const msgNorm = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (!toolAlvo) {
+            if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
+              toolAlvo = "identificar_clientes_retorno";
+            } else if (msgNorm.includes("buscar") || msgNorm.includes("procurar") || msgNorm.includes("ficha") || msgNorm.includes("tutor") || msgNorm.includes("cliente")) {
+              const termo = mensagemUsuario.replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "").trim();
+              toolAlvo = "buscar_clientes_pets";
+              toolParams = { termo };
+            } else if (msgNorm.includes("horario") || msgNorm.includes("vaga") || msgNorm.includes("encaixe") || msgNorm.includes("livre")) {
+              toolAlvo = "consultar_horarios_disponiveis";
+              toolParams = { data: hojeStr };
+            } else if (msgNorm.includes("agenda") || msgNorm.includes("atendimento") || msgNorm.includes("proximo pet") || msgNorm.includes("proximo")) {
+              toolAlvo = "consultar_agenda";
+              toolParams = { data: hojeStr };
+            } else if (msgNorm.includes("financeiro") || msgNorm.includes("faturamento") || msgNorm.includes("receber") || msgNorm.includes("caixa")) {
+              toolAlvo = "consultar_financeiro_consolidado";
+              toolParams = { periodo: "mes" };
             }
-          } catch (errDireto) {
-            console.warn("[JessiV2] Tentativa de chamada LLM direta também falhou:", errDireto);
           }
+
+          // Se há ferramenta de ação a ser executada no Supabase, executa e anexa o card visual
+          if (toolAlvo) {
+            try {
+              const resTool = await despacharFerramentaV2(sb, toolAlvo, toolParams);
+              this.anexarCardVisual(cards, toolAlvo, resTool, toolParams);
+            } catch (errTool) {
+              console.warn(`[JessiV2] Erro ao despachar ferramenta visual ${toolAlvo}:`, errTool);
+            }
+          }
+
+          return {
+            respostaTexto: textoLimpo,
+            cards,
+            pendingAction,
+            novoContexto,
+          };
         }
-      } catch (errGateway) {
-        console.warn("[JessiV2 Autonomous Agent] Erro no gateway, acionando despacho resiliente:", errGateway);
+      } catch (errLLM) {
+        console.warn("[JessiV2] Falha na chamada direta ao LLM, acionando despacho resiliente:", errLLM);
       }
     }
 
@@ -1064,7 +808,58 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 1. Próximo Pet / Quem é o Próximo / Fila de Atendimento
+    // 0.1 Conversação Empática e Lembretes de Bem-Estar (Água, Pausas, Agradecimentos)
+    if (
+      msg.includes("agua") ||
+      msg.includes("água") ||
+      msg.includes("beber") ||
+      msg.includes("hidrat") ||
+      msg.includes("obrigad") ||
+      msg.includes("valeu") ||
+      msg.includes("top") ||
+      msg.includes("legal") ||
+      msg.includes("descans") ||
+      msg.includes("pausa") ||
+      msg.includes("almoc") ||
+      msg.includes("almoç")
+    ) {
+      if (msg.includes("agua") || msg.includes("água") || msg.includes("hidrat")) {
+        return {
+          texto: `Muito obrigado pelo lembrete de hidratação, ${nomeOp}! Cuidar da água e fazer pequenas pausas é essencial para mantermos o foco e a energia alta na rotina do Spa. Já tomei meu gole virtual de água! Como posso te ajudar na operação agora?`,
+        };
+      }
+      return {
+        texto: `Muito obrigado, ${nomeOp}! É sempre um prazer estar ao seu lado cuidando da operação do Spa de Pet. Conte comigo para a agenda, clientes, financeiro e qualquer detalhe do dia!`,
+      };
+    }
+
+    // 1. Clientes Inativos / Reativação / Sugestão de Encaixe com Clientes Sumidos
+    if (
+      msg.includes("inativ") ||
+      msg.includes("reativa") ||
+      msg.includes("retorno") ||
+      msg.includes("ausente") ||
+      msg.includes("sumido") ||
+      msg.includes("saudade") ||
+      (msg.includes("sugerir") && msg.includes("encaixe")) ||
+      (msg.includes("clientes") && msg.includes("encaixe"))
+    ) {
+      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
+      const d = resRet?.data || resRet;
+      const lista = Array.isArray(d) ? d : d?.clientes || [];
+
+      return {
+        texto: `Identifiquei **${lista.length} cliente(s) inativo(s)** que não vêm ao Spa há mais de 25 dias, ${nomeOp}! Preparei a lista com os pets e sugestões de mensagens de carinho prontas para disparo no WhatsApp, para preenchermos os horários livres da grade!`,
+        card: {
+          type: "reativacao",
+          title: "Clientes Inativos para Encaixe",
+          subtitle: `${lista.length} tutores com potencial de retorno`,
+          data: lista,
+        },
+      };
+    }
+
+    // 2. Próximo Pet / Quem é o Próximo / Fila de Atendimento
     if (
       msg.includes("proximo pet") ||
       msg.includes("proximo atendimento") ||
@@ -1110,7 +905,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 2. Atrasos / Quem está atrasado / Sentinelas
+    // 3. Atrasos / Quem está atrasado / Sentinelas
     if (
       msg.includes("atrasad") ||
       msg.includes("atraso") ||
@@ -1150,7 +945,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 3. Financeiro / Valores a Receber / Faturamento / Caixa
+    // 4. Financeiro / Valores a Receber / Faturamento / Caixa
     if (
       msg.includes("receber") ||
       msg.includes("financeiro") ||
@@ -1184,7 +979,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 4. Horários Disponíveis / Vagas / Grade Livre
+    // 5. Horários Disponíveis / Vagas / Grade Livre
     if (
       msg.includes("horario") ||
       msg.includes("vaga") ||
@@ -1332,24 +1127,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 7. Clientes Ausentes / Reativação
-    if (msg.includes("reativa") || msg.includes("retorno") || msg.includes("ausente") || msg.includes("sumido") || msg.includes("saudade")) {
-      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
-      const d = resRet?.data || resRet;
-      const lista = Array.isArray(d) ? d : d?.clientes || [];
-
-      return {
-        texto: `Identifiquei **${lista.length} cliente(s)** que não vêm ao Spa há mais de 25 dias, ${nomeOp}. Preparei a lista com sugestões de mensagens carinhosas para disparo no WhatsApp!`,
-        card: {
-          type: "reativacao",
-          title: "Clientes Ausentes com Potencial de Retorno",
-          subtitle: `${lista.length} clientes identificados`,
-          data: lista,
-        },
-      };
-    }
-
-    // 8. Aniversariantes
+    // 7. Aniversariantes
     if (msg.includes("aniversari") || msg.includes("parabens") || msg.includes("niver")) {
       const resAniv = await despacharFerramentaV2(sb, "consultar_aniversariantes", {});
       const d = resAniv?.data || resAniv;
