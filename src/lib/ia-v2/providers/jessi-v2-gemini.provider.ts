@@ -742,13 +742,25 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
           // Detecção complementar de intenção de ação se o usuário pediu dados específicos
           const msgNorm = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           if (!toolAlvo) {
-            if (msgNorm.includes("pix") || msgNorm.includes("cobranca") || msgNorm.includes("cobrar") || msgNorm.includes("pagamento online")) {
+            if (
+              msgNorm.includes("pix") ||
+              msgNorm.includes("link") ||
+              msgNorm.includes("cartao") ||
+              msgNorm.includes("cartão") ||
+              msgNorm.includes("credito") ||
+              msgNorm.includes("crédito") ||
+              msgNorm.includes("cobranca") ||
+              msgNorm.includes("cobrar") ||
+              msgNorm.includes("pagamento") ||
+              msgNorm.includes("pagar") ||
+              msgNorm.includes("checkout")
+            ) {
               const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
               const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
               toolAlvo = "gerar_cobranca_pix_mercadopago";
               toolParams = {
                 valor: valorNum,
-                descricao: "Cobrança Pix Pet Spa Tia Jéssica",
+                descricao: "Cobrança Pet Spa Tia Jéssica",
               };
             } else if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
               toolAlvo = "identificar_clientes_retorno";
@@ -874,14 +886,19 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
       };
     }
 
-    // 0.2 Cobrança Pix Online Mercado Pago
+    // 0.2 Cobrança Pix e Cartão de Crédito Online Mercado Pago
     if (
       msg.includes("pix") ||
-      msg.includes("gerar pix") ||
-      msg.includes("criar pix") ||
+      msg.includes("link") ||
+      msg.includes("cartao") ||
+      msg.includes("cartão") ||
+      msg.includes("credito") ||
+      msg.includes("crédito") ||
       msg.includes("cobranca") ||
       msg.includes("cobrar") ||
-      msg.includes("pagamento online")
+      msg.includes("pagamento") ||
+      msg.includes("pagar") ||
+      msg.includes("checkout")
     ) {
       const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
       const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;

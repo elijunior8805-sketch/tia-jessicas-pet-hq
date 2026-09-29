@@ -229,16 +229,20 @@ export class VoiceRecognizer {
     const palavras = textoAtual.split(/\s+/).filter(Boolean);
 
     // Detecção dinâmica de latência:
-    // 1. Respostas rápidas e confirmações ("sim", "pode confirmar", "cancela") -> 550ms
-    const ehComandoCurto =
-      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|pode|autorizado|fechar|sair|agendar)$/i.test(textoAtual) ||
-      palavras.length <= 2;
+    // 1. Respostas rápidas e confirmações explícitas de 1 única palavra ("sim", "pode confirmar", "cancela") -> 1200ms
+    const ehConfirmacaoExplicita =
+      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|autorizado)$/i.test(textoAtual);
 
-    let delayCalculado = this.silenceMs;
-    if (ehComandoCurto && palavras.length <= 2) {
-      delayCalculado = 700;
-    } else if (palavras.length >= 3) {
-      delayCalculado = Math.min(this.silenceMs, 1200);
+    // 2. Frases incompletas terminadas em preposição ou artigo ("de", "para", "no", "com", "o", "a") ganham mais tempo
+    const terminaEmPreposicao = /\b(de|do|da|para|pra|no|na|com|em|um|uma|por|o|a|e|ao|aos|à|às|ou|que)$/i.test(textoAtual);
+
+    let delayCalculado = this.silenceMs || 2500;
+    if (ehConfirmacaoExplicita) {
+      delayCalculado = 1200;
+    } else if (terminaEmPreposicao) {
+      delayCalculado = 3500;
+    } else {
+      delayCalculado = 2500;
     }
 
     this.silenceTimer = setTimeout(() => {
