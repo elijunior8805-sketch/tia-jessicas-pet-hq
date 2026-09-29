@@ -742,7 +742,15 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
           // Detecção complementar de intenção de ação se o usuário pediu dados específicos
           const msgNorm = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           if (!toolAlvo) {
-            if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
+            if (msgNorm.includes("pix") || msgNorm.includes("cobranca") || msgNorm.includes("cobrar") || msgNorm.includes("pagamento online")) {
+              const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
+              const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
+              toolAlvo = "gerar_cobranca_pix_mercadopago";
+              toolParams = {
+                valor: valorNum,
+                descricao: "Cobrança Pix Pet Spa Tia Jéssica",
+              };
+            } else if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
               toolAlvo = "identificar_clientes_retorno";
             } else if (msgNorm.includes("buscar") || msgNorm.includes("procurar") || msgNorm.includes("ficha") || msgNorm.includes("tutor") || msgNorm.includes("cliente")) {
               const termo = mensagemUsuario.replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "").trim();
@@ -864,6 +872,42 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
       return {
         texto: `Muito obrigado, ${nomeOp}! É sempre um prazer estar ao seu lado cuidando da operação do Spa de Pet. Conte comigo para a agenda, clientes, financeiro e qualquer detalhe do dia!`,
       };
+    }
+
+    // 0.2 Cobrança Pix Online Mercado Pago
+    if (
+      msg.includes("pix") ||
+      msg.includes("gerar pix") ||
+      msg.includes("criar pix") ||
+      msg.includes("cobranca") ||
+      msg.includes("cobrar") ||
+      msg.includes("pagamento online")
+    ) {
+      const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
+      const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
+
+      const resPix = await despacharFerramentaV2(sb, "gerar_cobranca_pix_mercadopago", {
+        valor: valorNum,
+        descricao: "Cobrança Pix Pet Spa Tia Jéssica",
+      });
+
+      const d = resPix?.data || resPix;
+
+      if (resPix.success && (d?.qrCode || d?.qrCodeBase64 || d?.paymentId)) {
+        return {
+          texto: `Gerei a cobrança Pix no valor de **R$ ${valorNum.toFixed(2).replace(".", ",")}** via Mercado Pago com sucesso, ${nomeOp}! O QR Code dinâmico e o código Pix Copia e Cola já estão prontos na tela. O sistema identificará o pagamento automaticamente! ✨`,
+          card: {
+            type: "pix_mercadopago",
+            title: `Pix Mercado Pago · R$ ${valorNum.toFixed(2).replace(".", ",")}`,
+            subtitle: "Baixa automática em tempo real",
+            data: d,
+          },
+        };
+      } else {
+        return {
+          texto: `Não foi possível gerar a cobrança Pix no Mercado Pago no momento, ${nomeOp}. Detalhes: ${resPix.summary || d?.mensagemErro || "Verifique a conexão com o Mercado Pago."}`,
+        };
+      }
     }
 
     // 1. Clientes Inativos / Reativação / Sugestão de Encaixe com Clientes Sumidos
