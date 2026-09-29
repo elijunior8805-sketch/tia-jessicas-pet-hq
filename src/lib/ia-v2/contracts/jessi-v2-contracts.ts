@@ -10,6 +10,7 @@ export const JessiV2CardTypeSchema = z.enum([
   "agenda",
   "cliente",
   "pet",
+  "pix_mercadopago",
   "financeiro",
   "programa",
   "comprovante",

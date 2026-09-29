@@ -55,8 +55,21 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
             });
           }
 
+          if (pagamentoMp.status !== "approved") {
+            return new Response(JSON.stringify({ ok: true, status: pagamentoMp.status }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
+          const reference = pagamentoMp.externalReference;
+          const agendamentoId = typeof reference?.agendamentoId === "string" ? reference.agendamentoId : null;
+          const cobrancaId = typeof reference?.cobrancaId === "string" ? reference.cobrancaId : null;
+          const clienteId = typeof reference?.clienteId === "string" ? reference.clienteId : null;
+
           const url = process.env.SUPABASE_URL || "";
-          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
+          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+          if (!url || !serviceKey) throw new Error("Credenciais de processamento não configuradas");
           const admin = createClient(url, serviceKey, {
             auth: { persistSession: false, autoRefreshToken: false },
           });
@@ -137,8 +150,6 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
             }
 
             console.log(`[Webhook MercadoPago] Sucesso! Baixa automática realizada para o pagamento ${paymentId} (${metodoNormalizado}).`);
-          }
-
           return new Response(
             JSON.stringify({
               ok: true,

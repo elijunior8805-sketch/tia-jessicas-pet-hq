@@ -47,6 +47,7 @@ import { Route as AuthenticatedAtendimentosAtendIdRouteImport } from './routes/_
 import { Route as AuthenticatedClientesIdIndexRouteImport } from './routes/_authenticated/clientes.$id.index'
 import { Route as ApiPublicHooksRelatoriosDiariosRouteImport } from './routes/api/public/hooks/relatorios-diarios'
 import { Route as ApiPublicHooksReguaCobrancaRouteImport } from './routes/api/public/hooks/regua-cobranca'
+import { Route as ApiPublicHooksMercadopagoRouteImport } from './routes/api/public/hooks/mercadopago'
 import { Route as ApiPublicHooksLembretesRouteImport } from './routes/api/public/hooks/lembretes'
 import { Route as AuthenticatedPetsPetIdHistoricoRouteImport } from './routes/_authenticated/pets.$petId.historico'
 import { Route as AuthenticatedPetsPetIdFichaRouteImport } from './routes/_authenticated/pets.$petId.ficha'
@@ -259,6 +260,12 @@ const ApiPublicHooksReguaCobrancaRoute =
     path: '/api/public/hooks/regua-cobranca',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksMercadopagoRoute =
+  ApiPublicHooksMercadopagoRouteImport.update({
+    id: '/api/public/hooks/mercadopago',
+    path: '/api/public/hooks/mercadopago',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksLembretesRoute = ApiPublicHooksLembretesRouteImport.update({
   id: '/api/public/hooks/lembretes',
   path: '/api/public/hooks/lembretes',
@@ -336,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
   '/pets/$petId/historico': typeof AuthenticatedPetsPetIdHistoricoRoute
   '/api/public/hooks/lembretes': typeof ApiPublicHooksLembretesRoute
+  '/api/public/hooks/mercadopago': typeof ApiPublicHooksMercadopagoRoute
   '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
   '/clientes/$id/': typeof AuthenticatedClientesIdIndexRoute
@@ -380,6 +388,7 @@ export interface FileRoutesByTo {
   '/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
   '/pets/$petId/historico': typeof AuthenticatedPetsPetIdHistoricoRoute
   '/api/public/hooks/lembretes': typeof ApiPublicHooksLembretesRoute
+  '/api/public/hooks/mercadopago': typeof ApiPublicHooksMercadopagoRoute
   '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
   '/clientes/$id': typeof AuthenticatedClientesIdIndexRoute
@@ -427,6 +436,7 @@ export interface FileRoutesById {
   '/_authenticated/pets/$petId/ficha': typeof AuthenticatedPetsPetIdFichaRoute
   '/_authenticated/pets/$petId/historico': typeof AuthenticatedPetsPetIdHistoricoRoute
   '/api/public/hooks/lembretes': typeof ApiPublicHooksLembretesRoute
+  '/api/public/hooks/mercadopago': typeof ApiPublicHooksMercadopagoRoute
   '/api/public/hooks/regua-cobranca': typeof ApiPublicHooksReguaCobrancaRoute
   '/api/public/hooks/relatorios-diarios': typeof ApiPublicHooksRelatoriosDiariosRoute
   '/_authenticated/clientes/$id/': typeof AuthenticatedClientesIdIndexRoute
@@ -474,6 +484,7 @@ export interface FileRouteTypes {
     | '/pets/$petId/ficha'
     | '/pets/$petId/historico'
     | '/api/public/hooks/lembretes'
+    | '/api/public/hooks/mercadopago'
     | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
     | '/clientes/$id/'
@@ -518,6 +529,7 @@ export interface FileRouteTypes {
     | '/pets/$petId/ficha'
     | '/pets/$petId/historico'
     | '/api/public/hooks/lembretes'
+    | '/api/public/hooks/mercadopago'
     | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
     | '/clientes/$id'
@@ -564,6 +576,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pets/$petId/ficha'
     | '/_authenticated/pets/$petId/historico'
     | '/api/public/hooks/lembretes'
+    | '/api/public/hooks/mercadopago'
     | '/api/public/hooks/regua-cobranca'
     | '/api/public/hooks/relatorios-diarios'
     | '/_authenticated/clientes/$id/'
@@ -576,6 +589,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReciboCodigoRoute: typeof ReciboCodigoRoute
   ApiPublicHooksLembretesRoute: typeof ApiPublicHooksLembretesRoute
+  ApiPublicHooksMercadopagoRoute: typeof ApiPublicHooksMercadopagoRoute
   ApiPublicHooksReguaCobrancaRoute: typeof ApiPublicHooksReguaCobrancaRoute
   ApiPublicHooksRelatoriosDiariosRoute: typeof ApiPublicHooksRelatoriosDiariosRoute
 }
@@ -848,6 +862,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksReguaCobrancaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/mercadopago': {
+      id: '/api/public/hooks/mercadopago'
+      path: '/api/public/hooks/mercadopago'
+      fullPath: '/api/public/hooks/mercadopago'
+      preLoaderRoute: typeof ApiPublicHooksMercadopagoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/lembretes': {
       id: '/api/public/hooks/lembretes'
       path: '/api/public/hooks/lembretes'
@@ -994,6 +1015,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ReciboCodigoRoute: ReciboCodigoRoute,
   ApiPublicHooksLembretesRoute: ApiPublicHooksLembretesRoute,
+  ApiPublicHooksMercadopagoRoute: ApiPublicHooksMercadopagoRoute,
   ApiPublicHooksReguaCobrancaRoute: ApiPublicHooksReguaCobrancaRoute,
   ApiPublicHooksRelatoriosDiariosRoute: ApiPublicHooksRelatoriosDiariosRoute,
 }
