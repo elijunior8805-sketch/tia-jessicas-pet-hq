@@ -60,7 +60,7 @@ export function ReativacaoPosQuitacaoDialog({
     }
 
     openWhatsAppComposerGlobal({
-      tipo: "agendamento_lembrete",
+      tipo: "reativacao_cliente",
       destinatario: dados.clienteNome,
       telefone: dados.clienteWhatsapp,
       mensagem: dados.mensagemReativacao,

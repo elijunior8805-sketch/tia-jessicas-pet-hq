@@ -123,7 +123,8 @@ export function MesaNegociacaoDialog({
   };
 
   const handleEnviarWhatsApp = () => {
-    if (!cobranca.cliente_whatsapp) {
+    const whatsapp = cobranca.cliente_whatsapp;
+    if (!whatsapp) {
       toast.error("Cliente sem WhatsApp cadastrado");
       return;
     }
@@ -131,7 +132,7 @@ export function MesaNegociacaoDialog({
     openWhatsAppComposerGlobal({
       tipo: "cobranca_vencida",
       destinatario: cobranca.cliente_nome ?? "Cliente",
-      telefone: cobranca.cliente_whatsapp,
+      telefone: whatsapp,
       mensagem: textoProposta,
       motivo: "Acordo e Negociação",
       cliente_id: (cobranca as any).cliente_id ?? null,
