@@ -893,19 +893,19 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
 
       const d = resPix?.data || resPix;
 
-      if (resPix.success && (d?.qrCode || d?.qrCodeBase64 || d?.paymentId)) {
+      if (resPix.success && (d?.qrCode || d?.qrCodeBase64 || d?.paymentId || d?.linkCartao)) {
         return {
-          texto: `Gerei a cobrança Pix no valor de **R$ ${valorNum.toFixed(2).replace(".", ",")}** via Mercado Pago com sucesso, ${nomeOp}! O QR Code dinâmico e o código Pix Copia e Cola já estão prontos na tela. O sistema identificará o pagamento automaticamente! ✨`,
+          texto: `Gerei as opções de pagamento no valor de **R$ ${valorNum.toFixed(2).replace(".", ",")}** via Mercado Pago com sucesso, ${nomeOp}! O card abaixo já conta com o **Pix Instantâneo (QR Code e Copia-e-Cola)** e o **Link de Pagamento no Cartão de Crédito (até 12x)** para enviar no WhatsApp do tutor com 1 clique! ✨`,
           card: {
             type: "pix_mercadopago",
-            title: `Pix Mercado Pago · R$ ${valorNum.toFixed(2).replace(".", ",")}`,
-            subtitle: "Baixa automática em tempo real",
+            title: `Pagamento Mercado Pago · R$ ${valorNum.toFixed(2).replace(".", ",")}`,
+            subtitle: "Pix & Cartão de Crédito com baixa automática",
             data: d,
           },
         };
       } else {
         return {
-          texto: `Não foi possível gerar a cobrança Pix no Mercado Pago no momento, ${nomeOp}. Detalhes: ${resPix.summary || d?.mensagemErro || "Verifique a conexão com o Mercado Pago."}`,
+          texto: `Não foi possível gerar a cobrança no Mercado Pago no momento, ${nomeOp}. Detalhes: ${resPix.summary || d?.mensagemErro || "Verifique a conexão com o Mercado Pago."}`,
         };
       }
     }

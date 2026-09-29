@@ -1143,24 +1143,36 @@ export async function despacharFerramentaV2(
       case "gerar_cobranca_pix_online":
       case "gerar_pix_online":
       case "gerar_pix": {
-        const { criarCobrancaPixMercadoPago } = await import("@/lib/mercadopago.server");
-        const resPix = await criarCobrancaPixMercadoPago({
-          valor: Number(params.valor || 0),
-          descricao: params.descricao || "Atendimento Pet Spa Tia Jéssica",
-          clienteNome: params.clienteNome,
-          clienteTelefone: params.clienteTelefone,
-          agendamentoId: params.agendamentoId,
-          clienteId: params.clienteId,
-        });
+        const { criarCobrancaPixMercadoPago, criarLinkPagamentoMercadoPago } = await import("@/lib/mercadopago.server");
+        const valorNum = Number(params.valor || 0);
+        const desc = params.descricao || "Atendimento Pet Spa Tia Jéssica";
+
+        const [resPix, resLink] = await Promise.all([
+          criarCobrancaPixMercadoPago({
+            valor: valorNum,
+            descricao: desc,
+            clienteNome: params.clienteNome,
+            clienteTelefone: params.clienteTelefone,
+            agendamentoId: params.agendamentoId,
+            clienteId: params.clienteId,
+          }),
+          criarLinkPagamentoMercadoPago({
+            titulo: desc,
+            valor: valorNum,
+            clienteNome: params.clienteNome,
+            agendamentoId: params.agendamentoId,
+            clienteId: params.clienteId,
+          }).catch(() => null),
+        ]);
 
         if (resPix.sucesso && resPix.paymentId) {
           try {
             await (sb as any).from("pagamentos").insert({
-              valor: Number(params.valor || 0),
+              valor: valorNum,
               metodo: "pix",
               status: "pendente",
               tipo: "avulso",
-              observacoes: `Pix Mercado Pago: ID ${resPix.paymentId} - ${params.descricao || "Atendimento"}`,
+              observacoes: `Pix Mercado Pago: ID ${resPix.paymentId} - ${desc}`,
               agendamento_id: params.agendamentoId || null,
               cliente_id: params.clienteId || null,
             });
@@ -1173,15 +1185,17 @@ export async function despacharFerramentaV2(
           success: resPix.sucesso,
           data: {
             ...resPix,
-            valor: Number(params.valor || 0),
-            descricao: params.descricao || "Atendimento Pet Spa",
+            valor: valorNum,
+            descricao: desc,
             clienteNome: params.clienteNome,
             clienteTelefone: params.clienteTelefone,
             agendamentoId: params.agendamentoId,
+            linkCartao: resLink?.initPoint || null,
+            preferenceId: resLink?.preferenceId || null,
           },
           summary: resPix.sucesso
-            ? `Cobrança Pix de R$ ${Number(params.valor || 0).toFixed(2)} gerada com sucesso via Mercado Pago! QR Code e Copia-e-Cola disponíveis.`
-            : `Não foi possível gerar a cobrança Pix: ${resPix.mensagemErro}`,
+            ? `Cobrança de R$ ${valorNum.toFixed(2)} gerada com sucesso via Mercado Pago! Pix e Link de Cartão disponíveis.`
+            : `Não foi possível gerar a cobrança: ${resPix.mensagemErro}`,
         };
       }
 

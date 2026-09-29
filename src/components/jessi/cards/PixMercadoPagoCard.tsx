@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { QrCode, Copy, Check, CheckCircle2, Clock, Share2, RefreshCw, ShieldCheck, ExternalLink } from "lucide-react";
+import {
+  QrCode,
+  CreditCard,
+  Copy,
+  Check,
+  CheckCircle2,
+  Clock,
+  Share2,
+  RefreshCw,
+  ShieldCheck,
+  ExternalLink,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { verificarStatusPixMercadoPagoFn } from "@/lib/mercadopago.functions";
@@ -17,12 +29,15 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
   const descricao = data?.descricao || data?.description || "Atendimento Spa de Pet";
   const qrCode = data?.qrCode || data?.qr_code || "";
   const qrCodeBase64 = data?.qrCodeBase64 || data?.qr_code_base64 || "";
+  const linkCartao = data?.linkCartao || data?.initPoint || data?.init_point || "";
   const paymentId = data?.paymentId || data?.id || "";
   const agendamentoId = data?.agendamentoId || "";
   const clienteNome = data?.clienteNome || data?.cliente?.nome || "";
   const clienteTelefone = data?.clienteTelefone || data?.cliente?.telefone || "";
 
-  const [copiado, setCopiado] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState<"pix" | "cartao">("pix");
+  const [copiadoPix, setCopiadoPix] = useState(false);
+  const [copiadoCartao, setCopiadoCartao] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [pagoComSucesso, setPagoComSucesso] = useState(data?.status === "approved" || data?.pago === true);
   const [segundosRestantes, setSegundosRestantes] = useState(900); // 15 minutos
@@ -31,15 +46,34 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
   const handleCopiarPix = () => {
     if (!qrCode) return;
     navigator.clipboard.writeText(qrCode);
-    setCopiado(true);
+    setCopiadoPix(true);
     toast.success("Código Pix Copia-e-Cola copiado com sucesso!");
-    setTimeout(() => setCopiado(false), 3000);
+    setTimeout(() => setCopiadoPix(false), 3000);
   };
 
-  // Envia no WhatsApp do cliente
+  // Copia link do cartão
+  const handleCopiarLinkCartao = () => {
+    if (!linkCartao) return;
+    navigator.clipboard.writeText(linkCartao);
+    setCopiadoCartao(true);
+    toast.success("Link de pagamento com Cartão copiado!");
+    setTimeout(() => setCopiadoCartao(false), 3000);
+  };
+
+  // Envia no WhatsApp do cliente com opções de Pix e Cartão
   const handleEnviarWhatsApp = () => {
     const primeiroNome = (clienteNome || "Tutor").split(" ")[0];
-    const textoMsg = `Olá, ${primeiroNome}! 🐾\n\nSegue a chave Pix para pagamento de *${descricao}* no valor de *R$ ${valor.toFixed(2).replace(".", ",")}* no Spa de Pet Tia Jéssica:\n\n\`${qrCode}\`\n\nBasta copiar o código acima e colar na opção "Pix Copia e Cola" do aplicativo do seu banco. A baixa é instantânea! ✨`;
+    let textoMsg = `Olá, ${primeiroNome}! 🐾\n\nSegue as opções para pagamento de *${descricao}* no valor de *R$ ${valor.toFixed(2).replace(".", ",")}* no Spa de Pet Tia Jéssica:\n\n`;
+
+    if (linkCartao) {
+      textoMsg += `💳 *Pagar no Cartão de Crédito (em até 12x):*\n${linkCartao}\n\n`;
+    }
+
+    if (qrCode) {
+      textoMsg += `⚡ *Pagar via Pix (Copia e Cola):*\n\`${qrCode}\`\n\n_(Basta copiar o código acima e colar no app do seu banco)_\n\n`;
+    }
+
+    textoMsg += `A confirmação e baixa são automáticas! ✨`;
 
     if (clienteTelefone) {
       const telFormatado = clienteTelefone.replace(/\D/g, "");
@@ -47,7 +81,7 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
       window.open(`https://wa.me/${numCompleto}?text=${encodeURIComponent(textoMsg)}`, "_blank");
     } else {
       navigator.clipboard.writeText(textoMsg);
-      toast.info("Mensagem Pix copiada! Cole na conversa com o cliente.");
+      toast.info("Mensagem com Pix e Link de Cartão copiada! Cole na conversa com o cliente.");
     }
   };
 
@@ -67,7 +101,7 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
         setPagoComSucesso(true);
         toast.success("Pagamento confirmado instantaneamente no Mercado Pago!");
       } else {
-        toast.info("Pagamento ainda pendente de pagamento.");
+        toast.info("Pagamento ainda pendente de liquidação.");
       }
     } catch {
       // ignore
@@ -122,11 +156,11 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
             {pagoComSucesso ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-700" />
             ) : (
-              <QrCode className="w-4 h-4 text-emerald-700" />
+              <Sparkles className="w-4 h-4 text-emerald-700" />
             )}
           </div>
           <span className="font-display">
-            {pagoComSucesso ? "Pix Confirmado com Sucesso" : "Pix Online · Mercado Pago"}
+            {pagoComSucesso ? "Pagamento Confirmado com Sucesso" : "Pagamento Online · Mercado Pago"}
           </span>
         </div>
         <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
@@ -165,52 +199,121 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
             </div>
           </div>
 
-          {/* Imagem do QR Code Base64 */}
-          {qrCodeBase64 && (
-            <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-border/80">
-              <img
-                src={`data:image/png;base64,${qrCodeBase64}`}
-                alt="QR Code Pix"
-                className="w-44 h-44 object-contain"
-              />
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                <span>Expira em: <strong>{formatarMinutos(segundosRestantes)}</strong></span>
+          {/* Abas Pix e Cartão de Crédito */}
+          <div className="flex rounded-xl bg-muted/60 p-1 border border-border/60">
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("pix")}
+              className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                abaAtiva === "pix"
+                  ? "bg-background text-emerald-900 shadow-xs border border-border/60"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Pix Instantâneo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("cartao")}
+              className={`flex-1 py-1.5 px-2 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                abaAtiva === "cartao"
+                  ? "bg-background text-emerald-900 shadow-xs border border-border/60"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Cartão de Crédito</span>
+            </button>
+          </div>
+
+          {/* Conteúdo Aba Pix */}
+          {abaAtiva === "pix" && (
+            <div className="space-y-3">
+              {/* Imagem do QR Code Base64 */}
+              {qrCodeBase64 && (
+                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-border/80 shadow-2xs">
+                  <img
+                    src={`data:image/png;base64,${qrCodeBase64}`}
+                    alt="QR Code Pix"
+                    className="w-40 h-40 object-contain"
+                  />
+                  <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Expira em: <strong>{formatarMinutos(segundosRestantes)}</strong></span>
+                  </div>
+                </div>
+              )}
+
+              {/* Botão Copiar Código Pix */}
+              <Button
+                type="button"
+                onClick={handleCopiarPix}
+                className={`w-full h-9 text-xs font-bold gap-1.5 rounded-xl transition-all ${
+                  copiadoPix
+                    ? "bg-emerald-700 text-white"
+                    : "bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                }`}
+              >
+                {copiadoPix ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiadoPix ? "Código Pix Copiado!" : "Copiar Código Pix (Copia e Cola)"}
+              </Button>
+            </div>
+          )}
+
+          {/* Conteúdo Aba Cartão de Crédito */}
+          {abaAtiva === "cartao" && (
+            <div className="p-3.5 rounded-xl bg-zinc-50 border border-border/70 space-y-3">
+              <div className="space-y-1 text-center">
+                <span className="text-xs font-bold text-foreground block">
+                  Checkout Pro Mercado Pago
+                </span>
+                <span className="text-[11px] text-muted-foreground block">
+                  Permite ao tutor pagar no Cartão de Crédito em até 12x com segurança máxima.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {linkCartao && (
+                  <Button
+                    type="button"
+                    onClick={() => window.open(linkCartao, "_blank")}
+                    className="h-9 text-xs font-bold gap-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Abrir Página de Cartão
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCopiarLinkCartao}
+                  className="h-9 text-xs font-semibold gap-1.5 rounded-xl border-border hover:bg-muted"
+                >
+                  {copiadoCartao ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiadoCartao ? "Link Copiado!" : "Copiar Link de Pagamento"}
+                </Button>
               </div>
             </div>
           )}
 
-          {/* Botões de Ação */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-            <Button
-              type="button"
-              onClick={handleCopiarPix}
-              className={`h-9 text-xs font-bold gap-1.5 rounded-xl transition-all ${
-                copiado
-                  ? "bg-emerald-700 text-white"
-                  : "bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
-              }`}
-            >
-              {copiado ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              {copiado ? "Código Copiado!" : "Copiar Código Pix"}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleEnviarWhatsApp}
-              className="h-9 text-xs font-semibold gap-1.5 rounded-xl border-emerald-300 text-emerald-900 hover:bg-emerald-50"
-            >
-              <Share2 className="w-3.5 h-3.5 text-emerald-700" />
-              Enviar no WhatsApp
-            </Button>
-          </div>
+          {/* Botão de Envio Completo no WhatsApp */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleEnviarWhatsApp}
+            className="w-full h-10 text-xs font-semibold gap-2 rounded-xl border-emerald-300 text-emerald-900 hover:bg-emerald-50 bg-emerald-50/30"
+          >
+            <Share2 className="w-4 h-4 text-emerald-700" />
+            Enviar Opções (Pix & Cartão) no WhatsApp do Tutor
+          </Button>
 
           {/* Rodapé de Status */}
           <div className="flex items-center justify-between pt-2 border-t border-border/60 text-[11px] text-muted-foreground">
             <div className="flex items-center gap-1 text-emerald-700 font-medium">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Mercado Pago API Oficial</span>
+              <span>Mercado Pago Oficial</span>
             </div>
             <button
               type="button"
