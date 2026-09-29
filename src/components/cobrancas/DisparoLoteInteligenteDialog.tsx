@@ -76,7 +76,7 @@ export function DisparoLoteInteligenteDialog({
     try {
       const res = await gerarMensagensFn({
         data: {
-          cobrancaIds: cobrancaIds && cobrancaIds.length > 0 ? cobrancaIds : undefined,
+          cobrancaIds: cobrancaIds && cobrancaIds.length > 0 ? cobrancaIds : [],
         },
       });
       setItens(

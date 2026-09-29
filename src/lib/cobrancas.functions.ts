@@ -1414,9 +1414,27 @@ export type LoteMensagemItemDTO = {
 
 export const gerarMensagensLoteIA = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ cobrancaIds: z.array(z.string().uuid()) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ cobrancaIds: z.array(z.string().uuid()).optional() }).parse(d))
   .handler(async ({ data, context }): Promise<LoteMensagemItemDTO[]> => {
     const { supabase } = context;
+
+    let idsParaBuscar: string[] = data.cobrancaIds ?? [];
+
+    // Se nenhum ID foi fornecido (Régua do Dia), busca todas as cobranças pendentes/vencidas
+    if (idsParaBuscar.length === 0) {
+      const { data: pendentes } = await supabase
+        .from("cobrancas")
+        .select("id")
+        .is("arquivada_em", null)
+        .not("status", "in", '("pago","cancelado")')
+        .order("vencimento", { ascending: true })
+        .limit(50);
+      idsParaBuscar = (pendentes ?? []).map((r: any) => r.id);
+    }
+
+    if (idsParaBuscar.length === 0) {
+      return [];
+    }
 
     const { data: rows, error } = await supabase
       .from("cobrancas")
@@ -1425,7 +1443,7 @@ export const gerarMensagensLoteIA = createServerFn({ method: "POST" })
         clientes:cliente_id ( id, nome, whatsapp ),
         atendimentos:atendimento_id ( data_inicio, pets:pet_id ( nome ) )
       `)
-      .in("id", data.cobrancaIds)
+      .in("id", idsParaBuscar)
       .is("arquivada_em", null);
 
     if (error) throw new Error(error.message);
