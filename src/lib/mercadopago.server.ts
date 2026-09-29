@@ -12,7 +12,7 @@
 const MERCADOPAGO_API_URL = "https://api.mercadopago.com";
 
 // Token padrão fornecido pelo usuário com fallback para variável de ambiente
-const DEFAULT_ACCESS_TOKEN = "APP_USR-6505761826893447-092821-776bee11286068d740dba989a77951c8-3724613162";
+const DEFAULT_ACCESS_TOKEN = "APP_USR-2280844207590542-092821-f8cb33a17ab3ec64dc2a33d5c44ef817-1030414891";
 
 export function obterMercadoPagoAccessToken(): string {
   if (typeof process !== "undefined" && process.env) {
