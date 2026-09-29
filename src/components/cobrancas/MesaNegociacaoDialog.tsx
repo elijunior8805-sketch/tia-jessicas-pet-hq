@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Loader2,
   Clock,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -35,6 +36,7 @@ import {
   type FilaItemDTO,
 } from "@/lib/cobrancas.functions";
 import { openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
+import { PagamentoOnlineDialog } from "@/components/financeiro/PagamentoOnlineDialog";
 
 interface MesaNegociacaoDialogProps {
   open: boolean;
@@ -62,6 +64,8 @@ export function MesaNegociacaoDialog({
   // Promessa
   const [dataPromessa, setDataPromessa] = useState("");
   const [notaPromessa, setNotaPromessa] = useState("");
+  const [pagamentoOnlineAberto, setPagamentoOnlineAberto] = useState(false);
+  const [valorOnline, setValorOnline] = useState(0);
 
   const carregarSimulacao = async () => {
     if (!cobranca?.id) return;
@@ -311,7 +315,7 @@ export function MesaNegociacaoDialog({
             Cancelar
           </Button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
               variant="outline"
@@ -329,6 +333,20 @@ export function MesaNegociacaoDialog({
 
             <Button
               size="sm"
+              variant="outline"
+              onClick={() => {
+                const valorPix = simulacao?.pixAVista ?? cobranca.saldo;
+                setValorOnline(valorPix);
+                setPagamentoOnlineAberto(true);
+              }}
+              className="text-xs gap-1.5 border-blue-300 text-blue-950 hover:bg-blue-50"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-blue-600" />
+              Link com Valor Negociado
+            </Button>
+
+            <Button
+              size="sm"
               onClick={handleEnviarWhatsApp}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs gap-1.5 shadow-md"
             >
@@ -338,6 +356,23 @@ export function MesaNegociacaoDialog({
           </div>
         </DialogFooter>
       </DialogContent>
+
+      {/* Modal de Pagamento Online com Valor Negociado */}
+      <PagamentoOnlineDialog
+        open={pagamentoOnlineAberto}
+        onOpenChange={setPagamentoOnlineAberto}
+        valor={valorOnline}
+        descricao={`Acordo Spa de Pet - ${cobranca.pet_nome || "Pet"}`}
+        clienteNome={cobranca.cliente_nome || undefined}
+        clienteWhatsapp={cobranca.cliente_whatsapp || undefined}
+        clienteId={(cobranca as any).cliente_id || undefined}
+        cobrancaId={cobranca.id || undefined}
+        agendamentoId={(cobranca as any).atendimento_id || undefined}
+        onPagoComSucesso={() => {
+          qc.invalidateQueries({ queryKey: ["cobrancas"] });
+          onOpenChange(false);
+        }}
+      />
     </Dialog>
   );
 }

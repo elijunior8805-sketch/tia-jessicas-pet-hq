@@ -30,7 +30,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Loader2
+  Loader2,
+  CreditCard
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { openWhatsAppComposerGlobal } from "@/components/whatsapp-composer";
+import { PagamentoOnlineDialog } from "@/components/financeiro/PagamentoOnlineDialog";
 
 interface Props {
   cobrancaId: string | null;
@@ -55,6 +57,7 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
   const [carregandoIA, setCarregandoIA] = useState(false);
   const [promessaData, setPromessaData] = useState("");
   const [promessaValor, setPromessaValor] = useState("");
+  const [pagamentoOnlineAberto, setPagamentoOnlineAberto] = useState(false);
 
   const { data: dossie, isLoading, refetch } = useQuery({
     queryKey: ["cobranca-dossie", cobrancaId],
@@ -353,6 +356,13 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
                 <Button variant="ghost" className="flex-1" onClick={onClose}>
                   Fechar
                 </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-blue-300 text-blue-950 hover:bg-blue-50"
+                  onClick={() => setPagamentoOnlineAberto(true)}
+                >
+                  <CreditCard className="h-4 w-4 mr-2 text-blue-600" /> Pagamento Online
+                </Button>
                 {aba === 'compor' && (
                   <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={handleWhatsApp}>
                     <MessageCircle className="h-4 w-4 mr-2" /> Abrir WhatsApp
@@ -360,6 +370,20 @@ export function CobrancaPainelLateral({ cobrancaId, onClose }: Props) {
                 )}
               </div>
             </SheetFooter>
+
+            {/* Modal de Pagamento Online */}
+            <PagamentoOnlineDialog
+              open={pagamentoOnlineAberto}
+              onOpenChange={setPagamentoOnlineAberto}
+              valor={Number(cob?.saldo || 0)}
+              descricao={pet?.nome ? `Atendimento do pet ${pet.nome}` : "Atendimento Spa de Pet"}
+              clienteNome={cliente?.nome || undefined}
+              clienteWhatsapp={cliente?.whatsapp || undefined}
+              clienteId={cliente?.id || (cob as any)?.cliente_id || undefined}
+              cobrancaId={cobrancaId || undefined}
+              agendamentoId={(cob as any)?.atendimento_id || undefined}
+              onPagoComSucesso={() => refetch()}
+            />
           </>
         )}
       </SheetContent>

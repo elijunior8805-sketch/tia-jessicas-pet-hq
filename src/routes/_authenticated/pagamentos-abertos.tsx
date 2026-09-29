@@ -35,6 +35,7 @@ import { BaixaPagamentoDialog } from "@/components/financeiro/BaixaPagamentoDial
 import { WhatsAppComposer, useWhatsAppComposer } from "@/components/whatsapp-composer";
 import { renderTemplate } from "@/lib/whatsapp-templates";
 import { abrirWhatsApp } from "@/lib/whatsapp";
+import { PagamentoOnlineDialog } from "@/components/financeiro/PagamentoOnlineDialog";
 
 export const Route = createFileRoute("/_authenticated/pagamentos-abertos")({
   component: PagamentosAbertosPage,
@@ -71,6 +72,7 @@ function PagamentosAbertosPage() {
   const [cobrancaJessi, setCobrancaJessi] = useState<PagamentoAbertoDTO | null>(null);
   const [recebendoJessi, setRecebendoJessi] = useState<PagamentoAbertoDTO | null>(null);
   const composer = useWhatsAppComposer();
+  const [pagamentoOnline, setPagamentoOnline] = useState<PagamentoAbertoDTO | null>(null);
 
 
   const query = useQuery({
@@ -365,6 +367,15 @@ function PagamentosAbertosPage() {
                               </Button>
                               <Button
                                 size="sm"
+                                variant="outline"
+                                className="rounded-lg font-medium border-blue-300 text-blue-950 hover:bg-blue-50"
+                                onClick={() => setPagamentoOnline(p)}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 mr-1 text-blue-600" />
+                                Online
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant="ghost"
                                 className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
                                 onClick={() => {
@@ -424,6 +435,24 @@ function PagamentosAbertosPage() {
             : null
         }
         onSuccess={() => query.refetch()}
+      />
+
+      {/* Modal de Pagamento Online (Pix + Cartão) */}
+      <PagamentoOnlineDialog
+        open={!!pagamentoOnline}
+        onOpenChange={(open) => !open && setPagamentoOnline(null)}
+        valor={pagamentoOnline?.saldo ?? 0}
+        descricao={
+          pagamentoOnline?.pet_nome
+            ? `Atendimento do pet ${pagamentoOnline.pet_nome}`
+            : "Atendimento Spa de Pet"
+        }
+        clienteNome={pagamentoOnline?.cliente_nome || undefined}
+        clienteWhatsapp={pagamentoOnline?.cliente_whatsapp || undefined}
+        clienteId={pagamentoOnline?.cliente_id || undefined}
+        pagamentoId={pagamentoOnline?.id || undefined}
+        agendamentoId={pagamentoOnline?.atendimento_id || undefined}
+        onPagoComSucesso={() => query.refetch()}
       />
 
       <Dialog open={loteAberto} onOpenChange={setLoteAberto}>
