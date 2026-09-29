@@ -87,13 +87,14 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
 
   // Checar status
   const handleVerificarStatus = async () => {
-    if (!paymentId || isChecking || pagoComSucesso) return;
+    if (isChecking || pagoComSucesso) return;
     try {
       setIsChecking(true);
       const res = await verificarStatusFn({
         data: {
-          paymentId,
-          agendamentoId,
+          paymentId: paymentId || undefined,
+          preferenceId: data?.preferenceId || data?.preference_id || undefined,
+          agendamentoId: agendamentoId || undefined,
         },
       });
 
@@ -112,25 +113,26 @@ export const PixMercadoPagoCard: React.FC<PixMercadoPagoCardProps> = ({ data, on
 
   // Polling automático a cada 5 segundos
   useEffect(() => {
-    if (pagoComSucesso || !paymentId) return;
+    if (pagoComSucesso) return;
 
     const interval = setInterval(async () => {
       try {
         const res = await verificarStatusFn({
           data: {
-            paymentId,
-            agendamentoId,
+            paymentId: paymentId || undefined,
+            preferenceId: data?.preferenceId || data?.preference_id || undefined,
+            agendamentoId: agendamentoId || undefined,
           },
         });
         if (res.sucesso && res.status === "approved") {
           setPagoComSucesso(true);
-          toast.success("Pagamento Mercado Pago confirmado!");
+          toast.success("Pagamento Mercado Pago confirmado com sucesso!");
         }
       } catch {}
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [pagoComSucesso, paymentId, agendamentoId]);
+  }, [pagoComSucesso, paymentId, agendamentoId, data?.preferenceId]);
 
   // Contagem regressiva
   useEffect(() => {

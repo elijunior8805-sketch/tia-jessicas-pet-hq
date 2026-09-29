@@ -100,7 +100,7 @@ export async function criarCobrancaPixMercadoPago(
       last_name: sobrenome,
     },
     external_reference: externalReference,
-    notification_url: "https://tia-jessicas-pet-hq.lovable.app/api/webhooks/mercadopago",
+    notification_url: "https://tia-jessicas-pet-hq.lovable.app/api/public/hooks/mercadopago",
   };
 
   // Se houver CPF informado
@@ -222,7 +222,7 @@ export async function criarLinkPagamentoMercadoPago(
     },
     auto_return: "approved",
     statement_descriptor: "SPA DE PET",
-    notification_url: "https://tia-jessicas-pet-hq.lovable.app/api/webhooks/mercadopago",
+    notification_url: "https://tia-jessicas-pet-hq.lovable.app/api/public/hooks/mercadopago",
   };
 
   try {
@@ -257,6 +257,27 @@ export async function criarLinkPagamentoMercadoPago(
       sucesso: false,
       mensagemErro: err?.message || "Falha na conexão com o Mercado Pago.",
     };
+  }
+}
+
+/**
+ * Consulta os últimos pagamentos aprovados da conta Mercado Pago
+ */
+export async function consultarUltimosPagamentosAprovadosMercadoPago(): Promise<any[]> {
+  const token = obterMercadoPagoAccessToken();
+  try {
+    const response = await fetch(
+      `${MERCADOPAGO_API_URL}/v1/payments/search?sort=date_created&criteria=desc&limit=15`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    const data: any = await response.json();
+    return data?.results || [];
+  } catch {
+    return [];
   }
 }
 
