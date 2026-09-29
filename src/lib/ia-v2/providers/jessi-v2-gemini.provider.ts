@@ -965,15 +965,48 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
               novoContexto,
             };
           }
+        } else {
+          // Passada 1 com tools retornou erro HTTP: tenta chamada conversacional direta ao LLM com dados do contexto
+          const errText = await resPass1.text().catch(() => "");
+          console.warn(`[JessiV2] Gateway retornou HTTP ${resPass1.status} (${errText.slice(0, 80)}). Tentando síntese LLM direta.`);
+          
+          try {
+            const resDireto = await fetch(auth.endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${auth.key}`,
+              },
+              body: JSON.stringify({
+                model: auth.model,
+                temperature: 0.7,
+                messages,
+              }),
+            });
+
+            if (resDireto.ok) {
+              const dataDireto: any = await resDireto.json();
+              const conteudo = dataDireto?.choices?.[0]?.message?.content?.trim();
+              if (conteudo) {
+                return {
+                  respostaTexto: conteudo,
+                  cards,
+                  pendingAction,
+                  novoContexto,
+                };
+              }
+            }
+          } catch (errDireto) {
+            console.warn("[JessiV2] Tentativa de chamada LLM direta também falhou:", errDireto);
+          }
         }
       } catch (errGateway) {
         console.warn("[JessiV2 Autonomous Agent] Erro no gateway, acionando despacho resiliente:", errGateway);
       }
     }
 
-
-    // DISPATCHER RESILIENTE DIRETO DE FERRAMENTAS
-    // Garante que mesmo offline ou sem resposta do gateway, o comando é executado e os dados reais são mostrados e falados!
+    // DISPATCHER RESILIENTE DIRETO DE FERRAMENTAS COM CONVERSAÇÃO 100% FLUIDA
+    // Garante que mesmo offline ou sem resposta do gateway, o comando é executado com dados reais do Supabase e fala humanizada!
     const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli");
     if (despachoResiliente) {
       if (despachoResiliente.card) {
@@ -988,7 +1021,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
     }
 
     return {
-      respostaTexto: `Olá, ${user?.nome || "Eli"}! Estou pronta para te ajudar. Você pode me pedir para ver a agenda de hoje, consultar valores a receber, verificar vagas ou buscar a ficha de qualquer cliente ou pet!`,
+      respostaTexto: `Olá, ${user?.nome || "Eli"}! Estou 100% conectada e pronta para te ajudar. Você pode me perguntar sobre o próximo pet da fila, consultar horários livres, verificar atrasos, ver o faturamento de hoje ou buscar a ficha completa de qualquer cliente! O que deseja ver agora?`,
       cards,
       pendingAction: null,
       novoContexto: {},
@@ -996,7 +1029,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
   }
 
   /**
-   * Executa despacho determinístico resiliente quando o gateway de IA não estiver disponível
+   * Executa despacho determinístico resiliente e conversacional quando o gateway de IA não estiver disponível
    */
   private async executarDespachoResiliente(
     sb: SupabaseClient<Database>,
@@ -1005,6 +1038,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
     operadorNome: string
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any } | null> {
     const msg = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const nomeOp = operadorNome || "Eli";
 
     // 0. Saudações e Conversação Natural Humanizada
     if (
@@ -1026,11 +1060,97 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       const hora = new Date().getHours();
       const saudacaoHorario = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
       return {
-        texto: `${saudacaoHorario}, ${operadorNome || "Eli"}! Tudo ótimo por aqui no Spa. Estou 100% pronta para te ajudar com a agenda, financeiro, clientes ou qualquer detalhe da operação. O que faremos agora?`,
+        texto: `${saudacaoHorario}, ${nomeOp}! Tudo excelente por aqui no Spa de Pet. Estou com a central de atendimentos, agenda e financeiro 100% pronta para te apoiar. Por onde você gostaria de começar agora?`,
       };
     }
 
-    // 1. Financeiro / Valores a Receber / Faturamento / Caixa
+    // 1. Próximo Pet / Quem é o Próximo / Fila de Atendimento
+    if (
+      msg.includes("proximo pet") ||
+      msg.includes("proximo atendimento") ||
+      msg.includes("quem e o proximo") ||
+      msg.includes("quem e a proxima") ||
+      msg.includes("qual o proximo") ||
+      msg.includes("qual a proxima") ||
+      msg.includes("proxima tosa") ||
+      msg.includes("proximo banho")
+    ) {
+      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: hojeStr });
+      const d = resAgenda?.data || resAgenda;
+      const lista: any[] = Array.isArray(d) ? d : d?.agendamentos || [];
+
+      if (lista.length === 0) {
+        return {
+          texto: `No momento não temos mais nenhum atendimento agendado na grade de hoje, ${nomeOp}! A bancada está liberada. Gostaria que eu verificasse a rotina de amanhã ou visse clientes para encaixe?`,
+          card: {
+            type: "agenda",
+            title: "Agenda de Hoje (Vazia)",
+            subtitle: `Data: ${hojeStr}`,
+            data: { itens: [], total: 0 },
+          },
+        };
+      }
+
+      const horaAtual = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const proximo = lista.find((a: any) => (a.hora || "00:00") >= horaAtual) || lista[0];
+      const petNome = proximo.pets?.nome || proximo.pet_nome || proximo.petNome || "o pet";
+      const tutorNome = proximo.clientes?.nome || proximo.cliente_nome || proximo.tutor || "tutor não informado";
+      const servicoNome = proximo.servicos?.nome || proximo.servico_nome || proximo.servico || "Banho e Tosa";
+      const horaMarcada = (proximo.hora || "horário").slice(0, 5);
+      const levaTrazStr = proximo.leva_traz_modalidade ? " (com serviço de Leva e Traz)" : "";
+
+      return {
+        texto: `O próximo pet na fila é o **${petNome}** (${servicoNome}), agendado para às **${horaMarcada}** com o tutor **${tutorNome}**${levaTrazStr}. A ficha completa está aberta no card abaixo.`,
+        card: {
+          type: "agenda",
+          title: `Próximo: ${petNome} às ${horaMarcada}`,
+          subtitle: `Tutor: ${tutorNome} • ${servicoNome}`,
+          data: { itens: [proximo], total: lista.length, proximo },
+        },
+      };
+    }
+
+    // 2. Atrasos / Quem está atrasado / Sentinelas
+    if (
+      msg.includes("atrasad") ||
+      msg.includes("atraso") ||
+      msg.includes("quem faltou") ||
+      msg.includes("nao chegou") ||
+      msg.includes("sentinela")
+    ) {
+      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: hojeStr });
+      const d = resAgenda?.data || resAgenda;
+      const lista: any[] = Array.isArray(d) ? d : d?.agendamentos || [];
+
+      const horaAtual = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const atrasados = lista.filter((a: any) => {
+        const horaAg = (a.hora || "").slice(0, 5);
+        const status = (a.status || "").toLowerCase();
+        return horaAg && horaAg < horaAtual && (status === "agendado" || status === "pendente");
+      });
+
+      if (atrasados.length === 0) {
+        return {
+          texto: `Excelente notícia, ${nomeOp}! Verifiquei a grade e, no momento, nenhum pet está com atraso de chegada registrado. Todos os atendimentos estão dentro do horário!`,
+        };
+      }
+
+      const nomesAtrasados = atrasados
+        .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** (agendado às ${(a.hora || "").slice(0, 5)}, tutor: ${a.clientes?.nome || a.tutor || "tutor"})`)
+        .join(", ");
+
+      return {
+        texto: `Identifiquei ${atrasados.length} atendimento(s) com horário ultrapassado: ${nomesAtrasados}. Deseja que eu prepare uma mensagem no WhatsApp para checar se o tutor está a caminho?`,
+        card: {
+          type: "sentinela",
+          title: `Atrasos Identificados (${atrasados.length})`,
+          subtitle: `Horário de corte: ${horaAtual}`,
+          data: { atrasados, total: atrasados.length },
+        },
+      };
+    }
+
+    // 3. Financeiro / Valores a Receber / Faturamento / Caixa
     if (
       msg.includes("receber") ||
       msg.includes("financeiro") ||
@@ -1038,19 +1158,23 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       msg.includes("faturou") ||
       msg.includes("quanto entrou") ||
       msg.includes("caixa") ||
-      msg.includes("pagamento")
+      msg.includes("pagamento") ||
+      msg.includes("fechamento de caixa")
     ) {
       const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
       const resFin = await despacharFerramentaV2(sb, "consultar_financeiro_consolidado", { periodo });
       const d = resFin?.data || resFin;
-      const totalRecebido = d?.totalRecebido || d?.faturamento || 0;
-      const totalPendente = d?.totalPendente || d?.valoresAReceber || 0;
-      const ticketMedio = d?.ticketMedio || 0;
+      const totalRecebido = Number(d?.totalRecebido || d?.faturamento || 0);
+      const totalPendente = Number(d?.totalPendente || d?.valoresAReceber || 0);
+      const ticketMedio = Number(d?.ticketMedio || 0);
 
-      const texto = `Aqui está o resumo financeiro do ${periodo === "hoje" ? "dia" : periodo === "semana" ? "período desta semana" : "mês"}: já foram recebidos R$ ${Number(totalRecebido).toFixed(2).replace(".", ",")} e temos R$ ${Number(totalPendente).toFixed(2).replace(".", ",")} pendentes a receber, com ticket médio de R$ ${Number(ticketMedio).toFixed(2).replace(".", ",")}.`;
+      let textoFin = `Aqui está o panorama financeiro do ${periodo === "hoje" ? "dia" : periodo === "semana" ? "período desta semana" : "mês"}, ${nomeOp}: já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}**, com **R$ ${totalPendente.toFixed(2).replace(".", ",")}** pendentes de recebimento (ticket médio de R$ ${ticketMedio.toFixed(2).replace(".", ",")}).`;
+      if (totalPendente > 0) {
+        textoFin += ` Recomendo enviar os lembretes com chave Pix para agilizar a entrada desses valores pendentes!`;
+      }
 
       return {
-        texto,
+        texto: textoFin,
         card: {
           type: "financeiro",
           title: "Resumo Financeiro Consolidado",
@@ -1060,7 +1184,7 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 2. Horários Disponíveis / Vagas / Grade Livre
+    // 4. Horários Disponíveis / Vagas / Grade Livre
     if (
       msg.includes("horario") ||
       msg.includes("vaga") ||
@@ -1072,13 +1196,21 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       const d = resVagas?.data || resVagas;
       const vagas = d?.horariosSugeridos || d?.vagas || [];
 
-      let texto = `Temos ${vagas.length} horário(s) disponível(is) na grade de hoje: ${vagas.slice(0, 5).join(", ")}.`;
       if (vagas.length === 0) {
-        texto = `A grade de hoje está com horários preenchidos. Quer que eu verifique a grade de amanhã?`;
+        return {
+          texto: `A grade de atendimentos de hoje está totalmente preenchida, ${nomeOp}! Se você precisar de um encaixe, podemos verificar os horários de amanhã.`,
+          card: {
+            type: "agenda",
+            title: "Vagas Esgotadas Hoje",
+            subtitle: `Data: ${hojeStr}`,
+            data: d,
+          },
+        };
       }
 
+      const vagasTexto = vagas.slice(0, 5).join(", ");
       return {
-        texto,
+        texto: `Temos **${vagas.length} horário(s) livre(s)** na grade de hoje: **${vagasTexto}**. Uma ótima oportunidade para disparar convites de banho e tosa para clientes da lista de retorno!`,
         card: {
           type: "agenda",
           title: `Vagas Disponíveis (${vagas.length})`,
@@ -1088,39 +1220,55 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 3. Agenda de Atendimentos / Grade do Dia
+    // 5. Agenda de Atendimentos / Grade do Dia
     if (
       msg.includes("agenda") ||
       msg.includes("atendimento") ||
       msg.includes("marcado") ||
       msg.includes("banho") ||
-      msg.includes("tosa")
+      msg.includes("tosa") ||
+      msg.includes("rotina") ||
+      msg.includes("como esta o dia")
     ) {
-      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: hojeStr });
-      const d = resAgenda?.data || resAgenda;
-      const lista = Array.isArray(d) ? d : d?.agendamentos || [];
+      const dataAlvo = msg.includes("amanha") || msg.includes("amanhã")
+        ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000))
+        : hojeStr;
 
-      let texto = `Encontrei ${lista.length} atendimento(s) agendado(s) para hoje.`;
-      if (lista.length > 0) {
-        const primeiros = lista
-          .slice(0, 3)
-          .map((a: any) => `${a.petNome || a.pet_nome || "Pet"} às ${(a.hora || a.horario || "horário").slice(0, 5)}`)
-          .join(", ");
-        texto += ` Próximos: ${primeiros}.`;
+      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: dataAlvo });
+      const d = resAgenda?.data || resAgenda;
+      const lista: any[] = Array.isArray(d) ? d : d?.agendamentos || [];
+
+      if (lista.length === 0) {
+        const diaNome = dataAlvo === hojeStr ? "hoje" : "amanhã";
+        return {
+          texto: `Não temos atendimentos marcados na grade para ${diaNome}, ${nomeOp}! Essa é uma excelente oportunidade para realizarmos campanhas de retorno ou abrir horários promocionais de encaixe.`,
+          card: {
+            type: "agenda",
+            title: `Agenda de ${diaNome === "hoje" ? "Hoje" : "Amanhã"} (0 Atendimentos)`,
+            subtitle: `Data: ${dataAlvo}`,
+            data: { itens: [], total: 0 },
+          },
+        };
       }
 
+      const primeiros = lista
+        .slice(0, 3)
+        .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** às ${(a.hora || a.horario || "horário").slice(0, 5)} (${a.servicos?.nome || a.servicoNome || "Serviço"})`)
+        .join(", ");
+
+      const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
       return {
-        texto,
+        texto: `Temos **${lista.length} atendimento(s)** agendado(s) para ${diaLabel}, ${nomeOp}! Os primeiros da fila são: ${primeiros}. A lista completa e os detalhes estão no card na tela.`,
         card: {
           type: "agenda",
           title: `Agenda (${lista.length} atendimentos)`,
-          subtitle: `Data: ${hojeStr}`,
+          subtitle: `Data: ${dataAlvo}`,
           data: { itens: lista, total: lista.length },
         },
       };
     }
 
-    // 4. Clientes / Pets / Tutores — Extração inteligente do nome para busca
+    // 6. Clientes / Pets / Tutores — Extração inteligente do nome para busca
     if (
       msg.includes("cliente") ||
       msg.includes("pet") ||
@@ -1132,7 +1280,6 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       msg.includes("quem e") ||
       msg.includes("localizar")
     ) {
-      // Extrai o termo de busca removendo palavras-chave de comando
       const termo = mensagemUsuario
         .replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "")
         .replace(/\s+/g, " ")
@@ -1144,12 +1291,14 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       let texto: string;
       if (candidatos.length === 1) {
         const c = candidatos[0];
-        texto = `Encontrei! ${c.nomePrincipal || c.nome} — ${c.detalheSecundario || ""}. Toque no card para abrir a ficha completa.`;
+        const nomeCli = c.nomePrincipal || c.nome;
+        const det = c.detalheSecundario || "";
+        texto = `Localizei a ficha de **${nomeCli}** (${det})! Já abri o card com todos os detalhes, histórico e contatos.`;
       } else if (candidatos.length > 1) {
-        const nomes = candidatos.slice(0, 4).map((c: any) => c.nomePrincipal || c.nome).join(", ");
-        texto = `Encontrei ${candidatos.length} resultado(s) para "${termo || "clientes recentes"}": ${nomes}. Qual deles você quer ver?`;
+        const nomes = candidatos.slice(0, 4).map((c: any) => `**${c.nomePrincipal || c.nome}**`).join(", ");
+        texto = `Encontrei ${candidatos.length} resultados para "${termo || "clientes recentes"}": ${nomes}. Toque no card para abrir a ficha desejada!`;
       } else {
-        texto = `Não encontrei nenhum registro para "${termo}" no sistema. Tente com outro nome, telefone ou o nome do pet.`;
+        texto = `Não encontrei nenhum cadastro para "${termo}" no sistema, ${nomeOp}. Deseja que eu prepare o cadastro de um novo cliente agora?`;
       }
 
       return {
@@ -1183,14 +1332,14 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 5. Clientes Ausentes / Reativação
-    if (msg.includes("reativa") || msg.includes("retorno") || msg.includes("ausente") || msg.includes("sumido")) {
+    // 7. Clientes Ausentes / Reativação
+    if (msg.includes("reativa") || msg.includes("retorno") || msg.includes("ausente") || msg.includes("sumido") || msg.includes("saudade")) {
       const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
       const d = resRet?.data || resRet;
       const lista = Array.isArray(d) ? d : d?.clientes || [];
 
       return {
-        texto: `Identifiquei ${lista.length} cliente(s) que não vêm ao Spa há mais de 25 dias. Podemos disparar uma mensagem de carinho e retorno!`,
+        texto: `Identifiquei **${lista.length} cliente(s)** que não vêm ao Spa há mais de 25 dias, ${nomeOp}. Preparei a lista com sugestões de mensagens carinhosas para disparo no WhatsApp!`,
         card: {
           type: "reativacao",
           title: "Clientes Ausentes com Potencial de Retorno",
@@ -1200,14 +1349,14 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 6. Aniversariantes
+    // 8. Aniversariantes
     if (msg.includes("aniversari") || msg.includes("parabens") || msg.includes("niver")) {
       const resAniv = await despacharFerramentaV2(sb, "consultar_aniversariantes", {});
       const d = resAniv?.data || resAniv;
       const lista = Array.isArray(d) ? d : d?.aniversariantes || [];
 
       return {
-        texto: `Temos ${lista.length} aniversariante(s) registrado(s) para este período. É uma ótima oportunidade de encantamento!`,
+        texto: `Temos **${lista.length} aniversariante(s)** registrado(s) no Spa para este período! Uma excelente oportunidade para encantar os tutores com um mimo ou desconto especial.`,
         card: {
           type: "comunicacao",
           title: "Aniversariantes do Pet Spa",
@@ -1217,13 +1366,13 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 7. Cobrança Pix
+    // 9. Cobrança Pix
     if (msg.includes("cobranca") || msg.includes("devedor") || msg.includes("inadimplente") || msg.includes("cobrar")) {
       const resCob = await despacharFerramentaV2(sb, "gerar_mensagens_cobranca", {});
       const d = resCob?.data || resCob;
 
       return {
-        texto: `Preparei a lista de cobrança cordial com chave Pix pronta para envio no WhatsApp.`,
+        texto: `Preparei a lista de cobrança cordial com a chave Pix do Spa pronta para envio direto aos tutores no WhatsApp.`,
         card: {
           type: "financeiro",
           title: "Cobrança Cordial via Pix",
@@ -1233,13 +1382,13 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
       };
     }
 
-    // 8. Clubinho & Planos
+    // 10. Clubinho & Planos
     if (msg.includes("clubinho") || msg.includes("plano") || msg.includes("pacote") || msg.includes("credito")) {
       const resProg = await despacharFerramentaV2(sb, "consultar_programas_ativos_geral", {});
       const d = resProg?.data || resProg;
 
       return {
-        texto: `Aqui está o panorama dos contratos e créditos ativos do Clubinho no Spa de Pet.`,
+        texto: `Aqui está o panorama completo dos contratos e saldo de créditos do Clubinho no Spa de Pet.`,
         card: {
           type: "programa",
           title: "Clubinho & Planos Mensais",
@@ -1253,46 +1402,55 @@ DIRETRIZES DE USO DAS FERRAMENTAS (TOOL CALLING) & FLUIDEZ TOTAL:
   }
 
   /**
-   * Sintetiza uma resposta natural em português a partir dos dados retornados por uma ferramenta
+   * Sintetiza uma resposta natural, calorosa e fluida em português a partir dos dados retornados por qualquer ferramenta
    */
   private sintetizarResultadoLocal(toolNome: string, dados: any, operadorNome: string): string {
-    if (!dados) return "Prontinho! Consultei as informações no sistema.";
+    const nomeOp = operadorNome || "Eli";
+    if (!dados) return `Prontinho, ${nomeOp}! Consultei as informações diretamente no sistema.`;
 
     switch (toolNome) {
       case "consultar_financeiro_consolidado": {
-        const recebido = dados?.totalRecebido || dados?.faturamento || 0;
-        const pendente = dados?.totalPendente || dados?.valoresAReceber || 0;
-        return `Aqui está o resumo financeiro: R$ ${Number(recebido).toFixed(2).replace(".", ",")} recebidos e R$ ${Number(pendente).toFixed(2).replace(".", ",")} pendentes a receber.`;
+        const recebido = Number(dados?.totalRecebido || dados?.faturamento || 0);
+        const pendente = Number(dados?.totalPendente || dados?.valoresAReceber || 0);
+        return `Aqui está o resumo financeiro, ${nomeOp}: já foram recebidos **R$ ${recebido.toFixed(2).replace(".", ",")}** e temos **R$ ${pendente.toFixed(2).replace(".", ",")}** pendentes a receber.`;
       }
       case "consultar_agenda": {
         const lista = Array.isArray(dados) ? dados : dados?.agendamentos || [];
-        return `Encontrei ${lista.length} atendimento(s) na agenda. Os dados detalhados estão no card na tela.`;
+        if (lista.length === 0) {
+          return `Não há nenhum agendamento na grade para esta data, ${nomeOp}! Os horários estão livres para encaixes.`;
+        }
+        const primeiros = lista.slice(0, 3).map((a: any) => `${a.pets?.nome || a.petNome || "Pet"} (${(a.hora || "").slice(0, 5)})`).join(", ");
+        return `Encontrei **${lista.length} atendimento(s)** na agenda. Próximos: ${primeiros}. O card com a grade completa está na tela!`;
       }
       case "buscar_clientes_pets": {
         const lista = dados?.candidatos || (Array.isArray(dados) ? dados : []);
         if (lista.length === 0) {
-          return `Não encontrei nenhum cadastro com esse termo no sistema. Tente buscar com outro nome ou telefone.`;
+          return `Não encontrei nenhum cadastro com esse termo no sistema, ${nomeOp}. Tente buscar com outro nome, telefone ou raça.`;
         }
         if (lista.length === 1) {
           const c = lista[0];
-          return `Encontrei: ${c.nomePrincipal || c.nome} — ${c.detalheSecundario || ""}. Toque no card para ver a ficha completa.`;
+          return `Localizei: **${c.nomePrincipal || c.nome}** (${c.detalheSecundario || ""}). O card com a ficha completa já está aberto!`;
         }
         const nomes = lista.slice(0, 4).map((c: any) => c.nomePrincipal || c.nome).join(", ");
-        return `Encontrei ${lista.length} resultado(s): ${nomes}. Qual deles você quer consultar?`;
+        return `Encontrei ${lista.length} resultados: ${nomes}. Toque no card para abrir a ficha que você deseja!`;
       }
       case "consultar_horarios_disponiveis": {
         const vagas = dados?.horariosSugeridos || dados?.vagas || [];
-        return `Temos ${vagas.length} vaga(s) disponível(is) na grade: ${vagas.slice(0, 4).join(", ")}.`;
+        if (vagas.length === 0) {
+          return `A grade de hoje está com horários preenchidos, ${nomeOp}!`;
+        }
+        return `Temos **${vagas.length} horário(s) livre(s)** na grade: ${vagas.slice(0, 4).join(", ")}.`;
       }
       case "identificar_clientes_retorno": {
         const lista = Array.isArray(dados) ? dados : dados?.clientes || [];
-        return `Identifiquei ${lista.length} cliente(s) ausente(s) com potencial de retorno.`;
+        return `Identifiquei **${lista.length} cliente(s)** ausentes com alto potencial de retorno para o Spa!`;
       }
       case "consultar_aniversariantes": {
-        return `Consultei os aniversariantes do Pet Spa. Os dados estão disponíveis no card.`;
+        const lista = Array.isArray(dados) ? dados : dados?.aniversariantes || [];
+        return `Temos **${lista.length} aniversariante(s)** no período para ações de carinho e fidelização!`;
       }
       default:
-        return "Prontinho! Operação realizada e dados sincronizados com a grade.";
+        return `Prontinho, ${nomeOp}! Operação concluída com sucesso e sincronizada no sistema.`;
     }
   }
 
