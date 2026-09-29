@@ -111,7 +111,7 @@ function LembretesPage() {
 
       if (viewData && viewData.length > 0) {
         return viewData
-          .filter((item) => !petsComAgendamento.has(item.pet_id))
+          .filter((item) => !item.pet_id || !petsComAgendamento.has(item.pet_id))
           .map((item) => ({
             petId: item.pet_id,
             petNome: item.pet_nome || "Pet",

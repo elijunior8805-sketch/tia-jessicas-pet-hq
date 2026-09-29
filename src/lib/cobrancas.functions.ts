@@ -1240,6 +1240,7 @@ export type FilaItemDTO = {
   id: string;
   cliente_id: string;
   cliente_nome: string;
+  cliente_whatsapp: string | null;
   pet_nome: string | null;
   saldo: number;
   dias_atraso: number;
@@ -1265,7 +1266,7 @@ export const filaPriorizada = createServerFn({ method: "GET" })
         id, cliente_id, saldo, vencimento, status, tentativas,
         prioridade, prioridade_justificativa, promessas_quebradas,
         ultima_resposta_em,
-        clientes:cliente_id ( nome ),
+        clientes:cliente_id ( nome, whatsapp ),
         atendimentos:atendimento_id ( pets:pet_id ( nome ) )
       `)
       .is("arquivada_em", null)
@@ -1298,6 +1299,7 @@ export const filaPriorizada = createServerFn({ method: "GET" })
         id: r.id,
         cliente_id: r.cliente_id,
         cliente_nome: r.clientes?.nome ?? "—",
+        cliente_whatsapp: r.clientes?.whatsapp ?? null,
         pet_nome: r.atendimentos?.pets?.nome ?? null,
         saldo: Number(r.saldo),
         dias_atraso: dias,
@@ -1528,7 +1530,7 @@ export const quitarCobrancaComReativacao = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({
     cobrancaId: z.string().uuid(),
     valorPago: z.number().positive().optional(),
-    forma: z.string().default("pix"),
+    forma: z.enum(["credito", "debito", "dinheiro", "outras", "pendente", "pix"]).default("pix"),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, claims } = context;

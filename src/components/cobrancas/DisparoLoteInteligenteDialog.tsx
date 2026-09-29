@@ -82,6 +82,7 @@ export function DisparoLoteInteligenteDialog({
       setItens(
         (res || []).map((r) => ({
           ...r,
+          petNome: r.petNome ?? "",
           statusEnvio: "pendente",
         }))
       );

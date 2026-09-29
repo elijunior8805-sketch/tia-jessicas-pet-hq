@@ -713,11 +713,11 @@ export const listarClientesSegmentados = createServerFn({ method: "GET" })
     const { data: clubinhos } = await supabase
       .from("programas_contratados")
       .select(`
-        pet_id, status,
+        pet_id, status_do_programa,
         programas_fidelidade ( nome )
       `)
       .in("pet_id", petIds)
-      .eq("status", "ativo");
+      .eq("status_do_programa", "ativo");
 
     const clubinhoMap: Record<string, string> = {};
     for (const c of (clubinhos ?? []) as any[]) {
