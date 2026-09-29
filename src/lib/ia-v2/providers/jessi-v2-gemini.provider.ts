@@ -15,6 +15,7 @@ import {
 import { JessiV2ContextState } from "../session/jessi-v2-session";
 import { JESSI_V2_SYSTEM_PROMPT } from "../config/jessi-v2-config";
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
+import { AgendaAdapter } from "../adapters/agenda.adapter";
 
 /**
  * Provedor de IA Conversacional e Agente Autônomo com Tool Calling (Gemini 1.5 Flash / Lovable Gateway)
