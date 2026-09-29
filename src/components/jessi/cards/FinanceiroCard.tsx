@@ -163,18 +163,33 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
                       R$ {val.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
                     {onActionClick && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const comando = nome && nome !== "Cliente"
-                            ? `Gerar mensagem de cobrança para ${nome}`
-                            : `Gerar mensagem de cobrança para a pendência de R$ ${val.toFixed(2)}`;
-                          onActionClick(comando);
-                        }}
-                        className="text-[10px] text-emerald-800 hover:underline font-semibold"
-                      >
-                        Cobrar WhatsApp
-                      </button>
+                      <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const comando = nome && nome !== "Cliente"
+                              ? `Gerar cobrança Pix no Mercado Pago de R$ ${val.toFixed(2)} para ${nome}`
+                              : `Gerar cobrança Pix no Mercado Pago de R$ ${val.toFixed(2)}`;
+                            onActionClick(comando);
+                          }}
+                          className="text-[10px] text-emerald-800 hover:underline font-bold"
+                        >
+                          Pix Mercado Pago
+                        </button>
+                        <span className="text-[9px] text-muted-foreground">•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const comando = nome && nome !== "Cliente"
+                              ? `Gerar mensagem de cobrança para ${nome}`
+                              : `Gerar mensagem de cobrança para a pendência de R$ ${val.toFixed(2)}`;
+                            onActionClick(comando);
+                          }}
+                          className="text-[10px] text-muted-foreground hover:underline font-medium"
+                        >
+                          WhatsApp
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

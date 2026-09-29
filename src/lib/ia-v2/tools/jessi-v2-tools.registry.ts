@@ -891,6 +891,52 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  gerar_cobranca_pix_mercadopago: {
+    nomeInterno: "gerar_cobranca_pix_mercadopago",
+    descricao: "Gera cobrança Pix online com QR Code dinâmico e Copia-e-Cola via Mercado Pago API",
+    intencoes: ["gerar_pix", "cobrar_pix", "pix_mercadopago", "gerar_cobranca_pix", "gerar_pix_online"],
+    area: "financeiro_relatorios",
+    parametros: {
+      valor: { tipo: "number", obrigatorio: true, descricao: "Valor em R$" },
+      descricao: { tipo: "string", obrigatorio: true, descricao: "Descrição do serviço" },
+      clienteNome: { tipo: "string", obrigatorio: false, descricao: "Nome do cliente" },
+      clienteTelefone: { tipo: "string", obrigatorio: false, descricao: "Telefone do cliente" },
+      agendamentoId: { tipo: "string", obrigatorio: false, descricao: "ID do agendamento vinculado" },
+    },
+    retorno: "QR Code Base64, código Pix Copia-e-Cola e ID do pagamento Mercado Pago",
+    permissoes: ["financeiro", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "criarCobrancaPixMercadoPago",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 10000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+  gerar_link_pagamento_mercadopago: {
+    nomeInterno: "gerar_link_pagamento_mercadopago",
+    descricao: "Gera link de pagamento Mercado Pago (Checkout Pro) para cartão de crédito e parcelamento",
+    intencoes: ["gerar_link_pagamento", "link_cartao", "pagar_cartao", "checkout_mercadopago"],
+    area: "financeiro_relatorios",
+    parametros: {
+      titulo: { tipo: "string", obrigatorio: true, descricao: "Título do pagamento" },
+      valor: { tipo: "number", obrigatorio: true, descricao: "Valor em R$" },
+      clienteNome: { tipo: "string", obrigatorio: false, descricao: "Nome do cliente" },
+    },
+    retorno: "Link oficial Mercado Pago (init_point)",
+    permissoes: ["financeiro", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "criarLinkPagamentoMercadoPago",
+    featureFlag: "ai_v2_finance",
+    timeoutMs: 10000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
 };
 
 /**
@@ -1092,6 +1138,73 @@ export async function despacharFerramentaV2(
 
       case "executar_conciliacao":
         return await FinanceiroRelatoriosAdapter.executarConciliacaoAutorizada(sb, params as any, chave);
+
+      case "gerar_cobranca_pix_mercadopago":
+      case "gerar_cobranca_pix_online":
+      case "gerar_pix_online":
+      case "gerar_pix": {
+        const { criarCobrancaPixMercadoPago } = await import("@/lib/mercadopago.server");
+        const resPix = await criarCobrancaPixMercadoPago({
+          valor: Number(params.valor || 0),
+          descricao: params.descricao || "Atendimento Pet Spa Tia Jéssica",
+          clienteNome: params.clienteNome,
+          clienteTelefone: params.clienteTelefone,
+          agendamentoId: params.agendamentoId,
+          clienteId: params.clienteId,
+        });
+
+        if (resPix.sucesso && resPix.paymentId) {
+          try {
+            await (sb as any).from("pagamentos").insert({
+              valor: Number(params.valor || 0),
+              metodo: "pix",
+              status: "pendente",
+              tipo: "avulso",
+              observacoes: `Pix Mercado Pago: ID ${resPix.paymentId} - ${params.descricao || "Atendimento"}`,
+              agendamento_id: params.agendamentoId || null,
+              cliente_id: params.clienteId || null,
+            });
+          } catch (errDb) {
+            console.warn("[despacharFerramentaV2] Aviso ao inserir pagamento pendente:", errDb);
+          }
+        }
+
+        return {
+          success: resPix.sucesso,
+          data: {
+            ...resPix,
+            valor: Number(params.valor || 0),
+            descricao: params.descricao || "Atendimento Pet Spa",
+            clienteNome: params.clienteNome,
+            clienteTelefone: params.clienteTelefone,
+            agendamentoId: params.agendamentoId,
+          },
+          summary: resPix.sucesso
+            ? `Cobrança Pix de R$ ${Number(params.valor || 0).toFixed(2)} gerada com sucesso via Mercado Pago! QR Code e Copia-e-Cola disponíveis.`
+            : `Não foi possível gerar a cobrança Pix: ${resPix.mensagemErro}`,
+        };
+      }
+
+      case "gerar_link_pagamento_mercadopago":
+      case "gerar_link_cartao":
+      case "gerar_link_pagamento": {
+        const { criarLinkPagamentoMercadoPago } = await import("@/lib/mercadopago.server");
+        const resLink = await criarLinkPagamentoMercadoPago({
+          titulo: params.titulo || params.descricao || "Atendimento Pet Spa Tia Jéssica",
+          valor: Number(params.valor || 0),
+          clienteNome: params.clienteNome,
+          agendamentoId: params.agendamentoId,
+          clienteId: params.clienteId,
+        });
+
+        return {
+          success: resLink.sucesso,
+          data: resLink,
+          summary: resLink.sucesso
+            ? `Link de pagamento gerado com sucesso: ${resLink.initPoint}`
+            : `Não foi possível gerar o link: ${resLink.mensagemErro}`,
+        };
+      }
 
       default:
         return {

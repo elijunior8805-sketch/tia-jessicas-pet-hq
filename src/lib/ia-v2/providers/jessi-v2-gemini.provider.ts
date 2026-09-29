@@ -440,6 +440,39 @@ export const OPENAI_TOOLS_SCHEMA: any[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "gerar_cobranca_pix_mercadopago",
+      description: "Gera uma cobrança Pix online oficial via Mercado Pago com QR Code dinâmico e código Pix Copia-e-Cola.",
+      parameters: {
+        type: "object",
+        properties: {
+          valor: { type: "number", description: "Valor da cobrança em R$" },
+          descricao: { type: "string", description: "Descrição do serviço prestado" },
+          clienteNome: { type: "string", description: "Nome do cliente/tutor" },
+          clienteTelefone: { type: "string", description: "Telefone do cliente para envio no WhatsApp" },
+        },
+        required: ["valor"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "gerar_link_pagamento_mercadopago",
+      description: "Gera um link de pagamento Mercado Pago (Checkout Pro) para cartão de crédito parcelado.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: { type: "string", description: "Título do pagamento ou serviço" },
+          valor: { type: "number", description: "Valor em R$" },
+          clienteNome: { type: "string", description: "Nome do cliente" },
+        },
+        required: ["valor"],
+      },
+    },
+  },
 ];
 
 export class JessiV2GeminiProvider implements IJessiV2AIProvider {
@@ -1392,6 +1425,17 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
           type: "leva_traz",
           title: "Itinerário Leva & Traz",
           subtitle: "Rotas do dia",
+          data,
+        });
+        break;
+      }
+      case "gerar_cobranca_pix_mercadopago":
+      case "gerar_cobranca_pix_online":
+      case "gerar_pix": {
+        cards.push({
+          type: "pix_mercadopago",
+          title: "Cobrança Pix · Mercado Pago",
+          subtitle: `R$ ${Number(data.valor || toolArgs.valor || 0).toFixed(2)}`,
           data,
         });
         break;
