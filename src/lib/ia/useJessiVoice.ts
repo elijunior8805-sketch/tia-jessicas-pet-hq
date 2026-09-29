@@ -34,7 +34,11 @@ export interface UseJessiVoiceReturn {
   resumeListening: () => void;
   cancelListening: () => void;
   resetTranscript: () => void;
-  speakResponse: (entrada: string | { texto: string }, onFinish?: () => void) => void;
+  speakResponse: (
+    entrada: string | { texto: string; cards?: any[] },
+    cardsOrOnFinish?: any[] | (() => void),
+    onFinish?: () => void
+  ) => void;
   falarResposta: (texto: string) => void;
   pararFala: () => void;
   cancelVoice: () => void;
@@ -429,15 +433,34 @@ export function useJessiVoice(
 
   /** Sintese de voz TTS humanizada, fluida e natural em portugues do Brasil */
   const speakResponse = useCallback(
-    (entrada: string | { texto: string }, onFinish?: () => void) => {
+    (
+      entrada: string | { texto: string; cards?: any[] },
+      cardsOrOnFinish?: any[] | (() => void),
+      onFinishCallback?: () => void
+    ) => {
       if (typeof window === "undefined" || !ttsEnabled) {
-        onFinish?.();
+        if (typeof cardsOrOnFinish === "function") cardsOrOnFinish();
+        else onFinishCallback?.();
         return;
       }
 
+      let cards: any[] | undefined = undefined;
+      let onFinish: (() => void) | undefined = undefined;
+
+      if (typeof cardsOrOnFinish === "function") {
+        onFinish = cardsOrOnFinish;
+      } else if (Array.isArray(cardsOrOnFinish)) {
+        cards = cardsOrOnFinish;
+        onFinish = onFinishCallback;
+      }
+
+      if (typeof entrada !== "string" && entrada.cards) {
+        cards = entrada.cards;
+      }
+
       const textoCru = typeof entrada === "string" ? entrada : entrada.texto;
-      // Garante que a fala seja enxuta, humana e nunca leia listas ou números de opções em voz alta
-      const texto = humanizarRespostaParaVoz(textoCru);
+      // Garante que a fala seja enxuta, humana e considere os cards ricos (ex: agendamento proposto)
+      const texto = humanizarRespostaParaVoz(textoCru, cards, isContinuousModeRef.current);
       if (!texto.trim()) {
         onFinish?.();
         return;

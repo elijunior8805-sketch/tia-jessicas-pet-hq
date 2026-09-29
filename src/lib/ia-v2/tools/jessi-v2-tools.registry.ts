@@ -937,6 +937,64 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  sugerir_resposta: {
+    nomeInterno: "sugerir_resposta",
+    descricao: "Gera sugestão de resposta profissional para mensagem de cliente via WhatsApp",
+    intencoes: ["sugerir_resposta", "responder_cliente", "mensagem_whatsapp"],
+    area: "comunicacao_notificacoes",
+    parametros: {
+      mensagemCliente: { tipo: "string", obrigatorio: true, descricao: "Mensagem recebida do cliente" },
+      clienteNome: { tipo: "string", obrigatorio: false, descricao: "Nome do cliente" },
+      petNome: { tipo: "string", obrigatorio: false, descricao: "Nome do pet" },
+    },
+    retorno: "Sugestões de resposta em múltiplos tons (cordial, direto, comercial)",
+    permissoes: ["atendimento", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "sugerirRespostaJessi",
+    featureFlag: "ai_v2_messages",
+    timeoutMs: 10000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
+};
+
+const TOOL_ALIASES: Record<string, string> = {
+  verificar_disponibilidade: "consultar_horarios_disponiveis",
+  identificar_encaixes: "consultar_horarios_disponiveis",
+  consultar_saldo_creditos: "consultar_saldo_programas",
+  consultar_faturamento: "consultar_financeiro_consolidado",
+  gerar_relatorio_financeiro: "consultar_financeiro_consolidado",
+  consultar_clientes_inativos: "identificar_clientes_retorno",
+  consultar_reativacao: "identificar_clientes_retorno",
+  consultar_leva_traz: "otimizar_rotas_leva_traz",
+  consultar_rota_leva_traz: "otimizar_rotas_leva_traz",
+  analisar_comprovante: "processar_comprovante",
+  conciliar_e_baixar_comprovante: "conciliar_comprovante",
+  gerar_mensagem_cobranca: "gerar_mensagens_cobranca",
+  cobrar_cliente: "gerar_mensagens_cobranca",
+  resumo_negocio: "consultar_resumo_operacional",
+  analise_cruzada_operacao: "consultar_analise_negocio",
+  analise_porte_raca: "consultar_analise_negocio",
+  analise_bairro: "consultar_analise_negocio",
+  analise_ocupacao_semanal: "consultar_analise_negocio",
+  analise_cancelamentos: "consultar_analise_negocio",
+  verificar_sentinelas_operacionais: "verificar_sentinelas",
+  sentinelas_background: "verificar_sentinelas",
+  gerar_pix: "gerar_cobranca_pix_mercadopago",
+  gerar_pix_mercadopago: "gerar_cobranca_pix_mercadopago",
+  gerar_link_pagamento: "gerar_link_pagamento_mercadopago",
+  gerar_link_mercadopago: "gerar_link_pagamento_mercadopago",
+  verificar_pix_mercadopago: "verificar_status_pix_mercadopago",
+  consultar_pix_mercadopago: "verificar_status_pix_mercadopago",
+  preparar_agendamento: "criar_agendamento",
+  preparar_cancelamento: "cancelar_agendamento",
+  preparar_reagendamento: "reagendar_atendimento",
+  preparar_cadastro_cliente: "cadastrar_cliente_pet",
+  preparar_consumo_credito: "consumir_credito_programa",
+  preparar_estorno: "estornar_credito_programa",
 };
 
 /**
@@ -948,7 +1006,8 @@ export async function despacharFerramentaV2(
   params: Record<string, any>,
   idempotencyKey?: string
 ): Promise<JessiV2QueryResult | JessiV2MutationResult | any> {
-  const toolDef = JESSI_V2_TOOLS_CATALOG[toolNome];
+  const toolCanonical = TOOL_ALIASES[toolNome] || toolNome;
+  const toolDef = JESSI_V2_TOOLS_CATALOG[toolCanonical] || JESSI_V2_TOOLS_CATALOG[toolNome];
 
   if (!toolDef) {
     return {

@@ -21,6 +21,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { JessiMessage } from "@/lib/ia/jessi-contracts";
 import { VoiceRecognitionStatus } from "@/lib/ia/ia-voz";
+import { AgendaCard } from "./cards/AgendaCard";
+import { ClienteCard } from "./cards/ClienteCard";
+import { FinanceiroCard } from "./cards/FinanceiroCard";
+import { ProgramaCard } from "./cards/ProgramaCard";
+import { ComprovanteCard } from "./cards/ComprovanteCard";
+import { ConfirmacaoCard } from "./cards/ConfirmacaoCard";
+import { AlertaCard } from "./cards/AlertaCard";
+import { LevaTrazCard } from "./cards/LevaTrazCard";
+import { ComunicacaoCard } from "./cards/ComunicacaoCard";
+import { ReativacaoCard } from "./cards/ReativacaoCard";
+import { AnalyticsCard } from "./cards/AnalyticsCard";
+import { SentinelaCard } from "./cards/SentinelaCard";
+import { PetCard } from "./cards/PetCard";
+import { PixMercadoPagoCard } from "./cards/PixMercadoPagoCard";
 
 interface JessiBancadaModeProps {
   isOpen: boolean;
@@ -258,9 +272,60 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
               </span>
             </div>
 
-            <p className="text-sm sm:text-base md:text-lg text-white font-normal leading-relaxed whitespace-pre-line max-h-48 overflow-y-auto pr-1">
+            <p className="text-sm sm:text-base md:text-lg text-white font-normal leading-relaxed whitespace-pre-line max-h-40 overflow-y-auto pr-1">
               {lastAssistantMsg.content}
             </p>
+
+            {/* Cards Visuais Ricos no Modo Bancada (QR Code Pix, Agenda, Ficha, etc.) */}
+            {lastAssistantMsg.cards && lastAssistantMsg.cards.length > 0 && (
+              <div className="pt-2 space-y-2.5 max-h-72 sm:max-h-80 overflow-y-auto pr-1 text-slate-900">
+                {lastAssistantMsg.cards.map((card, cIdx) => {
+                  switch (card.type) {
+                    case "agenda":
+                      return <AgendaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "cliente":
+                      return <ClienteCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "financeiro":
+                      return <FinanceiroCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "programa":
+                      return <ProgramaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "comprovante":
+                      return <ComprovanteCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "comunicacao":
+                      return <ComunicacaoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "reativacao":
+                    case "proativo":
+                      return <ReativacaoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "confirmacao":
+                      return (
+                        <ConfirmacaoCard
+                          key={cIdx}
+                          data={card.data}
+                          onConfirmar={onConfirmAction}
+                          onCancelar={onCancelAction}
+                          isLoading={isLoading}
+                        />
+                      );
+                    case "alerta":
+                      return <AlertaCard key={cIdx} data={card.data} />;
+                    case "leva_traz":
+                      return <LevaTrazCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "analytics":
+                      return <AnalyticsCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "sentinela":
+                      return <SentinelaCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "pet":
+                      return <PetCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    case "pix_mercadopago":
+                    case "mercadopago":
+                    case "pix":
+                      return <PixMercadoPagoCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
+                    default:
+                      return null;
+                  }
+                })}
+              </div>
+            )}
 
             {/* Banner de Confirmação por Voz caso haja ação pendente */}
             {pendingAction && (
@@ -299,7 +364,7 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
         <span className="text-xs font-semibold text-[#F5E6BE] block mb-2 font-display">
           Exemplos de Comandos que Você Pode Falar na Bancada:
         </span>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
           <button
             type="button"
             onClick={() => onSendMessage("Qual o próximo atendimento da agenda?")}
@@ -327,6 +392,20 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition-all text-white/90 text-[11px] sm:text-xs truncate cursor-pointer"
           >
             🗣️ &ldquo;Fechamento de caixa&rdquo;
+          </button>
+          <button
+            type="button"
+            onClick={() => onSendMessage("Gerar cobrança Pix de R$ 50")}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition-all text-white/90 text-[11px] sm:text-xs truncate cursor-pointer"
+          >
+            🗣️ &ldquo;Gerar Pix de R$ 50&rdquo;
+          </button>
+          <button
+            type="button"
+            onClick={() => onSendMessage("Verificar sentinelas operacionais")}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition-all text-white/90 text-[11px] sm:text-xs truncate cursor-pointer"
+          >
+            🗣️ &ldquo;Sentinelas & Alertas&rdquo;
           </button>
         </div>
       </div>

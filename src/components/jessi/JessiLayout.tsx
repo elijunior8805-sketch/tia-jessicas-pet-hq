@@ -278,7 +278,7 @@ export const JessiLayout: React.FC = () => {
                              (res as any).intent?.intencao === "agradecimento_despedida";
 
       if (ttsEnabled && res.respostaTexto) {
-        speakResponse(res.respostaTexto, () => {
+        speakResponse(res.respostaTexto, res.cards as any, () => {
           if (isContinuousMode && ehEncerramento) {
             stopContinuousMode();
             setStatus("disponivel");
@@ -388,7 +388,7 @@ export const JessiLayout: React.FC = () => {
       toast.success("Ação confirmada e registrada com sucesso!");
 
       if (ttsEnabled && res.respostaTexto) {
-        speakResponse(res.respostaTexto, () => {
+        speakResponse(res.respostaTexto, res.cards as any, () => {
           if (isContinuousMode) {
             resumeListening();
           }
