@@ -143,13 +143,25 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
     // 3. Se o pagamento está aprovado, efetiva a baixa imediatamente no banco
     if (res.sucesso && res.status === "approved") {
       try {
-        const idTransacao = res.paymentId || data.paymentId || `mp_${Date.now()}`;
+        const idTransacao = String(res.paymentId || data.paymentId || `mp_${Date.now()}`);
+        const dataAprovacaoIso = res.dataAprovacao || new Date().toISOString();
+        const valorPagoNum = Number(res.valor || 10);
+
+        let metodoNormalizado: "pix" | "cartao_credito" | "cartao_debito" = "cartao_credito";
+        const mpMetodo = String(res.metodoPagamento || "").toLowerCase();
+        if (mpMetodo === "pix" || mpMetodo === "bank_transfer" || mpMetodo.includes("pix")) {
+          metodoNormalizado = "pix";
+        } else if (mpMetodo === "debit_card" || mpMetodo.includes("debito") || mpMetodo.includes("débito")) {
+          metodoNormalizado = "cartao_debito";
+        } else {
+          metodoNormalizado = "cartao_credito";
+        }
 
         // Verifica se já existe o pagamento registrado
         const { data: pagExistente } = await (supabase as any)
           .from("pagamentos")
-          .select("id, status")
-          .ilike("observacoes", `%${idTransacao}%`)
+          .select("id, status, observacoes")
+          .or(`observacoes.ilike.%${idTransacao}%,id_transacao_bancaria.eq.${idTransacao}`)
           .maybeSingle();
 
         if (pagExistente) {
@@ -157,18 +169,30 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
             .from("pagamentos")
             .update({
               status: "pago",
-              data_pagamento: res.dataAprovacao || new Date().toISOString(),
+              valor_pago: valorPagoNum,
+              forma: metodoNormalizado,
+              metodo: metodoNormalizado,
+              id_transacao_bancaria: idTransacao,
+              data_pagamento: dataAprovacaoIso,
+              observacoes: pagExistente.observacoes
+                ? `${pagExistente.observacoes} | Confirmado em tempo real (${metodoNormalizado})`
+                : `Confirmado em tempo real Mercado Pago ID ${idTransacao} (${metodoNormalizado})`,
             })
             .eq("id", pagExistente.id);
         } else {
           await (supabase as any).from("pagamentos").insert({
-            valor: res.valor || 10,
-            metodo: res.metodoPagamento === "pix" ? "pix" : "cartao_credito",
+            valor: valorPagoNum,
+            valor_total: valorPagoNum,
+            valor_pago: valorPagoNum,
+            metodo: metodoNormalizado,
+            forma: metodoNormalizado,
             status: "pago",
             tipo: "avulso",
-            data_pagamento: res.dataAprovacao || new Date().toISOString(),
-            observacoes: `Pagamento Mercado Pago ID ${idTransacao} confirmado via verificação em tempo real`,
+            data_pagamento: dataAprovacaoIso,
+            id_transacao_bancaria: idTransacao,
+            observacoes: `Pagamento Mercado Pago ID ${idTransacao} (${metodoNormalizado.toUpperCase()}) confirmado via verificação em tempo real`,
             agendamento_id: data.agendamentoId || null,
+            atendimento_id: data.agendamentoId || null,
             cliente_id: data.clienteId || null,
             created_by: userId,
           });

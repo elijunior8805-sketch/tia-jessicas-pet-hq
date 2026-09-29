@@ -62,17 +62,25 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
           });
 
           // Se o pagamento estiver APROVADO, efetiva a baixa imediata
-          if (pagamentoMp.status === "approved") {
-            const extRef = pagamentoMp.externalReference || {};
-            const agendamentoId = extRef.agendamentoId;
-            const cobrancaId = extRef.cobrancaId;
-            const clienteId = extRef.clienteId;
+            // Normalização inteligente da forma de pagamento
+            let metodoNormalizado: "pix" | "cartao_credito" | "cartao_debito" = "cartao_credito";
+            const mpMetodo = String(pagamentoMp.metodoPagamento || "").toLowerCase();
+            if (mpMetodo === "pix" || mpMetodo === "bank_transfer" || mpMetodo.includes("pix")) {
+              metodoNormalizado = "pix";
+            } else if (mpMetodo === "debit_card" || mpMetodo.includes("debito") || mpMetodo.includes("débito")) {
+              metodoNormalizado = "cartao_debito";
+            } else {
+              metodoNormalizado = "cartao_credito";
+            }
 
-            // 1. Atualiza registro na tabela de pagamentos
+            const dataPagoIso = pagamentoMp.dataAprovacao || new Date().toISOString();
+            const valorTotalNum = Number(pagamentoMp.valor || 0);
+
+            // 1. Atualiza ou insere registro na tabela de pagamentos
             const { data: pagamentoExistente } = await admin
               .from("pagamentos")
-              .select("id, status")
-              .ilike("observacoes", `%${paymentId}%`)
+              .select("id, status, observacoes")
+              .or(`observacoes.ilike.%${paymentId}%,id_transacao_bancaria.eq.${paymentId}`)
               .maybeSingle();
 
             if (pagamentoExistente) {
@@ -80,21 +88,33 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
                 .from("pagamentos")
                 .update({
                   status: "pago",
-                  data_pagamento: pagamentoMp.dataAprovacao || new Date().toISOString(),
-                })
+                  valor_pago: valorTotalNum,
+                  data_pagamento: dataPagoIso,
+                  forma: metodoNormalizado,
+                  metodo: metodoNormalizado,
+                  id_transacao_bancaria: String(paymentId),
+                  observacoes: pagamentoExistente.observacoes
+                    ? `${pagamentoExistente.observacoes} | Baixa automática via Webhook (${metodoNormalizado})`
+                    : `Baixa automática via Webhook Mercado Pago ID ${paymentId} (${metodoNormalizado})`,
+                } as any)
                 .eq("id", pagamentoExistente.id);
             } else {
               // Cria o pagamento caso não tenha sido pré-registrado
               await admin.from("pagamentos").insert({
-                valor: pagamentoMp.valor || 0,
-                metodo: (pagamentoMp.metodoPagamento === "pix" ? "pix" : "cartao_credito") as any,
+                valor: valorTotalNum,
+                valor_total: valorTotalNum,
+                valor_pago: valorTotalNum,
+                metodo: metodoNormalizado,
+                forma: metodoNormalizado,
                 status: "pago",
                 tipo: "avulso",
-                data_pagamento: pagamentoMp.dataAprovacao || new Date().toISOString(),
-                observacoes: `Pagamento Mercado Pago ID ${paymentId} aprovado via Webhook`,
+                data_pagamento: dataPagoIso,
+                id_transacao_bancaria: String(paymentId),
+                observacoes: `Pagamento Mercado Pago ID ${paymentId} (${metodoNormalizado.toUpperCase()}) aprovado automaticamente via Webhook`,
                 agendamento_id: agendamentoId || null,
+                atendimento_id: agendamentoId || null,
                 cliente_id: clienteId || null,
-              });
+              } as any);
             }
 
             // 2. Se houver agendamento vinculado, confirma o atendimento na grade
@@ -111,12 +131,12 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
                 .from("cobrancas")
                 .update({
                   status: "pago",
-                  data_pagamento: pagamentoMp.dataAprovacao || new Date().toISOString(),
+                  data_pagamento: dataPagoIso,
                 })
                 .eq("id", cobrancaId);
             }
 
-            console.log(`[Webhook MercadoPago] Sucesso! Baixa automática realizada para o pagamento ${paymentId}.`);
+            console.log(`[Webhook MercadoPago] Sucesso! Baixa automática realizada para o pagamento ${paymentId} (${metodoNormalizado}).`);
           }
 
           return new Response(
