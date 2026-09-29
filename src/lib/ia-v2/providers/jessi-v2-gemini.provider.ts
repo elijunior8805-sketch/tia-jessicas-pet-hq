@@ -690,8 +690,9 @@ ${snapshotTexto}
 DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
 1. Responda a QUALQUER pergunta, conselho, brincadeira, lembrete (ex: beber água, pausas, dicas de gestão), saudação ou dúvida de forma fluida, natural, inteligente e humana (estilo Gemini Live / ChatGPT).
 2. Não seja robótica, rígida ou travada. Demonstre proatividade e afeto com os pets.
-3. Se o usuário pedir para buscar um cliente/pet, sugerir clientes inativos para encaixe, agendar, cancelar, ver financeiro ou qualquer ação no sistema, inclua no final da sua resposta uma tag de ação estruturada:
-<<<ACTION:{"tool":"identificar_clientes_retorno"|"buscar_clientes_pets"|"consultar_agenda"|"consultar_financeiro_consolidado"|"consultar_horarios_disponiveis"|"preparar_agendamento"|"preparar_cancelamento"|"gerar_mensagens_cobranca", "params":{...}}>>>
+3. Se o usuário pedir para gerar pagamento, gerar link, pagar no cartão/crédito, cobrar via Pix, buscar cliente/pet, sugerir encaixes, agendar, cancelar, ver financeiro ou qualquer ação no sistema, inclua no final da sua resposta uma tag de ação estruturada:
+<<<ACTION:{"tool":"gerar_cobranca_pix_mercadopago"|"identificar_clientes_retorno"|"buscar_clientes_pets"|"consultar_agenda"|"consultar_financeiro_consolidado"|"consultar_horarios_disponiveis"|"preparar_agendamento"|"preparar_cancelamento"|"gerar_mensagens_cobranca"|"consultar_programas_ativos_geral", "params":{...}}>>>
+ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" referem-se a pagamento financeiro (ferramenta: "gerar_cobranca_pix_mercadopago"). NUNCA confunda cartão de crédito com créditos do Clubinho!
 4. Formate valores monetários em R$ (ex: R$ 80,00).`;
 
     const messages: any[] = [
@@ -739,30 +740,36 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
             }
           }
 
-          // Detecção complementar de intenção de ação se o usuário pediu dados específicos
+          // Detecção complementar e correção de desvio de intenção
           const msgNorm = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const ehIntencaoPagamento =
+            msgNorm.includes("pix") ||
+            msgNorm.includes("link") ||
+            msgNorm.includes("cartao") ||
+            msgNorm.includes("cartão") ||
+            msgNorm.includes("credito") ||
+            msgNorm.includes("crédito") ||
+            msgNorm.includes("cobranca") ||
+            msgNorm.includes("cobrar") ||
+            msgNorm.includes("pagamento") ||
+            msgNorm.includes("paganto") ||
+            msgNorm.includes("pagto") ||
+            msgNorm.includes("pagar") ||
+            msgNorm.includes("checkout");
+
+          // Se a IA confundiu cartão de crédito com créditos do Clubinho, redireciona para cobrança
+          if (ehIntencaoPagamento && (toolAlvo === "consultar_programas_ativos_geral" || toolAlvo === "consultar_saldo_programas" || !toolAlvo)) {
+            const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
+            const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
+            toolAlvo = "gerar_cobranca_pix_mercadopago";
+            toolParams = {
+              valor: valorNum,
+              descricao: "Cobrança Pet Spa Tia Jéssica",
+            };
+          }
+
           if (!toolAlvo) {
-            if (
-              msgNorm.includes("pix") ||
-              msgNorm.includes("link") ||
-              msgNorm.includes("cartao") ||
-              msgNorm.includes("cartão") ||
-              msgNorm.includes("credito") ||
-              msgNorm.includes("crédito") ||
-              msgNorm.includes("cobranca") ||
-              msgNorm.includes("cobrar") ||
-              msgNorm.includes("pagamento") ||
-              msgNorm.includes("pagar") ||
-              msgNorm.includes("checkout")
-            ) {
-              const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
-              const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
-              toolAlvo = "gerar_cobranca_pix_mercadopago";
-              toolParams = {
-                valor: valorNum,
-                descricao: "Cobrança Pet Spa Tia Jéssica",
-              };
-            } else if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
+            if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
               toolAlvo = "identificar_clientes_retorno";
             } else if (msgNorm.includes("buscar") || msgNorm.includes("procurar") || msgNorm.includes("ficha") || msgNorm.includes("tutor") || msgNorm.includes("cliente")) {
               const termo = mensagemUsuario.replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "").trim();
@@ -1255,7 +1262,20 @@ DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
     }
 
     // 10. Clubinho & Planos
-    if (msg.includes("clubinho") || msg.includes("plano") || msg.includes("pacote") || msg.includes("credito")) {
+    if (
+      msg.includes("clubinho") ||
+      msg.includes("pacote de banho") ||
+      msg.includes("plano mensal") ||
+      (msg.includes("credito") &&
+        !msg.includes("cartao") &&
+        !msg.includes("cartão") &&
+        !msg.includes("link") &&
+        !msg.includes("pagar") &&
+        !msg.includes("paganto") &&
+        !msg.includes("pagamento") &&
+        !msg.includes("cobranca") &&
+        !msg.includes("cobrar"))
+    ) {
       const resProg = await despacharFerramentaV2(sb, "consultar_programas_ativos_geral", {});
       const d = resProg?.data || resProg;
 
