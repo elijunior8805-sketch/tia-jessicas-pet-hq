@@ -15,8 +15,13 @@ import {
 import { JessiV2ContextState } from "../session/jessi-v2-session";
 import { JESSI_V2_SYSTEM_PROMPT } from "../config/jessi-v2-config";
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
-import { AgendaAdapter } from "../adapters/agenda.adapter";
+import { AgendaAdapter, partirDataHora } from "../adapters/agenda.adapter";
 import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
+import { FinanceiroRelatoriosAdapter } from "../adapters/financeiro-relatorios.adapter";
+import { ProgramasCreditosAdapter } from "../adapters/programas-creditos.adapter";
+import { ProativoAdapter } from "../adapters/proativo.adapter";
+import { SentinelasAdapter } from "../adapters/sentinelas.adapter";
+import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 
 /**
  * Provedor de IA Conversacional e Agente Autônomo com Tool Calling (Gemini 1.5 Flash / Lovable Gateway)
@@ -821,13 +826,13 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       return {
         respostaTexto: despachoResiliente.texto,
         cards,
-        pendingAction: null,
+        pendingAction: (despachoResiliente as any).pendingAction || null,
         novoContexto: despachoResiliente.novoContexto || {},
       };
     }
 
     return {
-      respostaTexto: `Olá, ${user?.nome || "Eli"}! Estou 100% conectada e pronta para te ajudar. Você pode me perguntar sobre o próximo pet da fila, consultar horários livres, verificar atrasos, ver o faturamento de hoje ou buscar a ficha completa de qualquer cliente! O que deseja ver agora?`,
+      respostaTexto: `Entendido, ${user?.nome || "Eli"}! Como posso te ajudar na operação do Spa de Pet agora? Você pode consultar a agenda de hoje, buscar um cliente ou pet, ver o financeiro ou horários livres.`,
       cards,
       pendingAction: null,
       novoContexto: {},
@@ -842,12 +847,14 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     mensagemUsuario: string,
     hojeStr: string,
     operadorNome: string
-  ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any } | null> {
+  ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any; pendingAction?: any } | null> {
     const msg = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     const nomeOp = operadorNome || "Eli";
 
-    // 0.0 Tratamento de Seleção Direta de ID [id:uuid] ou Opção de Desambiguação
-    const matchId = mensagemUsuario.match(/\[id:([a-f0-9-]+)\]/i);
+    // =========================================================================
+    // 0.0 TRATAMENTO DE SELEÇÃO DIRETA DE ID [id:uuid] OU OPÇÃO DE DESAMBIGUAÇÃO
+    // =========================================================================
+    const matchId = mensagemUsuario.match(/\[(?:id|selecionar):([a-f0-9-]+)\]/i);
     if (matchId && matchId[1]) {
       const idAlvo = matchId[1];
       const resFichaCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, idAlvo);
@@ -870,7 +877,7 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       const resFichaPet = await ClientesPetsAdapter.obterFichaPet(sb, idAlvo);
       if (resFichaPet.success && resFichaPet.data) {
         const pet = resFichaPet.data;
-        const tutor = pet.clientes?.nome || pet.tutor || "Tutor";
+        const tutor = (pet as any).clientes?.nome || (pet as any).tutor || "Tutor";
         return {
           texto: `Aqui está a ficha completa de **${pet.nome}** (${pet.raca || "Raça padrão"}, tutor: ${tutor})!`,
           card: {
@@ -884,75 +891,26 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       }
     }
 
-    // 0. Saudações e Conversação Natural Humanizada
-    if (
-      msg === "boa noite" ||
-      msg.startsWith("boa noite") ||
-      msg === "bom dia" ||
-      msg.startsWith("bom dia") ||
-      msg === "boa tarde" ||
-      msg.startsWith("boa tarde") ||
-      msg === "oi" ||
-      msg === "ola" ||
-      msg.startsWith("oi ") ||
-      msg.startsWith("ola ") ||
-      msg.includes("tudo bem") ||
-      msg.includes("como vai") ||
-      msg.includes("como voce esta") ||
-      msg.includes("como você está")
-    ) {
-      const hora = new Date().getHours();
-      const saudacaoHorario = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
-      return {
-        texto: `${saudacaoHorario}, ${nomeOp}! Tudo excelente por aqui no Spa de Pet. Estou com a central de atendimentos, agenda e financeiro 100% pronta para te apoiar. Por onde você gostaria de começar agora?`,
-      };
-    }
+    // =========================================================================
+    // 1. COBRANÇA DIRETA PIX & CARTÃO MERCADO PAGO (INTENÇÃO EXPLÍCITA)
+    // =========================================================================
+    const isExplicitPaymentGen =
+      msg.includes("gerar pix") ||
+      msg.includes("link de pagamento") ||
+      msg.includes("mercado pago") ||
+      msg.includes("qr code") ||
+      msg.includes("link do cartao") ||
+      msg.includes("link de cartao") ||
+      msg.includes("checkout online") ||
+      (msg.includes("pix") && (msg.includes("gerar") || msg.includes("criar") || msg.includes("de r$") || /(?:r\$|\$)?\s*\d+/.test(msg)));
 
-    // 0.1 Conversação Empática e Lembretes de Bem-Estar (Água, Pausas, Agradecimentos)
-    if (
-      msg.includes("agua") ||
-      msg.includes("água") ||
-      msg.includes("beber") ||
-      msg.includes("hidrat") ||
-      msg.includes("obrigad") ||
-      msg.includes("valeu") ||
-      msg.includes("top") ||
-      msg.includes("legal") ||
-      msg.includes("descans") ||
-      msg.includes("pausa") ||
-      msg.includes("almoc") ||
-      msg.includes("almoç")
-    ) {
-      if (msg.includes("agua") || msg.includes("água") || msg.includes("hidrat")) {
-        return {
-          texto: `Muito obrigado pelo lembrete de hidratação, ${nomeOp}! Cuidar da água e fazer pequenas pausas é essencial para mantermos o foco e a energia alta na rotina do Spa. Já tomei meu gole virtual de água! Como posso te ajudar na operação agora?`,
-        };
-      }
-      return {
-        texto: `Muito obrigado, ${nomeOp}! É sempre um prazer estar ao seu lado cuidando da operação do Spa de Pet. Conte comigo para a agenda, clientes, financeiro e qualquer detalhe do dia!`,
-      };
-    }
-
-    // 0.2 Cobrança Pix e Cartão de Crédito Online Mercado Pago
-    if (
-      msg.includes("pix") ||
-      msg.includes("link") ||
-      msg.includes("cartao") ||
-      msg.includes("cartão") ||
-      msg.includes("credito") ||
-      msg.includes("crédito") ||
-      msg.includes("cobranca") ||
-      msg.includes("cobrar") ||
-      msg.includes("pagamento") ||
-      msg.includes("pagar") ||
-      msg.includes("checkout")
-    ) {
+    if (isExplicitPaymentGen) {
       const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
-      const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
+      const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 50;
 
       const resPix = await despacharFerramentaV2(sb, "gerar_cobranca_pix_mercadopago", {
         valor: valorNum,
-        descricao: "Cobrança Pix Pet Spa Tia Jéssica",
+        descricao: "Cobrança Pet Spa Tia Jéssica",
       });
 
       const d = resPix?.data || resPix;
@@ -969,38 +927,220 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
         };
       } else {
         return {
-          texto: `Não foi possível gerar a cobrança no Mercado Pago no momento, ${nomeOp}. Detalhes: ${resPix.summary || d?.mensagemErro || "Verifique a conexão com o Mercado Pago."}`,
+          texto: `Não foi possível gerar a cobrança no Mercado Pago no momento, ${nomeOp}. Detalhes: ${resPix?.summary || d?.mensagemErro || "Verifique a integração do Mercado Pago nas configurações."}`,
         };
       }
     }
 
-    // 1. Clientes Inativos / Reativação / Sugestão de Encaixe com Clientes Sumidos
-    if (
-      msg.includes("inativ") ||
-      msg.includes("reativa") ||
-      msg.includes("retorno") ||
-      msg.includes("ausente") ||
-      msg.includes("sumido") ||
-      msg.includes("saudade") ||
-      (msg.includes("sugerir") && msg.includes("encaixe")) ||
-      (msg.includes("clientes") && msg.includes("encaixe"))
-    ) {
-      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
-      const d = resRet?.data || resRet;
-      const lista = Array.isArray(d) ? d : d?.clientes || [];
+    // =========================================================================
+    // 2. AGENDAMENTO & MARCAÇÃO DE ATENDIMENTOS (BANHO, TOSA, HORÁRIO)
+    // =========================================================================
+    const isSchedulingIntent =
+      msg.startsWith("agendar") ||
+      msg.startsWith("marcar") ||
+      msg.includes("agendar banho") ||
+      msg.includes("agendar tosa") ||
+      msg.includes("marcar banho") ||
+      msg.includes("marcar tosa") ||
+      msg.includes("novo agendamento") ||
+      msg.includes("marcar horario") ||
+      msg.includes("agendar horario");
+
+    if (isSchedulingIntent) {
+      // Extrair data
+      let dataAgendamento = hojeStr;
+      if (msg.includes("amanha")) {
+        dataAgendamento = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000));
+      }
+
+      // Extrair hora (ex: 14h, 14:30, as 10)
+      const matchHora = mensagemUsuario.match(/(?:as|às|ás)?\s*(\d{1,2})(?:[:h](\d{2})?|h)\b/i);
+      let horaAgendamento = "09:00";
+      if (matchHora) {
+        const h = matchHora[1].padStart(2, "0");
+        const m = matchHora[2] ? matchHora[2].padStart(2, "0") : "00";
+        horaAgendamento = `${h}:${m}`;
+      }
+
+      // Extrair serviço
+      let servicoNome = "Banho";
+      if (msg.includes("tosa higienica")) servicoNome = "Tosa Higiênica";
+      else if (msg.includes("tosa completa") || msg.includes("tosa geral")) servicoNome = "Tosa Completa";
+      else if (msg.includes("tosa")) servicoNome = "Tosa";
+      else if (msg.includes("hidratacao") || msg.includes("hidratação")) servicoNome = "Banho e Hidratação";
+
+      // Extrair nome de pet/cliente mencionado
+      const termoNome = mensagemUsuario
+        .replace(/\b(agendar|marcar|agendamento|horario|para|o|a|do|da|de|no|na|amanha|hoje|banho|tosa|higienica|completa|geral|as|às|ás|por|favor|novo|atendimento)\b/gi, "")
+        .replace(/\d{1,2}(?:[:h]\d{2}|h)?/gi, "")
+        .trim();
+
+      let petEncontrado: any = null;
+      let clienteEncontrado: any = null;
+
+      if (termoNome.length >= 2) {
+        const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoNome);
+        const candidatos = resBusca?.data?.candidatos || [];
+        if (candidatos.length > 0) {
+          const primeiro = candidatos[0];
+          if (primeiro.tipo === "pet") {
+            petEncontrado = primeiro.dadosCompletos || primeiro;
+            if (petEncontrado.clientes) {
+              clienteEncontrado = petEncontrado.clientes;
+            }
+          } else {
+            clienteEncontrado = primeiro.dadosCompletos || primeiro;
+            if (clienteEncontrado.pets && clienteEncontrado.pets.length > 0) {
+              petEncontrado = clienteEncontrado.pets[0];
+            }
+          }
+        }
+      }
+
+      const diaNome = dataAgendamento === hojeStr ? "hoje" : "amanhã";
+      const petNomeLabel = petEncontrado?.nome || (termoNome ? `Pet (${termoNome})` : "o Pet");
+      const tutorNomeLabel = clienteEncontrado?.nome || "Tutor";
 
       return {
-        texto: `Identifiquei **${lista.length} cliente(s) inativo(s)** que não vêm ao Spa há mais de 25 dias, ${nomeOp}! Preparei a lista com os pets e sugestões de mensagens de carinho prontas para disparo no WhatsApp, para preenchermos os horários livres da grade!`,
+        texto: `Preparei a proposta de agendamento de **${servicoNome}** para **${petNomeLabel}** (${tutorNomeLabel}) para ${diaNome} às **${horaAgendamento}**, ${nomeOp}! Toque em Confirmar no card para salvar na grade oficial.`,
         card: {
-          type: "reativacao",
-          title: "Clientes Inativos para Encaixe",
-          subtitle: `${lista.length} tutores com potencial de retorno`,
-          data: lista,
+          type: "confirmacao",
+          title: `Confirmar Agendamento: ${petNomeLabel}`,
+          subtitle: `${servicoNome} • ${diaNome.toUpperCase()} às ${horaAgendamento}`,
+          data: {
+            acao: "criar_agendamento",
+            tipo: "agendamento",
+            data: dataAgendamento,
+            hora: horaAgendamento,
+            servico: servicoNome,
+            petId: petEncontrado?.id,
+            petNome: petEncontrado?.nome || termoNome,
+            clienteId: clienteEncontrado?.id,
+            clienteNome: clienteEncontrado?.nome,
+          },
+        },
+        pendingAction: {
+          action: "criar_agendamento",
+          params: {
+            data: dataAgendamento,
+            hora: horaAgendamento,
+            servico: servicoNome,
+            petId: petEncontrado?.id,
+            clienteId: clienteEncontrado?.id,
+          },
         },
       };
     }
 
-    // 2. Próximo Pet / Quem é o Próximo / Fila de Atendimento
+    // =========================================================================
+    // 3. PAGAMENTOS EM ABERTO / COBRANÇA / INADIMPLÊNCIA / CONTAS A RECEBER
+    // =========================================================================
+    if (
+      msg.includes("pagamentos em aberto") ||
+      msg.includes("pagamento em aberto") ||
+      msg.includes("a receber") ||
+      msg.includes("inadimplente") ||
+      msg.includes("devedor") ||
+      msg.includes("quem deve") ||
+      msg.includes("cobrancas pendentes") ||
+      msg.includes("cobrar clientes") ||
+      msg.includes("mensagens de cobranca") ||
+      msg.includes("cobranca cordial")
+    ) {
+      const resAbertos = await FinanceiroRelatoriosAdapter.obterPagamentosEmAberto(sb);
+      const lista = resAbertos?.data || [];
+      const totalPendente = lista.reduce((acc: number, item: any) => acc + (Number(item.valor) || 0), 0);
+
+      if (lista.length === 0) {
+        return {
+          texto: `Parabéns, ${nomeOp}! Não há nenhum pagamento em aberto ou pendência financeira registrada no momento. O caixa está 100% em dia!`,
+          card: {
+            type: "financeiro",
+            title: "Pagamentos em Aberto (0)",
+            subtitle: "Tudo quitado no Pet Spa",
+            data: { itens: [], totalPendente: 0 },
+          },
+        };
+      }
+
+      return {
+        texto: `Encontrei **${lista.length} pagamento(s) pendente(s)** totalizando **R$ ${totalPendente.toFixed(2).replace(".", ",")}**, ${nomeOp}! Você pode gerar links do Mercado Pago ou disparar lembretes cordiais diretamente no WhatsApp.`,
+        card: {
+          type: "financeiro",
+          title: `Pagamentos em Aberto (${lista.length})`,
+          subtitle: `Total pendente: R$ ${totalPendente.toFixed(2).replace(".", ",")}`,
+          data: { itens: lista, totalPendente, total: lista.length },
+        },
+      };
+    }
+
+    // =========================================================================
+    // 4. RESUMO FINANCEIRO / FATURAMENTO / FECHAMENTO DE CAIXA
+    // =========================================================================
+    if (
+      msg.includes("faturamento") ||
+      msg.includes("faturou") ||
+      msg.includes("quanto entrou") ||
+      msg.includes("fechamento de caixa") ||
+      msg.includes("caixa de hoje") ||
+      msg.includes("resumo financeiro") ||
+      msg.includes("financeiro consolidado") ||
+      msg.includes("lucro") ||
+      (msg.includes("financeiro") && !msg.includes("ficha") && !msg.includes("cliente"))
+    ) {
+      const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
+      const resFin = await FinanceiroRelatoriosAdapter.obterConsolidadoFinanceiro(sb, periodo);
+      const d = resFin?.data || resFin;
+      const totalRecebido = Number(d?.totalRecebido || d?.faturamento || 0);
+      const totalPendente = Number(d?.totalPendente || d?.valoresAReceber || 0);
+      const ticketMedio = Number(d?.ticketMedio || 0);
+
+      let textoFin = `Aqui está o panorama financeiro de **${periodo === "hoje" ? "hoje" : periodo === "semana" ? "esta semana" : "deste mês"}**, ${nomeOp}: já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}** e temos **R$ ${totalPendente.toFixed(2).replace(".", ",")}** a receber (ticket médio: R$ ${ticketMedio.toFixed(2).replace(".", ",")}).`;
+      if (totalPendente > 0) {
+        textoFin += ` Você pode consultar a lista de pagamentos em aberto para agilizar a entrada desses valores.`;
+      }
+
+      return {
+        texto: textoFin,
+        card: {
+          type: "financeiro",
+          title: "Resumo Financeiro Consolidado",
+          subtitle: `Período: ${periodo.toUpperCase()}`,
+          data: d,
+        },
+      };
+    }
+
+    // =========================================================================
+    // 5. CLUBINHO & PACOTES DE BANHO / PLANOS & CRÉDITOS
+    // =========================================================================
+    if (
+      msg.includes("clubinho") ||
+      msg.includes("pacote de banho") ||
+      msg.includes("plano mensal") ||
+      msg.includes("saldo de banhos") ||
+      msg.includes("creditos de banho") ||
+      msg.includes("planos ativos") ||
+      (msg.includes("credito") && !msg.includes("cartao") && !msg.includes("cartão"))
+    ) {
+      const resProg = await ProgramasCreditosAdapter.consultarProgramasAtivosGeral(sb);
+      const d = resProg?.data || resProg;
+      const totalAssinantes = Array.isArray(d) ? d.length : (d?.totalAtivos || d?.programas?.length || 0);
+
+      return {
+        texto: `Aqui está o panorama dos contratos e créditos do Clubinho, ${nomeOp}! Temos **${totalAssinantes} assinatura(s) ativa(s)** gerando receita recorrente e fidelidade para o Spa.`,
+        card: {
+          type: "programa",
+          title: `Clubinho & Planos (${totalAssinantes} ativos)`,
+          subtitle: "Contratos e Saldo de Créditos",
+          data: d,
+        },
+      };
+    }
+
+    // =========================================================================
+    // 6. PRÓXIMO PET / QUEM É O PRÓXIMO / FILA DE ATENDIMENTO
+    // =========================================================================
     if (
       msg.includes("proximo pet") ||
       msg.includes("proximo atendimento") ||
@@ -1011,16 +1151,15 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       msg.includes("proxima tosa") ||
       msg.includes("proximo banho")
     ) {
-      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: hojeStr });
-      const d = resAgenda?.data || resAgenda;
-      const lista: any[] = Array.isArray(d) ? d : d?.agendamentos || [];
+      const resAgenda = await AgendaAdapter.consultarAgenda(sb, hojeStr);
+      const lista: any[] = resAgenda?.data || [];
 
       if (lista.length === 0) {
         return {
-          texto: `No momento não temos mais nenhum atendimento agendado na grade de hoje, ${nomeOp}! A bancada está liberada. Gostaria que eu verificasse a rotina de amanhã ou visse clientes para encaixe?`,
+          texto: `No momento não temos mais nenhum atendimento agendado na grade de hoje, ${nomeOp}! A bancada está livre. Gostaria de verificar os horários de amanhã ou sugerir encaixes com clientes sumidos?`,
           card: {
             type: "agenda",
-            title: "Agenda de Hoje (Vazia)",
+            title: "Grade de Hoje (Vazia)",
             subtitle: `Data: ${hojeStr}`,
             data: { itens: [], total: 0 },
           },
@@ -1046,141 +1185,74 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       };
     }
 
-    // 3. Atrasos / Quem está atrasado / Sentinelas
+    // =========================================================================
+    // 7. HORÁRIOS LIVRES / VAGAS / ENCAIXES
+    // =========================================================================
     if (
-      msg.includes("atrasad") ||
-      msg.includes("atraso") ||
-      msg.includes("quem faltou") ||
-      msg.includes("nao chegou") ||
-      msg.includes("sentinela")
+      msg.includes("horarios livres") ||
+      msg.includes("horario livre") ||
+      msg.includes("horarios disponiveis") ||
+      msg.includes("vagas") ||
+      msg.includes("tem vaga") ||
+      msg.includes("encaixe")
     ) {
-      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: hojeStr });
-      const d = resAgenda?.data || resAgenda;
-      const lista: any[] = Array.isArray(d) ? d : d?.agendamentos || [];
+      const dataAlvo = msg.includes("amanha")
+        ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000))
+        : hojeStr;
 
-      const horaAtual = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      const atrasados = lista.filter((a: any) => {
-        const horaAg = (a.hora || "").slice(0, 5);
-        const status = (a.status || "").toLowerCase();
-        return horaAg && horaAg < horaAtual && (status === "agendado" || status === "pendente");
-      });
-
-      if (atrasados.length === 0) {
-        return {
-          texto: `Excelente notícia, ${nomeOp}! Verifiquei a grade e, no momento, nenhum pet está com atraso de chegada registrado. Todos os atendimentos estão dentro do horário!`,
-        };
-      }
-
-      const nomesAtrasados = atrasados
-        .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** (agendado às ${(a.hora || "").slice(0, 5)}, tutor: ${a.clientes?.nome || a.tutor || "tutor"})`)
-        .join(", ");
-
-      return {
-        texto: `Identifiquei ${atrasados.length} atendimento(s) com horário ultrapassado: ${nomesAtrasados}. Deseja que eu prepare uma mensagem no WhatsApp para checar se o tutor está a caminho?`,
-        card: {
-          type: "sentinela",
-          title: `Atrasos Identificados (${atrasados.length})`,
-          subtitle: `Horário de corte: ${horaAtual}`,
-          data: { atrasados, total: atrasados.length },
-        },
-      };
-    }
-
-    // 4. Financeiro / Valores a Receber / Faturamento / Caixa
-    if (
-      msg.includes("receber") ||
-      msg.includes("financeiro") ||
-      msg.includes("faturamento") ||
-      msg.includes("faturou") ||
-      msg.includes("quanto entrou") ||
-      msg.includes("caixa") ||
-      msg.includes("pagamento") ||
-      msg.includes("fechamento de caixa")
-    ) {
-      const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
-      const resFin = await despacharFerramentaV2(sb, "consultar_financeiro_consolidado", { periodo });
-      const d = resFin?.data || resFin;
-      const totalRecebido = Number(d?.totalRecebido || d?.faturamento || 0);
-      const totalPendente = Number(d?.totalPendente || d?.valoresAReceber || 0);
-      const ticketMedio = Number(d?.ticketMedio || 0);
-
-      let textoFin = `Aqui está o panorama financeiro do ${periodo === "hoje" ? "dia" : periodo === "semana" ? "período desta semana" : "mês"}, ${nomeOp}: já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}**, com **R$ ${totalPendente.toFixed(2).replace(".", ",")}** pendentes de recebimento (ticket médio de R$ ${ticketMedio.toFixed(2).replace(".", ",")}).`;
-      if (totalPendente > 0) {
-        textoFin += ` Recomendo enviar os lembretes com chave Pix para agilizar a entrada desses valores pendentes!`;
-      }
-
-      return {
-        texto: textoFin,
-        card: {
-          type: "financeiro",
-          title: "Resumo Financeiro Consolidado",
-          subtitle: `Período: ${periodo.toUpperCase()}`,
-          data: d,
-        },
-      };
-    }
-
-    // 5. Horários Disponíveis / Vagas / Grade Livre
-    if (
-      msg.includes("horario") ||
-      msg.includes("vaga") ||
-      msg.includes("livre") ||
-      msg.includes("encaixe") ||
-      msg.includes("disponiv")
-    ) {
-      const resVagas = await despacharFerramentaV2(sb, "consultar_horarios_disponiveis", { data: hojeStr });
-      const d = resVagas?.data || resVagas;
-      const vagas = d?.horariosSugeridos || d?.vagas || [];
+      const resVagas = await AgendaAdapter.consultarHorariosLivres(sb, dataAlvo);
+      const vagas = resVagas?.data || [];
+      const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
 
       if (vagas.length === 0) {
         return {
-          texto: `A grade de atendimentos de hoje está totalmente preenchida, ${nomeOp}! Se você precisar de um encaixe, podemos verificar os horários de amanhã.`,
+          texto: `A grade de ${diaLabel} está 100% preenchida, ${nomeOp}! Não há horários ociosos. Excelente ocupação!`,
           card: {
             type: "agenda",
-            title: "Vagas Esgotadas Hoje",
-            subtitle: `Data: ${hojeStr}`,
-            data: d,
+            title: `Vagas Esgotadas (${diaLabel.toUpperCase()})`,
+            subtitle: `Data: ${dataAlvo}`,
+            data: { vagas: [], total: 0 },
           },
         };
       }
 
-      const vagasTexto = vagas.slice(0, 5).join(", ");
+      const vagasTexto = vagas.slice(0, 6).join(", ");
       return {
-        texto: `Temos **${vagas.length} horário(s) livre(s)** na grade de hoje: **${vagasTexto}**. Uma ótima oportunidade para disparar convites de banho e tosa para clientes da lista de retorno!`,
+        texto: `Temos **${vagas.length} horário(s) livre(s)** na grade de ${diaLabel}: **${vagasTexto}**. Uma ótima oportunidade para preencher com encaixes da lista de retorno!`,
         card: {
           type: "agenda",
-          title: `Vagas Disponíveis (${vagas.length})`,
-          subtitle: `Data: ${hojeStr}`,
-          data: d,
+          title: `Horários Livres (${vagas.length} vagas)`,
+          subtitle: `Data: ${dataAlvo}`,
+          data: { vagas, total: vagas.length },
         },
       };
     }
 
-    // 5. Agenda de Atendimentos / Grade do Dia
+    // =========================================================================
+    // 8. AGENDA DE ATENDIMENTOS / GRADE DO DIA / ROTINA
+    // =========================================================================
     if (
       msg.includes("agenda") ||
       msg.includes("atendimento") ||
       msg.includes("marcado") ||
-      msg.includes("banho") ||
-      msg.includes("tosa") ||
       msg.includes("rotina") ||
-      msg.includes("como esta o dia")
+      msg.includes("como esta o dia") ||
+      msg.includes("grade do dia")
     ) {
-      const dataAlvo = msg.includes("amanha") || msg.includes("amanhã")
+      const dataAlvo = msg.includes("amanha")
         ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000))
         : hojeStr;
 
-      const resAgenda = await despacharFerramentaV2(sb, "consultar_agenda", { data: dataAlvo });
-      const d = resAgenda?.data || resAgenda;
-      const lista: any[] = Array.isArray(d) ? d : d?.agendamentos || [];
+      const resAgenda = await AgendaAdapter.consultarAgenda(sb, dataAlvo);
+      const lista: any[] = resAgenda?.data || [];
+      const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
 
       if (lista.length === 0) {
-        const diaNome = dataAlvo === hojeStr ? "hoje" : "amanhã";
         return {
-          texto: `Não temos atendimentos marcados na grade para ${diaNome}, ${nomeOp}! Essa é uma excelente oportunidade para realizarmos campanhas de retorno ou abrir horários promocionais de encaixe.`,
+          texto: `Não temos atendimentos marcados na grade para ${diaLabel}, ${nomeOp}! Essa é uma oportunidade perfeita para disparar convites ou campanhas de fidelização.`,
           card: {
             type: "agenda",
-            title: `Agenda de ${diaNome === "hoje" ? "Hoje" : "Amanhã"} (0 Atendimentos)`,
+            title: `Agenda de ${diaLabel === "hoje" ? "Hoje" : "Amanhã"} (0 Atendimentos)`,
             subtitle: `Data: ${dataAlvo}`,
             data: { itens: [], total: 0 },
           },
@@ -1192,9 +1264,8 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
         .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** às ${(a.hora || a.horario || "horário").slice(0, 5)} (${a.servicos?.nome || a.servicoNome || "Serviço"})`)
         .join(", ");
 
-      const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
       return {
-        texto: `Temos **${lista.length} atendimento(s)** agendado(s) para ${diaLabel}, ${nomeOp}! Os primeiros da fila são: ${primeiros}. A lista completa e os detalhes estão no card na tela.`,
+        texto: `Temos **${lista.length} atendimento(s)** agendado(s) para ${diaLabel}, ${nomeOp}! Primeiros da fila: ${primeiros}. A lista completa e os detalhes estão no card na tela.`,
         card: {
           type: "agenda",
           title: `Agenda (${lista.length} atendimentos)`,
@@ -1204,71 +1275,109 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       };
     }
 
-    // 6. Clientes / Pets / Tutores — Extração inteligente do nome para busca
+    // =========================================================================
+    // 9. ATRASOS / QUEM FALTOU / SENTINELAS
+    // =========================================================================
     if (
-      msg.includes("cliente") ||
-      msg.includes("pet") ||
-      msg.includes("tutor") ||
-      msg.includes("buscar") ||
-      msg.includes("procurar") ||
-      msg.includes("ficha") ||
-      msg.includes("cadastro") ||
-      msg.includes("quem e") ||
-      msg.includes("localizar")
+      msg.includes("atrasad") ||
+      msg.includes("atraso") ||
+      msg.includes("quem faltou") ||
+      msg.includes("nao chegou") ||
+      msg.includes("sentinela")
     ) {
-      const termo = mensagemUsuario
-        .replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "")
-        .replace(/\s+/g, " ")
-        .trim();
-      const resBusca = await despacharFerramentaV2(sb, "buscar_clientes_pets", { termo: termo || "" });
-      const d = resBusca?.data || resBusca;
-      const candidatos = d?.candidatos || (Array.isArray(d) ? d : []);
+      const resAgenda = await AgendaAdapter.consultarAgenda(sb, hojeStr);
+      const lista: any[] = resAgenda?.data || [];
+      const horaAtual = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-      let texto: string;
-      if (candidatos.length === 1) {
-        const c = candidatos[0];
-        const nomeCli = c.nomePrincipal || c.nome;
-        const det = c.detalheSecundario || "";
-        texto = `Localizei a ficha de **${nomeCli}** (${det})! Já abri o card com todos os detalhes, histórico e contatos.`;
-      } else if (candidatos.length > 1) {
-        const nomes = candidatos.slice(0, 4).map((c: any) => `**${c.nomePrincipal || c.nome}**`).join(", ");
-        texto = `Encontrei ${candidatos.length} resultados para "${termo || "clientes recentes"}": ${nomes}. Toque no card para abrir a ficha desejada!`;
-      } else {
-        texto = `Não encontrei nenhum cadastro para "${termo}" no sistema, ${nomeOp}. Deseja que eu prepare o cadastro de um novo cliente agora?`;
+      const atrasados = lista.filter((a: any) => {
+        const horaAg = (a.hora || "").slice(0, 5);
+        const status = (a.status || "").toLowerCase();
+        return horaAg && horaAg < horaAtual && (status === "agendado" || status === "pendente");
+      });
+
+      if (atrasados.length === 0) {
+        return {
+          texto: `Excelente notícia, ${nomeOp}! Verifiquei a grade e nenhum pet está com atraso de chegada registrado no momento. Todos os atendimentos estão dentro do horário!`,
+        };
       }
 
+      const nomesAtrasados = atrasados
+        .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** (agendado às ${(a.hora || "").slice(0, 5)}, tutor: ${a.clientes?.nome || a.tutor || "tutor"})`)
+        .join(", ");
+
       return {
-        texto,
+        texto: `Identifiquei **${atrasados.length} atendimento(s)** com horário ultrapassado: ${nomesAtrasados}. Deseja que eu prepare uma mensagem no WhatsApp para checar se o tutor está a caminho?`,
         card: {
-          type: "cliente",
-          title: termo ? `Resultados para "${termo}"` : "Clientes Recentes",
-          subtitle: candidatos.length === 1 ? "Ficha do Cliente" : "Selecione para abrir a ficha completa",
-          data: candidatos.length === 1
-            ? (candidatos[0].dadosCompletos ? { ...candidatos[0].dadosCompletos, nome: candidatos[0].nomePrincipal || candidatos[0].nome, telefone: candidatos[0].telefone || candidatos[0].detalheSecundario } : {
-                ...candidatos[0],
-                nome: candidatos[0].nomePrincipal || candidatos[0].nome,
-                telefone: candidatos[0].telefone || candidatos[0].detalheSecundario,
-              })
-            : {
-                exigeDesambiguacao: candidatos.length > 1,
-                opcoes: candidatos.slice(0, 6).map((c: any) => {
-                  const comp = c.dadosCompletos || {};
-                  return {
-                    id: c.id,
-                    tipo: c.tipo || "cliente",
-                    nome: c.nomePrincipal || c.nome,
-                    detalhe: c.detalheSecundario || c.telefone || "",
-                    telefone: comp.telefone || c.telefone || c.detalheSecundario || "",
-                    pets: comp.pets || c.pets || [],
-                    bairro: comp.bairro || c.bairro || "",
-                  };
-                }),
-              },
+          type: "sentinela",
+          title: `Atrasos Identificados (${atrasados.length})`,
+          subtitle: `Horário de corte: ${horaAtual}`,
+          data: { atrasados, total: atrasados.length },
         },
       };
     }
 
-    // 7. Aniversariantes
+    // =========================================================================
+    // 10. LEVA E TRAZ / ROTAS / TRANSPORTE / TÁXI DOG
+    // =========================================================================
+    if (
+      msg.includes("leva e traz") ||
+      msg.includes("transporte") ||
+      msg.includes("taxi dog") ||
+      msg.includes("taxi pet") ||
+      msg.includes("rotas") ||
+      msg.includes("motorista") ||
+      msg.includes("buscar pet")
+    ) {
+      const resAgenda = await AgendaAdapter.consultarAgenda(sb, hojeStr);
+      const lista: any[] = resAgenda?.data || [];
+      const rotas = lista.filter((a: any) => Boolean(a.leva_traz_modalidade || a.transporte || a.endereco_busca));
+
+      if (rotas.length === 0) {
+        return {
+          texto: `Não temos viagens ou pets com serviço de Leva e Traz agendados para hoje, ${nomeOp}. Todos os pets virão diretamente pelos tutores.`,
+        };
+      }
+
+      return {
+        texto: `Temos **${rotas.length} atendimento(s) com Leva e Traz** na rota de hoje, ${nomeOp}! A lista com endereços e horários de busca está no card na tela.`,
+        card: {
+          type: "leva_traz",
+          title: `Leva e Traz de Hoje (${rotas.length} rotas)`,
+          subtitle: `Data: ${hojeStr}`,
+          data: { rotas, total: rotas.length },
+        },
+      };
+    }
+
+    // =========================================================================
+    // 11. CLIENTES INATIVOS / REATIVAÇÃO / CLIENTES SUMIDOS
+    // =========================================================================
+    if (
+      msg.includes("inativ") ||
+      msg.includes("reativa") ||
+      msg.includes("retorno") ||
+      msg.includes("ausente") ||
+      msg.includes("sumido") ||
+      msg.includes("saudade")
+    ) {
+      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
+      const d = resRet?.data || resRet;
+      const lista = Array.isArray(d) ? d : d?.clientes || [];
+
+      return {
+        texto: `Identifiquei **${lista.length} cliente(s) inativo(s)** que não vêm ao Spa há mais de 25 dias, ${nomeOp}! Preparei a lista com os pets e sugestões de mensagens de carinho prontas para disparo no WhatsApp, para preenchermos os horários livres da grade!`,
+        card: {
+          type: "reativacao",
+          title: "Clientes Inativos para Encaixe",
+          subtitle: `${lista.length} tutores com potencial de retorno`,
+          data: lista,
+        },
+      };
+    }
+
+    // =========================================================================
+    // 12. ANIVERSARIANTES
+    // =========================================================================
     if (msg.includes("aniversari") || msg.includes("parabens") || msg.includes("niver")) {
       const resAniv = await despacharFerramentaV2(sb, "consultar_aniversariantes", {});
       const d = resAniv?.data || resAniv;
@@ -1285,52 +1394,126 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       };
     }
 
-    // 9. Cobrança Pix
-    if (msg.includes("cobranca") || msg.includes("devedor") || msg.includes("inadimplente") || msg.includes("cobrar")) {
-      const resCob = await despacharFerramentaV2(sb, "gerar_mensagens_cobranca", {});
-      const d = resCob?.data || resCob;
-
-      return {
-        texto: `Preparei a lista de cobrança cordial com a chave Pix do Spa pronta para envio direto aos tutores no WhatsApp.`,
-        card: {
-          type: "financeiro",
-          title: "Cobrança Cordial via Pix",
-          subtitle: "Pendências financeiras",
-          data: d,
-        },
-      };
-    }
-
-    // 10. Clubinho & Planos
+    // =========================================================================
+    // 13. SAUDAÇÕES, POLIDEZ, BEM-ESTAR E EMPATIA
+    // =========================================================================
     if (
-      msg.includes("clubinho") ||
-      msg.includes("pacote de banho") ||
-      msg.includes("plano mensal") ||
-      (msg.includes("credito") &&
-        !msg.includes("cartao") &&
-        !msg.includes("cartão") &&
-        !msg.includes("link") &&
-        !msg.includes("pagar") &&
-        !msg.includes("paganto") &&
-        !msg.includes("pagamento") &&
-        !msg.includes("cobranca") &&
-        !msg.includes("cobrar"))
+      msg === "boa noite" ||
+      msg.startsWith("boa noite") ||
+      msg === "bom dia" ||
+      msg.startsWith("bom dia") ||
+      msg === "boa tarde" ||
+      msg.startsWith("boa tarde") ||
+      msg === "oi" ||
+      msg === "ola" ||
+      msg === "e ai" ||
+      msg.startsWith("oi ") ||
+      msg.startsWith("ola ") ||
+      msg.includes("tudo bem") ||
+      msg.includes("como vai") ||
+      msg.includes("como voce esta") ||
+      msg.includes("como você está")
     ) {
-      const resProg = await despacharFerramentaV2(sb, "consultar_programas_ativos_geral", {});
-      const d = resProg?.data || resProg;
-
+      const hora = new Date().getHours();
+      const saudacaoHorario = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
       return {
-        texto: `Aqui está o panorama completo dos contratos e saldo de créditos do Clubinho no Spa de Pet.`,
-        card: {
-          type: "programa",
-          title: "Clubinho & Planos Mensais",
-          subtitle: "Contratos ativos",
-          data: d,
-        },
+        texto: `${saudacaoHorario}, ${nomeOp}! Tudo excelente por aqui no Spa de Pet. Estou com a central de atendimentos, agenda e financeiro 100% pronta para te apoiar. Por onde você gostaria de começar agora?`,
       };
     }
 
-    return null;
+    if (
+      msg.includes("agua") ||
+      msg.includes("água") ||
+      msg.includes("beber") ||
+      msg.includes("hidrat") ||
+      msg.includes("obrigad") ||
+      msg.includes("valeu") ||
+      msg.includes("top") ||
+      msg.includes("legal") ||
+      msg.includes("descans") ||
+      msg.includes("pausa") ||
+      msg.includes("almoc") ||
+      msg.includes("almoç")
+    ) {
+      if (msg.includes("agua") || msg.includes("água") || msg.includes("hidrat")) {
+        return {
+          texto: `Muito obrigado pelo lembrete de hidratação, ${nomeOp}! Cuidar da água e fazer pequenas pausas é essencial para mantermos o foco e a energia alta na rotina do Spa. Já tomei meu gole virtual de água! Como posso te ajudar na operação agora?`,
+        };
+      }
+      return {
+        texto: `Muito obrigado, ${nomeOp}! É sempre um prazer estar ao seu lado cuidando da operação do Spa de Pet. Conte comigo para a agenda, clientes, financeiro e qualquer detalhe do dia!`,
+      };
+    }
+
+    // =========================================================================
+    // 14. REDE DE SEGURANÇA UNIVERSAL: BUSCA AUTOMÁTICA DE CLIENTE / PET / TUTOR
+    // Qualquer texto digitado ou falado (ex: "Thor", "Jaqueline", "Rex", "Toddy",
+    // "Golden", telefone, etc.) busca diretamente no Supabase em tempo real!
+    // =========================================================================
+    const termoLimpo = mensagemUsuario
+      .replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar|abrir)\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const termoBusca = termoLimpo.length >= 2 ? termoLimpo : mensagemUsuario.trim();
+
+    if (termoBusca.length >= 2) {
+      const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoBusca);
+      const d = resBusca?.data || resBusca;
+      const candidatos = d?.candidatos || (Array.isArray(d) ? d : []);
+
+      if (candidatos.length === 1) {
+        const c = candidatos[0];
+        const nomeCli = c.nomePrincipal || c.nome;
+        const det = c.detalheSecundario || "";
+        const dadosCard = c.dadosCompletos
+          ? { ...c.dadosCompletos, nome: nomeCli, telefone: c.telefone || c.detalheSecundario }
+          : { ...c, nome: nomeCli, telefone: c.telefone || c.detalheSecundario };
+
+        return {
+          texto: `Localizei a ficha de **${nomeCli}** (${det})! Já abri o card com todos os detalhes, contatos e histórico.`,
+          card: {
+            type: c.tipo === "pet" ? "pet" : "cliente",
+            title: `Ficha de ${nomeCli}`,
+            subtitle: det || "Cadastro no Pet Spa",
+            data: dadosCard,
+          },
+          novoContexto: c.tipo === "pet" ? { pet: { id: c.id, nome: nomeCli } } : { cliente: { id: c.id, nome: nomeCli } },
+        };
+      }
+
+      if (candidatos.length > 1) {
+        const nomes = candidatos.slice(0, 4).map((c: any) => `**${c.nomePrincipal || c.nome}**`).join(", ");
+        return {
+          texto: `Encontrei **${candidatos.length} resultados** para "${termoBusca}": ${nomes}. Toque em **[Selecionar]** no card para abrir a ficha completa!`,
+          card: {
+            type: "cliente",
+            title: `Resultados para "${termoBusca}"`,
+            subtitle: `${candidatos.length} cadastros encontrados`,
+            data: {
+              exigeDesambiguacao: true,
+              opcoes: candidatos.slice(0, 8).map((c: any) => {
+                const comp = c.dadosCompletos || {};
+                return {
+                  id: c.id,
+                  tipo: c.tipo || "cliente",
+                  nome: c.nomePrincipal || c.nome,
+                  detalhe: c.detalheSecundario || c.telefone || "",
+                  telefone: comp.telefone || c.telefone || c.detalheSecundario || "",
+                  pets: comp.pets || c.pets || [],
+                  bairro: comp.bairro || c.bairro || "",
+                };
+              }),
+            },
+          },
+        };
+      }
+    }
+
+    // Resposta final inteligente e orientada à ação se nada foi encontrado
+    return {
+      texto: `Não encontrei nenhum cadastro com o termo "${mensagemUsuario}", ${nomeOp}. Deseja que eu consulte a agenda de hoje, veja horários livres ou prepare o cadastro de um novo cliente?`,
+    };
   }
 
   /**
