@@ -17,7 +17,8 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({ data, onActionClic
     return null;
   }
 
-  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const brl = (v: number | undefined | null) =>
+    Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
     <div className="rounded-2xl border border-emerald-800/20 bg-card p-4 space-y-3.5 text-xs shadow-xs my-2">

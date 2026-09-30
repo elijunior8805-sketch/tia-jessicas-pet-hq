@@ -269,7 +269,7 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                       case "alerta":
                         return (
                           <div key={cIdx} className="space-y-1.5">
-                            <AlertaCard data={card.data} />
+                            <AlertaCard data={card.data} onAcao={onSendMessage} />
                             {card.data?.comandoAcao && onSendMessage && (
                               <button
                                 type="button"

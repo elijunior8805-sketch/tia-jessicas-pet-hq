@@ -48,7 +48,7 @@ const getFaixaBadge = (dias: number) => {
   return { label: `${dias}d sem visita`, color: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30" };
 };
 
-export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data }) => {
+export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionClick }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const lista: ReativacaoItem[] = React.useMemo(() => {

@@ -333,6 +333,8 @@ export async function processarMensagemJessiV2Core(
       },
       historico: input.historico || [],
       user: user as any,
+      canal: input.canal,
+      modoBancada: Boolean(input.modoBancada),
     });
 
     respostaTexto = resultadoAgente.respostaTexto;

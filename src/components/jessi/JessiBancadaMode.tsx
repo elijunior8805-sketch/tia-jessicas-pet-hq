@@ -307,7 +307,7 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
                         />
                       );
                     case "alerta":
-                      return <AlertaCard key={cIdx} data={card.data} />;
+                      return <AlertaCard key={cIdx} data={card.data} onAcao={onSendMessage} />;
                     case "leva_traz":
                       return <LevaTrazCard key={cIdx} data={card.data} onActionClick={onSendMessage} />;
                     case "analytics":

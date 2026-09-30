@@ -987,14 +987,20 @@ const TOOL_ALIASES: Record<string, string> = {
   gerar_pix_mercadopago: "gerar_cobranca_pix_mercadopago",
   gerar_link_pagamento: "gerar_link_pagamento_mercadopago",
   gerar_link_mercadopago: "gerar_link_pagamento_mercadopago",
-  verificar_pix_mercadopago: "verificar_status_pix_mercadopago",
-  consultar_pix_mercadopago: "verificar_status_pix_mercadopago",
+  verificar_pix_mercadopago: "gerar_cobranca_pix_mercadopago",
+  consultar_pix_mercadopago: "gerar_cobranca_pix_mercadopago",
   preparar_agendamento: "criar_agendamento",
   preparar_cancelamento: "cancelar_agendamento",
-  preparar_reagendamento: "reagendar_atendimento",
-  preparar_cadastro_cliente: "cadastrar_cliente_pet",
-  preparar_consumo_credito: "consumir_credito_programa",
-  preparar_estorno: "estornar_credito_programa",
+  preparar_reagendamento: "reagendar_agendamento",
+  preparar_cadastro_cliente: "executar_cadastro_cliente",
+  preparar_consumo_credito: "executar_consumo_credito",
+  preparar_estorno: "executar_estorno",
+  sentinela_atrasos: "verificar_sentinelas",
+  consultar_atrasos: "verificar_sentinelas",
+  sentinela_cancelamentos: "verificar_sentinelas",
+  consultar_cancelamentos: "verificar_sentinelas",
+  sentinela_fechamento: "verificar_sentinelas",
+  consultar_fechamento_caixa: "verificar_sentinelas",
 };
 
 /**
@@ -1037,7 +1043,7 @@ export async function despacharFerramentaV2(
   const chave = idempotencyKey || `v2_exec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
   try {
-    switch (toolNome) {
+    switch (toolCanonical) {
       case "consultar_agenda":
         return await AgendaAdapter.consultarAgendaPorData(
           sb,

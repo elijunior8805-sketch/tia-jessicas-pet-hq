@@ -29,10 +29,12 @@ import { AnalyticsAdapter } from "../adapters/analytics.adapter";
  */
 
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_CONFIG = {
   TIMEOUT_MS: 15000,
   MAX_RETRIES: 2,
   MODEL: "google/gemini-1.5-flash",
+  GROQ_MODEL: "llama-3.3-70b-versatile",
   DIRECT_ENDPOINT_BASE: "https://generativelanguage.googleapis.com/v1beta/models",
 };
 
@@ -526,6 +528,8 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     if (!chave && typeof import.meta !== "undefined" && (import.meta as any).env) {
       const env = (import.meta as any).env;
       chave =
+        env.VITE_GROQ_API_KEY ||
+        env.GROQ_API_KEY ||
         env.VITE_LOVABLE_API_KEY ||
         env.LOVABLE_API_KEY ||
         env.VITE_OPENAI_API_KEY ||
@@ -541,18 +545,21 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       chave = (globalThis as any).__JESSI_API_KEY__ || "";
     }
 
+    // Sem chave configurada — logar erro claro em vez de tentar token inválido
     if (!chave) {
-      try {
-        // Fallback seguro em runtime para ativação do Lovable Gateway
-        chave = typeof atob === "function"
-          ? atob("QVEuQWI4Uk42TGdSVXBFM2ZEZ0VmazdVRGFiN1dXUXJlX1gydmVXSzN1ZC1OeEtIbFZ5d0E=")
-          : "";
-      } catch {
-        chave = "";
-      }
+      console.error("[JessiV2] ERRO CRÍTICO: Nenhuma chave de IA configurada. Configure GROQ_API_KEY ou GEMINI_API_KEY no .env");
+      return null;
     }
 
-    if (!chave) return null;
+    // Groq (chaves começam com gsk_) — endpoint dedicado ultra-rápido
+    if (chave.startsWith("gsk_")) {
+      return {
+        key: chave,
+        isGateway: false,
+        endpoint: GROQ_ENDPOINT,
+        model: GEMINI_CONFIG.GROQ_MODEL,
+      };
+    }
 
     // Se a chave for do Google AI Studio direta (começa com AIzaSy)
     if (chave.startsWith("AIzaSy")) {
@@ -642,13 +649,15 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     contexto: JessiV2ContextState;
     historico?: any[];
     user?: { id: string; nome?: string; cargo?: string };
+    canal?: string;
+    modoBancada?: boolean;
   }): Promise<{
     respostaTexto: string;
     cards: JessiV2Card[];
     pendingAction: JessiV2PendingAction | null;
     novoContexto: Partial<JessiV2ContextState>;
   }> {
-    const { sb, mensagemUsuario, contexto, historico = [], user } = params;
+    const { sb, mensagemUsuario, contexto, historico = [], user, canal, modoBancada } = params;
     const auth = this.obterApiKeyServidor();
 
     const hojeStr =
@@ -676,7 +685,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     try {
       const [resAgendaHoje, resFinHoje, resVagasHoje, resInativos] = await Promise.all([
         sb.from("agendamentos").select("id, hora, status, pets(nome), clientes(nome), servicos(nome), leva_traz_modalidade").eq("data", hojeStr).order("hora", { ascending: true }),
-        sb.from("pagamentos").select("valor, status").gte("data_pagamento", `${hojeStr.slice(0, 7)}-01`),
+        sb.from("pagamentos").select("valor, valor_total, valor_pago, status").gte("data_pagamento", `${hojeStr.slice(0, 7)}-01`),
         AgendaAdapter.identificarEncaixesDisponiveis(sb, hojeStr).catch(() => null),
         sb.from("clientes").select("id, nome, pets(nome)").limit(10),
       ]);
@@ -686,7 +695,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         .map((a: any) => `${(a.pets as any)?.nome || "Pet"} às ${(a.hora || "").slice(0, 5)} (${(a.servicos as any)?.nome || "Banho"}, tutor: ${(a.clientes as any)?.nome || "Tutor"})`)
         .join("; ");
       vagasHojeTexto = (resVagasHoje as any)?.data?.horariosSugeridos?.slice(0, 5).join(", ") || "vagas livres a consultar";
-      faturamentoMes = (resFinHoje?.data || []).reduce((acc: number, p: any) => acc + Number(p.valor || 0), 0);
+      faturamentoMes = (resFinHoje?.data || []).reduce((acc: number, p: any) => acc + Number(p.valor_pago || p.valor_total || p.valor || 0), 0);
       listaInativosQtd = resInativos?.data?.length || 0;
 
       snapshotTexto = `
@@ -701,6 +710,17 @@ DADOS OPERACIONAIS EM TEMPO REAL DO SPA:
       console.warn("[JessiV2] Aviso ao carregar snapshot em tempo real:", errSnap);
     }
 
+    const ehVoz = canal === "voz" || Boolean(modoBancada);
+    const instrucaoVoz = ehVoz
+      ? `
+MODO BANCADA / CANAL DE VOZ ATIVO:
+- O operador está na bancada de banho e tosa ouvindo suas respostas por voz (TTS).
+- Responda em no máximo 2 a 3 frases faladas curtas, calorosas, expressivas e diretas.
+- NUNCA use marcadores de tópicos (•, -, *), numerações ou tabelas na fala.
+- Se houver múltiplos atendimentos na lista, cite apenas o próximo da fila e o total geral.
+- Use tom humano e expressões naturais como "Com certeza, Eli!", "Deixa comigo!", "Prontinho!".`
+      : "";
+
     const systemPrompt = `${JESSI_V2_SYSTEM_PROMPT}
 
 CONTEXTO TEMPORAL E OPERACIONAL ATUAL:
@@ -709,6 +729,7 @@ IMPORTANTE: Chame o operador sempre pelo primeiro nome ("${user?.nome?.split(" "
 ${contexto.pet?.nome ? `- Pet Selecionado no Contexto: ${contexto.pet.nome} (ID: ${contexto.pet.id || "N/A"})` : ""}
 ${contexto.cliente?.nome ? `- Cliente/Tutor no Contexto: ${contexto.cliente.nome} (ID: ${contexto.cliente.id || "N/A"})` : ""}
 ${snapshotTexto}
+${instrucaoVoz}
 
 DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
 1. Responda a QUALQUER pergunta, conselho, brincadeira, lembrete (ex: beber água, pausas, dicas de gestão), saudação ou dúvida de forma fluida, natural, inteligente e humana (estilo Gemini Live / ChatGPT).
@@ -828,7 +849,8 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           };
         }
       } catch (errLLM) {
-        console.warn("[JessiV2] Falha na chamada direta ao LLM, acionando despacho resiliente:", errLLM);
+        const auth = this.obterApiKeyServidor();
+        console.error(`[JessiV2] FALHA no LLM (${auth?.endpoint || "sem endpoint"}), acionando despacho resiliente:`, errLLM);
       }
     }
 
@@ -864,8 +886,20 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     hojeStr: string,
     operadorNome: string
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any; pendingAction?: any } | null> {
-    const msg = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     const nomeOp = operadorNome || "Eli";
+
+    // Normalização da mensagem
+    let msgTrabalho = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    // 0. Remove saudação inicial se a mensagem trouxer conteúdo operacional (ex: "Bom dia, quanto faturei hoje?")
+    const saudacaoRegex = /^(?:bom dia|boa tarde|boa noite|oi|ola|e ai|ei|opa|fala jessi|jessi)[,!\s]+/i;
+    if (saudacaoRegex.test(msgTrabalho)) {
+      const resto = msgTrabalho.replace(saudacaoRegex, "").trim();
+      if (resto.length > 2) {
+        msgTrabalho = resto;
+      }
+    }
+    const msg = msgTrabalho;
 
     // =========================================================================
     // 0.0 TRATAMENTO DE SELEÇÃO DIRETA DE ID [id:uuid] OU OPÇÃO DE DESAMBIGUAÇÃO
@@ -963,13 +997,11 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       msg.includes("agendar horario");
 
     if (isSchedulingIntent) {
-      // Extrair data
       let dataAgendamento = hojeStr;
       if (msg.includes("amanha")) {
         dataAgendamento = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000));
       }
 
-      // Extrair hora (ex: 14h, 14:30, as 10)
       const matchHora = mensagemUsuario.match(/(?:as|às|ás)?\s*(\d{1,2})(?:[:h](\d{2})?|h)\b/i);
       let horaAgendamento = "09:00";
       if (matchHora) {
@@ -978,14 +1010,12 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
         horaAgendamento = `${h}:${m}`;
       }
 
-      // Extrair serviço
       let servicoNome = "Banho";
       if (msg.includes("tosa higienica")) servicoNome = "Tosa Higiênica";
       else if (msg.includes("tosa completa") || msg.includes("tosa geral")) servicoNome = "Tosa Completa";
       else if (msg.includes("tosa")) servicoNome = "Tosa";
       else if (msg.includes("hidratacao") || msg.includes("hidratação")) servicoNome = "Banho e Hidratação";
 
-      // Extrair nome de pet/cliente mencionado
       const termoNome = mensagemUsuario
         .replace(/\b(agendar|marcar|agendamento|horario|para|o|a|do|da|de|no|na|amanha|hoje|banho|tosa|higienica|completa|geral|as|às|ás|por|favor|novo|atendimento)\b/gi, "")
         .replace(/\d{1,2}(?:[:h]\d{2}|h)?/gi, "")
@@ -1049,6 +1079,79 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     }
 
     // =========================================================================
+    // 2.5 CANCELAMENTO & DESMARCAÇÃO DE ATENDIMENTO
+    // =========================================================================
+    if (
+      msg.startsWith("cancelar") ||
+      msg.startsWith("desmarcar") ||
+      msg.includes("cancelar banho") ||
+      msg.includes("cancelar tosa") ||
+      msg.includes("cancelar atendimento") ||
+      msg.includes("desmarcar horario")
+    ) {
+      const resAgenda = await AgendaAdapter.consultarAgenda(sb, hojeStr);
+      const lista: any[] = resAgenda?.data || [];
+      const termoPet = msg.replace(/\b(cancelar|desmarcar|atendimento|agendamento|banho|tosa|de|do|da|o|a|horario|por|favor)\b/gi, "").trim();
+
+      const itemAlvo = lista.find((a: any) => {
+        const nomeP = (a.pets?.nome || a.petNome || "").toLowerCase();
+        return termoPet && nomeP.includes(termoPet);
+      }) || lista[0];
+
+      if (itemAlvo) {
+        const petNome = itemAlvo.pets?.nome || itemAlvo.petNome || "Pet";
+        const horaAg = (itemAlvo.hora || "").slice(0, 5);
+        return {
+          texto: `Localizei o atendimento de **${petNome}** agendado para hoje às **${horaAg}**, ${nomeOp}. Deseja confirmar o cancelamento e liberar a vaga na grade?`,
+          card: {
+            type: "confirmacao",
+            title: `Cancelar Agendamento: ${petNome}`,
+            subtitle: `Horário: ${horaAg} • Vaga será liberada`,
+            data: {
+              acao: "cancelar_agendamento",
+              agendamentoId: itemAlvo.id,
+              petNome,
+              hora: horaAg,
+            },
+          },
+          pendingAction: {
+            action: "cancelar_agendamento",
+            params: {
+              agendamentoId: itemAlvo.id,
+              motivo: `Cancelado pelo operador (${nomeOp})`,
+            },
+          },
+        };
+      }
+    }
+
+    // =========================================================================
+    // 2.6 TABELA DE PREÇOS / VALORES / CATÁLOGO DE SERVIÇOS
+    // =========================================================================
+    if (
+      msg.includes("quanto custa") ||
+      msg.includes("qual o valor") ||
+      msg.includes("qual o preco") ||
+      msg.includes("qual o preço") ||
+      msg.includes("tabela de preco") ||
+      msg.includes("tabela de precos") ||
+      msg.includes("tabela de valores") ||
+      msg.includes("catalogo de servico")
+    ) {
+      try {
+        const { data: servicos } = await sb.from("servicos").select("id, nome, preco, duracao_minutos").order("preco", { ascending: true });
+        if (servicos && servicos.length > 0) {
+          const listaFormatada = servicos
+            .map((s: any) => `• **${s.nome}**: R$ ${Number(s.preco || 0).toFixed(2).replace(".", ",")} (${s.duracao_minutos || 60} min)`)
+            .join("\n");
+          return {
+            texto: `Aqui está a nossa tabela de serviços e valores atualizada do Spa de Pet, ${nomeOp}:\n\n${listaFormatada}\n\nPosso preparar o agendamento de algum desses para hoje ou amanhã?`,
+          };
+        }
+      } catch {}
+    }
+
+    // =========================================================================
     // 3. PAGAMENTOS EM ABERTO / COBRANÇA / INADIMPLÊNCIA / CONTAS A RECEBER
     // =========================================================================
     if (
@@ -1074,7 +1177,7 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
             type: "financeiro",
             title: "Pagamentos em Aberto (0)",
             subtitle: "Tudo quitado no Pet Spa",
-            data: { itens: [], totalPendente: 0 },
+            data: { itens: [], devedores: [], totalPendente: 0 },
           },
         };
       }
@@ -1085,31 +1188,25 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           type: "financeiro",
           title: `Pagamentos em Aberto (${lista.length})`,
           subtitle: `Total pendente: R$ ${totalPendente.toFixed(2).replace(".", ",")}`,
-          data: { itens: lista, totalPendente, total: lista.length },
+          data: { devedores: lista, itens: lista, totalPendente, valoresAReceber: totalPendente, total: lista.length },
         },
       };
     }
 
     // =========================================================================
-    // 3.5 ANALYTICS / ESTATÍSTICAS DE FATURAMENTO POR PORTE, RAÇA, BAIRRO, DIA
+    // 3.5 ANALYTICS / ESTATÍSTICAS (EXIGE PALAVRAS DE ANÁLISE PARA NÃO CANIBALIZAR)
     // =========================================================================
-    if (
-      msg.includes("porte") ||
-      msg.includes("raca") ||
-      msg.includes("raça") ||
-      msg.includes("bairro") ||
-      msg.includes("dia da semana") ||
+    const isAnalyticsIntent =
+      msg.includes("analise") ||
+      msg.includes("estatistica") ||
       msg.includes("ranking") ||
-      msg.includes("cancelamento") ||
-      (msg.includes("analise") &&
-        (msg.includes("faturamento") ||
-          msg.includes("vendas") ||
-          msg.includes("desempenho") ||
-          msg.includes("clientes") ||
-          msg.includes("porte") ||
-          msg.includes("raca") ||
-          msg.includes("raça")))
-    ) {
+      msg.includes("relatorio de desempenho") ||
+      msg.includes("faturamento por porte") ||
+      msg.includes("faturamento por raca") ||
+      msg.includes("faturamento por bairro") ||
+      msg.includes("faturamento por dia");
+
+    if (isAnalyticsIntent) {
       let tipoAnalise = "porte_raca";
       if (msg.includes("bairro") || msg.includes("regiao")) tipoAnalise = "bairro";
       else if (msg.includes("dia") || msg.includes("semana")) tipoAnalise = "dia_semana";
@@ -1131,16 +1228,21 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     }
 
     // =========================================================================
-    // 4. RESUMO FINANCEIRO / FATURAMENTO / FECHAMENTO DE CAIXA
+    // 4. RESUMO FINANCEIRO / FATURAMENTO / FECHAMENTO DE CAIXA / GANHOS
     // =========================================================================
     if (
       msg.includes("faturamento") ||
       msg.includes("faturou") ||
+      msg.includes("faturei") ||
+      msg.includes("faturamos") ||
       msg.includes("quanto entrou") ||
       msg.includes("fechamento de caixa") ||
       msg.includes("caixa de hoje") ||
       msg.includes("resumo financeiro") ||
       msg.includes("financeiro consolidado") ||
+      msg.includes("ganhamos") ||
+      msg.includes("rendeu") ||
+      msg.includes("receita") ||
       msg.includes("lucro") ||
       (msg.includes("financeiro") && !msg.includes("ficha") && !msg.includes("cliente"))
     ) {
@@ -1165,6 +1267,30 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           data: d,
         },
       };
+    }
+
+    // =========================================================================
+    // 4.5 CONTAGEM DE SERVIÇOS REALIZADOS (QUANTOS BANHOS / TOSAS)
+    // =========================================================================
+    if (
+      msg.includes("quantos banhos") ||
+      msg.includes("quantas tosas") ||
+      msg.includes("quantos atendimentos") ||
+      msg.includes("total de banhos") ||
+      msg.includes("total de atendimentos")
+    ) {
+      try {
+        const { data: ags } = await sb
+          .from("agendamentos")
+          .select("id, status, servicos(nome)")
+          .eq("data", hojeStr);
+
+        const listaAgs = ags || [];
+        const concluidos = listaAgs.filter((a: any) => a.status === "finalizado" || a.status === "concluido");
+        return {
+          texto: `Hoje realizamos **${concluidos.length} atendimento(s) concluído(s)** de um total de **${listaAgs.length} agendados** na grade, ${nomeOp}!`,
+        };
+      } catch {}
     }
 
     // =========================================================================
@@ -1217,7 +1343,7 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
             type: "agenda",
             title: "Grade de Hoje (Vazia)",
             subtitle: `Data: ${hojeStr}`,
-            data: { itens: [], total: 0 },
+            data: { agendamentos: [], itens: [], total: 0 },
           },
         };
       }
@@ -1236,7 +1362,7 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           type: "agenda",
           title: `Próximo: ${petNome} às ${horaMarcada}`,
           subtitle: `Tutor: ${tutorNome} • ${servicoNome}`,
-          data: { itens: [proximo], total: lista.length, proximo },
+          data: { agendamentos: [proximo], itens: [proximo], total: lista.length, proximo },
         },
       };
     }
@@ -1308,54 +1434,7 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     }
 
     // =========================================================================
-    // 8. AGENDA DE ATENDIMENTOS / GRADE DO DIA / ROTINA
-    // =========================================================================
-    if (
-      msg.includes("agenda") ||
-      msg.includes("atendimento") ||
-      msg.includes("marcado") ||
-      msg.includes("rotina") ||
-      msg.includes("como esta o dia") ||
-      msg.includes("grade do dia")
-    ) {
-      const dataAlvo = msg.includes("amanha")
-        ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000))
-        : hojeStr;
-
-      const resAgenda = await AgendaAdapter.consultarAgenda(sb, dataAlvo);
-      const lista: any[] = resAgenda?.data || [];
-      const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
-
-      if (lista.length === 0) {
-        return {
-          texto: `Não temos atendimentos marcados na grade para ${diaLabel}, ${nomeOp}! Essa é uma oportunidade perfeita para disparar convites ou campanhas de fidelização.`,
-          card: {
-            type: "agenda",
-            title: `Agenda de ${diaLabel === "hoje" ? "Hoje" : "Amanhã"} (0 Atendimentos)`,
-            subtitle: `Data: ${dataAlvo}`,
-            data: { itens: [], total: 0 },
-          },
-        };
-      }
-
-      const primeiros = lista
-        .slice(0, 3)
-        .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** às ${(a.hora || a.horario || "horário").slice(0, 5)} (${a.servicos?.nome || a.servicoNome || "Serviço"})`)
-        .join(", ");
-
-      return {
-        texto: `Temos **${lista.length} atendimento(s)** agendado(s) para ${diaLabel}, ${nomeOp}! Primeiros da fila: ${primeiros}. A lista completa e os detalhes estão no card na tela.`,
-        card: {
-          type: "agenda",
-          title: `Agenda (${lista.length} atendimentos)`,
-          subtitle: `Data: ${dataAlvo}`,
-          data: { itens: lista, total: lista.length },
-        },
-      };
-    }
-
-    // =========================================================================
-    // 9. ATRASOS / QUEM FALTOU / SENTINELAS
+    // 8. ATRASOS / QUEM FALTOU / SENTINELAS (ANTES DA AGENDA GERAL)
     // =========================================================================
     if (
       msg.includes("atrasad") ||
@@ -1390,13 +1469,13 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           type: "sentinela",
           title: `Atrasos Identificados (${atrasados.length})`,
           subtitle: `Horário de corte: ${horaAtual}`,
-          data: { atrasados, total: atrasados.length },
+          data: { atrasados, atrasosDetectados: atrasados, total: atrasados.length },
         },
       };
     }
 
     // =========================================================================
-    // 10. LEVA E TRAZ / ROTAS / TRANSPORTE / TÁXI DOG
+    // 9. LEVA E TRAZ / ROTAS / TRANSPORTE / TÁXI DOG (ANTES DA AGENDA GERAL)
     // =========================================================================
     if (
       msg.includes("leva e traz") ||
@@ -1424,6 +1503,53 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           title: `Leva e Traz de Hoje (${rotas.length} rotas)`,
           subtitle: `Data: ${hojeStr}`,
           data: { rotas, total: rotas.length },
+        },
+      };
+    }
+
+    // =========================================================================
+    // 10. AGENDA DE ATENDIMENTOS / GRADE DO DIA / ROTINA
+    // =========================================================================
+    if (
+      msg.includes("agenda") ||
+      msg.includes("atendimento") ||
+      msg.includes("marcado") ||
+      msg.includes("rotina") ||
+      msg.includes("como esta o dia") ||
+      msg.includes("grade do dia")
+    ) {
+      const dataAlvo = msg.includes("amanha")
+        ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000))
+        : hojeStr;
+
+      const resAgenda = await AgendaAdapter.consultarAgenda(sb, dataAlvo);
+      const lista: any[] = resAgenda?.data || [];
+      const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
+
+      if (lista.length === 0) {
+        return {
+          texto: `Não temos atendimentos marcados na grade para ${diaLabel}, ${nomeOp}! Essa é uma oportunidade perfeita para disparar convites ou campanhas de fidelização.`,
+          card: {
+            type: "agenda",
+            title: `Agenda de ${diaLabel === "hoje" ? "Hoje" : "Amanhã"} (0 Atendimentos)`,
+            subtitle: `Data: ${dataAlvo}`,
+            data: { agendamentos: [], itens: [], total: 0 },
+          },
+        };
+      }
+
+      const primeiros = lista
+        .slice(0, 3)
+        .map((a: any) => `**${a.pets?.nome || a.petNome || "Pet"}** às ${(a.hora || a.horario || "horário").slice(0, 5)} (${a.servicos?.nome || a.servicoNome || "Serviço"})`)
+        .join(", ");
+
+      return {
+        texto: `Temos **${lista.length} atendimento(s)** agendado(s) para ${diaLabel}, ${nomeOp}! Primeiros da fila: ${primeiros}. A lista completa e os detalhes estão no card na tela.`,
+        card: {
+          type: "agenda",
+          title: `Agenda (${lista.length} atendimentos)`,
+          subtitle: `Data: ${dataAlvo}`,
+          data: { agendamentos: lista, itens: lista, total: lista.length },
         },
       };
     }
@@ -1474,22 +1600,17 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     }
 
     // =========================================================================
-    // 13. SAUDAÇÕES, POLIDEZ, BEM-ESTAR E EMPATIA
+    // 13. SAUDAÇÕES, POLIDEZ, BEM-ESTAR E EMPATIA (SE SOBROU APENAS SAUDAÇÃO)
     // =========================================================================
     if (
       msg === "boa noite" ||
-      msg.startsWith("boa noite") ||
       msg === "bom dia" ||
-      msg.startsWith("bom dia") ||
       msg === "boa tarde" ||
-      msg.startsWith("boa tarde") ||
       msg === "oi" ||
       msg === "ola" ||
       msg === "e ai" ||
-      msg.startsWith("oi ") ||
-      msg.startsWith("ola ") ||
-      msg.includes("tudo bem") ||
-      msg.includes("como vai") ||
+      msg === "tudo bem" ||
+      msg === "como vai" ||
       msg.includes("como voce esta") ||
       msg.includes("como você está")
     ) {
@@ -1525,73 +1646,83 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
     }
 
     // =========================================================================
-    // 14. REDE DE SEGURANÇA UNIVERSAL: BUSCA AUTOMÁTICA DE CLIENTE / PET / TUTOR
-    // Qualquer texto digitado ou falado (ex: "Thor", "Jaqueline", "Rex", "Toddy",
-    // "Golden", telefone, etc.) busca diretamente no Supabase em tempo real!
+    // 14. REDE DE SEGURANÇA UNIVERSAL: BUSCA DE CLIENTE / PET OU GUIA OPERACIONAL
     // =========================================================================
-    const termoLimpo = mensagemUsuario
-      .replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar|abrir)\b/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    const isSearchIntent =
+      msg.includes("buscar") ||
+      msg.includes("procurar") ||
+      msg.includes("cliente") ||
+      msg.includes("pet") ||
+      msg.includes("tutor") ||
+      msg.includes("ficha") ||
+      msg.includes("cadastro") ||
+      msg.split(" ").length <= 2;
 
-    const termoBusca = termoLimpo.length >= 2 ? termoLimpo : mensagemUsuario.trim();
+    if (isSearchIntent) {
+      const termoLimpo = mensagemUsuario
+        .replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar|abrir)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
-    if (termoBusca.length >= 2) {
-      const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoBusca);
-      const d = resBusca?.data || resBusca;
-      const candidatos = d?.candidatos || (Array.isArray(d) ? d : []);
+      const termoBusca = termoLimpo.length >= 2 ? termoLimpo : mensagemUsuario.trim();
 
-      if (candidatos.length === 1) {
-        const c = candidatos[0];
-        const nomeCli = c.nomePrincipal || c.nome;
-        const det = c.detalheSecundario || "";
-        const dadosCard = c.dadosCompletos
-          ? { ...c.dadosCompletos, nome: nomeCli, telefone: c.telefone || c.detalheSecundario }
-          : { ...c, nome: nomeCli, telefone: c.telefone || c.detalheSecundario };
+      if (termoBusca.length >= 2) {
+        const resBusca = await ClientesPetsAdapter.buscarClientesPets(sb, termoBusca);
+        const d = resBusca?.data || resBusca;
+        const candidatos = d?.candidatos || (Array.isArray(d) ? d : []);
 
-        return {
-          texto: `Localizei a ficha de **${nomeCli}** (${det})! Já abri o card com todos os detalhes, contatos e histórico.`,
-          card: {
-            type: c.tipo === "pet" ? "pet" : "cliente",
-            title: `Ficha de ${nomeCli}`,
-            subtitle: det || "Cadastro no Pet Spa",
-            data: dadosCard,
-          },
-          novoContexto: c.tipo === "pet" ? { pet: { id: c.id, nome: nomeCli } } : { cliente: { id: c.id, nome: nomeCli } },
-        };
-      }
+        if (candidatos.length === 1) {
+          const c = candidatos[0];
+          const nomeCli = c.nomePrincipal || c.nome;
+          const det = c.detalheSecundario || "";
+          const dadosCard = c.dadosCompletos
+            ? { ...c.dadosCompletos, nome: nomeCli, telefone: c.telefone || c.detalheSecundario }
+            : { ...c, nome: nomeCli, telefone: c.telefone || c.detalheSecundario };
 
-      if (candidatos.length > 1) {
-        const nomes = candidatos.slice(0, 4).map((c: any) => `**${c.nomePrincipal || c.nome}**`).join(", ");
-        return {
-          texto: `Encontrei **${candidatos.length} resultados** para "${termoBusca}": ${nomes}. Toque em **[Selecionar]** no card para abrir a ficha completa!`,
-          card: {
-            type: "cliente",
-            title: `Resultados para "${termoBusca}"`,
-            subtitle: `${candidatos.length} cadastros encontrados`,
-            data: {
-              exigeDesambiguacao: true,
-              opcoes: candidatos.slice(0, 8).map((c: any) => {
-                const comp = c.dadosCompletos || {};
-                return {
-                  id: c.id,
-                  tipo: c.tipo || "cliente",
-                  nome: c.nomePrincipal || c.nome,
-                  detalhe: c.detalheSecundario || c.telefone || "",
-                  telefone: comp.telefone || c.telefone || c.detalheSecundario || "",
-                  pets: comp.pets || c.pets || [],
-                  bairro: comp.bairro || c.bairro || "",
-                };
-              }),
+          return {
+            texto: `Localizei a ficha de **${nomeCli}** (${det})! Já abri o card com todos os detalhes, contatos e histórico.`,
+            card: {
+              type: c.tipo === "pet" ? "pet" : "cliente",
+              title: `Ficha de ${nomeCli}`,
+              subtitle: det || "Cadastro no Pet Spa",
+              data: dadosCard,
             },
-          },
-        };
+            novoContexto: c.tipo === "pet" ? { pet: { id: c.id, nome: nomeCli } } : { cliente: { id: c.id, nome: nomeCli } },
+          };
+        }
+
+        if (candidatos.length > 1) {
+          const nomes = candidatos.slice(0, 4).map((c: any) => `**${c.nomePrincipal || c.nome}**`).join(", ");
+          return {
+            texto: `Encontrei **${candidatos.length} resultados** para "${termoBusca}": ${nomes}. Toque em **[Selecionar]** no card para abrir a ficha completa!`,
+            card: {
+              type: "cliente",
+              title: `Resultados para "${termoBusca}"`,
+              subtitle: `${candidatos.length} cadastros encontrados`,
+              data: {
+                exigeDesambiguacao: true,
+                opcoes: candidatos.slice(0, 8).map((c: any) => {
+                  const comp = c.dadosCompletos || {};
+                  return {
+                    id: c.id,
+                    tipo: c.tipo || "cliente",
+                    nome: c.nomePrincipal || c.nome,
+                    detalhe: c.detalheSecundario || c.telefone || "",
+                    telefone: comp.telefone || c.telefone || c.detalheSecundario || "",
+                    pets: comp.pets || c.pets || [],
+                    bairro: comp.bairro || c.bairro || "",
+                  };
+                }),
+              },
+            },
+          };
+        }
       }
     }
 
-    // Resposta final inteligente e orientada à ação se nada foi encontrado
+    // Guia inteligente quando o termo não é um cadastro específico
     return {
-      texto: `Não encontrei nenhum cadastro com o termo "${mensagemUsuario}", ${nomeOp}. Deseja que eu consulte a agenda de hoje, veja horários livres ou prepare o cadastro de um novo cliente?`,
+      texto: `Entendido, ${nomeOp}! Estou pronta para te apoiar. Você pode me pedir:\n\n• **"Agenda de hoje"** ou **"Próximo pet"**\n• **"Quanto faturamos este mês?"** ou **"Pagamentos em aberto"**\n• **"Gerar Pix de R$ 80"** ou **"Horários livres de amanhã"**\n• **"Clientes inativos"** ou o nome de qualquer cliente/pet.`,
     };
   }
 
@@ -1657,12 +1788,12 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
 
     switch (toolNome) {
       case "consultar_agenda": {
-        const lista = Array.isArray(data) ? data : data?.agendamentos || [];
+        const lista = Array.isArray(data) ? data : data?.agendamentos || data?.itens || [];
         cards.push({
           type: "agenda",
           title: `Agenda (${lista.length} atendimento(s))`,
           subtitle: toolArgs.data || "Data de hoje",
-          data: { itens: lista, total: lista.length },
+          data: { agendamentos: lista, itens: lista, total: lista.length },
         });
         break;
       }
@@ -1671,10 +1802,11 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
         if (candidatos.length > 0) {
           if (candidatos.length === 1) {
             const c = candidatos[0];
+            const isPet = c.tipo === "pet";
             cards.push({
-              type: "cliente",
+              type: isPet ? "pet" : "cliente",
               title: `Ficha de ${c.nomePrincipal || c.nome}`,
-              subtitle: "Detalhes do cliente",
+              subtitle: isPet ? `${c.detalheSecundario || "Pet"}` : "Detalhes do cliente",
               data: c.dadosCompletos ? {
                 ...c.dadosCompletos,
                 nome: c.nomePrincipal || c.nome,
@@ -1803,7 +1935,8 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
         });
         break;
       }
-      case "verificar_sentinelas": {
+      case "verificar_sentinelas":
+      case "gerar_central_proativa": {
         cards.push({
           type: "sentinela",
           title: "Sentinelas Operacionais",
@@ -1823,11 +1956,62 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       }
       case "gerar_cobranca_pix_mercadopago":
       case "gerar_cobranca_pix_online":
+      case "gerar_link_pagamento_mercadopago":
+      case "gerar_link_pagamento":
       case "gerar_pix": {
         cards.push({
           type: "pix_mercadopago",
-          title: "Cobrança Pix · Mercado Pago",
+          title: "Cobrança Pix & Cartão · Mercado Pago",
           subtitle: `R$ ${Number(data.valor || toolArgs.valor || 0).toFixed(2)}`,
+          data,
+        });
+        break;
+      }
+      case "executar_agendamento":
+      case "criar_agendamento": {
+        cards.push({
+          type: "confirmacao",
+          title: "Agendamento Confirmado!",
+          subtitle: "Salvo com sucesso na grade do Spa",
+          data: { executado: true, resultado: data },
+        });
+        break;
+      }
+      case "executar_cancelamento":
+      case "cancelar_agendamento": {
+        cards.push({
+          type: "confirmacao",
+          title: "Atendimento Cancelado",
+          subtitle: "Vaga liberada com sucesso",
+          data: { executado: true, resultado: data },
+        });
+        break;
+      }
+      case "executar_remarcacao":
+      case "reagendar_agendamento": {
+        cards.push({
+          type: "confirmacao",
+          title: "Atendimento Reagendado",
+          subtitle: "Novo horário salvo na grade",
+          data: { executado: true, resultado: data },
+        });
+        break;
+      }
+      case "processar_comprovante":
+      case "analisar_comprovante": {
+        cards.push({
+          type: "comprovante",
+          title: "Comprovante Processado",
+          subtitle: "Conciliação Pix",
+          data,
+        });
+        break;
+      }
+      case "gerar_mensagem_whatsapp": {
+        cards.push({
+          type: "comunicacao",
+          title: "Mensagem WhatsApp",
+          subtitle: "Pronta para envio",
           data,
         });
         break;

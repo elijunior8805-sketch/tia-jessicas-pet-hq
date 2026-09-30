@@ -42,6 +42,14 @@ export function humanizarRespostaParaVoz(
     .replace(/\s+/g, " ")
     .trim();
 
+  // 3. Em Modo Bancada, se o texto for excessivamente longo (> 280 caracteres), sintetiza para fala ágil
+  if (modoBancada && fala.length > 280) {
+    const sentencas = fala.split(/(?<=[.?!])\s+/);
+    if (sentencas.length > 2) {
+      fala = `${sentencas[0]} ${sentencas[1]} Os detalhes completos estão no card da tela, ${userName}.`;
+    }
+  }
+
   return fala;
 }
 

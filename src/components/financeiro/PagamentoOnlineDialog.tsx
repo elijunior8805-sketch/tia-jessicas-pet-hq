@@ -173,6 +173,7 @@ export function PagamentoOnlineDialog({
           data: {
             paymentId: pixPaymentId || undefined,
             agendamentoId: agendamentoId || undefined,
+            cobrancaId: cobrancaId || undefined,
             clienteId: clienteId || undefined,
           },
         });
@@ -185,7 +186,7 @@ export function PagamentoOnlineDialog({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [open, pagoComSucesso, pixPaymentId, agendamentoId, clienteId, linkCartao]);
+  }, [open, pagoComSucesso, pixPaymentId, agendamentoId, cobrancaId, clienteId, linkCartao]);
 
   // Contagem regressiva
   useEffect(() => {

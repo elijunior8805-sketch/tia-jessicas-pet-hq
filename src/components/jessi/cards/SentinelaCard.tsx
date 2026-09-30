@@ -32,14 +32,37 @@ export const SentinelaCard: React.FC<SentinelaCardProps> = ({ data, onActionClic
     if (data?.fechamentoCaixa || data?.cancelamentosEVagas || data?.atrasosDetectados) {
       return data;
     }
-    // Fallback se veio apenas um dos alertas
+
+    const rawAtrasos = Array.isArray(data?.atrasosDetectados)
+      ? data.atrasosDetectados
+      : Array.isArray(data?.atrasados)
+      ? data.atrasados
+      : Array.isArray(data?.atrasos)
+      ? data.atrasos
+      : [];
+
+    const atrasosNormalizados: AlertaAtrasoSentinela[] = rawAtrasos.map((a: any, idx: number) => {
+      if (a.agendamentoId && a.tempoAtrasoMinutos !== undefined) return a as AlertaAtrasoSentinela;
+      const hora = (a.hora || "").slice(0, 5) || "09:00";
+      return {
+        agendamentoId: a.id || `atraso_${idx}`,
+        clienteNome: a.clientes?.nome || a.clienteNome || a.tutor || "Cliente",
+        petNome: a.pets?.nome || a.petNome || "Pet",
+        servicoNome: a.servicos?.nome || a.servicoNome || "Serviço",
+        horarioPrevisto: hora,
+        tempoAtrasoMinutos: 30,
+        telefoneCliente: a.clientes?.telefone || a.telefone || "",
+        mensagemWhatsappSugerida: `Olá, ${a.clientes?.nome || "tudo bem"}? Estamos aguardando o ${a.pets?.nome || "seu pet"} para o atendimento das ${hora}.`,
+      };
+    });
+
     return {
       dataReferencia: new Date().toISOString().split("T")[0],
-      totalAlertasAtivos: Array.isArray(data) ? data.length : 1,
+      totalAlertasAtivos: atrasosNormalizados.length || (Array.isArray(data) ? data.length : 1),
       cancelamentosEVagas: Array.isArray(data?.vagas) ? data.vagas : [],
-      atrasosDetectados: Array.isArray(data?.atrasos) ? data.atrasos : [],
+      atrasosDetectados: atrasosNormalizados,
       fechamentoCaixa: data?.fechamento || null,
-      statusGeral: "operacao_normal",
+      statusGeral: atrasosNormalizados.length > 0 ? "atencao" : "operacao_normal",
       resumoVoz: "Diagnóstico das sentinelas concluído.",
     };
   }, [data]);

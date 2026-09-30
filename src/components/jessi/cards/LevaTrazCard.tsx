@@ -24,8 +24,54 @@ export const LevaTrazCard: React.FC<LevaTrazCardProps> = ({ data, onActionClick 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedItinerario, setCopiedItinerario] = useState(false);
 
-  const rota = data as RotaLevaTrazResult;
-  const paradas: ParadaRota[] = rota?.paradas || [];
+  const paradas: ParadaRota[] = React.useMemo(() => {
+    if (Array.isArray(data?.paradas) && data.paradas.length > 0) {
+      return data.paradas;
+    }
+    const rawList = Array.isArray(data?.rotas)
+      ? data.rotas
+      : Array.isArray(data?.itens)
+      ? data.itens
+      : Array.isArray(data)
+      ? data
+      : [];
+
+    return rawList.map((a: any, idx: number) => {
+      const clienteNome = a.clientes?.nome || a.clienteNome || a.tutor || "Cliente";
+      const petNome = a.pets?.nome || a.petNome || "Pet";
+      const endereco = a.endereco_busca || a.endereco || a.clientes?.endereco || "Endereço a confirmar";
+      const telefone = a.clientes?.telefone || a.telefone || "";
+      const hora = (a.hora || "").slice(0, 5) || "09:00";
+      const tipo: "busca" | "entrega" = a.leva_traz_modalidade === "leva" ? "entrega" : "busca";
+
+      return {
+        id: a.id || `parada_${idx}`,
+        ordem: idx + 1,
+        tipo,
+        horarioEstimado: hora,
+        clienteNome,
+        petNome,
+        telefone,
+        enderecoCompleto: endereco,
+        mensagemWhatsapp: `Olá, ${clienteNome}! Sou o motorista do Spa de Pet Tia Jéssica e estou a caminho para a ${tipo === "busca" ? "busca" : "entrega"} do ${petNome}.`,
+        whatsappUrl: telefone ? `https://wa.me/55${telefone.replace(/\D/g, "")}` : undefined,
+      };
+    });
+  }, [data]);
+
+  const rota = React.useMemo(() => {
+    if (data?.totalParadas !== undefined) return data as RotaLevaTrazResult;
+    return {
+      data: data?.data || new Date().toISOString().slice(0, 10),
+      totalParadas: paradas.length,
+      totalBuscas: paradas.filter((p) => p.tipo === "busca").length,
+      totalEntregas: paradas.filter((p) => p.tipo === "entrega").length,
+      resumoMotoristaWhatsapp: paradas
+        .map((p) => `${p.ordem}º [${p.horarioEstimado}] ${p.tipo.toUpperCase()}: ${p.petNome} (${p.clienteNome}) - ${p.enderecoCompleto}`)
+        .join("\n"),
+      paradas,
+    } as RotaLevaTrazResult;
+  }, [data, paradas]);
 
   const handleCopyText = (id: string, text: string) => {
     navigator.clipboard.writeText(text);

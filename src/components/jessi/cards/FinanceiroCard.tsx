@@ -10,7 +10,7 @@ interface FinanceiroCardProps {
 export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionClick }) => {
   const faturamento = Number(data?.faturamentoBruto ?? data?.faturamento ?? data?.faturamento_total ?? data?.receita ?? 0);
   const recebido = Number(data?.valoresRecebidos ?? data?.recebido ?? faturamento);
-  const pendente = Number(data?.valoresAReceber ?? data?.pendente ?? data?.a_receber ?? 0);
+  const pendente = Number(data?.valoresAReceber ?? data?.pendente ?? data?.a_receber ?? data?.totalPendente ?? 0);
   const vencidos = Number(data?.valoresVencidosDevedores ?? 0);
   const ticketMedio = Number(data?.ticketMedio ?? 0);
   const formas = data?.formasPagamento || {};
@@ -22,6 +22,10 @@ export const FinanceiroCard: React.FC<FinanceiroCardProps> = ({ data, onActionCl
     ? data.pendencias
     : Array.isArray(data?.registros)
     ? data.registros
+    : Array.isArray(data?.itens)
+    ? data.itens
+    : Array.isArray(data?.lista)
+    ? data.lista
     : Array.isArray(data)
     ? data
     : [];

@@ -148,7 +148,9 @@ export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) =
     );
   }
 
-  const agendamentos = Array.isArray(data) ? data : data?.agendamentos || [];
+  const agendamentos = Array.isArray(data)
+    ? data
+    : (data?.agendamentos || data?.itens || data?.grade || data?.lista || []);
 
   if (!agendamentos.length) {
     return (

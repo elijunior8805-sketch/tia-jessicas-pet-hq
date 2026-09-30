@@ -36,18 +36,26 @@ export const gerarPixMercadoPagoFn = createServerFn({ method: "POST" })
     // Se o Pix foi gerado com sucesso, registra a pendência na tabela de pagamentos do Supabase
     if (res.sucesso && res.paymentId) {
       try {
-        await (supabase as any).from("pagamentos").insert({
-          valor: data.valor,
-          metodo: "pix",
+        const payloadInsert: any = {
+          valor_total: data.valor,
+          valor_pago: 0,
+          forma: "pix",
           status: "pendente",
-          tipo: "avulso",
+          categoria_receita: "servico",
+          descricao: data.descricao,
+          id_transacao_bancaria: String(res.paymentId),
           observacoes: `Pix Mercado Pago: ID ${res.paymentId} - ${data.descricao}`,
-          agendamento_id: data.agendamentoId || null,
+          atendimento_id: data.agendamentoId || null,
           cliente_id: data.clienteId || null,
-          created_by: userId,
-        });
+          vencimento: new Date().toISOString().slice(0, 10),
+        };
+
+        const { error: errInsert } = await (supabase as any).from("pagamentos").insert(payloadInsert);
+        if (errInsert) {
+          console.warn("[MercadoPago] Aviso ao registrar pagamento pendente:", errInsert);
+        }
       } catch (errDb) {
-        console.warn("[MercadoPago] Aviso ao registrar pagamento pendente:", errDb);
+        console.warn("[MercadoPago] Erro ao registrar pagamento pendente:", errDb);
       }
     }
 
@@ -89,11 +97,12 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
         preferenceId: z.string().optional().nullable(),
         agendamentoId: z.string().optional().nullable(),
         clienteId: z.string().optional().nullable(),
+        cobrancaId: z.string().optional().nullable(),
       })
       .parse(data)
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
 
     let res: any = { sucesso: false, status: "pending" };
 
@@ -102,7 +111,7 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
       res = await consultarPagamentoMercadoPago(data.paymentId);
     }
 
-    // 2. Se não estiver aprovado, busca nos pagamentos recentes aprovados da conta Mercado Pago
+    // 2. Se não estiver aprovado ou sem paymentId, busca nos pagamentos recentes aprovados da conta Mercado Pago
     if (!res.sucesso || res.status !== "approved") {
       try {
         const ultimos = await consultarUltimosPagamentosAprovadosMercadoPago();
@@ -120,9 +129,12 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
             extRef = p.external_reference;
           }
 
-          if (data.agendamentoId && extRef?.agendamentoId === data.agendamentoId) return true;
-          if (data.clienteId && extRef?.clienteId === data.clienteId) return true;
-          return true; // Pega o pagamento aprovado mais recente
+          // Verificação estrita para evitar confirmação de clientes errados
+          if (data.agendamentoId && extRef?.agendamentoId && extRef.agendamentoId === data.agendamentoId) return true;
+          if (data.cobrancaId && extRef?.cobrancaId && extRef.cobrancaId === data.cobrancaId) return true;
+          if (data.clienteId && extRef?.clienteId && extRef.clienteId === data.clienteId) return true;
+          if (data.paymentId && String(p.id) === String(data.paymentId)) return true;
+          return false;
         });
 
         if (pagamentoRecenteAprovado) {
@@ -145,57 +157,72 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
       try {
         const idTransacao = String(res.paymentId || data.paymentId || `mp_${Date.now()}`);
         const dataAprovacaoIso = res.dataAprovacao || new Date().toISOString();
-        const valorPagoNum = Number(res.valor || 10);
+        const valorPagoNum = Number(res.valor || 0);
 
-        let metodoNormalizado: "pix" | "cartao_credito" | "cartao_debito" = "cartao_credito";
+        // Mapeamento correto para o enum PostgreSQL `pagamento_forma` ('pix' | 'credito' | 'debito' | 'dinheiro' | 'pendente' | 'outras')
+        let formaNormalizada: "pix" | "credito" | "debito" = "credito";
         const mpMetodo = String(res.metodoPagamento || "").toLowerCase();
         if (mpMetodo === "pix" || mpMetodo === "bank_transfer" || mpMetodo.includes("pix")) {
-          metodoNormalizado = "pix";
+          formaNormalizada = "pix";
         } else if (mpMetodo === "debit_card" || mpMetodo.includes("debito") || mpMetodo.includes("débito")) {
-          metodoNormalizado = "cartao_debito";
+          formaNormalizada = "debito";
         } else {
-          metodoNormalizado = "cartao_credito";
+          formaNormalizada = "credito";
         }
 
-        // Verifica se já existe o pagamento registrado
-        const { data: pagExistente } = await (supabase as any)
+        // Verifica se já existe o pagamento registrado pelo id de transação ou por atendimento/cobrança
+        let query = (supabase as any)
           .from("pagamentos")
-          .select("id, status, observacoes")
-          .or(`observacoes.ilike.%${idTransacao}%,id_transacao_bancaria.eq.${idTransacao}`)
-          .maybeSingle();
+          .select("id, status, valor_total, observacoes")
+          .or(`observacoes.ilike.%${idTransacao}%,id_transacao_bancaria.eq.${idTransacao}`);
+
+        if (data.agendamentoId) {
+          query = (supabase as any)
+            .from("pagamentos")
+            .select("id, status, valor_total, observacoes")
+            .or(`observacoes.ilike.%${idTransacao}%,id_transacao_bancaria.eq.${idTransacao},atendimento_id.eq.${data.agendamentoId}`);
+        }
+
+        const { data: pagExistente } = await query.maybeSingle();
 
         if (pagExistente) {
-          await (supabase as any)
+          const valorFinal = valorPagoNum > 0 ? valorPagoNum : Number(pagExistente.valor_total || 0);
+          const { error: errUpdate } = await (supabase as any)
             .from("pagamentos")
             .update({
               status: "pago",
-              valor_pago: valorPagoNum,
-              forma: metodoNormalizado,
-              metodo: metodoNormalizado,
+              valor_pago: valorFinal,
+              forma: formaNormalizada,
               id_transacao_bancaria: idTransacao,
-              data_pagamento: dataAprovacaoIso,
+              data_pagamento: dataAprovacaoIso.slice(0, 10),
               observacoes: pagExistente.observacoes
-                ? `${pagExistente.observacoes} | Confirmado em tempo real (${metodoNormalizado})`
-                : `Confirmado em tempo real Mercado Pago ID ${idTransacao} (${metodoNormalizado})`,
+                ? `${pagExistente.observacoes} | Confirmado em tempo real (${formaNormalizada.toUpperCase()})`
+                : `Confirmado Mercado Pago ID ${idTransacao} (${formaNormalizada.toUpperCase()})`,
             })
             .eq("id", pagExistente.id);
+
+          if (errUpdate) {
+            console.error("[MercadoPago] Erro ao atualizar pagamento para pago:", errUpdate);
+          }
         } else {
-          await (supabase as any).from("pagamentos").insert({
-            valor: valorPagoNum,
+          const { error: errInsert } = await (supabase as any).from("pagamentos").insert({
             valor_total: valorPagoNum,
             valor_pago: valorPagoNum,
-            metodo: metodoNormalizado,
-            forma: metodoNormalizado,
+            forma: formaNormalizada,
             status: "pago",
-            tipo: "avulso",
-            data_pagamento: dataAprovacaoIso,
+            categoria_receita: "servico",
+            descricao: `Mercado Pago ${formaNormalizada.toUpperCase()} (${idTransacao})`,
+            data_pagamento: dataAprovacaoIso.slice(0, 10),
+            vencimento: dataAprovacaoIso.slice(0, 10),
             id_transacao_bancaria: idTransacao,
-            observacoes: `Pagamento Mercado Pago ID ${idTransacao} (${metodoNormalizado.toUpperCase()}) confirmado via verificação em tempo real`,
-            agendamento_id: data.agendamentoId || null,
+            observacoes: `Pagamento Mercado Pago ID ${idTransacao} (${formaNormalizada.toUpperCase()}) confirmado via verificação em tempo real`,
             atendimento_id: data.agendamentoId || null,
             cliente_id: data.clienteId || null,
-            created_by: userId,
           });
+
+          if (errInsert) {
+            console.error("[MercadoPago] Erro ao inserir novo pagamento pago:", errInsert);
+          }
         }
 
         // Se houver agendamento vinculado, confirma o agendamento
@@ -206,7 +233,7 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
             .eq("id", data.agendamentoId);
         }
       } catch (errUp) {
-        console.warn("[MercadoPago] Aviso ao efetivar baixa de pagamento:", errUp);
+        console.error("[MercadoPago] Erro ao efetivar baixa de pagamento:", errUp);
       }
     }
 
