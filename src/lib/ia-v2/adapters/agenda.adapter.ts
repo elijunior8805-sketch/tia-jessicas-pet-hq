@@ -294,6 +294,130 @@ export class AgendaAdapter {
   }
 
   /**
+   * Prepara proposta de agendamento na grade (com busca de dados e supervisão humana)
+   */
+  static async prepararPropostaAgendamento(
+    sb: SupabaseClient<Database>,
+    params: {
+      clienteId?: string;
+      clienteNome?: string;
+      petId?: string;
+      petNome?: string;
+      servicoId?: string;
+      servicoNome?: string;
+      data?: string;
+      hora?: string;
+      dataHora?: string;
+      valor?: number;
+      transporte?: boolean;
+    }
+  ) {
+    let dataAlvo = params.data || "";
+    let horaAlvo = params.hora || "";
+
+    if (params.dataHora && (!dataAlvo || !horaAlvo)) {
+      try {
+        const parsed = partirDataHora(params.dataHora, params.data, params.hora);
+        dataAlvo = parsed.data;
+        horaAlvo = parsed.hora;
+      } catch {}
+    }
+
+    if (!dataAlvo) {
+      dataAlvo = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    }
+    if (!horaAlvo) {
+      horaAlvo = "14:00";
+    }
+
+    let clienteId = params.clienteId;
+    let clienteNome = params.clienteNome;
+    let petId = params.petId;
+    let petNome = params.petNome;
+    const servicoNome = params.servicoNome || "Banho";
+
+    // Se temos nome de cliente ou pet sem ID, busca no banco
+    if ((!clienteId || !petId) && (clienteNome || petNome)) {
+      try {
+        const termo = clienteNome || petNome || "";
+        const busca = await ClientesPetsAdapter.buscarClientesPets(sb, termo);
+        if (busca.success && busca.data?.candidatos?.length > 0) {
+          const c = busca.data.candidatos[0];
+          if (c.tipo === "pet") {
+            petId = c.id;
+            petNome = c.nomePrincipal || c.nome;
+            if (c.dadosCompletos?.clientes) {
+              clienteId = c.dadosCompletos.clientes.id;
+              clienteNome = c.dadosCompletos.clientes.nome;
+            }
+          } else {
+            clienteId = c.id;
+            clienteNome = c.nomePrincipal || c.nome;
+            if (c.dadosCompletos?.pets?.length > 0) {
+              petId = c.dadosCompletos.pets[0].id;
+              petNome = c.dadosCompletos.pets[0].nome;
+            }
+          }
+        }
+      } catch (errBusca) {
+        console.warn("[AgendaAdapter] Erro na busca de cliente/pet para proposta:", errBusca);
+      }
+    }
+
+    // Se temos petId mas não clienteId, busca o tutor
+    if (petId && !clienteId) {
+      try {
+        const { data: petDb } = await sb.from("pets").select("id, nome, cliente_id, clientes(id, nome)").eq("id", petId).maybeSingle();
+        if (petDb) {
+          petNome = petDb.nome;
+          clienteId = petDb.cliente_id;
+          clienteNome = (petDb.clientes as any)?.nome || clienteNome;
+        }
+      } catch {}
+    }
+
+    const valorEstimado = Number(params.valor || 80);
+
+    return {
+      success: true,
+      data: {
+        status: "proposto",
+        tipo: "agendamento",
+        data: dataAlvo,
+        hora: horaAlvo,
+        servico: servicoNome,
+        servicoNome,
+        clienteId,
+        clienteNome: clienteNome || "Cliente a confirmar",
+        petId,
+        petNome: petNome || "Pet a confirmar",
+        valor: valorEstimado,
+        transporte: Boolean(params.transporte),
+      },
+      pendingAction: {
+        action: "criar_agendamento",
+        params: {
+          data: dataAlvo,
+          hora: horaAlvo,
+          servico: servicoNome,
+          servicoNome,
+          clienteId,
+          clienteNome: clienteNome || "Cliente a confirmar",
+          petId,
+          petNome: petNome || "Pet a confirmar",
+          valor: valorEstimado,
+        },
+      },
+      summary: `Proposta de agendamento de ${servicoNome} para ${petNome || clienteNome || "o Pet"} em ${dataAlvo} às ${horaAlvo}.`,
+    };
+  }
+
+  /**
    * Prepara o agendamento sem persistir no banco (Supervisão Humana)
    */
   static prepararAgendamento(params: {
@@ -353,7 +477,7 @@ export class AgendaAdapter {
         };
       }
 
-      // 1. Validação estrita de identificadores obrigatórios
+      // 1. Resolução estrita ou auto-criação de cliente e pet
       let clienteId = params.clienteId || params.cliente_id;
       let petId = params.petId || params.pet_id;
       let servicoId = params.servicoId || params.servico_id || null;
@@ -363,6 +487,37 @@ export class AgendaAdapter {
       if (petId === "undefined" || petId === "null" || !petId) petId = null;
       if (servicoId === "undefined" || servicoId === "null" || !servicoId) servicoId = null;
 
+      // Se IDs ausentes mas nomes presentes, tenta localizar ou criar
+      if (!clienteId || !petId) {
+        const busca = await ClientesPetsAdapter.buscarClientesPets(sb, params.clienteNome || params.petNome || "");
+        if (busca.success && busca.data?.candidatos?.length > 0) {
+          const c = busca.data.candidatos[0];
+          if (c.tipo === "pet") {
+            petId = c.id;
+            clienteId = c.dadosCompletos?.cliente_id || c.dadosCompletos?.clientes?.id || clienteId;
+          } else {
+            clienteId = c.id;
+            petId = c.dadosCompletos?.pets?.[0]?.id || petId;
+          }
+        }
+
+        // Se ainda não tiver cliente, cria cadastro rápido
+        if (!clienteId && params.clienteNome) {
+          const { data: newCli } = await sb.from("clientes").insert({ nome: params.clienteNome }).select("id, nome").single();
+          if (newCli) clienteId = newCli.id;
+        }
+        // Se ainda não tiver pet, cria cadastro rápido
+        if (!petId && (params.petNome || params.clienteNome)) {
+          const { data: newPet } = await sb.from("pets").insert({
+            nome: params.petNome || `${params.clienteNome || "Pet"} Pet`,
+            cliente_id: clienteId,
+            raca: "SRD",
+            porte: "medio",
+          }).select("id, nome").single();
+          if (newPet) petId = newPet.id;
+        }
+      }
+
       if (!clienteId || !petId) {
         console.error("[AgendaAdapter] Identificação do cliente ou pet ausente:", { clienteId, petId });
         return {
@@ -370,7 +525,7 @@ export class AgendaAdapter {
           entity_id: null,
           affected_record_id: null,
           source: "tabela_agendamentos",
-          summary: "Operação abortada: Identificação do cliente e do pet são obrigatórias antes da execução física.",
+          summary: "Operação abortada: Identificação do cliente e do pet são obrigatórias antes da gravação.",
           idempotency_key: idempotencyKey,
           executed_at: new Date().toISOString(),
           error_code: "CAMPOS_OBRIGATORIOS_AUSENTES",

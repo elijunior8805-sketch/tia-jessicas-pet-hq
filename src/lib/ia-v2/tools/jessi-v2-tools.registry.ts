@@ -200,10 +200,35 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  preparar_agendamento: {
+    nomeInterno: "preparar_agendamento",
+    descricao: "Prepara proposta de agendamento na grade do Pet Spa com resolução automática de cliente/pet para confirmação",
+    intencoes: ["preparar_agendamento", "agendar", "marcar_horario", "novo_agendamento"],
+    area: "agenda",
+    parametros: {
+      clienteNome: { tipo: "string", obrigatorio: false, descricao: "Nome do cliente/tutor" },
+      petNome: { tipo: "string", obrigatorio: false, descricao: "Nome do pet" },
+      data: { tipo: "string", obrigatorio: false, descricao: "Data YYYY-MM-DD" },
+      hora: { tipo: "string", obrigatorio: false, descricao: "Hora HH:mm" },
+      servicoNome: { tipo: "string", obrigatorio: false, descricao: "Nome do serviço" },
+      valor: { tipo: "number", obrigatorio: false, descricao: "Valor do serviço" },
+    },
+    retorno: "Proposta estruturada de agendamento",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "AgendaAdapter.prepararPropostaAgendamento",
+    featureFlag: "ai_v2_queries",
+    timeoutMs: 5000,
+    politicaRepeticao: "nenhuma",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
   criar_agendamento: {
     nomeInterno: "criar_agendamento",
     descricao: "Grava agendamento confirmado no banco de dados com revalidação de grade e verificação",
-    intencoes: ["criar_agendamento", "preparar_agendamento", "executar_agendamento", "confirmar_agendamento"],
+    intencoes: ["criar_agendamento", "executar_agendamento", "confirmar_agendamento"],
     area: "agenda",
     parametros: {
       clienteId: { tipo: "string", obrigatorio: true, descricao: "ID do cliente" },
@@ -989,7 +1014,10 @@ const TOOL_ALIASES: Record<string, string> = {
   gerar_link_mercadopago: "gerar_link_pagamento_mercadopago",
   verificar_pix_mercadopago: "gerar_cobranca_pix_mercadopago",
   consultar_pix_mercadopago: "gerar_cobranca_pix_mercadopago",
-  preparar_agendamento: "criar_agendamento",
+  preparar_agendamento: "preparar_agendamento",
+  agendar_horario: "preparar_agendamento",
+  marcar_horario: "preparar_agendamento",
+  agendar: "preparar_agendamento",
   preparar_cancelamento: "cancelar_agendamento",
   preparar_reagendamento: "reagendar_agendamento",
   preparar_cadastro_cliente: "executar_cadastro_cliente",
@@ -1044,6 +1072,9 @@ export async function despacharFerramentaV2(
 
   try {
     switch (toolCanonical) {
+      case "preparar_agendamento":
+        return await AgendaAdapter.prepararPropostaAgendamento(sb, params);
+
       case "consultar_agenda":
         return await AgendaAdapter.consultarAgendaPorData(
           sb,

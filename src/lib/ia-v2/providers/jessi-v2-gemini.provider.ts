@@ -593,7 +593,83 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   }
 
   /**
-   * Executa chamada segura com timeout e retentativas
+   * Executa chamada segura com suporte a Tool Calling nativo (OpenAI / Groq / Lovable)
+   */
+  private async executarRequisicaoIAComTools(
+    messages: Array<any>,
+    tools?: any[],
+    temperature = 0.3
+  ): Promise<{
+    content: string | null;
+    tool_calls?: Array<{
+      id: string;
+      type: string;
+      function: {
+        name: string;
+        arguments: string;
+      };
+    }>;
+  }> {
+    const auth = this.obterApiKeyServidor();
+    if (!auth) {
+      throw new Error("Nenhuma chave de API configurada no ambiente.");
+    }
+
+    for (let tentativa = 1; tentativa <= GEMINI_CONFIG.MAX_RETRIES; tentativa++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), GEMINI_CONFIG.TIMEOUT_MS);
+
+      try {
+        const body: any = {
+          model: auth.model,
+          temperature,
+          messages,
+        };
+
+        if (tools && tools.length > 0) {
+          body.tools = tools;
+          body.tool_choice = "auto";
+        }
+
+        const resp = await fetch(auth.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.key}`,
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timer);
+
+        if (!resp.ok) {
+          const errBody = await resp.text().catch(() => "");
+          throw new Error(`HTTP ${resp.status}: ${errBody.slice(0, 120)}`);
+        }
+
+        const data: any = await resp.json();
+        const msg = data?.choices?.[0]?.message;
+        if (!msg) {
+          throw new Error("Provedor retornou resposta vazia sem escolhas.");
+        }
+
+        return {
+          content: msg.content || null,
+          tool_calls: msg.tool_calls || undefined,
+        };
+      } catch (err: any) {
+        clearTimeout(timer);
+        if (tentativa >= GEMINI_CONFIG.MAX_RETRIES) throw err;
+        await new Promise((res) => setTimeout(res, tentativa * 350));
+      }
+    }
+
+    throw new Error("Falha na comunicação com o provedor de IA após retentativas.");
+  }
+
+  /**
+   * Executa chamada segura com timeout e retentativas (legado / texto simples)
    */
   private async executarRequisicaoIA(
     messages: Array<{ role: string; content: string }>,
@@ -652,8 +728,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
   }
 
   /**
-   * MOTOR DO AGENTE AUTÔNOMO COM TOOL CALLING (LOOP MULTI-PASSOS)
-   * A IA recebe a pergunta, decide quais ferramentas consultar no Supabase, raciocina sobre os dados e responde naturalmente.
+   * MOTOR DO AGENTE AUTÔNOMO COM TOOL CALLING NATIVO (MULTI-PASSOS)
+   * A IA recebe a mensagem, raciocina com 70B de parâmetros, seleciona e executa ferramentas no Supabase,
+   * e sintetiza uma resposta conversacional e calorosa com dados reais e cards interativos.
    */
   async executarAgenteAutonomo(params: {
     sb: SupabaseClient<Database>;
@@ -743,13 +820,11 @@ ${contexto.cliente?.nome ? `- Cliente/Tutor no Contexto: ${contexto.cliente.nome
 ${snapshotTexto}
 ${instrucaoVoz}
 
-DIRETRIZES DE CONVERSAÇÃO E PODER TOTAL DA IA:
-1. Responda a QUALQUER pergunta, conselho, brincadeira, lembrete (ex: beber água, pausas, dicas de gestão), saudação ou dúvida de forma fluida, natural, inteligente e humana (estilo Gemini Live / ChatGPT).
-2. Não seja robótica, rígida ou travada. Demonstre proatividade e afeto com os pets.
-3. Se o usuário pedir para gerar pagamento, gerar link, pagar no cartão/crédito, cobrar via Pix, buscar cliente/pet, sugerir encaixes, agendar, cancelar, ver financeiro ou qualquer ação no sistema, inclua no final da sua resposta uma tag de ação estruturada:
-<<<ACTION:{"tool":"gerar_cobranca_pix_mercadopago"|"identificar_clientes_retorno"|"buscar_clientes_pets"|"consultar_agenda"|"consultar_financeiro_consolidado"|"consultar_horarios_disponiveis"|"preparar_agendamento"|"preparar_cancelamento"|"gerar_mensagens_cobranca"|"consultar_programas_ativos_geral", "params":{...}}>>>
-ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" referem-se a pagamento financeiro (ferramenta: "gerar_cobranca_pix_mercadopago"). NUNCA confunda cartão de crédito com créditos do Clubinho!
-4. Formate valores monetários em R$ (ex: R$ 80,00).`;
+DIRETRIZES DE AUTONOMIA E TOOL CALLING:
+1. Você tem total liberdade de raciocínio. Se o usuário pedir para agendar, cancelar, consultar faturamento, buscar clientes, gerar cobrança Pix/cartão Mercado Pago ou ver a agenda, ACIONE A TOOL CORRESPONDENTE.
+2. Quando acionar ferramentas, você receberá os dados reais do banco e responderá em seguida com calor humano e precisão executiva.
+3. Se o usuário estiver apenas conversando, tirando dúvidas, pedindo conselhos ou fazendo brincadeiras, responda diretamente com inteligência natural fluida (estilo Gemini Live).
+4. Formate valores em R$ (ex: R$ 80,00).`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt },
@@ -770,87 +845,102 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
 
     const cards: JessiV2Card[] = [];
     let pendingAction: JessiV2PendingAction | null = null;
-    let novoContexto: Partial<JessiV2ContextState> = {};
+    const novoContexto: Partial<JessiV2ContextState> = {};
 
-    // Tenta chamada direta ao LLM (Gemini 1.5 Flash via Lovable Gateway)
+    // 2. TENTA CHAMADA NATIVA COM TOOL CALLING AO LLM (GROQ / GEMINI)
     if (auth?.key) {
       try {
-        const textoGerado = await this.executarRequisicaoIA(messages, false, 0.7);
+        const respostaIA = await this.executarRequisicaoIAComTools(messages, OPENAI_TOOLS_SCHEMA, 0.2);
 
-        if (textoGerado && textoGerado.trim().length > 0) {
-          let textoLimpo = textoGerado.trim();
+        // A. O LLM decidiu chamar uma ou mais ferramentas nativamente
+        if (respostaIA.tool_calls && respostaIA.tool_calls.length > 0) {
+          const toolMessages: any[] = [
+            {
+              role: "assistant",
+              content: respostaIA.content || null,
+              tool_calls: respostaIA.tool_calls,
+            },
+          ];
 
-          // Extrai tag de ação <<<ACTION:{...}>>> se o Gemini gerou
+          for (const tc of respostaIA.tool_calls) {
+            const toolNome = tc.function.name;
+            let toolArgs: any = {};
+            try {
+              toolArgs = JSON.parse(tc.function.arguments || "{}");
+            } catch {
+              toolArgs = {};
+            }
+
+            try {
+              const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
+              this.anexarCardVisual(cards, toolNome, resTool, toolArgs);
+
+              if (resTool?.pendingAction) {
+                pendingAction = resTool.pendingAction;
+              } else if (resTool?.data?.pendingAction) {
+                pendingAction = resTool.data.pendingAction;
+              }
+
+              toolMessages.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: JSON.stringify(resTool?.data || resTool?.summary || resTool || { success: true }),
+              });
+            } catch (errTool) {
+              console.warn(`[JessiV2] Erro ao executar tool ${toolNome}:`, errTool);
+              toolMessages.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: JSON.stringify({ success: false, error: String(errTool) }),
+              });
+            }
+          }
+
+          // Segunda rodada: O LLM gera a resposta final humanizada com os dados reais
+          try {
+            const mensagensRound2 = [...messages, ...toolMessages];
+            const respostaFinal = await this.executarRequisicaoIAComTools(mensagensRound2, undefined, 0.4);
+            const textoFinal = (respostaFinal.content || respostaIA.content || "").trim();
+
+            if (textoFinal) {
+              return {
+                respostaTexto: textoFinal.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim(),
+                cards,
+                pendingAction,
+                novoContexto,
+              };
+            }
+          } catch (errRound2) {
+            console.warn("[JessiV2] Aviso na rodada final de síntese:", errRound2);
+          }
+
+          // Se a rodada 2 não produziu texto novo, usa o conteúdo inicial ou resumo
+          const textoFallback = respostaIA.content || "Prontinho! Solicitação processada com sucesso.";
+          return {
+            respostaTexto: textoFallback.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim(),
+            cards,
+            pendingAction,
+            novoContexto,
+          };
+        }
+
+        // B. O LLM respondeu diretamente sem tool calls (conversa pura, conselho, instrução)
+        if (respostaIA.content && respostaIA.content.trim().length > 0) {
+          let textoLimpo = respostaIA.content.trim();
+
+          // Fallback para tags legadas <<<ACTION:{...}>>> se o modelo emitiu no texto
           const actionMatch = textoLimpo.match(/<<<ACTION:([\s\S]*?)>>>/);
-          let toolAlvo: string | null = null;
-          let toolParams: any = {};
-
           if (actionMatch && actionMatch[1]) {
             try {
               const parsedAction = JSON.parse(actionMatch[1].trim());
-              toolAlvo = parsedAction.tool;
-              toolParams = parsedAction.params || {};
+              const toolAlvo = parsedAction.tool;
+              const toolParams = parsedAction.params || {};
               textoLimpo = textoLimpo.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim();
-            } catch {
-              // ignore json parse error
-            }
-          }
 
-          // Detecção complementar e correção de desvio de intenção
-          const msgNorm = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const ehIntencaoPagamento =
-            msgNorm.includes("pix") ||
-            msgNorm.includes("link") ||
-            msgNorm.includes("cartao") ||
-            msgNorm.includes("cartão") ||
-            msgNorm.includes("credito") ||
-            msgNorm.includes("crédito") ||
-            msgNorm.includes("cobranca") ||
-            msgNorm.includes("cobrar") ||
-            msgNorm.includes("pagamento") ||
-            msgNorm.includes("paganto") ||
-            msgNorm.includes("pagto") ||
-            msgNorm.includes("pagar") ||
-            msgNorm.includes("checkout");
-
-          // Se a IA confundiu cartão de crédito com créditos do Clubinho, redireciona para cobrança
-          if (ehIntencaoPagamento && (toolAlvo === "consultar_programas_ativos_geral" || toolAlvo === "consultar_saldo_programas" || !toolAlvo)) {
-            const matchVal = mensagemUsuario.match(/(?:r\$|\$)?\s*(\d+(?:[.,]\d{1,2})?)/i);
-            const valorNum = matchVal ? parseFloat(matchVal[1].replace(",", ".")) : 10;
-            toolAlvo = "gerar_cobranca_pix_mercadopago";
-            toolParams = {
-              valor: valorNum,
-              descricao: "Cobrança Pet Spa Tia Jéssica",
-            };
-          }
-
-          if (!toolAlvo) {
-            if (msgNorm.includes("inativ") || msgNorm.includes("reativa") || msgNorm.includes("ausente") || msgNorm.includes("sumido")) {
-              toolAlvo = "identificar_clientes_retorno";
-            } else if (msgNorm.includes("buscar") || msgNorm.includes("procurar") || msgNorm.includes("ficha") || msgNorm.includes("tutor") || msgNorm.includes("cliente")) {
-              const termo = mensagemUsuario.replace(/\b(buscar|procurar|consultar|ver|ficha|cliente|pet|tutor|cadastro|quem|e|o|a|da|do|de|no|na|me|pra|para|por|favor|localizar|pesquisar|achar|encontrar|mostra|mostrar|olha|olhar)\b/gi, "").trim();
-              toolAlvo = "buscar_clientes_pets";
-              toolParams = { termo };
-            } else if (msgNorm.includes("horario") || msgNorm.includes("vaga") || msgNorm.includes("encaixe") || msgNorm.includes("livre")) {
-              toolAlvo = "consultar_horarios_disponiveis";
-              toolParams = { data: hojeStr };
-            } else if (msgNorm.includes("agenda") || msgNorm.includes("atendimento") || msgNorm.includes("proximo pet") || msgNorm.includes("proximo")) {
-              toolAlvo = "consultar_agenda";
-              toolParams = { data: hojeStr };
-            } else if (msgNorm.includes("financeiro") || msgNorm.includes("faturamento") || msgNorm.includes("receber") || msgNorm.includes("caixa")) {
-              toolAlvo = "consultar_financeiro_consolidado";
-              toolParams = { periodo: "mes" };
-            }
-          }
-
-          // Se há ferramenta de ação a ser executada no Supabase, executa e anexa o card visual
-          if (toolAlvo) {
-            try {
               const resTool = await despacharFerramentaV2(sb, toolAlvo, toolParams);
               this.anexarCardVisual(cards, toolAlvo, resTool, toolParams);
-            } catch (errTool) {
-              console.warn(`[JessiV2] Erro ao despachar ferramenta visual ${toolAlvo}:`, errTool);
-            }
+              if (resTool?.pendingAction) pendingAction = resTool.pendingAction;
+            } catch {}
           }
 
           return {
@@ -861,12 +951,12 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           };
         }
       } catch (errLLM) {
-        const auth = this.obterApiKeyServidor();
-        console.error(`[JessiV2] FALHA no LLM (${auth?.endpoint || "sem endpoint"}), acionando despacho resiliente:`, errLLM);
+        const authInfo = this.obterApiKeyServidor();
+        console.error(`[JessiV2] FALHA no LLM (${authInfo?.endpoint || "sem endpoint"}), acionando despacho resiliente:`, errLLM);
       }
     }
 
-    // DISPATCHER RESILIENTE DIRETO DE FERRAMENTAS COM CONVERSAÇÃO 100% FLUIDA
+    // 3. DISPATCHER RESILIENTE DE BACKUP (caso a rede/IA esteja offline)
     // Garante que mesmo offline ou sem resposta do gateway, o comando é executado com dados reais do Supabase e fala humanizada!
     const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli");
     if (despachoResiliente) {
@@ -2011,6 +2101,44 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           title: "Cobrança Pix & Cartão · Mercado Pago",
           subtitle: `R$ ${Number(data.valor || toolArgs.valor || 0).toFixed(2)}`,
           data,
+        });
+        break;
+      }
+      case "preparar_agendamento": {
+        const d = data || toolArgs || {};
+        const diaFormatado = d.data ? (d.data.includes("-") ? d.data.split("-").reverse().slice(0, 2).join("/") : d.data) : "Hoje";
+        cards.push({
+          type: "confirmacao",
+          title: `Confirmar Agendamento: ${d.petNome || d.clienteNome || "Pet"}`,
+          subtitle: `${d.servico || d.servicoNome || "Banho"} • Dia ${diaFormatado} às ${d.hora || "14:00"}`,
+          data: {
+            acao: "criar_agendamento",
+            tipo: "agendamento",
+            data: d.data,
+            hora: d.hora,
+            servico: d.servico || d.servicoNome || "Banho",
+            servicoNome: d.servico || d.servicoNome || "Banho",
+            petId: d.petId,
+            petNome: d.petNome,
+            clienteId: d.clienteId,
+            clienteNome: d.clienteNome,
+            valor: d.valor || 80,
+          },
+        });
+        break;
+      }
+      case "preparar_cancelamento": {
+        const d = data || toolArgs || {};
+        cards.push({
+          type: "confirmacao",
+          title: `Cancelar Agendamento: ${d.petNome || "Pet"}`,
+          subtitle: `Horário: ${d.hora || "Atendimento"} • Vaga será liberada`,
+          data: {
+            acao: "cancelar_agendamento",
+            agendamentoId: d.agendamentoId,
+            petNome: d.petNome,
+            hora: d.hora,
+          },
         });
         break;
       }

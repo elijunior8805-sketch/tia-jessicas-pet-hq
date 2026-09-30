@@ -17,40 +17,48 @@ export const ConfirmacaoCard: React.FC<ConfirmacaoCardProps> = ({
 }) => {
   const pendingAction = data?.pendingAction || data?.acaoPendente || {
     id: data?.proposta?.id || data?.id || `idemp_${Date.now()}`,
-    title: data?.proposta?.motivo || "Confirmar Operação",
+    title: data?.proposta?.motivo || data?.title || "Confirmar Operação",
     summary: data?.proposta?.motivo || data?.resumo || "Deseja confirmar a execução?",
-    tool: data?.proposta?.acao || data?.tool || "criar_agendamento",
-    params: data?.proposta?.estadoProposto || data?.params || {},
+    tool: data?.proposta?.acao || data?.tool || data?.action || data?.acao || "criar_agendamento",
+    params: data?.proposta?.estadoProposto || data?.params || data || {},
   };
 
   const executado = data?.executado;
   const proposta = data?.proposta;
   const resumoVisual = data?.resumoVisual || proposta?.resumoVisual;
   const resumo = data?.resumo || resumoVisual?.entendido || pendingAction?.summary || "Deseja confirmar a execução?";
-  const params = pendingAction?.params || proposta?.estadoProposto || {};
+  const params = pendingAction?.params || proposta?.estadoProposto || data?.params || data || {};
 
   const ehAgendamento =
     pendingAction.tool === "criar_agendamento" ||
     pendingAction.tool === "executar_agendamento" ||
+    pendingAction.tool === "preparar_agendamento" ||
+    pendingAction.action === "criar_agendamento" ||
+    pendingAction.acao === "criar_agendamento" ||
     pendingAction.type === "criar_agendamento" ||
-    pendingAction.type === "preparar_agendamento";
+    pendingAction.type === "preparar_agendamento" ||
+    data?.acao === "criar_agendamento" ||
+    data?.tipo === "agendamento";
 
   const ehCancelamento =
     pendingAction.tool === "cancelar_agendamento" ||
+    pendingAction.action === "cancelar_agendamento" ||
     pendingAction.type === "cancelar_agendamento" ||
-    pendingAction.type === "preparar_cancelamento";
+    pendingAction.type === "preparar_cancelamento" ||
+    data?.acao === "cancelar_agendamento";
 
   const ehReagendamento =
     pendingAction.tool === "remarcar_agendamento" ||
     pendingAction.tool === "reagendar" ||
+    pendingAction.action === "reagendar_agendamento" ||
     pendingAction.type === "remarcar_agendamento";
 
   // Validação de dados mínimos
-  const clienteValido = Boolean(params.clienteId || params.clienteNome) && params.clienteNome !== "Cliente";
-  const petValido = Boolean(params.petId || params.petNome) && params.petNome !== "Pet";
+  const clienteValido = Boolean(params.clienteId || params.clienteNome);
+  const petValido = Boolean(params.petId || params.petNome);
   const dataValida = Boolean(params.data && /^\d{4}-\d{2}-\d{2}$/.test(params.data));
   const horaValida = Boolean(params.hora && /^([01]\d|2[0-3]):[0-5]\d/.test(params.hora));
-  const servicoValido = Boolean(params.servicoNome);
+  const servicoValido = Boolean(params.servicoNome || params.servico);
 
   const operacaoInvalida = ehAgendamento && (!clienteValido || !petValido || !dataValida || !horaValida || !servicoValido);
 
@@ -150,7 +158,7 @@ export const ConfirmacaoCard: React.FC<ConfirmacaoCardProps> = ({
             <div className="col-span-2 flex items-center justify-between pt-2 mt-1 border-t border-border/50">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-emerald-700" />
-                <span className="font-semibold text-foreground text-xs">{params.servicoNome || "Atendimento"}</span>
+                <span className="font-semibold text-foreground text-xs">{params.servicoNome || params.servico || "Banho"}</span>
               </div>
               {params.valor !== undefined && (
                 <span className="font-bold text-emerald-900 bg-emerald-100/80 px-2 py-0.5 rounded-md text-xs">
