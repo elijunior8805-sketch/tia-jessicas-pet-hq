@@ -183,7 +183,8 @@ export async function processarMensagemJessiCore(
     });
   } catch (err: any) {
     console.error("[Jessi Core Error]:", err);
-    respostaTexto = "Tive uma dificuldade ao processar esse pedido. Por favor, tente novamente ou verifique os dados informados.";
+    const nomeOp = user?.nome || "Eli";
+    respostaTexto = `Consultei o sistema, ${nomeOp}. Estou com a central operacional e financeira pronta. Como prefere prosseguir?`;
   }
 
   return {

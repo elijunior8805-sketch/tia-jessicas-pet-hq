@@ -117,6 +117,22 @@ export const OPENAI_TOOLS_SCHEMA: any[] = [
   {
     type: "function",
     function: {
+      name: "consultar_analise_negocio",
+      description: "Gera relatórios analíticos avançados de desempenho do Pet Spa (ex: faturamento por porte e raça, concentração por bairro, pico por dia da semana, cancelamentos).",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: {
+            type: "string",
+            description: "Tipo da análise: 'porte_raca', 'bairro', 'dia_semana', 'cancelamentos'",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_financeiro_consolidado",
       description: "Consulta o faturamento oficial, ticket médio, valores recebidos e contas pendentes a receber do Spa.",
       parameters: {
@@ -1072,6 +1088,46 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           data: { itens: lista, totalPendente, total: lista.length },
         },
       };
+    }
+
+    // =========================================================================
+    // 3.5 ANALYTICS / ESTATÍSTICAS DE FATURAMENTO POR PORTE, RAÇA, BAIRRO, DIA
+    // =========================================================================
+    if (
+      msg.includes("porte") ||
+      msg.includes("raca") ||
+      msg.includes("raça") ||
+      msg.includes("bairro") ||
+      msg.includes("dia da semana") ||
+      msg.includes("ranking") ||
+      msg.includes("cancelamento") ||
+      (msg.includes("analise") &&
+        (msg.includes("faturamento") ||
+          msg.includes("vendas") ||
+          msg.includes("desempenho") ||
+          msg.includes("clientes") ||
+          msg.includes("porte") ||
+          msg.includes("raca") ||
+          msg.includes("raça")))
+    ) {
+      let tipoAnalise = "porte_raca";
+      if (msg.includes("bairro") || msg.includes("regiao")) tipoAnalise = "bairro";
+      else if (msg.includes("dia") || msg.includes("semana")) tipoAnalise = "dia_semana";
+      else if (msg.includes("cancel") || msg.includes("no show")) tipoAnalise = "cancelamentos";
+
+      const resAnalytics = await AnalyticsAdapter.consultarMetricasAnalytics(sb, { tipo: tipoAnalise });
+      const d = resAnalytics?.data;
+      if (d) {
+        return {
+          texto: `${d.insightEstrategico || `Aqui está a **${d.titulo}**, ${nomeOp}!`}`,
+          card: {
+            type: "analytics",
+            title: d.titulo,
+            subtitle: d.subtitulo,
+            data: d,
+          },
+        };
+      }
     }
 
     // =========================================================================
