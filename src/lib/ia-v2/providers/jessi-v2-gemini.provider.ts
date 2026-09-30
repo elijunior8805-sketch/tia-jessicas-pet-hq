@@ -16,6 +16,7 @@ import { JessiV2ContextState } from "../session/jessi-v2-session";
 import { JESSI_V2_SYSTEM_PROMPT } from "../config/jessi-v2-config";
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { AgendaAdapter } from "../adapters/agenda.adapter";
+import { ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
 
 /**
  * Provedor de IA Conversacional e Agente Autônomo com Tool Calling (Gemini 1.5 Flash / Lovable Gateway)
@@ -844,6 +845,44 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any } | null> {
     const msg = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     const nomeOp = operadorNome || "Eli";
+
+    // 0.0 Tratamento de Seleção Direta de ID [id:uuid] ou Opção de Desambiguação
+    const matchId = mensagemUsuario.match(/\[id:([a-f0-9-]+)\]/i);
+    if (matchId && matchId[1]) {
+      const idAlvo = matchId[1];
+      const resFichaCli = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, idAlvo);
+      if (resFichaCli.success && resFichaCli.data) {
+        const cli = resFichaCli.data;
+        const tel = cli.whatsapp || cli.telefone || "Não informado";
+        const petsCount = cli.pets?.length || 0;
+        return {
+          texto: `Aqui está a ficha completa de **${cli.nome}** (Tel: ${tel}, ${petsCount} pet(s))! Você pode agendar, consultar créditos ou enviar mensagem diretamente.`,
+          card: {
+            type: "cliente",
+            title: `Ficha de ${cli.nome}`,
+            subtitle: `Tel: ${tel} • ${petsCount} pet(s)`,
+            data: { ...cli, clientes: [cli] },
+          },
+          novoContexto: { cliente: { id: cli.id, nome: cli.nome, telefone: tel } },
+        };
+      }
+
+      const resFichaPet = await ClientesPetsAdapter.obterFichaPet(sb, idAlvo);
+      if (resFichaPet.success && resFichaPet.data) {
+        const pet = resFichaPet.data;
+        const tutor = pet.clientes?.nome || pet.tutor || "Tutor";
+        return {
+          texto: `Aqui está a ficha completa de **${pet.nome}** (${pet.raca || "Raça padrão"}, tutor: ${tutor})!`,
+          card: {
+            type: "pet",
+            title: `Ficha de ${pet.nome}`,
+            subtitle: `${pet.raca || "Raça padrão"} • Tutor: ${tutor}`,
+            data: pet,
+          },
+          novoContexto: { pet: { id: pet.id, nome: pet.nome, raca: pet.raca } },
+        };
+      }
+    }
 
     // 0. Saudações e Conversação Natural Humanizada
     if (

@@ -8,7 +8,7 @@ import {
 } from "../contracts/jessi-v2-contracts";
 import { JessiV2ContextState, criarSessaoV2 } from "../session/jessi-v2-session";
 import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
-import { normalizarTexto } from "../adapters/clientes-pets.adapter";
+import { normalizarTexto, ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
 import { humanizarRespostaParaVoz } from "@/lib/ia/ia-voz-conversational";
@@ -197,13 +197,20 @@ export async function processarMensagemJessiV2Core(
       };
     }
 
-    // 1.1 Tratamento de Seleção Direta de ID [id:uuid]
+    // 1.1 Tratamento de Seleção Direta de ID [id:uuid] ou Opção de Desambiguação
     const matchIdDireto = textoLimpo.match(/\[id:([a-f0-9-]+)\]/i);
+    const ehMensagemSelecaoPura =
+      /^(selecionar|escolher|abrir|ver)\s+(op[cç][aã]o\s+\d+:?\s*)?/i.test(textoLimpo.trim()) ||
+      /^\s*op[cç][aã]o\s+\d+/i.test(textoLimpo.trim()) ||
+      textoLimpo.replace(/\[id:[^\]]+\]/gi, "").replace(/selecionar\s+op[cç][aã]o\s+\d+:?/gi, "").trim().length <= 30;
+
     if (matchIdDireto && matchIdDireto[1]) {
       const idAlvo = matchIdDireto[1];
+
+      // Busca pet por ID
       const { data: petAlvo } = await sb
         .from("pets")
-        .select("id, nome, raca, porte, cliente_id, clientes(id, nome, whatsapp, telefone)")
+        .select("id, nome, raca, porte, peso, cuidados_saude, alergias, cliente_id, clientes(id, nome, whatsapp, telefone, rua, numero, bairro, cidade)")
         .eq("id", idAlvo)
         .maybeSingle();
 
@@ -221,10 +228,47 @@ export async function processarMensagemJessiV2Core(
             telefone: (petAlvo.clientes as any).whatsapp || (petAlvo.clientes as any).telefone,
           };
         }
+
+        // Se a mensagem for de seleção direta, retorna a ficha do pet imediatamente sem depender do LLM
+        if (ehMensagemSelecaoPura) {
+          const resFicha = await ClientesPetsAdapter.obterFichaPet(sb, petAlvo.id);
+          const tutorNome = (petAlvo.clientes as any)?.nome || "Tutor não informado";
+          const tutorTel = (petAlvo.clientes as any)?.whatsapp || (petAlvo.clientes as any)?.telefone || "";
+
+          const cardPet: JessiV2Card = {
+            type: "pet",
+            title: `Ficha de ${petAlvo.nome}`,
+            subtitle: `${petAlvo.raca || "Raça padrão"} • Tutor: ${tutorNome}`,
+            data: {
+              ...(resFicha.data || {}),
+              pet: petAlvo,
+              tutor: petAlvo.clientes,
+            },
+          };
+
+          const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
+          const respostaTexto = `Aqui está a ficha completa de **${petAlvo.nome}** (${petAlvo.raca || "Raça padrão"}), pet do tutor **${tutorNome}**${tutorTel ? ` (Tel: ${tutorTel})` : ""}. Todos os dados e histórico de atendimentos estão no card abaixo. O que você gostaria de fazer com o ${petAlvo.nome}?`;
+
+          return {
+            versao: "v2",
+            respostaTexto: ehCanalVoz
+              ? humanizarRespostaParaVoz(respostaTexto, [cardPet], input.modoBancada, user?.nome)
+              : respostaTexto,
+            cards: [cardPet],
+            pendingAction: null,
+            novoContexto: {
+              ...contextoAtual,
+              ...novoContexto,
+            },
+            tempoProcessamentoMs: Date.now() - inicioMs,
+            correlationId,
+          };
+        }
       } else {
+        // Busca cliente por ID
         const { data: clienteAlvo } = await sb
           .from("clientes")
-          .select("id, nome, whatsapp, telefone")
+          .select("id, nome, whatsapp, telefone, email, rua, numero, complemento, bairro, cidade, observacoes, pets(id, nome, raca, porte, peso)")
           .eq("id", idAlvo)
           .maybeSingle();
 
@@ -234,6 +278,47 @@ export async function processarMensagemJessiV2Core(
             nome: clienteAlvo.nome,
             telefone: clienteAlvo.whatsapp || clienteAlvo.telefone,
           };
+
+          // Se a mensagem for de seleção direta, retorna a ficha completa do cliente imediatamente
+          if (ehMensagemSelecaoPura) {
+            const resFicha = await ClientesPetsAdapter.obterFichaClienteCompleta(sb, clienteAlvo.id);
+            const petsCount = clienteAlvo.pets?.length || 0;
+            const petsLista = (clienteAlvo.pets || []).map((p: any) => `${p.nome}${p.raca ? ` (${p.raca})` : ""}`).join(", ");
+            const tel = clienteAlvo.whatsapp || clienteAlvo.telefone || "Não informado";
+
+            const cardCliente: JessiV2Card = {
+              type: "cliente",
+              title: `Ficha de ${clienteAlvo.nome}`,
+              subtitle: `Tel: ${tel} • ${petsCount} pet(s)`,
+              data: {
+                ...(resFicha.data || {}),
+                cliente: clienteAlvo,
+                clientes: [clienteAlvo],
+              },
+            };
+
+            const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
+            const respostaTexto = `Aqui está a ficha cadastral completa de **${clienteAlvo.nome}**!\n\n` +
+              `• **WhatsApp / Telefone:** ${tel}\n` +
+              `• **Pets vinculados (${petsCount}):** ${petsLista || "Nenhum pet cadastrado"}\n` +
+              `• **Endereço:** ${clienteAlvo.rua ? `${clienteAlvo.rua}${clienteAlvo.numero ? `, ${clienteAlvo.numero}` : ""} - ${clienteAlvo.bairro || ""}` : "Não informado"}\n\n` +
+              `Você pode agendar um serviço, consultar créditos ou enviar uma mensagem pelo WhatsApp diretamente pelos botões no card abaixo.`;
+
+            return {
+              versao: "v2",
+              respostaTexto: ehCanalVoz
+                ? humanizarRespostaParaVoz(respostaTexto, [cardCliente], input.modoBancada, user?.nome)
+                : respostaTexto,
+              cards: [cardCliente],
+              pendingAction: null,
+              novoContexto: {
+                ...contextoAtual,
+                ...novoContexto,
+              },
+              tempoProcessamentoMs: Date.now() - inicioMs,
+              correlationId,
+            };
+          }
         }
       }
     }
