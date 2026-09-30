@@ -189,6 +189,26 @@ export class AgendaAdapter {
   }
 
   /**
+   * Alias de conveniência para consultar agenda por data
+   */
+  static async consultarAgenda(
+    sb: SupabaseClient<Database>,
+    data: string
+  ): Promise<JessiV2QueryResult> {
+    return this.consultarAgendaPorData(sb, data);
+  }
+
+  /**
+   * Alias de conveniência para consultar horários livres
+   */
+  static async consultarHorariosLivres(
+    sb: SupabaseClient<Database>,
+    data: string
+  ): Promise<JessiV2QueryResult<{ gradeOcupada: string[]; horariosSugeridos: string[] }>> {
+    return this.identificarEncaixesDisponiveis(sb, data);
+  }
+
+  /**
    * Identifica lacunas e horários de encaixe disponíveis na grade do dia (Seção 15)
    */
   static async identificarEncaixesDisponiveis(

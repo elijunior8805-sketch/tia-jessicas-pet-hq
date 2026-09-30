@@ -1192,16 +1192,23 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
       msg.includes("horarios livres") ||
       msg.includes("horario livre") ||
       msg.includes("horarios disponiveis") ||
+      msg.includes("horario disponivel") ||
       msg.includes("vagas") ||
       msg.includes("tem vaga") ||
-      msg.includes("encaixe")
+      msg.includes("tem horario") ||
+      msg.includes("tem horário") ||
+      msg.includes("encaixe") ||
+      (msg.includes("vaga") && !msg.includes("garagem"))
     ) {
       const dataAlvo = msg.includes("amanha")
         ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000))
         : hojeStr;
 
       const resVagas = await AgendaAdapter.consultarHorariosLivres(sb, dataAlvo);
-      const vagas = resVagas?.data || [];
+      const dVagas = resVagas?.data;
+      const vagas: string[] = Array.isArray(dVagas)
+        ? dVagas
+        : dVagas?.horariosSugeridos || (dVagas as any)?.vagas || [];
       const diaLabel = dataAlvo === hojeStr ? "hoje" : "amanhã";
 
       if (vagas.length === 0) {
@@ -1211,7 +1218,14 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
             type: "agenda",
             title: `Vagas Esgotadas (${diaLabel.toUpperCase()})`,
             subtitle: `Data: ${dataAlvo}`,
-            data: { vagas: [], total: 0 },
+            data: {
+              tipo: "disponibilidade",
+              data: dataAlvo,
+              vagas_disponiveis: [],
+              vagas: [],
+              horariosSugeridos: [],
+              total: 0,
+            },
           },
         };
       }
@@ -1223,7 +1237,16 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
           type: "agenda",
           title: `Horários Livres (${vagas.length} vagas)`,
           subtitle: `Data: ${dataAlvo}`,
-          data: { vagas, total: vagas.length },
+          data: {
+            tipo: "disponibilidade",
+            data: dataAlvo,
+            vagas_disponiveis: vagas,
+            vagas,
+            horariosSugeridos: vagas,
+            manha: vagas.filter((s: string) => parseInt(s.split(":")[0], 10) < 12),
+            tarde: vagas.filter((s: string) => parseInt(s.split(":")[0], 10) >= 12),
+            total: vagas.length,
+          },
         },
       };
     }
@@ -1650,12 +1673,21 @@ ATENÇÃO: "cartão de crédito", "crédito", "link de pagamento" ou "pix" refer
         break;
       }
       case "consultar_horarios_disponiveis": {
-        const vagas = data?.horariosSugeridos || data?.vagas || [];
+        const dVagas = data?.horariosSugeridos || (Array.isArray(data) ? data : (data as any)?.vagas || []);
         cards.push({
           type: "agenda",
-          title: `Vagas Disponíveis (${vagas.length})`,
-          subtitle: toolArgs.data || "Grade de hoje",
-          data,
+          title: `Vagas Disponíveis (${dVagas.length})`,
+          subtitle: toolArgs?.data || "Grade de hoje",
+          data: {
+            tipo: "disponibilidade",
+            data: toolArgs?.data || "Hoje",
+            vagas_disponiveis: dVagas,
+            vagas: dVagas,
+            horariosSugeridos: dVagas,
+            manha: dVagas.filter((s: string) => parseInt(s.split(":")[0], 10) < 12),
+            tarde: dVagas.filter((s: string) => parseInt(s.split(":")[0], 10) >= 12),
+            total: dVagas.length,
+          },
         });
         break;
       }

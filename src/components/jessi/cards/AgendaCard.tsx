@@ -56,8 +56,8 @@ export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) =
   }
 
   // Tratamento de Disponibilidade de Horários Livres
-  if (data?.tipo === "disponibilidade" || Array.isArray(data?.vagas_disponiveis)) {
-    const vagas: string[] = data?.vagas_disponiveis || [];
+  if (data?.tipo === "disponibilidade" || Array.isArray(data?.vagas_disponiveis) || Array.isArray(data?.vagas) || Array.isArray(data?.horariosSugeridos)) {
+    const vagas: string[] = data?.vagas_disponiveis || data?.vagas || data?.horariosSugeridos || [];
     const manha = data?.manha || vagas.filter((s: string) => parseInt(s.split(":")[0], 10) < 12);
     const tarde = data?.tarde || vagas.filter((s: string) => parseInt(s.split(":")[0], 10) >= 12);
     const dataRef = data?.data || "hoje";
