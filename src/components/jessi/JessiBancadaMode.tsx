@@ -395,10 +395,10 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => onSendMessage("Gerar cobrança Pix de R$ 50")}
+            onClick={() => onSendMessage("Consultar pagamentos pendentes dos clientes")}
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition-all text-white/90 text-[11px] sm:text-xs truncate cursor-pointer"
           >
-            🗣️ &ldquo;Gerar Pix de R$ 50&rdquo;
+            🗣️ &ldquo;Pagamentos pendentes&rdquo;
           </button>
           <button
             type="button"

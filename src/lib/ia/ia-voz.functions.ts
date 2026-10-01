@@ -40,7 +40,6 @@ export const salvarTranscricaoIA = createServerFn({ method: "POST" })
  * Server Function para gerar áudio neural ultra-humanizado da Jessi sob demanda
  */
 export const gerarAudioNeuralJessiFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: any) =>
     z.object({
       texto: z.string(),

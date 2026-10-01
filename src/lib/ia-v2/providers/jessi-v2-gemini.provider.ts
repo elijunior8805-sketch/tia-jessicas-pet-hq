@@ -1977,7 +1977,7 @@ DIRETRIZES DE AUTONOMIA E TOOL CALLING:
 
     // Guia inteligente quando o termo não é um cadastro específico
     return {
-      texto: `Entendido, ${nomeOp}! Estou pronta para te apoiar. Você pode me pedir:\n\n• **"Agenda de hoje"** ou **"Próximo pet"**\n• **"Quanto faturamos este mês?"** ou **"Pagamentos em aberto"**\n• **"Gerar Pix de R$ 80"** ou **"Horários livres de amanhã"**\n• **"Clientes inativos"** ou o nome de qualquer cliente/pet.`,
+      texto: `Entendido, ${nomeOp}! Estou pronta para te apoiar. Você pode me pedir:\n\n• **"Como está a agenda de hoje?"** ou **"Próximos pets para atendimento"**\n• **"Horários livres para amanhã"** ou **"Lembretes de confirmação"**\n• **"Resumo do faturamento deste mês"** ou **"Pagamentos pendentes dos clientes"**\n• **"Clientes sumidos para reativar"** ou o nome de qualquer tutor/pet.`,
     };
   }
 

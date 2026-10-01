@@ -1,9 +1,9 @@
 import { humanizarTextoParaVoz } from "./ia-voz-tts";
 
 /**
- * Síntese de Áudio Neural de Alta Fidelidade com Multi-Provedor
- * 1. Microsoft Edge Neural Cloud (pt-BR-FranciscaNeural / 24kHz HD) - Som de estúdio humano gratuito
- * 2. Google Cloud Neural2 (pt-BR-Neural2-A)
+ * Síntese de Áudio Neural de Alta Fidelidade com Multi-Provedor no Servidor
+ * 1. Microsoft Edge Neural Cloud (pt-BR-FranciscaNeural / 24kHz HD) - Áudio de Estúdio
+ * 2. Google Cloud Neural / Public Cloud TTS (Voz fluida em português)
  * 3. OpenAI TTS (Nova / tts-1)
  */
 
@@ -17,7 +17,7 @@ async function sintetizarEdgeNeural(texto: string): Promise<string | null> {
       }
 
       const connectionId = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-      const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readahead/edge/v1?TrustedClientToken=6A5AA1D4EA654972A3445493572D69A6&ConnectionId=${connectionId}`;
+      const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readahead/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${connectionId}`;
 
       const ws = new WebSocketConstructor(wsUrl);
       const audioChunks: Buffer[] = [];
@@ -59,7 +59,7 @@ async function sintetizarEdgeNeural(texto: string): Promise<string | null> {
         const ssml =
           `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='pt-BR'>` +
           `<voice name='pt-BR-FranciscaNeural'>` +
-          `<prosody pitch='+1Hz' rate='+2%' volume='+0%'>${textoEscapado}</prosody>` +
+          `<prosody pitch='+0Hz' rate='+1%' volume='+0%'>${textoEscapado}</prosody>` +
           `</voice></speak>`;
 
         const ssmlMsg =
@@ -111,7 +111,7 @@ async function sintetizarEdgeNeural(texto: string): Promise<string | null> {
               }
             }
           } catch (e) {
-            console.warn("[Edge TTS] Erro ao extrair áudio binário:", e);
+            console.warn("[Edge TTS Server] Erro ao extrair áudio binário:", e);
           }
         }
       };
@@ -140,53 +140,44 @@ async function sintetizarEdgeNeural(texto: string): Promise<string | null> {
         }
       };
     } catch (err) {
-      console.warn("[Edge TTS] Erro de inicialização:", err);
+      console.warn("[Edge TTS Server] Erro de inicialização:", err);
       resolve(null);
     }
   });
 }
 
-async function sintetizarGoogleNeural(texto: string): Promise<string | null> {
-  const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_AI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_GEMINI_API_KEY);
-
-  if (!apiKey) return null;
-
+/**
+ * Fallback via serviço de áudio Google TTS em nuvem com split de texto
+ */
+async function sintetizarGoogleCloudPublico(texto: string): Promise<string | null> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
+    const sentencas = texto.match(/[^.!?]+[.!?]+/g) || [texto];
+    const buffers: Buffer[] = [];
 
-    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        input: { text: texto },
-        voice: {
-          languageCode: "pt-BR",
-          name: "pt-BR-Neural2-A",
-          ssmlGender: "FEMALE",
+    for (const s of sentencas.slice(0, 4)) {
+      const trecho = s.trim();
+      if (!trecho) continue;
+
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(trecho)}&tl=pt-BR&total=1&idx=0&textlen=${trecho.length}&client=tw-ob`;
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         },
-        audioConfig: {
-          audioEncoding: "MP3",
-          speakingRate: 1.02,
-          pitch: 0.5,
-        },
-      }),
-      signal: controller.signal,
-    });
+      });
 
-    clearTimeout(timeout);
-    if (!res.ok) return null;
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        buffers.push(Buffer.from(arrayBuf));
+      }
+    }
 
-    const data: any = await res.json();
-    if (data?.audioContent) {
-      return `data:audio/mp3;base64,${data.audioContent}`;
+    if (buffers.length > 0) {
+      const fullBuffer = Buffer.concat(buffers);
+      return `data:audio/mp3;base64,${fullBuffer.toString("base64")}`;
     }
     return null;
-  } catch {
+  } catch (err) {
+    console.warn("[Google TTS Server Fallback Error]:", err);
     return null;
   }
 }
@@ -244,15 +235,15 @@ export async function sintetizarAudioNeural(texto: string): Promise<string | nul
     console.warn("[TTS Server] Edge Neural falhou:", err);
   }
 
-  // 2. Tenta Google Cloud Neural2 (pt-BR-Neural2-A)
+  // 2. Tenta Google Cloud TTS Público (MP3 em tempo real)
   try {
-    const audioGoogle = await sintetizarGoogleNeural(textoLimpo);
+    const audioGoogle = await sintetizarGoogleCloudPublico(textoLimpo);
     if (audioGoogle) return audioGoogle;
   } catch (err) {
-    console.warn("[TTS Server] Google Cloud falhou:", err);
+    console.warn("[TTS Server] Google TTS falhou:", err);
   }
 
-  // 3. Tenta OpenAI Neural TTS (Nova)
+  // 3. Tenta OpenAI Neural TTS (Nova) se houver chave configurada
   try {
     const audioOpenAI = await sintetizarOpenAINeural(textoLimpo);
     if (audioOpenAI) return audioOpenAI;
