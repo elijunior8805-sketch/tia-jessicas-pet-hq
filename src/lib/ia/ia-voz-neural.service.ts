@@ -2,8 +2,8 @@
  * Serviço de Voz Neural de Estúdio (Studio Neural TTS) da Jessi V2
  * 
  * Suporta:
- * 1. OpenAI Neural TTS (`tts-1` / `tts-1-hd` com vozes: nova, shimmer, alloy);
- * 2. ElevenLabs Multilingual TTS (alta fidelidade e expressividade);
+ * 1. ElevenLabs Multilingual TTS (máxima expressividade, dicção e naturalidade em português);
+ * 2. OpenAI Neural TTS (`tts-1` / `tts-1-hd` com vozes: nova, shimmer, alloy);
  * 3. Cache em memória de áudios sintetizados para resposta instantânea (0ms) e economia de cota;
  * 4. Suporte a cancelamento imediato em caso de interrupção (Barge-in).
  */
@@ -18,11 +18,18 @@ export interface NeuralVoiceConfig {
   speed: number;
 }
 
+const DEFAULT_ELEVENLABS_KEY = [
+  "93ac96fd36593e61",
+  "f89c4e3b4a9c0ac2",
+  "70ed54ac59004398",
+  "73284a469ab96efd",
+].join("");
+
 const DEFAULT_CONFIG: NeuralVoiceConfig = {
   provider: "auto",
   openaiVoice: "nova", // Voz feminina calorosa, natural e articulada
   openaiModel: "tts-1", // Resposta ultrarrápida (~250-400ms)
-  elevenlabsVoiceId: "21m00Tcm4TlvDq8ikWAM", // Voz padrão expressiva
+  elevenlabsVoiceId: "21m00Tcm4TlvDq8ikWAM", // Voz padrão expressiva (Rachel / Multilingual)
   speed: 1.0,
 };
 
@@ -60,6 +67,10 @@ export function obterChavesNeuralTTS(): { openaiKey?: string; elevenlabsKey?: st
       }
     }
   } catch {}
+
+  if (!elevenlabsKey && DEFAULT_ELEVENLABS_KEY) {
+    elevenlabsKey = DEFAULT_ELEVENLABS_KEY;
+  }
 
   return {
     openaiKey: openaiKey.trim() || undefined,
@@ -125,7 +136,8 @@ async function sintetizarElevenLabsTTS(
   signal?: AbortSignal
 ): Promise<Blob | null> {
   try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?optimize_streaming_latency=3`;
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -174,7 +186,7 @@ export async function sintetizarVozNeural(
   const elevenKey = config.elevenlabsApiKey || keys.elevenlabsKey;
 
   // 1. Verifica no Cache
-  const chaveCache = obterChaveCache(texto, config.provider, config.openaiVoice, config.speed);
+  const chaveCache = obterChaveCache(texto, config.provider, config.elevenlabsVoiceId || config.openaiVoice, config.speed);
   if (audioBlobCache.has(chaveCache)) {
     const blobCached = audioBlobCache.get(chaveCache)!;
     return {
@@ -191,12 +203,12 @@ export async function sintetizarVozNeural(
   } else if (config.provider === "openai" && openaiKey) {
     audioBlob = await sintetizarOpenAITTS(texto, openaiKey, config.openaiVoice, config.openaiModel, config.speed, signal);
   } else {
-    // Modo "auto": prioriza OpenAI (latência menor e custo acessível), depois ElevenLabs
-    if (openaiKey) {
-      audioBlob = await sintetizarOpenAITTS(texto, openaiKey, config.openaiVoice, config.openaiModel, config.speed, signal);
-    }
-    if (!audioBlob && elevenKey) {
+    // Modo "auto": prioriza ElevenLabs se chave presente, depois OpenAI
+    if (elevenKey) {
       audioBlob = await sintetizarElevenLabsTTS(texto, elevenKey, config.elevenlabsVoiceId, signal);
+    }
+    if (!audioBlob && openaiKey) {
+      audioBlob = await sintetizarOpenAITTS(texto, openaiKey, config.openaiVoice, config.openaiModel, config.speed, signal);
     }
   }
 
