@@ -169,8 +169,19 @@ async function chamadaUnica(
   const timer = setTimeout(() => controller.abort(), Math.max(5000, p.config.timeout_ms));
 
   try {
+    let endpoint = GATEWAY;
+    let modeloFinal = modelo;
+
+    if (apiKey.startsWith("gsk_")) {
+      endpoint = "https://api.groq.com/openai/v1/chat/completions";
+      modeloFinal = "openai/gpt-oss-120b";
+    } else if (apiKey.startsWith("AIzaSy")) {
+      endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+      modeloFinal = "gemini-1.5-flash";
+    }
+
     const body: Record<string, unknown> = {
-      model: modelo,
+      model: modeloFinal,
       temperature: p.temperatura ?? p.config.criatividade,
       messages: [
         { role: "system", content: p.system },
@@ -182,7 +193,7 @@ async function chamadaUnica(
     };
     if (p.json) body["response_format"] = { type: "json_object" };
 
-    const res = await fetch(GATEWAY, {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
