@@ -272,7 +272,7 @@ export function useJessiVoice(
     }
 
     recognizerRef.current = new VoiceRecognizer({
-      silenceMs: 2500,
+      silenceMs: 1200,
       onFinal: (texto) => {
         if (isSpeakingRef.current || (Date.now() - lastSpeakingEndTimeRef.current < 300)) return;
         const humanizado = humanizarTranscricao(texto);

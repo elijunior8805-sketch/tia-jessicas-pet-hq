@@ -31,11 +31,11 @@ import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_CONFIG = {
-  TIMEOUT_MS: 15000,
-  MAX_RETRIES: 2,
+  TIMEOUT_MS: 4000,
+  MAX_RETRIES: 1,
   MODEL: "google/gemini-1.5-flash",
-  GROQ_MODEL: "openai/gpt-oss-120b",
-  GROQ_FALLBACK_MODELS: ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"],
+  GROQ_MODEL: "llama-3.3-70b-versatile",
+  GROQ_FALLBACK_MODELS: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
   DIRECT_ENDPOINT_BASE: "https://generativelanguage.googleapis.com/v1beta/models",
 };
 
@@ -636,6 +636,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
         if (!resp.ok) {
           const errBody = await resp.text().catch(() => "");
+          if (resp.status === 401 || resp.status === 403 || resp.status === 404 || resp.status === 429) {
+            throw new Error(`Fatal HTTP ${resp.status}: ${errBody.slice(0, 80)}`);
+          }
           throw new Error(`HTTP ${resp.status}: ${errBody.slice(0, 120)}`);
         }
 
@@ -651,13 +654,16 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         };
       } catch (err: any) {
         clearTimeout(timer);
+        if (err?.message?.startsWith("Fatal HTTP")) {
+          throw err;
+        }
         console.warn(`[JessiV2] Tentativa com modelo ${modeloAtual} falhou:`, err?.message || err);
         if (tentativa >= modelosParaTentar.length - 1) throw err;
-        await new Promise((res) => setTimeout(res, 200));
+        await new Promise((res) => setTimeout(res, 100));
       }
     }
 
-    throw new Error("Falha na comunicação com o provedor de IA após retentativas.");
+    throw new Error("Falha na comunicação com o provedor de IA.");
   }
 
   /**
