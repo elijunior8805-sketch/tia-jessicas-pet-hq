@@ -9,6 +9,50 @@
  */
 
 /**
+ * Converte um número inteiro (0 a 999.999.999) para texto por extenso em Português do Brasil.
+ */
+export function numeroPorExtensoPtBr(n: number): string {
+  if (isNaN(n)) return "";
+  if (n === 0) return "zero";
+  if (n < 0) return `menos ${numeroPorExtensoPtBr(Math.abs(n))}`;
+
+  const unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+  const especiais = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+  const dezenas = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+  const centenas = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+
+  if (n < 10) return unidades[n];
+  if (n >= 10 && n < 20) return especiais[n - 10];
+  if (n >= 20 && n < 100) {
+    const d = Math.floor(n / 10);
+    const u = n % 10;
+    return u === 0 ? dezenas[d] : `${dezenas[d]} e ${unidades[u]}`;
+  }
+  if (n === 100) return "cem";
+  if (n > 100 && n < 1000) {
+    const c = Math.floor(n / 100);
+    const resto = n % 100;
+    return resto === 0 ? centenas[c] : `${centenas[c]} e ${numeroPorExtensoPtBr(resto)}`;
+  }
+  if (n >= 1000 && n < 1000000) {
+    const mil = Math.floor(n / 1000);
+    const resto = n % 1000;
+    const prefixo = mil === 1 ? "mil" : `${numeroPorExtensoPtBr(mil)} mil`;
+    if (resto === 0) return prefixo;
+    if (resto < 100 || resto % 100 === 0) return `${prefixo} e ${numeroPorExtensoPtBr(resto)}`;
+    return `${prefixo}, ${numeroPorExtensoPtBr(resto)}`;
+  }
+  if (n >= 1000000 && n < 1000000000) {
+    const milhao = Math.floor(n / 1000000);
+    const resto = n % 1000000;
+    const sufixo = milhao === 1 ? "um milhão" : `${numeroPorExtensoPtBr(milhao)} milhões`;
+    if (resto === 0) return sufixo;
+    return `${sufixo} e ${numeroPorExtensoPtBr(resto)}`;
+  }
+  return String(n);
+}
+
+/**
  * Normaliza o texto cru da IA para uma leitura fonética e conversacional 100% natural em pt-BR.
  */
 export function humanizarTextoParaVoz(texto: string): string {
@@ -42,35 +86,85 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\n[•*\-–—]\s+/g, ", ");
   t = t.replace(/\n\d+\.\s+/g, ", ");
 
-  // 5. Normalização de Moeda (R$ 75,00 -> 75 reais / R$ 1.500,00 -> 1.500 reais)
+  // 5. Normalização de Moeda (R$ 75,00 -> setenta e cinco reais / R$ 1.500,00 -> mil e quinhentos reais)
   t = t.replace(/R\$\s*(\d+(?:\.\d{3})*),(\d{2})/gi, (_, inteiros, centavos) => {
-    const valLimpo = inteiros.replace(/\./g, "");
-    if (centavos === "00") {
-      return `${valLimpo} reais`;
+    const numLimpo = parseInt(inteiros.replace(/\./g, ""), 10);
+    const numExtenso = numeroPorExtensoPtBr(numLimpo);
+    const centavosNum = parseInt(centavos, 10);
+    if (centavosNum === 0) {
+      return `${numExtenso} reais`;
     }
-    return `${valLimpo} reais e ${parseInt(centavos, 10)} centavos`;
+    const centExtenso = numeroPorExtensoPtBr(centavosNum);
+    return `${numExtenso} reais e ${centExtenso} centavos`;
   });
   t = t.replace(/R\$\s*(\d+(?:\.\d{3})*)/gi, (_, val) => {
-    return `${val.replace(/\./g, "")} reais`;
+    const numLimpo = parseInt(val.replace(/\./g, ""), 10);
+    return `${numeroPorExtensoPtBr(numLimpo)} reais`;
   });
 
-  // 6. Normalização de Horários e Períodos do Dia
-  t = t.replace(/\b0?([0-9]|1[01]):00\b/g, "$1 da manhã");
-  t = t.replace(/\b0?([0-9]|1[01]):30\b/g, "$1 e meia da manhã");
-  t = t.replace(/\b12:00\b/g, "meio-dia");
-  t = t.replace(/\b12:30\b/g, "meio-dia e meia");
-  t = t.replace(/\b(1[3-9]|2[0-3]):00\b/g, (_, h) => `${parseInt(h, 10) - 12} da tarde`);
-  t = t.replace(/\b(1[3-9]|2[0-3]):30\b/g, (_, h) => `${parseInt(h, 10) - 12} e meia da tarde`);
-  t = t.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, "$1 e $2");
+  // 6. Normalização de Datas ISO (YYYY-MM-DD -> dia de mês de ano)
+  const meses = [
+    "", "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+  ];
+  t = t.replace(/\b(\d{4})-(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])\b/g, (_, ano, mes, dia) => {
+    const nomeMes = meses[parseInt(mes, 10)];
+    const diaExt = numeroPorExtensoPtBr(parseInt(dia, 10));
+    const anoExt = numeroPorExtensoPtBr(parseInt(ano, 10));
+    return `${diaExt} de ${nomeMes} de ${anoExt}`;
+  });
 
-  t = t.replace(/\b0?([0-9]|1[01])h00\b/gi, "$1 da manhã");
-  t = t.replace(/\b0?([0-9]|1[01])h30\b/gi, "$1 e meia da manhã");
-  t = t.replace(/\b(1[3-9]|2[0-3])h00\b/gi, (_, h) => `${parseInt(h, 10) - 12} da tarde`);
-  t = t.replace(/\b(1[3-9]|2[0-3])h30\b/gi, (_, h) => `${parseInt(h, 10) - 12} e meia da tarde`);
-  t = t.replace(/\b([01]?\d|2[0-3])h([0-5]\d)\b/gi, "$1 e $2");
-  t = t.replace(/\b([01]?\d|2[0-3])h\b/gi, "$1 horas");
+  // 7. Normalização de Datas com barras (10/10/2026 ou 10/10)
+  t = t.replace(/\b(0?[1-9]|[12]\d|3[01])\/(0?[1-9]|1[0-2])(?:\/(\d{2,4}))?\b/g, (_, dia, mes, ano) => {
+    const nomeMes = meses[parseInt(mes, 10)];
+    const diaExt = numeroPorExtensoPtBr(parseInt(dia, 10));
+    if (ano) {
+      const anoNum = ano.length === 2 ? parseInt(`20${ano}`, 10) : parseInt(ano, 10);
+      return `${diaExt} de ${nomeMes} de ${numeroPorExtensoPtBr(anoNum)}`;
+    }
+    return `${diaExt} de ${nomeMes}`;
+  });
 
-  // 7. Normalização de Raças de Cães para Fonética Perfeita em Português
+  // 8. Normalização de Horários e Períodos do Dia (10:00 -> dez da manhã / 14:00 -> duas da tarde)
+  t = t.replace(/\b0?([0-9]|1[01]):00(?::00)?\b/g, (_, h) => `${numeroPorExtensoPtBr(parseInt(h, 10))} da manhã`);
+  t = t.replace(/\b0?([0-9]|1[01]):30(?::00)?\b/g, (_, h) => `${numeroPorExtensoPtBr(parseInt(h, 10))} e meia da manhã`);
+  t = t.replace(/\b12:00(?::00)?\b/g, "meio-dia");
+  t = t.replace(/\b12:30(?::00)?\b/g, "meio-dia e meia");
+  t = t.replace(/\b00:00(?::00)?\b/g, "meia-noite");
+  t = t.replace(/\b(1[3-9]|2[0-3]):00(?::00)?\b/g, (_, h) => {
+    const h12 = parseInt(h, 10) - 12;
+    const hLabel = h12 === 1 ? "uma" : h12 === 2 ? "duas" : numeroPorExtensoPtBr(h12);
+    const periodo = parseInt(h, 10) >= 18 ? "da noite" : "da tarde";
+    return `${hLabel} ${periodo}`;
+  });
+  t = t.replace(/\b(1[3-9]|2[0-3]):30(?::00)?\b/g, (_, h) => {
+    const h12 = parseInt(h, 10) - 12;
+    const hLabel = h12 === 1 ? "uma" : h12 === 2 ? "duas" : numeroPorExtensoPtBr(h12);
+    const periodo = parseInt(h, 10) >= 18 ? "da noite" : "da tarde";
+    return `${hLabel} e meia ${periodo}`;
+  });
+  t = t.replace(/\b([01]?\d|2[0-3]):([0-5]\d)(?::00)?\b/g, (_, h, m) => {
+    return `${numeroPorExtensoPtBr(parseInt(h, 10))} e ${numeroPorExtensoPtBr(parseInt(m, 10))}`;
+  });
+
+  t = t.replace(/\b0?([0-9]|1[01])h00\b/gi, (_, h) => `${numeroPorExtensoPtBr(parseInt(h, 10))} da manhã`);
+  t = t.replace(/\b0?([0-9]|1[01])h30\b/gi, (_, h) => `${numeroPorExtensoPtBr(parseInt(h, 10))} e meia da manhã`);
+  t = t.replace(/\b(1[3-9]|2[0-3])h00\b/gi, (_, h) => {
+    const h12 = parseInt(h, 10) - 12;
+    const hLabel = h12 === 1 ? "uma" : h12 === 2 ? "duas" : numeroPorExtensoPtBr(h12);
+    const periodo = parseInt(h, 10) >= 18 ? "da noite" : "da tarde";
+    return `${hLabel} ${periodo}`;
+  });
+  t = t.replace(/\b(1[3-9]|2[0-3])h30\b/gi, (_, h) => {
+    const h12 = parseInt(h, 10) - 12;
+    const hLabel = h12 === 1 ? "uma" : h12 === 2 ? "duas" : numeroPorExtensoPtBr(h12);
+    const periodo = parseInt(h, 10) >= 18 ? "da noite" : "da tarde";
+    return `${hLabel} e meia ${periodo}`;
+  });
+  t = t.replace(/\b([01]?\d|2[0-3])h([0-5]\d)\b/gi, (_, h, m) => `${numeroPorExtensoPtBr(parseInt(h, 10))} e ${numeroPorExtensoPtBr(parseInt(m, 10))}`);
+  t = t.replace(/\b([01]?\d|2[0-3])h\b/gi, (_, h) => `${numeroPorExtensoPtBr(parseInt(h, 10))} horas`);
+
+  // 9. Normalização de Raças de Cães para Fonética Perfeita em Português
   t = t.replace(/\bshih\s*tzu\b|\bshihtzu\b/gi, "chitzu");
   t = t.replace(/\byorkshire\b|\byorkie\b/gi, "iorquechaire");
   t = t.replace(/\bpoodle\b|\bpudle\b/gi, "púdou");
@@ -87,23 +181,9 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\bbeagle\b/gi, "bígou");
   t = t.replace(/\bmalt[eê]s\b/gi, "maltês");
 
-  // 8. Normalização de Datas em português (12/09 -> 12 de setembro)
-  const meses = [
-    "", "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
-  ];
-  t = t.replace(/\b(0?[1-9]|[12]\d|3[01])\/(0?[1-9]|1[0-2])(?:\/(\d{4}))?\b/g, (_, dia, mes, ano) => {
-    const nomeMes = meses[parseInt(mes, 10)];
-    const diaNum = parseInt(dia, 10);
-    if (ano) {
-      return `${diaNum} de ${nomeMes} de ${ano}`;
-    }
-    return `${diaNum} de ${nomeMes}`;
-  });
-
-  // 9. Normalização de Abreviações Comuns e Termos
+  // 10. Normalização de Abreviações Comuns e Termos
   t = t.replace(/\bbanho simples\b/gi, "banho essencial");
-  t = t.replace(/(\d+)%/g, "$1 por cento");
+  t = t.replace(/(\d+)%/g, (_, num) => `${numeroPorExtensoPtBr(parseInt(num, 10))} por cento`);
   t = t.replace(/\bDr\.\s*/gi, "Doutor ");
   t = t.replace(/\bDra\.\s*/gi, "Doutora ");
   t = t.replace(/\bSr\.\s*/gi, "Senhor ");
@@ -118,29 +198,39 @@ export function humanizarTextoParaVoz(texto: string): string {
   t = t.replace(/\bvenc:\s*/gi, "vencimento em ");
   t = t.replace(/\bwhats\b|\bzap\b/gi, "WhatsApp");
 
-  // 10. Telefones: insere vírgulas para leitura pausada
+  // 11. Telefones: insere vírgulas para leitura pausada
   t = t.replace(/\(?(\d{2})\)?\s*(\d{4,5})[-.\s]?(\d{4})/g, "$1, $2, $3");
 
-  // 11. Limpeza de pontuação excessiva
+  // 12. Unidades e símbolos comuns para leitura natural
+  t = t.replace(/\bn[º°.]\s*(\d+)/gi, (_, n) => `número ${numeroPorExtensoPtBr(parseInt(n, 10))}`);
+  t = t.replace(/\b(\d+)\s?kg\b/gi, (_, n) => `${numeroPorExtensoPtBr(parseInt(n, 10))} quilos`);
+  t = t.replace(/\b(\d+)\s?km\b/gi, (_, n) => `${numeroPorExtensoPtBr(parseInt(n, 10))} quilômetros`);
+  t = t.replace(/\b(\d+)\s?ml\b/gi, (_, n) => `${numeroPorExtensoPtBr(parseInt(n, 10))} mililitros`);
+  t = t.replace(/\b(\d+)\s?min\b/gi, (_, n) => `${numeroPorExtensoPtBr(parseInt(n, 10))} minutos`);
+  t = t.replace(/(\d+)\s*x\s*(\d+)/gi, (_, a, b) => `${numeroPorExtensoPtBr(parseInt(a, 10))} vezes ${numeroPorExtensoPtBr(parseInt(b, 10))}`);
+
+  // 13. Converte TODOS os números inteiros isolados restantes para palavras por extenso!
+  // (Ex: "10 atendimentos" -> "dez atendimentos", "dia 1" -> "dia um")
+  t = t.replace(/\b\d+\b/g, (digitos) => {
+    const num = parseInt(digitos, 10);
+    if (!isNaN(num) && num >= 0 && num < 1000000) {
+      return numeroPorExtensoPtBr(num);
+    }
+    return digitos;
+  });
+
+  // 14. Limpeza de pontuação excessiva
   t = t.replace(/\.{2,}/g, ", ");
   t = t.replace(/!{2,}/g, "!");
   t = t.replace(/\?{2,}/g, "?");
   t = t.replace(/[:;]\s*$/g, ".");
   t = t.replace(/[:;]\s*\n/g, ".\n");
 
-  // 12. Unidades e símbolos comuns para leitura natural
-  t = t.replace(/\bn[º°.]\s*/gi, "número ");
-  t = t.replace(/\b(\d+)\s?kg\b/gi, "$1 quilos");
-  t = t.replace(/\b(\d+)\s?km\b/gi, "$1 quilômetros");
-  t = t.replace(/\b(\d+)\s?ml\b/gi, "$1 mililitros");
-  t = t.replace(/\b(\d+)\s?min\b/gi, "$1 minutos");
-  t = t.replace(/(\d+)\s*x\s*(\d+)/gi, "$1 vezes $2");
-
-  // 13. Remove quebras de linha desnecessárias e múltiplos espaços
+  // 15. Remove quebras de linha desnecessárias e múltiplos espaços
   t = t.replace(/\n+/g, ". ");
   t = t.replace(/\s+/g, " ").trim();
 
-  // 14. Pontuação final e limpeza de duplicidades
+  // 16. Pontuação final e limpeza de duplicidades
   t = t.replace(/\s+([.,!?])/g, "$1");
   t = t.replace(/([.!?])\s*\1+/g, "$1");
   t = t.replace(/,\s*,+/g, ",");
