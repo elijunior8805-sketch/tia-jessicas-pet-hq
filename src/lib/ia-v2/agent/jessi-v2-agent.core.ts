@@ -181,14 +181,9 @@ export async function processarMensagemJessiV2Core(
         registroAfetadoId: recordIdReal,
       });
 
-      const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
-      const respostaFinal = ehCanalVoz
-        ? humanizarRespostaParaVoz(respostaTexto, cards, input.modoBancada, user?.nome)
-        : respostaTexto;
-
       return {
         versao: "v2",
-        respostaTexto: respostaFinal,
+        respostaTexto,
         cards,
         pendingAction: null,
         novoContexto: { operacaoPreparada: null, acaoPendente: null } as any,
@@ -368,14 +363,9 @@ export async function processarMensagemJessiV2Core(
       propostaId: pendingAction?.id || null,
     });
 
-    const ehCanalVoz = input.canal === "voz" || Boolean(input.modoBancada);
-    const respostaFinal = ehCanalVoz
-      ? humanizarRespostaParaVoz(respostaTexto, cards, input.modoBancada, user?.nome)
-      : respostaTexto;
-
     return {
       versao: "v2",
-      respostaTexto: respostaFinal,
+      respostaTexto,
       cards,
       pendingAction,
       novoContexto: {

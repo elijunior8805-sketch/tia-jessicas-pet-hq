@@ -348,7 +348,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
 
       // Reproduz em audio com voz feminina natural brasileira
       if (ttsEnabled && respostaTextoFinal) {
-        speakResponse(respostaTextoFinal, () => {
+        speakResponse(respostaTextoFinal, res?.cards || [], () => {
           if (isContinuousMode) resumeListening();
         });
       } else if (isContinuousMode) {
@@ -415,7 +415,7 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
       setMessages((prev) => [...prev, confirmMsg]);
       toast.success("Ação confirmada e gravada!");
       if (ttsEnabled && res?.respostaTexto) {
-        speakResponse(res.respostaTexto);
+        speakResponse(res.respostaTexto, res?.cards || []);
       }
     } catch (err: any) {
       toast.error(err?.message || "Falha ao executar a confirmação.");

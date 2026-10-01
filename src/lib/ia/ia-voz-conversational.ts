@@ -14,25 +14,9 @@ export function humanizarRespostaParaVoz(
 ): string {
   if (!respostaOriginal) return "Prontinho!";
 
-  let texto = respostaOriginal.trim();
+  const texto = respostaOriginal.trim();
 
-  // 1. Tratamento de Ação Pendente / Confirmação Proposta
-  const cardConfirmacao = (cards || []).find((c) => c.type === "confirmacao" || c.type === "confirmacao_agendamento");
-  if (cardConfirmacao?.data) {
-    const d = cardConfirmacao.data;
-    // Se a ação já foi executada com sucesso, não repetir a pergunta de confirmação
-    if (d.executado === true || d.pendingAction?.executado === true) {
-      // Deixa o texto original da resposta (ex: "Agendamento confirmado!") ser falado
-    } else {
-      const pet = d.petNome || d.pet?.nome || d.pendingAction?.params?.petNome || "o pet";
-      const servico = d.servicoNome || d.servico?.nome || d.pendingAction?.params?.servicoNome || "o serviço";
-      const data = d.data || d.pendingAction?.params?.data || "hoje";
-      const hora = (d.hora || d.pendingAction?.params?.hora) ? `às ${(d.hora || d.pendingAction?.params?.hora).slice(0, 5)}` : "";
-      return `Preparei o agendamento do ${pet} para ${servico} ${data} ${hora}. Posso confirmar?`;
-    }
-  }
-
-  // 2. Limpeza inteligente de formatação markdown e estruturação para leitura por voz
+  // Limpeza inteligente de formatação markdown e estruturação para leitura por voz
   let fala = limparMarcacaoTexto(texto);
 
   // Converte padrões de tópicos (• ou -) em fala contínua natural
@@ -42,8 +26,8 @@ export function humanizarRespostaParaVoz(
     .replace(/\s+/g, " ")
     .trim();
 
-  // 3. Em Modo Bancada, se o texto for excessivamente longo (> 280 caracteres), sintetiza para fala ágil
-  if (modoBancada && fala.length > 280) {
+  // Em Modo Bancada, se o texto for excessivamente longo (> 350 caracteres), sintetiza mantendo fluidez
+  if (modoBancada && fala.length > 350) {
     const sentencas = fala.split(/(?<=[.?!])\s+/);
     if (sentencas.length > 2) {
       fala = `${sentencas[0]} ${sentencas[1]} Os detalhes completos estão no card da tela, ${userName}.`;
