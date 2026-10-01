@@ -183,6 +183,36 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       exige_confirmacao: false,
       resposta_ia: "Analisando clientes com potencial de reativação para preencher horários vagos..."
     },
+    "sugerir cliente": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Identificando clientes com potencial para preencher a grade..."
+    },
+    "sugerir clientes": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Identificando clientes com potencial para preencher a grade..."
+    },
+    "sugerir encaixe": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Cruzando vagas ociosas com clientes frequentes para sugerir encaixes..."
+    },
     "sugerir encaixes": {
       intencao: "sugerir_encaixes_reativacao",
       ferramenta: "sugerir_encaixes_reativacao",
@@ -192,6 +222,26 @@ export async function classificarComandoIA(texto: string, contexto?: any): Promi
       nivel_confianca: 1,
       exige_confirmacao: false,
       resposta_ia: "Cruzando vagas ociosas com clientes frequentes para sugerir encaixes..."
+    },
+    "preencher grade": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Analisando clientes e preparando mensagens para preencher a grade..."
+    },
+    "convidar clientes": {
+      intencao: "sugerir_encaixes_reativacao",
+      ferramenta: "sugerir_encaixes_reativacao",
+      especialista: "agenda",
+      tipo_operacao: "consulta",
+      parametros: { comando_original: texto },
+      nivel_confianca: 1,
+      exige_confirmacao: false,
+      resposta_ia: "Selecionando clientes para convidar via WhatsApp..."
     },
   };
 
@@ -571,8 +621,21 @@ function fallbackClassificador(texto: string): IAIntent {
     };
   }
 
-  // 10. Clientes Inativos / Reativação
-  if (lowercaseText.includes("reativação") || lowercaseText.includes("reativacao") || lowercaseText.includes("sumidos") || lowercaseText.includes("inativos") || lowercaseText.includes("risco")) {
+  // 10. Clientes Inativos / Sugestões para Preencher Grade / Reativação
+  if (
+    lowercaseText.includes("reativação") ||
+    lowercaseText.includes("reativacao") ||
+    lowercaseText.includes("sumidos") ||
+    lowercaseText.includes("inativos") ||
+    lowercaseText.includes("inativo") ||
+    lowercaseText.includes("risco") ||
+    lowercaseText.includes("sugerir cliente") ||
+    lowercaseText.includes("sugerir clientes") ||
+    lowercaseText.includes("preencher grade") ||
+    lowercaseText.includes("preencher") ||
+    lowercaseText.includes("convidar") ||
+    lowercaseText.includes("encaixe")
+  ) {
     return {
       intencao: "consultar_reativacao",
       especialista: "comunicacao",

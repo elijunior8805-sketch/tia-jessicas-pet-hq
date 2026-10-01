@@ -1615,7 +1615,43 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     }
 
     // =========================================================================
-    // 7. HORÁRIOS LIVRES / VAGAS / ENCAIXES
+    // 7. CLIENTES PARA ENCAIXE / REATIVAÇÃO / PREENCHER GRADE (PRIORITÁRIO)
+    // =========================================================================
+    if (
+      msg.includes("sugerir cliente") ||
+      msg.includes("sugerir clientes") ||
+      msg.includes("sugerir encaixe") ||
+      msg.includes("sugerir encaixes") ||
+      msg.includes("preencher grade") ||
+      msg.includes("preencher horario") ||
+      msg.includes("preencher horário") ||
+      msg.includes("clientes para preencher") ||
+      msg.includes("convidar cliente") ||
+      msg.includes("convidar clientes") ||
+      msg.includes("inativ") ||
+      msg.includes("reativa") ||
+      msg.includes("retorno") ||
+      msg.includes("ausente") ||
+      msg.includes("sumido") ||
+      msg.includes("saudade")
+    ) {
+      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
+      const d = resRet?.data || resRet;
+      const lista = Array.isArray(d) ? d : d?.clientes || d?.sugestoes || [];
+
+      return {
+        texto: `Identifiquei **${lista.length} cliente(s)** com alto potencial para preencher os horários livres da grade, ${nomeOp}! Preparei os cartões com mensagens de carinho prontas para envio no WhatsApp.`,
+        card: {
+          type: "reativacao",
+          title: "Clientes Sugeridos para Encaixe",
+          subtitle: `${lista.length} tutores com potencial de retorno`,
+          data: lista,
+        },
+      };
+    }
+
+    // =========================================================================
+    // 8. HORÁRIOS LIVRES / VAGAS / DISPONIBILIDADE
     // =========================================================================
     if (
       msg.includes("horarios livres") ||
@@ -1626,7 +1662,6 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       msg.includes("tem vaga") ||
       msg.includes("tem horario") ||
       msg.includes("tem horário") ||
-      msg.includes("encaixe") ||
       (msg.includes("vaga") && !msg.includes("garagem"))
     ) {
       const dataAlvo = msg.includes("amanha")
@@ -1681,7 +1716,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     }
 
     // =========================================================================
-    // 8. ATRASOS / QUEM FALTOU / SENTINELAS (ANTES DA AGENDA GERAL)
+    // 9. ATRASOS / QUEM FALTOU / SENTINELAS (ANTES DA AGENDA GERAL)
     // =========================================================================
     if (
       msg.includes("atrasad") ||
@@ -1722,7 +1757,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     }
 
     // =========================================================================
-    // 9. LEVA E TRAZ / ROTAS / TRANSPORTE / TÁXI DOG (ANTES DA AGENDA GERAL)
+    // 10. LEVA E TRAZ / ROTAS / TRANSPORTE / TÁXI DOG (ANTES DA AGENDA GERAL)
     // =========================================================================
     if (
       msg.includes("leva e traz") ||
@@ -1755,7 +1790,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     }
 
     // =========================================================================
-    // 10. AGENDA DE ATENDIMENTOS / GRADE DO DIA / ROTINA
+    // 11. AGENDA DE ATENDIMENTOS / GRADE DO DIA / ROTINA
     // =========================================================================
     if (
       (msg.includes("agenda") ||
@@ -1803,32 +1838,6 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
           title: `Agenda (${lista.length} atendimentos)`,
           subtitle: `Data: ${dataAlvo}`,
           data: { agendamentos: lista, itens: lista, total: lista.length },
-        },
-      };
-    }
-
-    // =========================================================================
-    // 11. CLIENTES INATIVOS / REATIVAÇÃO / CLIENTES SUMIDOS
-    // =========================================================================
-    if (
-      msg.includes("inativ") ||
-      msg.includes("reativa") ||
-      msg.includes("retorno") ||
-      msg.includes("ausente") ||
-      msg.includes("sumido") ||
-      msg.includes("saudade")
-    ) {
-      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
-      const d = resRet?.data || resRet;
-      const lista = Array.isArray(d) ? d : d?.clientes || [];
-
-      return {
-        texto: `Identifiquei **${lista.length} cliente(s) inativo(s)** que não vêm ao Spa há mais de 25 dias, ${nomeOp}! Preparei a lista com os pets e sugestões de mensagens de carinho prontas para disparo no WhatsApp, para preenchermos os horários livres da grade!`,
-        card: {
-          type: "reativacao",
-          title: "Clientes Inativos para Encaixe",
-          subtitle: `${lista.length} tutores com potencial de retorno`,
-          data: lista,
         },
       };
     }

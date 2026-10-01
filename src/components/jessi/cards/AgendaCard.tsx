@@ -129,7 +129,7 @@ export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) =
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onActionClick("Sugerir clientes inativos para encaixe")}
+              onClick={() => onActionClick("Sugerir clientes para preencher a grade")}
               className="h-7 px-2.5 text-xs text-emerald-900 border-emerald-300 hover:bg-emerald-50 rounded-lg font-medium"
             >
               <User className="h-3 w-3 mr-1 text-emerald-700" />
@@ -175,7 +175,7 @@ export const AgendaCard: React.FC<AgendaCardProps> = ({ data, onActionClick }) =
             </Button>
             <Button
               size="sm"
-              onClick={() => onActionClick("Sugerir clientes inativos para encaixe")}
+              onClick={() => onActionClick("Sugerir clientes para preencher a grade")}
               className="h-7 px-2.5 text-xs bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg font-medium"
             >
               Convidar Clientes

@@ -55,14 +55,59 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.itens)) return data.itens;
     if (Array.isArray(data?.data)) return data.data;
-    if (data && typeof data === "object" && data.cliente) return [data];
+    if (Array.isArray(data?.clientes)) return data.clientes;
+    if (Array.isArray(data?.sugestoes)) {
+      return data.sugestoes.map((s: any) => ({
+        cliente: {
+          id: s.clienteId || s.cliente?.id,
+          nome: s.clienteNome || s.cliente?.nome || "Cliente",
+          telefone: s.telefone || s.cliente?.telefone,
+        },
+        pet: {
+          id: s.petId || s.pet?.id,
+          nome: s.petNome || s.pet?.nome || "Pet",
+        },
+        diasInativo: s.diasInativo || 25,
+        faixaRisco: s.faixaRisco || "alerta",
+        ultimoAtendimento: s.ultimoAtendimento,
+        mensagemSugerida: {
+          textoMensagem: s.mensagemWhatsapp || s.mensagemSugerida?.textoMensagem || s.mensagemSugerida?.mensagemFormatada,
+          urlWhatsApp: s.whatsappUrl || s.mensagemSugerida?.urlWhatsApp,
+          telefoneDestino: s.telefone || s.mensagemSugerida?.telefoneDestino,
+        },
+      }));
+    }
+    if (data && typeof data === "object" && (data.cliente || data.clienteNome || data.petNome)) {
+      return [{
+        cliente: {
+          id: data.clienteId || data.cliente?.id,
+          nome: data.clienteNome || data.cliente?.nome || "Cliente",
+          telefone: data.telefone || data.cliente?.telefone,
+        },
+        pet: {
+          id: data.petId || data.pet?.id,
+          nome: data.petNome || data.pet?.nome || "Pet",
+        },
+        diasInativo: data.diasInativo || 25,
+        faixaRisco: data.faixaRisco || "alerta",
+        ultimoAtendimento: data.ultimoAtendimento,
+        mensagemSugerida: {
+          textoMensagem: data.mensagemWhatsapp || data.mensagemSugerida?.textoMensagem || data.mensagemSugerida?.mensagemFormatada,
+          urlWhatsApp: data.whatsappUrl || data.mensagemSugerida?.urlWhatsApp,
+          telefoneDestino: data.telefone || data.mensagemSugerida?.telefoneDestino,
+        },
+      }];
+    }
     return [];
   }, [data]);
 
   if (lista.length === 0) return null;
 
   const handleCopiar = async (item: ReativacaoItem, id: string) => {
-    const msg = item.mensagemSugerida?.textoMensagem;
+    const msg =
+      item.mensagemSugerida?.textoMensagem ||
+      (item.mensagemSugerida as any)?.mensagemFormatada ||
+      (item as any).mensagemWhatsapp;
     if (!msg) return;
     try {
       await navigator.clipboard.writeText(msg);
@@ -75,7 +120,17 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
   };
 
   const handleEnviar = (item: ReativacaoItem) => {
-    const url = item.mensagemSugerida?.urlWhatsApp;
+    const url =
+      item.mensagemSugerida?.urlWhatsApp ||
+      (item as any).whatsappUrl ||
+      (item.cliente?.telefone
+        ? `https://wa.me/55${item.cliente.telefone.replace(/\D/g, "")}?text=${encodeURIComponent(
+            item.mensagemSugerida?.textoMensagem ||
+              (item.mensagemSugerida as any)?.mensagemFormatada ||
+              `Olá, ${item.cliente.nome}! Sentimos saudade do ${item.pet?.nome || "seu pet"} no Spa!`
+          )}`
+        : undefined);
+
     if (url) {
       abrirWhatsApp(url);
     } else {

@@ -257,26 +257,36 @@ export class ProativoAdapter {
         .limit(10);
 
       if (reativacoes && reativacoes.length > 0) {
-        const sugestoes = reativacoes.map((r: any) => ({
-          cliente: {
-            id: r.cliente_id,
-            nome: r.cliente_nome,
-            telefone: r.cliente_whatsapp || r.cliente_telefone,
-          },
-          pet: {
-            id: r.pet_id,
-            nome: r.pet_nome,
-          },
-          diasInativo: r.dias_inativo,
-          faixaRisco: r.faixa,
-          ultimoAtendimento: r.ultimo_atendimento_em,
-          mensagemSugerida: MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
-            telefoneDestino: r.cliente_whatsapp || r.cliente_telefone || "",
+        const sugestoes = reativacoes.map((r: any) => {
+          const tel = r.cliente_whatsapp || r.cliente_telefone || "";
+          const msgGen = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+            telefoneDestino: tel,
             nomeCliente: r.cliente_nome || "Cliente",
             nomePet: r.pet_nome || "seu pet",
             tipoMensagem: "reativacao_carinho",
-          }),
-        }));
+          });
+
+          return {
+            cliente: {
+              id: r.cliente_id,
+              nome: r.cliente_nome,
+              telefone: tel,
+            },
+            pet: {
+              id: r.pet_id,
+              nome: r.pet_nome,
+            },
+            diasInativo: r.dias_inativo,
+            faixaRisco: r.faixa,
+            ultimoAtendimento: r.ultimo_atendimento_em,
+            mensagemSugerida: {
+              textoMensagem: msgGen.mensagemFormatada,
+              mensagemFormatada: msgGen.mensagemFormatada,
+              urlWhatsApp: msgGen.urlWhatsApp,
+              telefoneDestino: msgGen.telefoneFormatado,
+            },
+          };
+        });
 
         return {
           success: true,
@@ -297,15 +307,33 @@ export class ProativoAdapter {
       .select("id, nome, telefone, whatsapp, pets(id, nome, raca)")
       .limit(10);
 
-    const sugestoes = (clientes || []).map((c: any) => ({
-      cliente: c,
-      mensagemSugerida: MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
-        telefoneDestino: c.whatsapp || c.telefone || "",
+    const sugestoes = (clientes || []).map((c: any) => {
+      const pet = Array.isArray(c.pets) && c.pets.length > 0 ? c.pets[0] : null;
+      const tel = c.whatsapp || c.telefone || "";
+      const msgGen = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+        telefoneDestino: tel,
         nomeCliente: c.nome,
-        nomePet: c.pets?.[0]?.nome || "seu pet",
+        nomePet: pet?.nome || "seu pet",
         tipoMensagem: "reativacao_carinho",
-      }),
-    }));
+      });
+
+      return {
+        cliente: {
+          id: c.id,
+          nome: c.nome,
+          telefone: tel,
+        },
+        pet: pet ? { id: pet.id, nome: pet.nome, raca: pet.raca } : undefined,
+        diasInativo: 25,
+        faixaRisco: "alerta",
+        mensagemSugerida: {
+          textoMensagem: msgGen.mensagemFormatada,
+          mensagemFormatada: msgGen.mensagemFormatada,
+          urlWhatsApp: msgGen.urlWhatsApp,
+          telefoneDestino: msgGen.telefoneFormatado,
+        },
+      };
+    });
 
     return {
       success: true,
