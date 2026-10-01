@@ -76,9 +76,13 @@ export async function processarMensagemJessiV2Core(
       };
     }
 
+    const ehComandoCompletoCancelamento =
+      /\b(agendamento|horario|horário|dia|tutor|cliente|pet|banho|tosa|atendimento|da|do|de|no|na)\b/i.test(textoLower);
+
     const ehCancelamentoProposta =
       Boolean(acaoPendenteAtual) &&
-      /\b(não|nao|cancelar|cancela|desistir|manter|manter agendamento|não agendar|nao agendar|não cancelar|nao cancelar|abortar)\b/i.test(textoLower);
+      !ehComandoCompletoCancelamento &&
+      /^(não|nao|cancelar|cancela|desistir|abortar|cancela isso|descartar|deixa pra lá|deixa pra la|não precisa|nao precisa)$/i.test(textoLower.trim());
 
     if (ehCancelamentoProposta) {
       return {

@@ -199,22 +199,6 @@ export const OPENAI_TOOLS_SCHEMA: any[] = [
   {
     type: "function",
     function: {
-      name: "consultar_analise_negocio",
-      description: "Realiza análises estatísticas cruzadas da operação: faturamento por porte/raça, dias de pico, bairros ou cancelamentos.",
-      parameters: {
-        type: "object",
-        properties: {
-          tipo: {
-            type: "string",
-            description: "porte_raca | dia_semana | bairro | cancelamentos",
-          },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "verificar_sentinelas",
       description: "Executa varredura de atrasos de chegada de pets, vagas por cancelamento e fechamento de caixa.",
       parameters: {
@@ -1093,7 +1077,125 @@ DIRETRIZES DE AUTONOMIA E TOOL CALLING:
     }
 
     // =========================================================================
-    // 2. AGENDAMENTO & MARCAÇÃO DE ATENDIMENTOS (BANHO, TOSA, HORÁRIO)
+    // 2. CANCELAMENTO & DESMARCAÇÃO DE ATENDIMENTOS
+    // =========================================================================
+    const isCancelIntent =
+      msg.includes("cancelar") ||
+      msg.includes("cancela") ||
+      msg.includes("desmarcar") ||
+      msg.includes("desmarca") ||
+      msg.includes("anular agendamento");
+
+    if (isCancelIntent) {
+      const termoNome = mensagemUsuario
+        .replace(/\b(eu|quero|por|favor|cancelar|cancela|desmarcar|desmarca|o|a|os|as|do|da|de|no|na|em|dia|agendamento|horario|horário|atendimento|banho|tosa|para|às|as|horas|hora|manhã|manha|tarde|noite)\b/gi, "")
+        .replace(/\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b/g, "")
+        .replace(/\b\d{1,2}(?:[:h]\d{2}|h|\s*horas)?\b/gi, "")
+        .replace(/[^\w\s\u00C0-\u00FF]/gi, "")
+        .trim();
+
+      const resCancel = await AgendaAdapter.prepararPropostaCancelamento(sb, {
+        petNome: termoNome || undefined,
+        clienteNome: termoNome || undefined,
+        motivo: "Cancelamento solicitado pelo tutor/operador",
+      });
+
+      const d = resCancel?.data || {};
+      const petLabel = d.petNome || (termoNome ? termoNome : "o Pet");
+
+      return {
+        texto: `Preparei a proposta de cancelamento para o agendamento de **${petLabel}**, ${nomeOp}. Toque em Confirmar no card abaixo para efetivar a desmarcação e liberar a vaga na grade.`,
+        card: {
+          type: "confirmacao",
+          title: `Cancelar Agendamento: ${petLabel}`,
+          subtitle: `Horário: ${d.hora || "Atendimento"} • Vaga será liberada`,
+          data: {
+            acao: "cancelar_agendamento",
+            tipo: "cancelamento",
+            agendamentoId: d.agendamentoId,
+            petNome: d.petNome,
+            hora: d.hora,
+          },
+        },
+        pendingAction: resCancel?.pendingAction || null,
+      };
+    }
+
+    // =========================================================================
+    // 3. REAGENDAMENTO & REMARCAÇÃO (TROCA DE DATA/HORÁRIO)
+    // =========================================================================
+    const isRescheduleIntent =
+      msg.includes("reagendar") ||
+      msg.includes("remarcar") ||
+      msg.includes("trocar a data") ||
+      msg.includes("troca a data") ||
+      msg.includes("trocar data") ||
+      msg.includes("mudar data") ||
+      msg.includes("mudar horario") ||
+      msg.includes("mudar o horario") ||
+      msg.includes("alterar horario");
+
+    if (isRescheduleIntent) {
+      let novaData = hojeStr;
+      const matchDataBarra = mensagemUsuario.match(/\b(\d{1,2})[\/\.-](\d{1,2})(?:[\/\.-](\d{2,4}))?\b/);
+      if (matchDataBarra) {
+        const dia = matchDataBarra[1].padStart(2, "0");
+        const mes = matchDataBarra[2].padStart(2, "0");
+        const anoAtual = new Date().getFullYear();
+        const ano = matchDataBarra[3] ? (matchDataBarra[3].length === 2 ? `20${matchDataBarra[3]}` : matchDataBarra[3]) : String(anoAtual);
+        novaData = `${ano}-${mes}-${dia}`;
+      }
+
+      const matchHora = mensagemUsuario.match(/(?:as|às|ás)?\s*(\d{1,2})(?:[:h](\d{2})?|h|\s*horas)?\b/i);
+      let novaHora = "14:00";
+      if (matchHora) {
+        const h = matchHora[1].padStart(2, "0");
+        const m = matchHora[2] ? matchHora[2].padStart(2, "0") : "00";
+        novaHora = `${h}:${m}`;
+      }
+
+      const termoNome = mensagemUsuario
+        .replace(/\b(eu|quero|por|favor|reagendar|remarcar|trocar|troca|mudar|muda|alterar|a|o|os|as|do|da|de|no|na|em|dia|data|horario|horário|atendimento|banho|tosa|para|às|as|horas|hora|manhã|manha|tarde|noite)\b/gi, "")
+        .replace(/\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b/g, "")
+        .replace(/\b\d{1,2}(?:[:h]\d{2}|h|\s*horas)?\b/gi, "")
+        .replace(/[^\w\s\u00C0-\u00FF]/gi, "")
+        .trim();
+
+      const resRemarcar = await AgendaAdapter.prepararPropostaReagendamento(sb, {
+        petNome: termoNome || undefined,
+        clienteNome: termoNome || undefined,
+        novaData,
+        novaHora,
+        motivo: "Remarcação solicitada pelo tutor/operador",
+      });
+
+      const d = resRemarcar?.data || {};
+      const petLabel = d.petNome || (termoNome ? termoNome : "o Pet");
+      const diaFormatado = novaData.split("-").reverse().slice(0, 2).join("/");
+
+      return {
+        texto: `Preparei a proposta de remarcação do atendimento de **${petLabel}** para o dia **${diaFormatado}** às **${novaHora}**, ${nomeOp}! Toque em Confirmar no card para atualizar a grade.`,
+        card: {
+          type: "confirmacao",
+          title: `Remarcar: ${petLabel}`,
+          subtitle: `Mudar para ${diaFormatado} às ${novaHora}`,
+          data: {
+            acao: "reagendar_agendamento",
+            tipo: "reagendamento",
+            agendamentoId: d.agendamentoId,
+            petNome: d.petNome,
+            clienteNome: d.clienteNome,
+            novaData,
+            novaHora,
+            motivo: "Remarcação solicitada pelo operador",
+          },
+        },
+        pendingAction: resRemarcar?.pendingAction || null,
+      };
+    }
+
+    // =========================================================================
+    // 4. AGENDAMENTO & MARCAÇÃO DE ATENDIMENTOS (BANHO, TOSA, HORÁRIO)
     // =========================================================================
     const isSchedulingIntent =
       (msg.includes("agendar") ||
@@ -1111,6 +1213,14 @@ DIRETRIZES DE AUTONOMIA E TOOL CALLING:
         msg.includes("novo agendamento") ||
         msg.includes("agendar horario") ||
         msg.includes("horario para")) &&
+      !msg.includes("cancelar") &&
+      !msg.includes("cancela") &&
+      !msg.includes("desmarcar") &&
+      !msg.includes("desmarca") &&
+      !msg.includes("remarcar") &&
+      !msg.includes("reagendar") &&
+      !msg.includes("trocar data") &&
+      !msg.includes("troca a data") &&
       !msg.includes("como esta a agenda") &&
       !msg.includes("ver agenda") &&
       !msg.includes("consultar agenda") &&
