@@ -517,12 +517,13 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
 
     if (typeof process !== "undefined" && process.env) {
       chave =
-        process.env.LOVABLE_API_KEY ||
+        process.env.GROQ_API_KEY ||
+        process.env.VITE_GROQ_API_KEY ||
         process.env.OPENAI_API_KEY ||
         process.env.GEMINI_API_KEY ||
         process.env.GOOGLE_AI_API_KEY ||
         process.env.GOOGLE_API_KEY ||
-        process.env.GROQ_API_KEY ||
+        process.env.LOVABLE_API_KEY ||
         "";
     }
 
