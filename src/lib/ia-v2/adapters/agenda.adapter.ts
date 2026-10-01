@@ -418,6 +418,184 @@ export class AgendaAdapter {
   }
 
   /**
+   * Prepara proposta de remarcação (troca de data/hora) para supervisão humana
+   */
+  static async prepararPropostaReagendamento(
+    sb: SupabaseClient<Database>,
+    params: {
+      agendamentoId?: string;
+      petNome?: string;
+      clienteNome?: string;
+      novaData?: string;
+      novaHora?: string;
+      novaDataHora?: string;
+      data?: string;
+      hora?: string;
+      motivo?: string;
+    }
+  ) {
+    let novaData = params.novaData || params.data || "";
+    let novaHora = params.novaHora || params.hora || "";
+
+    if (params.novaDataHora && (!novaData || !novaHora)) {
+      try {
+        const parsed = partirDataHora(params.novaDataHora, novaData, novaHora);
+        novaData = parsed.data;
+        novaHora = parsed.hora;
+      } catch {}
+    }
+
+    if (!novaData) {
+      novaData = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    }
+    if (!novaHora) novaHora = "14:00";
+
+    let agendamentoAlvo: any = null;
+
+    if (params.agendamentoId) {
+      try {
+        const { data: agDb } = await sb
+          .from("agendamentos")
+          .select("id, data, hora, status, pet_id, cliente_id, pets(id, nome), clientes(id, nome), servicos(id, nome)")
+          .eq("id", params.agendamentoId)
+          .maybeSingle();
+        if (agDb) agendamentoAlvo = agDb;
+      } catch {}
+    }
+
+    if (!agendamentoAlvo && (params.petNome || params.clienteNome)) {
+      try {
+        const termo = (params.petNome || params.clienteNome || "").toLowerCase();
+        const { data: lista } = await sb
+          .from("agendamentos")
+          .select("id, data, hora, status, pet_id, cliente_id, pets(id, nome), clientes(id, nome), servicos(id, nome)")
+          .order("data", { ascending: false })
+          .limit(20);
+
+        if (lista && lista.length > 0) {
+          agendamentoAlvo = lista.find((a: any) => {
+            const nomeP = ((a.pets as any)?.nome || "").toLowerCase();
+            const nomeC = ((a.clientes as any)?.nome || "").toLowerCase();
+            return (params.petNome && nomeP.includes(termo)) || (params.clienteNome && nomeC.includes(termo));
+          }) || lista[0];
+        }
+      } catch {}
+    }
+
+    const petNomeFinal = (agendamentoAlvo?.pets as any)?.nome || params.petNome || "Pet";
+    const clienteNomeFinal = (agendamentoAlvo?.clientes as any)?.nome || params.clienteNome || "Cliente";
+    const servicoNomeFinal = (agendamentoAlvo?.servicos as any)?.nome || "Atendimento";
+    const agendamentoIdFinal = agendamentoAlvo?.id || params.agendamentoId || "";
+
+    const diaFormatado = novaData.includes("-") ? novaData.split("-").reverse().slice(0, 2).join("/") : novaData;
+
+    return {
+      success: true,
+      data: {
+        status: "proposto",
+        tipo: "reagendamento",
+        agendamentoId: agendamentoIdFinal,
+        data: novaData,
+        hora: novaHora,
+        novaData,
+        novaHora,
+        petNome: petNomeFinal,
+        clienteNome: clienteNomeFinal,
+        servicoNome: servicoNomeFinal,
+        dataAnterior: agendamentoAlvo?.data,
+        horaAnterior: agendamentoAlvo?.hora,
+      },
+      pendingAction: {
+        action: "reagendar_agendamento",
+        params: {
+          agendamentoId: agendamentoIdFinal,
+          novaData,
+          novaHora,
+          novaDataHoraISO: `${novaData}T${novaHora}:00`,
+          petNome: petNomeFinal,
+          motivo: params.motivo || "Remarcação solicitada pelo operador",
+        },
+      },
+      summary: `Proposta para remarcar o atendimento de ${petNomeFinal} para dia ${diaFormatado} às ${novaHora}.`,
+    };
+  }
+
+  /**
+   * Prepara proposta de cancelamento para supervisão humana
+   */
+  static async prepararPropostaCancelamento(
+    sb: SupabaseClient<Database>,
+    params: {
+      agendamentoId?: string;
+      petNome?: string;
+      clienteNome?: string;
+      motivo?: string;
+    }
+  ) {
+    let agendamentoAlvo: any = null;
+
+    if (params.agendamentoId) {
+      try {
+        const { data: agDb } = await sb
+          .from("agendamentos")
+          .select("id, data, hora, status, pet_id, cliente_id, pets(id, nome), clientes(id, nome), servicos(id, nome)")
+          .eq("id", params.agendamentoId)
+          .maybeSingle();
+        if (agDb) agendamentoAlvo = agDb;
+      } catch {}
+    }
+
+    if (!agendamentoAlvo && (params.petNome || params.clienteNome)) {
+      try {
+        const termo = (params.petNome || params.clienteNome || "").toLowerCase();
+        const { data: lista } = await sb
+          .from("agendamentos")
+          .select("id, data, hora, status, pet_id, cliente_id, pets(id, nome), clientes(id, nome), servicos(id, nome)")
+          .order("data", { ascending: false })
+          .limit(20);
+
+        if (lista && lista.length > 0) {
+          agendamentoAlvo = lista.find((a: any) => {
+            const nomeP = ((a.pets as any)?.nome || "").toLowerCase();
+            const nomeC = ((a.clientes as any)?.nome || "").toLowerCase();
+            return (params.petNome && nomeP.includes(termo)) || (params.clienteNome && nomeC.includes(termo));
+          }) || lista[0];
+        }
+      } catch {}
+    }
+
+    const petNomeFinal = (agendamentoAlvo?.pets as any)?.nome || params.petNome || "Pet";
+    const agendamentoIdFinal = agendamentoAlvo?.id || params.agendamentoId || "";
+    const horaFinal = (agendamentoAlvo?.hora || "").slice(0, 5) || "hoje";
+
+    return {
+      success: true,
+      data: {
+        status: "proposto",
+        tipo: "cancelamento",
+        agendamentoId: agendamentoIdFinal,
+        petNome: petNomeFinal,
+        hora: horaFinal,
+        data: agendamentoAlvo?.data,
+      },
+      pendingAction: {
+        action: "cancelar_agendamento",
+        params: {
+          agendamentoId: agendamentoIdFinal,
+          petNome: petNomeFinal,
+          motivo: params.motivo || "Cancelamento solicitado pelo operador",
+        },
+      },
+      summary: `Proposta de cancelamento para o atendimento de ${petNomeFinal} às ${horaFinal}.`,
+    };
+  }
+
+  /**
    * Prepara o agendamento sem persistir no banco (Supervisão Humana)
    */
   static prepararAgendamento(params: {

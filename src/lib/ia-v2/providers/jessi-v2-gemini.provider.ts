@@ -34,7 +34,8 @@ const GEMINI_CONFIG = {
   TIMEOUT_MS: 15000,
   MAX_RETRIES: 2,
   MODEL: "google/gemini-1.5-flash",
-  GROQ_MODEL: "llama-3.3-70b-versatile",
+  GROQ_MODEL: "openai/gpt-oss-120b",
+  GROQ_FALLBACK_MODELS: ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"],
   DIRECT_ENDPOINT_BASE: "https://generativelanguage.googleapis.com/v1beta/models",
 };
 
@@ -615,13 +616,18 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       throw new Error("Nenhuma chave de API configurada no ambiente.");
     }
 
-    for (let tentativa = 1; tentativa <= GEMINI_CONFIG.MAX_RETRIES; tentativa++) {
+    const modelosParaTentar = auth.endpoint.includes("groq.com")
+      ? GEMINI_CONFIG.GROQ_FALLBACK_MODELS
+      : [auth.model];
+
+    for (let tentativa = 0; tentativa < modelosParaTentar.length; tentativa++) {
+      const modeloAtual = modelosParaTentar[tentativa];
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), GEMINI_CONFIG.TIMEOUT_MS);
 
       try {
         const body: any = {
-          model: auth.model,
+          model: modeloAtual,
           temperature,
           messages,
         };
@@ -660,8 +666,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         };
       } catch (err: any) {
         clearTimeout(timer);
-        if (tentativa >= GEMINI_CONFIG.MAX_RETRIES) throw err;
-        await new Promise((res) => setTimeout(res, tentativa * 350));
+        console.warn(`[JessiV2] Tentativa com modelo ${modeloAtual} falhou:`, err?.message || err);
+        if (tentativa >= modelosParaTentar.length - 1) throw err;
+        await new Promise((res) => setTimeout(res, 200));
       }
     }
 
@@ -2123,6 +2130,29 @@ DIRETRIZES DE AUTONOMIA E TOOL CALLING:
             clienteId: d.clienteId,
             clienteNome: d.clienteNome,
             valor: d.valor || 80,
+          },
+        });
+        break;
+      }
+      case "preparar_reagendamento":
+      case "remarcar_horario":
+      case "trocar_data":
+      case "mudar_horario": {
+        const d = data || toolArgs || {};
+        const diaFormatado = d.novaData ? (d.novaData.includes("-") ? d.novaData.split("-").reverse().slice(0, 2).join("/") : d.novaData) : (d.data || "Nova Data");
+        cards.push({
+          type: "confirmacao",
+          title: `Remarcar: ${d.petNome || d.clienteNome || "Agendamento"}`,
+          subtitle: `Mudar para ${diaFormatado} às ${d.novaHora || d.hora || "Horário"}`,
+          data: {
+            acao: "reagendar_agendamento",
+            tipo: "reagendamento",
+            agendamentoId: d.agendamentoId,
+            petNome: d.petNome,
+            clienteNome: d.clienteNome,
+            novaData: d.novaData || d.data,
+            novaHora: d.novaHora || d.hora,
+            motivo: d.motivo,
           },
         });
         break;

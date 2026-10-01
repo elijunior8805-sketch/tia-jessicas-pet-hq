@@ -1018,8 +1018,13 @@ const TOOL_ALIASES: Record<string, string> = {
   agendar_horario: "preparar_agendamento",
   marcar_horario: "preparar_agendamento",
   agendar: "preparar_agendamento",
-  preparar_cancelamento: "cancelar_agendamento",
-  preparar_reagendamento: "reagendar_agendamento",
+  preparar_cancelamento: "preparar_cancelamento",
+  cancelar_horario: "preparar_cancelamento",
+  desmarcar_horario: "preparar_cancelamento",
+  preparar_reagendamento: "preparar_reagendamento",
+  remarcar_horario: "preparar_reagendamento",
+  trocar_data: "preparar_reagendamento",
+  mudar_horario: "preparar_reagendamento",
   preparar_cadastro_cliente: "executar_cadastro_cliente",
   preparar_consumo_credito: "executar_consumo_credito",
   preparar_estorno: "executar_estorno",
@@ -1074,6 +1079,12 @@ export async function despacharFerramentaV2(
     switch (toolCanonical) {
       case "preparar_agendamento":
         return await AgendaAdapter.prepararPropostaAgendamento(sb, params);
+
+      case "preparar_reagendamento":
+        return await AgendaAdapter.prepararPropostaReagendamento(sb, params);
+
+      case "preparar_cancelamento":
+        return await AgendaAdapter.prepararPropostaCancelamento(sb, params);
 
       case "consultar_agenda":
         return await AgendaAdapter.consultarAgendaPorData(
