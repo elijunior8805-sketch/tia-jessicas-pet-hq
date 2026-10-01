@@ -26,11 +26,11 @@ export function humanizarRespostaParaVoz(
     .replace(/\s+/g, " ")
     .trim();
 
-  // Em Modo Bancada, se o texto for excessivamente longo (> 350 caracteres), sintetiza mantendo fluidez
-  if (modoBancada && fala.length > 350) {
-    const sentencas = fala.split(/(?<=[.?!])\s+/);
+  // Se o texto for longo (> 200 caracteres), prioriza as 2 primeiras frases principais para fala dinâmica
+  if (fala.length > 200) {
+    const sentencas = fala.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 0);
     if (sentencas.length > 2) {
-      fala = `${sentencas[0]} ${sentencas[1]} Os detalhes completos estão no card da tela, ${userName}.`;
+      fala = `${sentencas[0]} ${sentencas[1]}`;
     }
   }
 
