@@ -560,6 +560,17 @@ function AtendimentoDetalhe() {
       confirmado_por_nome: myProfile?.nome ?? null,
     };
     await patchMut.mutateAsync({ ...extraPatch, etapas_status: map });
+
+    // Se confirmou relatório (6), fechamento (7) ou encerramento (8), atualiza o agendamento na grade
+    if ([6, 7, 8].includes(num) && (atendimento as any)?.agendamento_id) {
+      await supabase
+        .from("agendamentos")
+        .update({ status: "finalizado" })
+        .eq("id", (atendimento as any).agendamento_id);
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    }
+
     toast.success("Etapa confirmada");
   };
 
@@ -685,67 +696,142 @@ function AtendimentoDetalhe() {
   const encerrarMut = useMutation({
     mutationFn: async () => {
       if (!atendimento) throw new Error("Atendimento não carregado");
-      const pendentes: string[] = [];
-      const need = [
-        [1, "Serviço solicitado"], [2, "Serviços extras"], [3, "Fotos antes"],
-        [4, "Informações do atendimento"], [5, "Fotos depois"],
-        [7, "Pagamento"], [6, "Relatório"],
-      ] as const;
-      for (const [n, label] of need) {
-        if (!isEtapaConfirmada(atendimento, n)) pendentes.push(label);
-      }
-      if (pendentes.length) {
-        throw new Error("Etapas pendentes:\n• " + pendentes.join("\n• "));
-      }
+      
       const executados = [...(((atendimento as any).servicos_solicitados ?? (atendimento as any).servicos_planejados ?? []) as ServicoItem[]), ...(((atendimento as any).servicos_extras ?? []) as ServicoItem[])];
       const subtotalCalc = sumItens(executados) + Number(taxa || 0) - Number(desc || 0);
+      const hojeISO = new Date().toISOString().slice(0, 10);
+
+      // 1. Resolução inteligente de pagamento
+      let formaPagFinal = (atendimento as any).pagamento_forma || formaPag || formaQuitacaoBanho || "";
+      let statusPagFinal = (atendimento as any).pagamento_status || "pendente";
+      let valorPagoFinal = Number((atendimento as any).valor_pago ?? 0);
+
+      // Se ainda não estava explicitamente pago
+      if (statusPagFinal !== "pago") {
+        if (usarCreditoPrograma && elegibilidadeCredito?.possui_credito_elegivel && formaQuitacaoBanho === "credito_programa") {
+          if (totalExtrasFinanceiro <= 0) {
+            formaPagFinal = "credito_programa";
+            statusPagFinal = "pago";
+            valorPagoFinal = 0;
+          } else {
+            formaPagFinal = formaPagExtras || "pendente";
+            const isPagoExtras = ["dinheiro", "pix", "debito", "credito"].includes(formaPagExtras);
+            statusPagFinal = isPagoExtras ? "pago" : formaPagExtras === "parcial" && Number(valorPagoExtrasInput || 0) > 0 ? "parcial" : "pendente";
+            valorPagoFinal = isPagoExtras ? totalExtrasFinanceiro : formaPagExtras === "parcial" ? Number(valorPagoExtrasInput || 0) : 0;
+          }
+        } else {
+          const formaEscolhida = formaQuitacaoBanho || formaPag;
+          if (["dinheiro", "pix", "debito", "credito"].includes(formaEscolhida)) {
+            formaPagFinal = formaEscolhida;
+            statusPagFinal = "pago";
+            valorPagoFinal = subtotalCalc;
+          } else if (formaEscolhida === "parcial") {
+            formaPagFinal = "parcial";
+            statusPagFinal = Number(valorPagoInput || 0) > 0 ? "parcial" : "pendente";
+            valorPagoFinal = Number(valorPagoInput || 0);
+          } else {
+            formaPagFinal = formaEscolhida || "pendente";
+            statusPagFinal = "pendente";
+            valorPagoFinal = 0;
+          }
+        }
+      }
+
+      // 2. Registro no financeiro / pagamentos (idempotente)
+      const pagPayload: any = {
+        atendimento_id: atendId,
+        cliente_id: (atendimento as any).cliente_id,
+        valor_total: formaPagFinal === "credito_programa" ? 0 : totalExtrasFinanceiro > 0 && usarCreditoPrograma && elegibilidadeCredito?.possui_credito_elegivel ? totalExtrasFinanceiro : subtotalCalc,
+        valor_pago: valorPagoFinal,
+        forma: formaPagFinal,
+        status: statusPagFinal,
+        vencimento: hojeISO,
+        data_pagamento: statusPagFinal === "pago" ? hojeISO : null,
+        descricao: formaPagFinal === "credito_programa" 
+          ? `Atendimento de ${pet?.nome || 'Pet'} quitado com 1 crédito do Clubinho`
+          : `Atendimento de ${pet?.nome || 'Pet'}`,
+      };
+      const { data: existingPag } = await supabase.from("pagamentos")
+        .select("id").eq("atendimento_id", atendId).maybeSingle();
+      if (existingPag) await supabase.from("pagamentos").update(pagPayload).eq("id", existingPag.id);
+      else await supabase.from("pagamentos").insert(pagPayload);
+
+      // 3. Consome crédito do Clubinho se aplicável
+      if (usarCreditoPrograma && elegibilidadeCredito?.possui_credito_elegivel && (formaQuitacaoBanho === "credito_programa" || formaPagFinal === "credito_programa")) {
+        try {
+          await consumirCreditoAtendimento({
+            data: {
+              atendimento_id: atendId,
+              agendamento_id: (atendimento as any).agendamento_id || null,
+              pet_id: (atendimento as any).pet_id,
+              cliente_id: (atendimento as any).cliente_id || null,
+              servicos_executados: executados.map((s) => ({
+                id: (s as any).id,
+                servico_id: s.servico_id,
+                nome: s.nome,
+                valor: Number(s.valor_total || s.valor_unit || 0),
+                categoria: s.categoria
+              }))
+            }
+          });
+        } catch (credErr) {
+          console.error("Erro ao consumir crédito:", credErr);
+        }
+      }
+
+      // 4. Marca todas as etapas como concluídas para um encerramento limpo
+      const mapEtapas = { ...((atendimento as any)?.etapas_status ?? {}) };
+      const nowIso = new Date().toISOString();
+      for (let i = 1; i <= 8; i++) {
+        if (!mapEtapas[String(i)]?.status) {
+          mapEtapas[String(i)] = {
+            status: "concluida",
+            confirmado_em: nowIso,
+            confirmado_por: myProfile?.id ?? null,
+            confirmado_por_nome: myProfile?.nome ?? null,
+          };
+        }
+      }
+
+      // 5. Atualiza o atendimento no Supabase
       const { error } = await supabase.from("atendimentos").update({
         finalizado: true,
-        data_fim: new Date().toISOString(),
-        encerrado_em: new Date().toISOString(),
+        data_fim: (atendimento as any).data_fim ?? nowIso,
+        encerrado_em: nowIso,
         encerrado_por: myProfile?.id ?? null,
         servicos_executados: executados as any,
         valor_executado: subtotalCalc,
         taxa_leva_traz: Number(taxa || 0),
         desconto: Number(desc || 0),
+        observacoes: obs,
+        observacoes_internas: obsInt,
+        recomendacoes: rec,
+        proxima_visita: prox || (atendimento as any).proxima_visita || null,
+        usou_focinheira: focinheira,
+        precisou_pausa: pausa,
+        pagamento_forma: formaPagFinal,
+        pagamento_status: statusPagFinal,
+        valor_pago: valorPagoFinal,
+        etapas_status: mapEtapas,
       } as never).eq("id", atendId);
       if (error) throw error;
-      
-      // Consome o crédito do programa de cuidado com idempotência garantida
-      if (usarCreditoPrograma && elegibilidadeCredito?.possui_credito_elegivel) {
-        await consumirCreditoAtendimento({
-          data: {
-            atendimento_id: atendId,
-            agendamento_id: (atendimento as any).agendamento_id || null,
-            pet_id: (atendimento as any).pet_id,
-            cliente_id: (atendimento as any).cliente_id || null,
-            servicos_executados: executados.map((s) => ({
-              id: (s as any).id,
-              servico_id: s.servico_id,
-              nome: s.nome,
-              valor: Number(s.valor_total || s.valor_unit || 0),
-              categoria: s.categoria
-            }))
-          }
-        });
-      }
 
-
+      // 6. Atualiza o agendamento vinculado para finalizado
       if ((atendimento as any).agendamento_id) {
         await supabase.from("agendamentos")
           .update({ status: "finalizado" })
           .eq("id", (atendimento as any).agendamento_id);
       }
-      const hojeISO = new Date().toISOString().slice(0, 10);
+
+      // 7. Atualiza o cadastro do pet
       if ((atendimento as any).pet_id) {
         const petPatch: Record<string, any> = {
-          proxima_visita: (atendimento as any).proxima_visita ?? null,
+          proxima_visita: prox || (atendimento as any).proxima_visita || null,
         };
         if (executados.some(isBanho)) petPatch.ultimo_banho = hojeISO;
         if (executados.some(isTosa)) petPatch.ultima_tosa = hojeISO;
         await supabase.from("pets").update(petPatch as any).eq("id", (atendimento as any).pet_id);
       }
-      await confirmarEtapa(8);
     },
     onSuccess: () => {
       toast.success("Atendimento encerrado com sucesso");
@@ -753,6 +839,8 @@ function AtendimentoDetalhe() {
       qc.invalidateQueries({ queryKey: ["atendimentos-painel"] });
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["pets"] });
       navigate({ to: "/atendimentos" });
     },
     onError: (e: any) => toast.error(e.message ?? "Erro ao encerrar"),
@@ -2126,21 +2214,14 @@ function AtendimentoDetalhe() {
                 <CheckCircle2 className="h-5 w-5 text-primary" /> Encerrar atendimento
               </h2>
               {pendentesFinais.length > 0 ? (
-                <>
-                  <p className="text-sm text-muted-foreground mb-2">Etapas pendentes:</p>
-                  <ul className="text-sm space-y-1 mb-3">
-                    {pendentesFinais.map((p) => (
-                      <li key={p} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> {p}
-                      </li>
-                    ))}
-                  </ul>
-                </>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Ao encerrar o atendimento, todas as informações e pendências serão salvas e o agendamento será concluído na agenda.
+                </p>
               ) : (
                 <p className="text-sm text-success mb-3">Todas as etapas confirmadas.</p>
               )}
               <Button className="w-full h-12 uppercase"
-                disabled={readOnly || encerrado || encerrarMut.isPending || pendentesFinais.length > 0}
+                disabled={readOnly || encerrado || encerrarMut.isPending}
                 onClick={() => encerrarMut.mutate()}>
                 <CheckCircle2 className="h-5 w-5 mr-2" />
                 {encerrado ? "Já encerrado" : encerrarMut.isPending ? "Encerrando…" : "Encerrar atendimento"}
