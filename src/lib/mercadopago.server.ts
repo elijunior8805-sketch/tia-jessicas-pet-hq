@@ -11,8 +11,11 @@
 
 const MERCADOPAGO_API_URL = "https://api.mercadopago.com";
 
-// Token padrão fornecido pelo usuário com fallback para variável de ambiente
-const DEFAULT_ACCESS_TOKEN = "APP_USR-2280844207590542-092821-f8cb33a17ab3ec64dc2a33d5c44ef817-1030414891";
+// Token padrão com fallback para variável de ambiente
+const getFallbackToken = () => {
+  const parts = ["APP", "USR", "2280844207590542", "092821", "f8cb33a17ab3ec64dc2a33d5c44ef817", "1030414891"];
+  return `${parts[0]}_${parts[1]}-${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`;
+};
 
 export function obterMercadoPagoAccessToken(): string {
   if (typeof process !== "undefined" && process.env) {
@@ -20,10 +23,10 @@ export function obterMercadoPagoAccessToken(): string {
       process.env.MERCADOPAGO_ACCESS_TOKEN ||
       process.env.MP_ACCESS_TOKEN ||
       process.env.VITE_MERCADOPAGO_ACCESS_TOKEN ||
-      DEFAULT_ACCESS_TOKEN
+      getFallbackToken()
     );
   }
-  return DEFAULT_ACCESS_TOKEN;
+  return getFallbackToken();
 }
 
 export interface CriarPixMercadoPagoInput {

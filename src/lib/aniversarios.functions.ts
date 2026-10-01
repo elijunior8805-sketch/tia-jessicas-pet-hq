@@ -395,24 +395,10 @@ DIRETRIZES:
           const raw = parsed?.choices?.[0]?.message?.content?.trim();
           if (raw) return { mensagem: raw };
         }
-        } else {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-          const res = await fetch(directUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-            }),
-          });
-          if (res.ok) {
-            const parsed = await res.json();
-            const raw = parsed?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (raw) return { mensagem: raw };
-          }
-        }
       } catch (err) {
         console.warn("Erro ao gerar mensagem de aniversário com IA:", err);
       }
+    }
     }
 
     return {

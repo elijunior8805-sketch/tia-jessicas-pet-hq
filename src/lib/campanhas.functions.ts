@@ -521,34 +521,10 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte schema:
           const rawContent = parsed?.choices?.[0]?.message?.content;
           if (rawContent) responseJson = JSON.parse(rawContent);
         }
-        } else {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-          const res = await fetch(directUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-                  parts: [
-                    {
-                      text: `${promptSistema}\n\nTema da campanha: ${tema}\nResponda APENAS com o JSON válido.`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                responseMimeType: "application/json",
-              },
-            }),
-          });
-          if (res.ok) {
-            const parsed = await res.json();
-            const rawContent = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (rawContent) responseJson = JSON.parse(rawContent);
-          }
-        }
+      } catch (e) {
+        console.error("Erro na chamada de IA para gerar campanha:", e);
+      }
+    }
 
         if (responseJson && responseJson.titulo && responseJson.textoOferta) {
           return {
@@ -650,21 +626,6 @@ ${mensagemAtual}`;
           const parsed = await res.json();
           const texto = parsed?.choices?.[0]?.message?.content?.trim();
           if (texto) return { mensagemAjustada: texto };
-        }
-        } else {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-          const res = await fetch(directUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-            }),
-          });
-          if (res.ok) {
-            const parsed = await res.json();
-            const texto = parsed?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (texto) return { mensagemAjustada: texto };
-          }
         }
       } catch (e) {
         console.error("Erro ao ajustar mensagem com IA:", e);
