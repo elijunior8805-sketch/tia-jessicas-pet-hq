@@ -399,7 +399,6 @@ DIRETRIZES:
         console.warn("Erro ao gerar mensagem de aniversário com IA:", err);
       }
     }
-    }
 
     return {
       mensagem: `Oi, ${primeiroNome}! 🐾 Parabéns pro ${petNome} pelo seu aniversário! 🎂🎈\n\nComo forma de comemoração, preparamos de presente um acerto de patinhas e uma hidratação de pelos cortesia no próximo banho dele(a) no Spa de Pet Tia Jéssica! ✨\n\nPodemos agendar o horário especial dele(a) esta semana? Te esperamos com muito carinho! 💚`,

@@ -521,10 +521,6 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte schema:
           const rawContent = parsed?.choices?.[0]?.message?.content;
           if (rawContent) responseJson = JSON.parse(rawContent);
         }
-      } catch (e) {
-        console.error("Erro na chamada de IA para gerar campanha:", e);
-      }
-    }
 
         if (responseJson && responseJson.titulo && responseJson.textoOferta) {
           return {
