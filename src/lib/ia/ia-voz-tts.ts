@@ -8,6 +8,12 @@
  * 4. Cadência de respiração e segmentação por frases para evitar voz robótica ou corte do navegador.
  */
 
+import {
+  sintetizarVozNeural,
+  NeuralVoiceConfig,
+  obterChavesNeuralTTS,
+} from "./ia-voz-neural.service";
+
 /**
  * Converte um número inteiro (0 a 999.999.999) para texto por extenso em Português do Brasil.
  */
@@ -359,6 +365,8 @@ export function segmentarEmFrases(texto: string): string[] {
 
 export interface ReproduzirFalaOptions {
   ttsEnabled?: boolean;
+  preferNeural?: boolean;
+  neuralConfig?: Partial<NeuralVoiceConfig>;
   onStart?: () => void;
   onFinish?: () => void;
   onError?: (erro: any) => void;
@@ -372,15 +380,17 @@ export interface ControladorFala {
 const utterancesAtivas = new Set<SpeechSynthesisUtterance>();
 
 /**
- * Reproduz o texto com síntese de voz fluida, humana e natural no navegador (Mobile e Desktop).
+ * Reproduz o texto com síntese de voz fluida, humana e natural.
+ * Prioriza áudio neural de estúdio (OpenAI TTS / ElevenLabs) com fallback instantâneo
+ * para o motor fonético nativo do navegador.
  */
 export function reproduzirFalaHumana(
   textoOriginal: string,
   options: ReproduzirFalaOptions = {}
 ): ControladorFala {
-  const { ttsEnabled = true, onStart, onFinish, onError } = options;
+  const { ttsEnabled = true, preferNeural = true, neuralConfig, onStart, onFinish, onError } = options;
 
-  if (typeof window === "undefined" || !window.speechSynthesis || !ttsEnabled) {
+  if (!ttsEnabled || !textoOriginal || typeof window === "undefined") {
     onFinish?.();
     return { cancelar: () => {} };
   }
@@ -392,96 +402,160 @@ export function reproduzirFalaHumana(
   }
 
   let cancelado = false;
+  let audioNeuralElement: HTMLAudioElement | null = null;
+  let abortController: AbortController | null = null;
   let timerSafety: any = null;
 
-  try {
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.resume();
-  } catch {}
-
-  const melhorVoz = obterMelhorVozPtBr();
-  const frases = segmentarEmFrases(textoHumanizado);
-  let indexFrase = 0;
-
-  const falarProximaFrase = () => {
+  const fallbackNativoWebSpeech = () => {
     if (cancelado) return;
 
-    if (indexFrase >= frases.length) {
-      if (timerSafety) clearTimeout(timerSafety);
-      onFinish?.();
-      return;
-    }
-
-    const fraseAtual = frases[indexFrase];
-    indexFrase++;
-
     try {
-      const utterance = new SpeechSynthesisUtterance(fraseAtual);
-      utterance.lang = "pt-BR";
-      // Ritmo fluido, dinâmico e conversacional (evita voz lenta/arrastada)
-      const ehLonga = fraseAtual.length > 120;
-      const ehPergunta = /\?\s*$/.test(fraseAtual);
-       utterance.rate = ehLonga ? 0.96 : 0.99;
-      // Perguntas ganham entonação ascendente calorosa; afirmativas soam firmes e empáticas
-       utterance.pitch = ehPergunta ? 1.06 : 1.02;
-      utterance.volume = 1.0;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+    } catch {}
 
-      if (melhorVoz) {
-        utterance.voice = melhorVoz;
+    const melhorVoz = obterMelhorVozPtBr();
+    const frases = segmentarEmFrases(textoHumanizado);
+    let indexFrase = 0;
+
+    const falarProximaFrase = () => {
+      if (cancelado) return;
+
+      if (indexFrase >= frases.length) {
+        if (timerSafety) clearTimeout(timerSafety);
+        onFinish?.();
+        return;
       }
 
-      // Retém referência para evitar GC prematuro no Chromium / Safari
-      utterancesAtivas.add(utterance);
+      const fraseAtual = frases[indexFrase];
+      indexFrase++;
 
-      const limparUtterance = () => {
-        utterancesAtivas.delete(utterance);
-      };
+      try {
+        const utterance = new SpeechSynthesisUtterance(fraseAtual);
+        utterance.lang = "pt-BR";
+        const ehLonga = fraseAtual.length > 120;
+        const ehPergunta = /\?\s*$/.test(fraseAtual);
+        utterance.rate = ehLonga ? 0.96 : 0.99;
+        utterance.pitch = ehPergunta ? 1.06 : 1.02;
+        utterance.volume = 1.0;
 
-      utterance.onstart = () => {
-        if (indexFrase === 1) {
-          onStart?.();
+        if (melhorVoz) {
+          utterance.voice = melhorVoz;
         }
-      };
 
-      utterance.onend = () => {
-        limparUtterance();
-        if (cancelado) return;
-        // Respiração natural: micropausa fluida entre orações sem silêncio morto
-        const pausa = ehPergunta ? 160 : ehLonga ? 110 : 80;
-        setTimeout(() => {
+        utterancesAtivas.add(utterance);
+
+        const limparUtterance = () => {
+          utterancesAtivas.delete(utterance);
+        };
+
+        utterance.onstart = () => {
+          if (indexFrase === 1) {
+            onStart?.();
+          }
+        };
+
+        utterance.onend = () => {
+          limparUtterance();
+          if (cancelado) return;
+          const pausa = ehPergunta ? 160 : ehLonga ? 110 : 80;
+          setTimeout(() => {
+            falarProximaFrase();
+          }, pausa);
+        };
+
+        utterance.onerror = (e) => {
+          limparUtterance();
+          if (cancelado) return;
+          console.warn("[TTS Fallback Warning]:", e);
+          onError?.(e);
           falarProximaFrase();
-        }, pausa);
-      };
+        };
 
-      utterance.onerror = (e) => {
-        limparUtterance();
-        if (cancelado) return;
-        console.warn("[TTS Warning]:", e);
-        onError?.(e);
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("[TTS Fallback Exception]:", err);
         falarProximaFrase();
-      };
+      }
+    };
 
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      console.warn("[TTS Exception]:", err);
-      falarProximaFrase();
-    }
+    const tempoTotalEstimado = Math.max(3000, textoHumanizado.length * 80 + 3000);
+    timerSafety = setTimeout(() => {
+      if (!cancelado) {
+        onFinish?.();
+      }
+    }, tempoTotalEstimado);
+
+    falarProximaFrase();
   };
 
-  // Timer de segurança geral contra congelamentos do navegador
-  const tempoTotalEstimado = Math.max(3000, textoHumanizado.length * 80 + 3000);
-  timerSafety = setTimeout(() => {
-    if (!cancelado) {
-      onFinish?.();
-    }
-  }, tempoTotalEstimado);
+  // 1. Tenta sintetizar voz neural de estúdio se configurado/disponível
+  const keys = obterChavesNeuralTTS();
+  const temChaveNeural = Boolean(keys.openaiKey || keys.elevenlabsKey || neuralConfig?.openaiApiKey || neuralConfig?.elevenlabsApiKey);
 
-  // Inicia a fala imediatamente de forma suave
-  falarProximaFrase();
+  if (preferNeural && temChaveNeural) {
+    abortController = new AbortController();
+
+    sintetizarVozNeural(textoHumanizado, neuralConfig, abortController.signal)
+      .then((res) => {
+        if (cancelado) {
+          if (res?.url) URL.revokeObjectURL(res.url);
+          return;
+        }
+
+        if (!res || !res.url) {
+          // Fallback para Web Speech nativo
+          fallbackNativoWebSpeech();
+          return;
+        }
+
+        audioNeuralElement = new Audio(res.url);
+        audioNeuralElement.onplay = () => {
+          onStart?.();
+        };
+        audioNeuralElement.onended = () => {
+          URL.revokeObjectURL(res.url);
+          audioNeuralElement = null;
+          onFinish?.();
+        };
+        audioNeuralElement.onerror = (err) => {
+          console.warn("[Neural Audio Playback Error]:", err);
+          URL.revokeObjectURL(res.url);
+          audioNeuralElement = null;
+          fallbackNativoWebSpeech();
+        };
+
+        audioNeuralElement.play().catch((playErr) => {
+          console.warn("[Neural Audio Play Exception, falling back]:", playErr);
+          URL.revokeObjectURL(res.url);
+          audioNeuralElement = null;
+          fallbackNativoWebSpeech();
+        });
+      })
+      .catch((err) => {
+        console.warn("[Neural TTS Service Error, falling back]:", err);
+        fallbackNativoWebSpeech();
+      });
+  } else {
+    // 2. Executa imediatamente o motor fonético nativo do navegador
+    fallbackNativoWebSpeech();
+  }
 
   return {
     cancelar: () => {
       cancelado = true;
+      if (abortController) {
+        try {
+          abortController.abort();
+        } catch {}
+      }
+      if (audioNeuralElement) {
+        try {
+          audioNeuralElement.pause();
+          audioNeuralElement.currentTime = 0;
+          audioNeuralElement = null;
+        } catch {}
+      }
       if (timerSafety) clearTimeout(timerSafety);
       utterancesAtivas.clear();
       if (typeof window !== "undefined" && window.speechSynthesis) {
