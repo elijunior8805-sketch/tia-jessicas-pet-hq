@@ -489,11 +489,8 @@ export function reproduzirFalaHumana(
     falarProximaFrase();
   };
 
-  // 1. Tenta sintetizar voz neural de estúdio se configurado/disponível
-  const keys = obterChavesNeuralTTS();
-  const temChaveNeural = Boolean(keys.openaiKey || keys.elevenlabsKey || neuralConfig?.openaiApiKey || neuralConfig?.elevenlabsApiKey);
-
-  if (preferNeural && temChaveNeural) {
+  // 1. Tenta sintetizar voz neural de estúdio (Edge Neural 24kHz 100% gratuita, ElevenLabs ou OpenAI)
+  if (preferNeural) {
     abortController = new AbortController();
 
     sintetizarVozNeural(textoHumanizado, neuralConfig, abortController.signal)
