@@ -229,20 +229,20 @@ export class VoiceRecognizer {
     const palavras = textoAtual.split(/\s+/).filter(Boolean);
 
     // Detecção dinâmica de latência:
-    // 1. Respostas rápidas e confirmações explícitas de 1 única palavra ("sim", "pode confirmar", "cancela") -> 1200ms
+    // 1. Respostas rápidas e confirmações explícitas de 1 única palavra ("sim", "pode confirmar", "cancela") -> 550ms
     const ehConfirmacaoExplicita =
-      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|autorizado)$/i.test(textoAtual);
+      /^(pode confirmar|confirmar|confirma|sim|cancela|cancelar|não|nao|ok|autorizado|pode)$/i.test(textoAtual);
 
-    // 2. Frases incompletas terminadas em preposição ou artigo ("de", "para", "no", "com", "o", "a") ganham mais tempo
+    // 2. Frases incompletas terminadas em preposição ou artigo ("de", "para", "no", "com", "o", "a") ganham um pequeno fôlego
     const terminaEmPreposicao = /\b(de|do|da|para|pra|no|na|com|em|um|uma|por|o|a|e|ao|aos|à|às|ou|que)$/i.test(textoAtual);
 
-    let delayCalculado = this.silenceMs || 2500;
+    let delayCalculado = this.silenceMs || 850;
     if (ehConfirmacaoExplicita) {
-      delayCalculado = 1200;
+      delayCalculado = 550;
     } else if (terminaEmPreposicao) {
-      delayCalculado = 3500;
+      delayCalculado = 1600;
     } else {
-      delayCalculado = 2500;
+      delayCalculado = 850;
     }
 
     this.silenceTimer = setTimeout(() => {
@@ -280,7 +280,7 @@ export class VoiceRecognizer {
     // Proteção rigorosa contra envio duplicado da mesma frase em janela curta (< 2s)
     if (
       this.ultimaFalaEnviada.toLowerCase() === textoCompleto.toLowerCase() &&
-      agora - this.ultimoEnvioTimestamp < 2500
+      agora - this.ultimoEnvioTimestamp < 2000
     ) {
       this.acumulado = "";
       this.interimAtual = "";
@@ -311,14 +311,14 @@ export class VoiceRecognizer {
     if (this.isPaused || this.pararSolicitado || !this.isContinuous) return;
 
     const agora = Date.now();
-    if (agora - this.lastReconnectTime > 5000) {
+    if (agora - this.lastReconnectTime > 15000) {
       this.reconnectAttempts = 0;
     }
     this.lastReconnectTime = agora;
     this.reconnectAttempts++;
 
-    // Prevenção de loop infinito de reconexão
-    if (this.reconnectAttempts > 10) {
+    // Só interrompe se houver mais de 50 falhas seguidas sem nenhuma fala em janela curta
+    if (this.reconnectAttempts > 50) {
       console.warn("[VoiceRecognizer] Limite de reconexões atingido.");
       this.isContinuous = false;
       this.setStatus("idle");
@@ -326,7 +326,7 @@ export class VoiceRecognizer {
       return;
     }
 
-    const delay = this.reconnectAttempts > 3 ? 300 : 80;
+    const delay = this.reconnectAttempts > 5 ? 200 : 50;
     setTimeout(() => {
       if (this.isContinuous && !this.pararSolicitado && !this.isPaused) {
         try {
