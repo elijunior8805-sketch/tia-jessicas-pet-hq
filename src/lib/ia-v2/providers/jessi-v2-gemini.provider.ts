@@ -511,38 +511,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         "";
     }
 
-    if (!chave && typeof import.meta !== "undefined" && (import.meta as any).env) {
-      const env = (import.meta as any).env;
-      chave =
-        env.VITE_GROQ_API_KEY ||
-        env.GROQ_API_KEY ||
-        env.VITE_LOVABLE_API_KEY ||
-        env.LOVABLE_API_KEY ||
-        env.VITE_OPENAI_API_KEY ||
-        env.OPENAI_API_KEY ||
-        env.VITE_GEMINI_API_KEY ||
-        env.GEMINI_API_KEY ||
-        env.VITE_GOOGLE_AI_API_KEY ||
-        env.GOOGLE_AI_API_KEY ||
-        "";
-    }
-
-    if (!chave && typeof globalThis !== "undefined") {
-      chave = (globalThis as any).__JESSI_API_KEY__ || "";
-    }
-
-    if (!chave) {
-      try {
-        // Fallback de runtime garantido para produção
-        const k1 = ["g", "s", "k", "_", "b", "0", "B", "l", "O", "9", "f", "x"].join("");
-        const k2 = ["V", "e", "z", "j", "h", "y", "E", "j", "x", "J", "C", "R", "W", "G", "d", "y", "b", "3", "F", "Y"].join("");
-        const k3 = ["i", "H", "j", "U", "W", "4", "s", "S", "H", "Q", "I", "l", "e", "T", "0", "l", "M", "D", "X", "G", "V", "O", "Z", "9"].join("");
-        chave = `${k1}${k2}${k3}`;
-      } catch {
-        chave = "";
-      }
-    }
-
     // Sem chave configurada — logar erro claro
     if (!chave) {
       console.error("[JessiV2] ERRO CRÍTICO: Nenhuma chave de IA configurada.");
@@ -1419,8 +1387,9 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       msg.includes("mensagens de cobranca") ||
       msg.includes("cobranca cordial")
     ) {
-      const resAbertos = await FinanceiroRelatoriosAdapter.obterPagamentosEmAberto(sb);
-      const lista = resAbertos?.data || [];
+      const resAbertos = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb);
+      if (!resAbertos.success) return { texto: "Não consegui consultar os pagamentos em aberto agora. Tente novamente em instantes." };
+      const lista = ((resAbertos.data as any)?.itens_pendentes || []) as any[];
       const totalPendente = lista.reduce((acc: number, item: any) => acc + (Number(item.valor) || 0), 0);
 
       if (lista.length === 0) {
@@ -1500,10 +1469,11 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       (msg.includes("financeiro") && !msg.includes("ficha") && !msg.includes("cliente"))
     ) {
       const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
-      const resFin = await FinanceiroRelatoriosAdapter.obterConsolidadoFinanceiro(sb, periodo);
-      const d = resFin?.data || resFin;
-      const totalRecebido = Number(d?.totalRecebido || d?.faturamento || 0);
-      const totalPendente = Number(d?.totalPendente || d?.valoresAReceber || 0);
+      const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, periodo);
+      if (!resFin.success) return { texto: "Não consegui consultar o financeiro agora. Tente novamente em instantes." };
+      const d = resFin.data;
+      const totalRecebido = Number(d.valoresRecebidos || 0);
+      const totalPendente = Number(d.valoresAReceber || 0) + Number(d.valoresVencidosDevedores || 0);
       const ticketMedio = Number(d?.ticketMedio || 0);
 
       let textoFin = `Aqui está o panorama financeiro de **${periodo === "hoje" ? "hoje" : periodo === "semana" ? "esta semana" : "deste mês"}**, ${nomeOp}: já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}** e temos **R$ ${totalPendente.toFixed(2).replace(".", ",")}** a receber (ticket médio: R$ ${ticketMedio.toFixed(2).replace(".", ",")}).`;
