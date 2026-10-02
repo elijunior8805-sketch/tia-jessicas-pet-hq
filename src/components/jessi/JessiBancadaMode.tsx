@@ -318,6 +318,7 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
                           data={card.data}
                           onConfirmar={onConfirmAction}
                           onCancelar={onCancelAction}
+                          onActionClick={onSendMessage}
                           isLoading={isLoading}
                         />
                       );

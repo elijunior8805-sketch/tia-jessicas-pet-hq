@@ -263,6 +263,7 @@ export const JessiChat: React.FC<JessiChatProps> = ({
                             data={card.data}
                             onConfirmar={onConfirmAction}
                             onCancelar={onCancelAction}
+                            onActionClick={onSendMessage}
                             isLoading={isLoading}
                           />
                         );

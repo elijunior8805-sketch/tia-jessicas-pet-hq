@@ -144,13 +144,13 @@ export async function processarMensagemJessiV2Core(
           const [d, h] = String(params.dataHora || params.data || "").split(/[T ]/);
           const diaNum = d ? d.split("-")[2] || d : "";
           const horaStr = (h || params.hora) ? String(h || params.hora).slice(0, 5) : "";
-          const petStr = params.petNome ? ` para o(a) **${params.petNome}**` : "";
+          const petStr = params.petNome ? ` para **${params.petNome}**` : "";
           const dataHoraStr = (diaNum && horaStr) ? ` no dia **${diaNum}**, às **${horaStr}**` : "";
-          respostaTexto = `Perfeito! Agendamento confirmado com sucesso${petStr}${dataHoraStr}! Já incluí na grade do Spa.`;
+          respostaTexto = `Agendamento confirmado${petStr}${dataHoraStr}! O atendimento já está garantido na grade.`;
         } else if (toolNome === "cancelar_agendamento" || toolNome === "preparar_cancelamento") {
-          respostaTexto = `Cancelamento realizado com sucesso! O horário já foi liberado na grade de atendimentos.`;
+          respostaTexto = `Cancelamento concluído. O horário foi liberado na grade de atendimentos.`;
         } else if (toolNome === "reagendar_agendamento" || toolNome === "preparar_reagendamento") {
-          respostaTexto = `Horário remarcado com sucesso! A grade já foi devidamente atualizada.`;
+          respostaTexto = `Remarcação confirmada com sucesso. A grade já foi atualizada.`;
         } else {
           respostaTexto = mutationResult?.summary || `Operação realizada com sucesso!`;
         }
@@ -162,13 +162,14 @@ export async function processarMensagemJessiV2Core(
             executado: true,
             tool: toolNome,
             registroId: recordIdReal,
+            agendamentoId: recordIdReal || (params as any)?.agendamentoId,
             resultado: mutationResult,
             params,
             gravacaoVerificada: true,
           },
         });
       } else {
-        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro desconhecido na execução da operação."}`;
+        respostaTexto = `Não foi possível concluir a gravação: ${mutationResult?.summary || "Erro na execução da operação."}`;
       }
 
       registrarAuditoriaV2({
@@ -190,7 +191,15 @@ export async function processarMensagemJessiV2Core(
         respostaTexto,
         cards,
         pendingAction: null,
-        novoContexto: { operacaoPreparada: null, acaoPendente: null } as any,
+        novoContexto: {
+          ...contextoAtual,
+          operacaoPreparada: null,
+          acaoPendente: null,
+          ultimoAgendamentoId: recordIdReal || (params as any)?.agendamentoId || contextoAtual.ultimoAgendamentoId,
+          agendamentoId: recordIdReal || (params as any)?.agendamentoId || contextoAtual.agendamentoId,
+          pet: params?.petNome ? { id: params?.petId, nome: params?.petNome } : contextoAtual.pet,
+          cliente: params?.clienteNome ? { id: params?.clienteId, nome: params?.clienteNome } : contextoAtual.cliente,
+        } as any,
         tempoProcessamentoMs: Date.now() - inicioMs,
         correlationId,
       };

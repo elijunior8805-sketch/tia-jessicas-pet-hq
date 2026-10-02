@@ -922,7 +922,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
 
     // 3. DISPATCHER RESILIENTE DE BACKUP (caso a rede/IA esteja offline)
     // Garante que mesmo offline ou sem resposta do gateway, o comando é executado com dados reais do Supabase e fala humanizada!
-    const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli");
+    const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli", contexto);
     if (despachoResiliente) {
       if (despachoResiliente.card) {
         cards.push(despachoResiliente.card);
@@ -936,7 +936,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     }
 
     return {
-      respostaTexto: `Entendido, ${user?.nome || "Eli"}! Como posso te ajudar na operação do Spa de Pet agora? Você pode consultar a agenda de hoje, buscar um cliente ou pet, ver o financeiro ou horários livres.`,
+      respostaTexto: `Como posso te ajudar agora, ${user?.nome || "Eli"}? Posso consultar a agenda, agendar ou cancelar atendimentos, ver o financeiro ou buscar clientes.`,
       cards,
       pendingAction: null,
       novoContexto: {},
@@ -950,7 +950,8 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     sb: SupabaseClient<Database>,
     mensagemUsuario: string,
     hojeStr: string,
-    operadorNome: string
+    operadorNome: string,
+    contexto?: any
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any; pendingAction?: any } | null> {
     const nomeOp = operadorNome || "Eli";
 
@@ -1060,15 +1061,16 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
 
     if (isCancelIntent) {
       const termoNome = mensagemUsuario
-        .replace(/\b(eu|quero|por|favor|cancelar|cancela|desmarcar|desmarca|o|a|os|as|do|da|de|no|na|em|dia|agendamento|horario|horário|atendimento|banho|tosa|para|às|as|horas|hora|manhã|manha|tarde|noite)\b/gi, "")
+        .replace(/\b(eu|quero|por|favor|cancelar|cancela|desmarcar|desmarca|o|a|os|as|do|da|de|no|na|em|dia|agendamento|horario|horário|atendimento|banho|tosa|para|às|as|horas|hora|manhã|manha|tarde|noite|esse|este|essa|este agendamento|esse agendamento)\b/gi, "")
         .replace(/\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b/g, "")
         .replace(/\b\d{1,2}(?:[:h]\d{2}|h|\s*horas)?\b/gi, "")
         .replace(/[^\w\s\u00C0-\u00FF]/gi, "")
         .trim();
 
       const resCancel = await AgendaAdapter.prepararPropostaCancelamento(sb, {
-        petNome: termoNome || undefined,
-        clienteNome: termoNome || undefined,
+        agendamentoId: contexto?.ultimoAgendamentoId || contexto?.agendamentoId || undefined,
+        petNome: termoNome || contexto?.pet?.nome || undefined,
+        clienteNome: termoNome || contexto?.cliente?.nome || undefined,
         motivo: "Cancelamento solicitado pelo tutor/operador",
       });
 
@@ -1076,7 +1078,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       const petLabel = d.petNome || (termoNome ? termoNome : "o Pet");
 
       return {
-        texto: `Preparei a proposta de cancelamento para o agendamento de **${petLabel}**, ${nomeOp}. Toque em Confirmar no card abaixo para efetivar a desmarcação e liberar a vaga na grade.`,
+        texto: `Preparei o cancelamento do agendamento de **${petLabel}**. Toque em Confirmar para liberar a vaga na grade.`,
         card: {
           type: "confirmacao",
           title: `Cancelar Agendamento: ${petLabel}`,
@@ -1090,6 +1092,10 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
           },
         },
         pendingAction: resCancel?.pendingAction || null,
+        novoContexto: {
+          agendamentoId: d.agendamentoId,
+          ultimoAgendamentoId: d.agendamentoId,
+        },
       };
     }
 
@@ -1127,15 +1133,16 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       }
 
       const termoNome = mensagemUsuario
-        .replace(/\b(eu|quero|por|favor|reagendar|remarcar|trocar|troca|mudar|muda|alterar|a|o|os|as|do|da|de|no|na|em|dia|data|horario|horário|atendimento|banho|tosa|para|às|as|horas|hora|manhã|manha|tarde|noite)\b/gi, "")
+        .replace(/\b(eu|quero|por|favor|reagendar|remarcar|trocar|troca|mudar|muda|alterar|a|o|os|as|do|da|de|no|na|em|dia|data|horario|horário|atendimento|banho|tosa|para|às|as|horas|hora|manhã|manha|tarde|noite|este|esse|essa|este agendamento|esse agendamento)\b/gi, "")
         .replace(/\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b/g, "")
         .replace(/\b\d{1,2}(?:[:h]\d{2}|h|\s*horas)?\b/gi, "")
         .replace(/[^\w\s\u00C0-\u00FF]/gi, "")
         .trim();
 
       const resRemarcar = await AgendaAdapter.prepararPropostaReagendamento(sb, {
-        petNome: termoNome || undefined,
-        clienteNome: termoNome || undefined,
+        agendamentoId: contexto?.ultimoAgendamentoId || contexto?.agendamentoId || undefined,
+        petNome: termoNome || contexto?.pet?.nome || undefined,
+        clienteNome: termoNome || contexto?.cliente?.nome || undefined,
         novaData,
         novaHora,
         motivo: "Remarcação solicitada pelo tutor/operador",
@@ -1146,7 +1153,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       const diaFormatado = novaData.split("-").reverse().slice(0, 2).join("/");
 
       return {
-        texto: `Preparei a proposta de remarcação do atendimento de **${petLabel}** para o dia **${diaFormatado}** às **${novaHora}**, ${nomeOp}! Toque em Confirmar no card para atualizar a grade.`,
+        texto: `Preparei a remarcação de **${petLabel}** para o dia **${diaFormatado}** às **${novaHora}**. Toque em Confirmar para atualizar a grade.`,
         card: {
           type: "confirmacao",
           title: `Remarcar: ${petLabel}`,
@@ -1163,6 +1170,10 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
           },
         },
         pendingAction: resRemarcar?.pendingAction || null,
+        novoContexto: {
+          agendamentoId: d.agendamentoId,
+          ultimoAgendamentoId: d.agendamentoId,
+        },
       };
     }
 
