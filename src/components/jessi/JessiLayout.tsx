@@ -16,276 +16,601 @@ import { Sparkles, PanelRightOpen, PanelRightClose, Mic, Headphones } from "luci
 import { Button } from "@/components/ui/button";
 
 export const JessiLayout: React.FC = () => {
- const processarMensagemFn = useServerFn(processarMensagemJessi);
- const obterCentralFn = useServerFn(obterCentralOperacionalJessiFn);
- const [messages, setMessages] = useState<JessiMessage[]>([]);
- const [inputText, setInputText] = useState("");
- const [isLoading, setIsLoading] = useState(false);
- const [status, setStatus] = useState<JessiStatus>("disponivel");
- const [statusDetalhe, setStatusDetalhe] = useState<string | undefined>();
- const [selectedFile, setSelectedFile] = useState<File | null>(null);
- const [filePreview, setFilePreview] = useState<string | null>(null);
- const [centralData, setCentralData] = useState<JessiProactiveCentral | null>(null);
- const [isLoadingCentral, setIsLoadingCentral] = useState(true);
- const [contexto, setContexto] = useState<JessiContextState>({
- dataReferencia: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
- });
- const [isContextOpen, setIsContextOpen] = useState(false);
- const [moduloAtivo, setModuloAtivo] = useState("rotina");
- const [isBancadaModeOpen, setIsBancadaModeOpen] = useState(false);
+  const processarMensagemFn = useServerFn(processarMensagemJessi);
+  const obterCentralFn = useServerFn(obterCentralOperacionalJessiFn);
 
- React.useEffect(() => {
- async function carregarCentral() {
- try {
- setIsLoadingCentral(true);
- const res = await obterCentralFn();
- setCentralData(res);
- } catch (err) {
- console.warn("Aviso ao carregar central proativa da Jessi:", err);
- } finally {
- setIsLoadingCentral(false);
- }
- }
- carregarCentral();
- }, []);
+  const [messages, setMessages] = useState<JessiMessage[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<JessiStatus>("disponivel");
+  const [statusDetalhe, setStatusDetalhe] = useState<string | undefined>();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [centralData, setCentralData] = useState<JessiProactiveCentral | null>(null);
+  const [isLoadingCentral, setIsLoadingCentral] = useState(true);
+  const [contexto, setContexto] = useState<JessiContextState>({
+    dataReferencia: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+  });
+  const [isContextOpen, setIsContextOpen] = useState(false);
+  const [moduloAtivo, setModuloAtivo] = useState("rotina");
+  const [isBancadaModeOpen, setIsBancadaModeOpen] = useState(false);
 
- const handleSendMessageRef = React.useRef<((text?: string) => Promise<void>) | null>(null);
- const {
- voiceStatus,
- isListening,
- isContinuousMode,
- interimTranscript,
- finalTranscript,
- isSpeaking,
- audioLevel,
- isInterrupted,
- ttsEnabled,
- setTtsEnabled,
- startListening,
- stopListening,
- startContinuousMode,
- stopContinuousMode,
- toggleContinuousMode,
- pauseListening,
- resumeListening,
- cancelListening,
- resetTranscript,
- speakResponse,
- falarResposta,
- pararFala,
- } = useJessiVoice(
- (textoFinal) => {
- if (!isContinuousMode && textoFinal.trim()) {
- setInputText(textoFinal);
- }
- },
- (textoParaEnvio) => {
- if (textoParaEnvio.trim() && handleSendMessageRef.current) {
- handleSendMessageRef.current(textoParaEnvio.trim());
- }
- }
- );
+  // Carrega a Central Operacional Proativa com dados 100% reais do banco na inicializacao
+  React.useEffect(() => {
+    async function carregarCentral() {
+      try {
+        setIsLoadingCentral(true);
+        const res = await obterCentralFn();
+        setCentralData(res);
+      } catch (err) {
+        console.warn("Aviso ao carregar central proativa da Jessi:", err);
+      } finally {
+        setIsLoadingCentral(false);
+      }
+    }
+    carregarCentral();
+  }, []);
 
- React.useEffect(() => {
- if (isLoading) {
- setStatus("processando");
- setStatusDetalhe("Consultando sistema e regras operacionais.");
- } else if (voiceStatus === "sending") {
- setStatus("enviando");
- setStatusDetalhe("Enviando comando.");
- } else if (voiceStatus === "transcribing") {
- setStatus("transcrevendo");
- setStatusDetalhe("Transcrevendo fala.");
- } else if (voiceStatus === "listening") {
- setStatus("ouvindo");
- setStatusDetalhe(isContinuousMode? "Modo Contínuo: Ouvindo.": "Ouvindo sua voz.");
- } else if (isSpeaking) {
- setStatus("processando");
- setStatusDetalhe("Falando resposta.");
- } else if (status === "ouvindo" || status === "transcrevendo" || status === "enviando" || status === "processando") {
- setStatus("disponivel");
- setStatusDetalhe(undefined);
- }
- }, [voiceStatus, isListening, isContinuousMode, isSpeaking, isLoading]);
+  const handleSendMessageRef = React.useRef<((text?: string) => Promise<void>) | null>(null);
 
- const abortControllerRef = React.useRef<AbortController | null>(null);
+  // Hook de reconhecimento de voz continua com deteccao de silencio e auto-envio
+  const {
+    voiceStatus,
+    isListening,
+    isContinuousMode,
+    interimTranscript,
+    finalTranscript,
+    isSpeaking,
+    audioLevel,
+    isInterrupted,
+    ttsEnabled,
+    setTtsEnabled,
+    startListening,
+    stopListening,
+    startContinuousMode,
+    stopContinuousMode,
+    toggleContinuousMode,
+    pauseListening,
+    resumeListening,
+    cancelListening,
+    resetTranscript,
+    speakResponse,
+    falarResposta,
+    pararFala,
+  } = useJessiVoice(
+    (textoFinal) => {
+      if (!isContinuousMode && textoFinal.trim()) {
+        setInputText(textoFinal);
+      }
+    },
+    (textoParaEnvio) => {
+      if (textoParaEnvio.trim() && handleSendMessageRef.current) {
+        handleSendMessageRef.current(textoParaEnvio.trim());
+      }
+    }
+  );
 
- const handleToggleVoice = () => {
- toggleContinuousMode();
- };
+  // Sincroniza status visual quando estiver gravando voz ou em modo continuo
+  React.useEffect(() => {
+    if (isLoading) {
+      setStatus("processando");
+      setStatusDetalhe("Consultando sistema e regras operacionais...");
+    } else if (voiceStatus === "sending") {
+      setStatus("enviando");
+      setStatusDetalhe("Enviando comando...");
+    } else if (voiceStatus === "transcribing") {
+      setStatus("transcrevendo");
+      setStatusDetalhe("Transcrevendo fala...");
+    } else if (voiceStatus === "listening") {
+      setStatus("ouvindo");
+      setStatusDetalhe(isContinuousMode ? "Modo Contínuo: Ouvindo..." : "Ouvindo sua voz...");
+    } else if (isSpeaking) {
+      setStatus("processando");
+      setStatusDetalhe("Falando resposta...");
+    } else if (status === "ouvindo" || status === "transcrevendo" || status === "enviando" || status === "processando") {
+      setStatus("disponivel");
+      setStatusDetalhe(undefined);
+    }
+  }, [voiceStatus, isListening, isContinuousMode, isSpeaking, isLoading]);
 
- const handleCancelProcessing = () => {
- pararFala();
- if (abortControllerRef.current) {
- abortControllerRef.current.abort();
- abortControllerRef.current = null;
- }
- setIsLoading(false);
- setStatus("disponivel");
- setStatusDetalhe(undefined);
- toast.info("Processamento cancelado pelo usuário.");
- if (isContinuousMode) {
- resumeListening();
- }
- };
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
- const handleNovaConversa = () => {
- pararFala();
- if (abortControllerRef.current) {
- abortControllerRef.current.abort();
- abortControllerRef.current = null;
- }
- setMessages([]);
- setContexto({
- dataReferencia: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
- });
- setStatus("disponivel");
- setStatusDetalhe(undefined);
- };
+  const handleToggleVoice = () => {
+    toggleContinuousMode();
+  };
 
- const handleConfirmAction = async (acao: JessiPendingAction) => {
- setIsLoading(true);
- try {
- const res = await processarMensagemFn({ data: { mensagem: "confirmar", contexto, acaoConfirmada: acao } as any });
- if (res?.mensagem) {
- setMessages((prev) => [.prev, res.mensagem as JessiMessage]);
- if (res.contexto) setContexto(res.contexto);
- }
- toast.success("Ação confirmada!");
- if (isContinuousMode) resumeListening();
- } catch (e: any) {
- toast.error(e?.message || "Falha ao confirmar ação");
- } finally {
- setIsLoading(false);
- }
- };
+  const handleCancelProcessing = () => {
+    pararFala();
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setStatus("disponivel");
+    setStatusDetalhe(undefined);
+    toast.info("Processamento cancelado pelo usuário.");
+    if (isContinuousMode) {
+      resumeListening();
+    }
+  };
 
- const handleCancelAction = () => {
- setContexto((prev) => ({.prev, operacaoPreparada: undefined }));
- setMessages((prev) => [.prev, { id: `cancel_${Date.now()}`, role: "assistant", content: "Tudo bem, cancelei a operação pendente." } as JessiMessage]);
- toast.info("Operação cancelada.");
- if (isContinuousMode) resumeListening();
- };
+  const handleNovaConversa = () => {
+    pararFala();
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setMessages([]);
+    setContexto({
+      dataReferencia: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+    });
+    setStatus("disponivel");
+    setStatusDetalhe(undefined);
+  };
 
- const handleSendMessage = async (customText?: string) => {
- if (typeof window!== "undefined" && window.speechSynthesis) {
- try { window.speechSynthesis.resume(); } catch {}
- }
- pauseListening();
- resetTranscript();
- if (isLoading) return;
- pararFala();
- const textToSend = customText || inputText;
- if (!textToSend.trim() &&!selectedFile) {
- if (isContinuousMode) resumeListening();
- return;
- }
- const acaoPendenteAtiva = (contexto as any)?.operacaoPreparada || (messages.slice(-1)[0] as any)?.pendingAction;
- if (acaoPendenteAtiva &&!selectedFile) {
- const textoNorm = textToSend.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
- const ehConfirmacaoVoz = /^(pode confirmar|confirmar|confirma|pode agendar|pode marcar|pode cancelar|pode fazer|sim|autorizado|ok pode confirmar|ta confirmado|confirmo|pode registrar|sim pode|pode|autorizo|confirme)$/i.test(textoNorm) || textoNorm === "sim" || textoNorm === "pode" || textoNorm === "confirma" || textoNorm === "confirmar" || textoNorm === "pode confirmar";
- const ehCancelamentoVoz = /^(cancela|cancelar|nao cancela|nao|esquece|deixa pra la|nao confirma|cancela isso|parar)$/i.test(textoNorm) || textoNorm === "nao" || textoNorm === "não" || textoNorm === "cancela" || textoNorm === "cancelar";
- if (ehConfirmacaoVoz) { setInputText(""); await handleConfirmAction(acaoPendenteAtiva); return; }
- else if (ehCancelamentoVoz) { setInputText(""); handleCancelAction(); return; }
- }
- const userMessageId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
- const userMsg: JessiMessage = {
- id: userMessageId,
- role: "user",
- content: selectedFile? `[Arquivo: ${selectedFile.name}] ${textToSend}`: textToSend,
- } as JessiMessage;
- setMessages((prev) => [.prev, userMsg]);
- setInputText("");
- setSelectedFile(null);
- setFilePreview(null);
- setIsLoading(true);
- const controller = new AbortController();
- abortControllerRef.current = controller;
- try {
- const res = await processarMensagemFn({ data: { mensagem: textToSend, contexto } as any });
- if (controller.signal.aborted) return;
- if (res?.mensagem) {
- setMessages((prev) => [.prev, res.mensagem as JessiMessage]);
- const textoResposta = (res.mensagem as any)?.content || "";
- if (textoResposta && ttsEnabled) falarResposta(textoResposta);
- }
- if (res?.contexto) setContexto(res.contexto);
- } catch (e: any) {
- if (e?.name === "AbortError") return;
- toast.error(e?.message || "Erro ao processar mensagem");
- } finally {
- if (abortControllerRef.current === controller) abortControllerRef.current = null;
- setIsLoading(false);
- if (isContinuousMode) resumeListening();
- }
- };
+  const handleSendMessage = async (customText?: string) => {
+    // 0. Desbloqueia contexto de audio se suportado pelo navegador
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }
 
- handleSendMessageRef.current = handleSendMessage;
+    // 1. Pausa o microfone para nao capturar a propria fala
+    pauseListening();
+    resetTranscript();
 
- const showWelcome = messages.length === 0 &&!isLoading;
+    // 2. Prevencao Rigida de Duplicidade: Impede envio simultaneo se ja estiver processando
+    if (isLoading) {
+      return;
+    }
 
- return (
- <div className="flex w-full min-w-0 flex-col lg:flex-row h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)] overflow-hidden bg-background">
- <div className="hidden lg:flex lg:w-[280px] lg:shrink-0 border-r border-border overflow-hidden">
- <JessiSidebar centralData={centralData} isLoadingCentral={isLoadingCentral} moduloAtivo={moduloAtivo} onSelectModulo={setModuloAtivo} onNovaConversa={handleNovaConversa} />
- </div>
- <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
- <div className="flex items-center justify-between gap-2 border-b border-border bg-card/50 px-4 sm:px-6 py-2 shrink-0 min-w-0">
- <div className="flex items-center gap-2 min-w-0">
- <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"><Sparkles className="h-4 w-4" /></span>
- <span className="font-display text-sm font-semibold truncate">Jessi — Assistente Operacional</span>
- <JessiStatusIndicator status={status} detalhe={statusDetalhe} />
- </div>
- <div className="flex items-center gap-1 shrink-0">
- <Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setIsContextOpen((v) =>!v)} aria-label="Painel contextual">
- {isContextOpen? <PanelRightClose className="h-4 w-4" />: <PanelRightOpen className="h-4 w-4" />}
- </Button>
- <Button variant="ghost" size="icon" className="hidden lg:inline-flex h-8 w-8" onClick={() => setIsContextOpen((v) =>!v)} aria-label="Toggle contexto">
- {isContextOpen? <PanelRightClose className="h-4 w-4" />: <PanelRightOpen className="h-4 w-4" />}
- </Button>
- <Button variant={isContinuousMode? "default": "outline"} size="sm" onClick={handleToggleVoice} className="min-h-9 gap-1.5">
- {isContinuousMode? <Headphones className="h-4 w-4" />: <Mic className="h-4 w-4" />}
- <span className="hidden sm:inline">{isContinuousMode? "Ouvindo": "Voz"}</span>
- </Button>
- </div>
- </div>
- <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
- <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
- <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4">
- {showWelcome? (
- <JessiWelcome onSugestao={(t) => handleSendMessage(t)} centralData={centralData} />
- ): (
- <JessiChat messages={messages} isLoading={isLoading} onConfirm={handleConfirmAction} onCancel={handleCancelAction} onCancelProcessing={handleCancelProcessing} />
- )}
- </div>
- <div className="border-t border-border bg-card/50 p-3 sm:p-4 shrink-0">
- <JessiInputBar
- value={inputText}
- onChange={setInputText}
- onSend={() => handleSendMessage()}
- isLoading={isLoading}
- isListening={isListening}
- interimTranscript={interimTranscript}
- onStartListening={startListening}
- onStopListening={stopListening}
- selectedFile={selectedFile}
- onSelectFile={setSelectedFile}
- filePreview={filePreview}
- setFilePreview={setFilePreview}
- onCancelProcessing={handleCancelProcessing}
- />
- </div>
- </div>
- {isContextOpen && (
- <div className="w-full lg:w-[340px] shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card overflow-y-auto overflow-x-hidden max-h-[40vh] lg:max-h-none">
- <JessiContextPanel contexto={contexto} centralData={centralData} onClose={() => setIsContextOpen(false)} />
- </div>
- )}
- </div>
- </div>
- {isBancadaModeOpen && (
- <JessiBancadaMode open={isBancadaModeOpen} onClose={() => setIsBancadaModeOpen(false)} />
- )}
- </div>
- );
+    pararFala();
+    const textToSend = customText || inputText;
+    if (!textToSend.trim() && !selectedFile) {
+      if (isContinuousMode) {
+        resumeListening();
+      }
+      return;
+    }
+
+    // Intercepta confirmação por voz quando houver ação pendente ativa
+    const acaoPendenteAtiva = contexto?.operacaoPreparada || messages.slice(-1)[0]?.pendingAction;
+    if (acaoPendenteAtiva && !selectedFile) {
+      const textoNorm = textToSend.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const ehConfirmacaoVoz =
+        /^(pode confirmar|confirmar|confirma|pode agendar|pode marcar|pode cancelar|pode fazer|sim|autorizado|ok pode confirmar|ta confirmado|confirmo|pode registrar|sim pode|pode|autorizo|confirme)$/i.test(textoNorm) ||
+        textoNorm === "sim" ||
+        textoNorm === "pode" ||
+        textoNorm === "confirma" ||
+        textoNorm === "confirmar" ||
+        textoNorm === "pode confirmar";
+
+      const ehCancelamentoVoz =
+        /^(cancela|cancelar|nao cancela|nao|esquece|deixa pra la|nao confirma|cancela isso|parar)$/i.test(textoNorm) ||
+        textoNorm === "nao" ||
+        textoNorm === "não" ||
+        textoNorm === "cancela" ||
+        textoNorm === "cancelar";
+
+      if (ehConfirmacaoVoz) {
+        setInputText("");
+        await handleConfirmAction(acaoPendenteAtiva);
+        return;
+      } else if (ehCancelamentoVoz) {
+        setInputText("");
+        handleCancelAction();
+        return;
+      }
+    }
+
+    const userMessageId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const userMsg: JessiMessage = {
+      id: userMessageId,
+      role: "user",
+      content: selectedFile ? `[Arquivo: ${selectedFile.name}] ${textToSend}` : textToSend,
+      timestamp: new Date().toISOString(),
+    };
+
+    // 3. Preserva mensagem enviada no historico
+    setMessages((prev) => [...prev, userMsg]);
+    setInputText("");
+    setIsLoading(true);
+    setStatus("processando");
+    setStatusDetalhe("Consultando sistema e regras operacionais...");
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      let fileBase64: string | undefined;
+      if (selectedFile) {
+        const reader = new FileReader();
+        fileBase64 = await new Promise((resolve) => {
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.readAsDataURL(selectedFile);
+        });
+      }
+
+      const res = await processarMensagemFn({
+        data: {
+          mensagem: textToSend,
+          contexto: contexto as any,
+          historico: messages.slice(-20) as any,
+          canal: isContinuousMode || isBancadaModeOpen ? "voz" : "texto",
+          modoBancada: isBancadaModeOpen,
+          correlationId: `req_${Date.now()}`,
+        },
+      });
+
+      // Se foi cancelado antes do retorno, descarta a resposta
+      if (controller.signal.aborted) {
+        if (isContinuousMode) resumeListening();
+        return;
+      }
+
+      const assistantMsg: JessiMessage = {
+        id: `ast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        role: "assistant",
+        content: res.respostaTexto,
+        timestamp: new Date().toISOString(),
+        cards: res.cards as any,
+        pendingAction: res.pendingAction,
+        intent: (res as any).intencao,
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      if ((res as any).novoContexto) {
+        setContexto((prev) => ({ ...prev, ...(res as any).novoContexto }));
+      }
+
+      if (res.pendingAction) {
+        setStatus("aguardando_confirmacao");
+        setStatusDetalhe("Aguardando sua confirmação");
+      } else {
+        setStatus("disponivel");
+        setStatusDetalhe(undefined);
+      }
+
+      // 4. Retomada automatica da escuta e fala da resposta da Jessi
+      const ehEncerramento = (res as any).intencao?.intencao === "agradecimento_despedida" ||
+                             (res as any).intent?.intencao === "agradecimento_despedida";
+
+      if (ttsEnabled && res.respostaTexto) {
+        speakResponse(res.respostaTexto, res.cards as any, () => {
+          if (isContinuousMode && ehEncerramento) {
+            stopContinuousMode();
+            setStatus("disponivel");
+            setStatusDetalhe(undefined);
+          }
+        });
+      } else if (isContinuousMode) {
+        if (ehEncerramento) {
+          stopContinuousMode();
+          setStatus("disponivel");
+          setStatusDetalhe(undefined);
+        } else {
+          setTimeout(() => {
+            resumeListening();
+          }, 350);
+        }
+      }
+    } catch (err: any) {
+      if (controller.signal.aborted) {
+        if (isContinuousMode) resumeListening();
+        return;
+      }
+
+      console.error("Erro na comunicação com a Jessi:", err);
+      const assistantErrMsg: JessiMessage = {
+        id: `ast_err_${Date.now()}`,
+        role: "assistant",
+        content: "Houve uma instabilidade temporária na comunicação com o servidor. Sua mensagem foi preservada e você pode reenviá-la.",
+        timestamp: new Date().toISOString(),
+        cards: [
+          {
+            type: "alerta",
+            data: {
+              tipo: "erro",
+              titulo: "Dificuldade de Conexão",
+              mensagem: "A consulta falhou temporariamente. Clique abaixo para tentar novamente.",
+              acaoTexto: "Tentar novamente",
+              comandoAcao: textToSend,
+            },
+          },
+        ],
+      };
+      setMessages((prev) => [...prev, assistantErrMsg]);
+      toast.error("Instabilidade na conexão. Tente novamente.");
+      setStatus("erro");
+      setStatusDetalhe("Falha temporária de conexão");
+
+      if (isContinuousMode) {
+        setTimeout(() => {
+          resumeListening();
+        }, 1200);
+      }
+    } finally {
+      // 5. Retira o indicador de processamento ao concluir ou falhar
+      setIsLoading(false);
+      setSelectedFile(null);
+      setFilePreview(null);
+      abortControllerRef.current = null;
+    }
+  };
+
+  handleSendMessageRef.current = handleSendMessage;
+
+  const handleConfirmAction = async (pendingAction?: any) => {
+    const action = pendingAction || contexto?.operacaoPreparada || (messages.slice(-1)[0]?.pendingAction);
+    if (!action) {
+      toast.error("Nenhuma ação pendente localizada para confirmação.");
+      return;
+    }
+
+    const actionId = action.id || `idemp_${Date.now()}`;
+    const actionTitle = action.title || action.motivo || "Operação";
+    const actionTool = action.tool || action.tipo || "criar_agendamento";
+    const actionParams = action.params || action.parametros || action.estadoProposto || {};
+
+    setIsLoading(true);
+    setStatus("processando");
+
+    try {
+      const res = await processarMensagemFn({
+        data: {
+          mensagem: `Confirmar ação: ${actionTitle}`,
+          contexto: contexto as any,
+          historico: messages.slice(-10) as any,
+          confirmacaoAcaoPendenteId: actionId,
+          dadosConfirmacao: {
+            tool: actionTool,
+            params: actionParams,
+          },
+          correlationId: `req_conf_${Date.now()}`,
+        },
+      });
+
+      const assistantMsg: JessiMessage = {
+        id: `ast_${Date.now()}`,
+        role: "assistant",
+        content: res.respostaTexto,
+        timestamp: new Date().toISOString(),
+        cards: res.cards as any,
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      if ((res as any).novoContexto) {
+        setContexto((prev) => ({ ...prev, ...(res as any).novoContexto }));
+      }
+      setStatus("disponivel");
+      toast.success("Ação confirmada e registrada com sucesso!");
+
+      if (ttsEnabled && res.respostaTexto) {
+        speakResponse(res.respostaTexto, res.cards as any, () => {
+          if (isContinuousMode) {
+            resumeListening();
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error("Erro ao executar ação confirmada:", err);
+      toast.error(err?.message || "Erro ao executar ação confirmada.");
+      setStatus("erro");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelAction = () => {
+    const cancelMsg: JessiMessage = {
+      id: `ast_${Date.now()}`,
+      role: "assistant",
+      content: "Operação cancelada. Nenhuma alteração foi realizada no sistema.",
+      timestamp: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, cancelMsg]);
+    setStatus("disponivel");
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Arquivo excede o limite de 8MB.");
+      return;
+    }
+
+    setSelectedFile(file);
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setFilePreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview("pdf");
+    }
+  };
+
+  const handleSelecionarModulo = (modulo: string) => {
+    setModuloAtivo(modulo);
+    switch (modulo) {
+      case "agenda":
+        handleSendMessage("consultar agenda de hoje");
+        break;
+      case "clientes":
+        handleSendMessage("buscar clientes");
+        break;
+      case "financeiro":
+        handleSendMessage("consultar faturamento do mês");
+        break;
+      case "programas":
+        handleSendMessage("consultar catalogo de programas");
+        break;
+      case "comprovantes":
+        handleSendMessage("como envio um comprovante pix?");
+        break;
+      case "alertas":
+        handleSendMessage("consultar valores a receber");
+        break;
+      case "historico":
+        handleSendMessage("consultar indicadores de qualidade da IA");
+        break;
+      default:
+        break;
+    }
+  };
+
+  return (
+    <div className="flex w-full h-[calc(100dvh-3.5rem)] pb-20 md:pb-0 bg-[#FAF8F5] overflow-hidden">
+      {/* Sidebar de Navegacao */}
+      <JessiSidebar
+        onNovaConversa={handleNovaConversa}
+        onSelecionarModulo={handleSelecionarModulo}
+        moduloAtivo={moduloAtivo}
+      />
+
+      {/* Area Central de Conversacao */}
+      <main className="w-full flex-1 flex flex-col h-full bg-background md:border-r border-border/70 overflow-hidden min-w-0">
+        {/* Header da Jessi */}
+        <header className="h-14 border-b border-border/70 bg-card/70 backdrop-blur-xs px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-emerald-800 text-white flex items-center justify-center shadow-xs shrink-0">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 font-display truncate">
+                <span>Jessi</span>
+                <span className="hidden sm:inline-block text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                  IA V2 Operacional
+                </span>
+              </div>
+              <p className="hidden sm:block text-[11px] text-muted-foreground truncate">Spa de Pet Tia Jéssica</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setIsBancadaModeOpen(true);
+                if (!isContinuousMode) {
+                  startContinuousMode();
+                }
+                setTtsEnabled(true);
+              }}
+              title="Ativar Modo Bancada Mãos-Livres para Banho e Tosa"
+              className="h-8 px-2 sm:px-3 text-xs font-bold gap-1 sm:gap-1.5 rounded-lg bg-[#123F2A] hover:bg-[#1A5C3D] text-[#F5E6BE] border border-[#C8A951]/50 shadow-xs cursor-pointer"
+            >
+              <Headphones className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#C8A951] animate-pulse" />
+              <span className="hidden sm:inline">Modo Bancada</span>
+            </Button>
+
+            <Button
+              variant={isContinuousMode ? "default" : "outline"}
+              size="sm"
+              onClick={toggleContinuousMode}
+              title={isContinuousMode ? "Desativar modo de conversa contínua" : "Ativar Modo de Conversa por Voz Contínua"}
+              className={`h-8 px-2 sm:px-2.5 text-xs font-semibold gap-1 sm:gap-1.5 rounded-lg transition-all ${
+                isContinuousMode
+                  ? "bg-red-600 hover:bg-red-700 text-white shadow-xs animate-pulse"
+                  : "text-emerald-800 border-emerald-300 hover:bg-emerald-50"
+              }`}
+            >
+              <Mic className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">{isContinuousMode ? "Voz Contínua ON" : "Ativar Voz"}</span>
+            </Button>
+            <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsContextOpen(!isContextOpen)}
+              title={isContextOpen ? "Ocultar contexto" : "Ver contexto"}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              {isContextOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            </Button>
+          </div>
+        </header>
+
+        {/* Mensagens ou Welcome Screen */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {messages.length === 0 ? (
+            <JessiWelcome 
+              onQuickAction={handleSendMessage} 
+              centralData={centralData}
+              isLoadingCentral={isLoadingCentral}
+              onOpenBancadaMode={() => {
+                setIsBancadaModeOpen(true);
+                if (!isContinuousMode) {
+                  startContinuousMode();
+                }
+                setTtsEnabled(true);
+              }}
+            />
+          ) : (
+            <JessiChat
+              messages={messages}
+              onConfirmAction={handleConfirmAction}
+              onCancelAction={handleCancelAction}
+              onSendMessage={handleSendMessage}
+              onCancelProcessing={handleCancelProcessing}
+              isLoading={isLoading}
+            />
+          )}
+        </div>
+
+        {/* Barra de Entrada */}
+        <JessiInputBar
+          inputText={inputText}
+          setInputText={setInputText}
+          onSend={() => handleSendMessage()}
+          isLoading={isLoading}
+          voiceStatus={voiceStatus}
+          isContinuousMode={isContinuousMode}
+          onToggleContinuousVoice={toggleContinuousMode}
+          onCancelVoice={cancelListening}
+          interimTranscript={interimTranscript}
+          ttsEnabled={ttsEnabled}
+          onToggleTts={() => setTtsEnabled(!ttsEnabled)}
+          selectedFile={selectedFile}
+          onSelectFile={handleFileSelect}
+          onRemoveFile={() => {
+            setSelectedFile(null);
+            setFilePreview(null);
+          }}
+        />
+      </main>
+
+      {/* Painel Lateral de Contexto */}
+      <JessiContextPanel
+        contexto={contexto}
+        isOpen={isContextOpen}
+        onClose={() => setIsContextOpen(false)}
+      />
+
+      {/* Modo Bancada Mãos-Livres */}
+      <JessiBancadaMode
+        isOpen={isBancadaModeOpen}
+        onClose={() => setIsBancadaModeOpen(false)}
+        voiceStatus={voiceStatus}
+        isListening={isListening}
+        isSpeaking={isSpeaking}
+        interimTranscript={interimTranscript}
+        finalTranscript={finalTranscript}
+        audioLevel={audioLevel}
+        isInterrupted={isInterrupted}
+        ttsEnabled={ttsEnabled}
+        onToggleTts={() => setTtsEnabled(!ttsEnabled)}
+        onToggleListening={toggleContinuousMode}
+        onSendMessage={(txt) => handleSendMessage(txt)}
+        onConfirmAction={handleConfirmAction}
+        onCancelAction={handleCancelAction}
+        messages={messages}
+        isLoading={isLoading}
+      />
+    </div>
+  );
 };
