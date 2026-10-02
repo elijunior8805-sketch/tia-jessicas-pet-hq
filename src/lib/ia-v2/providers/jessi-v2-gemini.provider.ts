@@ -1387,8 +1387,9 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       msg.includes("mensagens de cobranca") ||
       msg.includes("cobranca cordial")
     ) {
-      const resAbertos = await FinanceiroRelatoriosAdapter.obterPagamentosEmAberto(sb);
-      const lista = resAbertos?.data || [];
+      const resAbertos = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb);
+      if (!resAbertos.success) return { texto: "Não consegui consultar os pagamentos em aberto agora. Tente novamente em instantes." };
+      const lista = ((resAbertos.data as any)?.itens_pendentes || []) as any[];
       const totalPendente = lista.reduce((acc: number, item: any) => acc + (Number(item.valor) || 0), 0);
 
       if (lista.length === 0) {
@@ -1468,10 +1469,11 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       (msg.includes("financeiro") && !msg.includes("ficha") && !msg.includes("cliente"))
     ) {
       const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
-      const resFin = await FinanceiroRelatoriosAdapter.obterConsolidadoFinanceiro(sb, periodo);
-      const d = resFin?.data || resFin;
-      const totalRecebido = Number(d?.totalRecebido || d?.faturamento || 0);
-      const totalPendente = Number(d?.totalPendente || d?.valoresAReceber || 0);
+      const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, periodo);
+      if (!resFin.success) return { texto: "Não consegui consultar o financeiro agora. Tente novamente em instantes." };
+      const d = resFin.data;
+      const totalRecebido = Number(d.valoresRecebidos || 0);
+      const totalPendente = Number(d.valoresAReceber || 0) + Number(d.valoresVencidosDevedores || 0);
       const ticketMedio = Number(d?.ticketMedio || 0);
 
       let textoFin = `Aqui está o panorama financeiro de **${periodo === "hoje" ? "hoje" : periodo === "semana" ? "esta semana" : "deste mês"}**, ${nomeOp}: já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}** e temos **R$ ${totalPendente.toFixed(2).replace(".", ",")}** a receber (ticket médio: R$ ${ticketMedio.toFixed(2).replace(".", ",")}).`;
