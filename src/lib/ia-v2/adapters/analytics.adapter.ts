@@ -186,7 +186,7 @@ export class AnalyticsAdapter {
       .neq("status", "cancelado");
 
     if (error || !agendamentos || agendamentos.length === 0) {
-      const { data: todos } = await sb.from("agendamentos").select("id, valor_previsto, clientes(id, nome, bairro)");
+      const { data: todos } = await sb.from("agendamentos").select("id, valor_previsto, status, clientes(id, nome, bairro)");
       agendamentos = todos || [];
     }
 
