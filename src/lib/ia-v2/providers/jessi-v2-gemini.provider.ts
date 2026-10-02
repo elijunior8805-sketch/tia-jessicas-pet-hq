@@ -511,38 +511,6 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
         "";
     }
 
-    if (!chave && typeof import.meta !== "undefined" && (import.meta as any).env) {
-      const env = (import.meta as any).env;
-      chave =
-        env.VITE_GROQ_API_KEY ||
-        env.GROQ_API_KEY ||
-        env.VITE_LOVABLE_API_KEY ||
-        env.LOVABLE_API_KEY ||
-        env.VITE_OPENAI_API_KEY ||
-        env.OPENAI_API_KEY ||
-        env.VITE_GEMINI_API_KEY ||
-        env.GEMINI_API_KEY ||
-        env.VITE_GOOGLE_AI_API_KEY ||
-        env.GOOGLE_AI_API_KEY ||
-        "";
-    }
-
-    if (!chave && typeof globalThis !== "undefined") {
-      chave = (globalThis as any).__JESSI_API_KEY__ || "";
-    }
-
-    if (!chave) {
-      try {
-        // Fallback de runtime garantido para produção
-        const k1 = ["g", "s", "k", "_", "b", "0", "B", "l", "O", "9", "f", "x"].join("");
-        const k2 = ["V", "e", "z", "j", "h", "y", "E", "j", "x", "J", "C", "R", "W", "G", "d", "y", "b", "3", "F", "Y"].join("");
-        const k3 = ["i", "H", "j", "U", "W", "4", "s", "S", "H", "Q", "I", "l", "e", "T", "0", "l", "M", "D", "X", "G", "V", "O", "Z", "9"].join("");
-        chave = `${k1}${k2}${k3}`;
-      } catch {
-        chave = "";
-      }
-    }
-
     // Sem chave configurada — logar erro claro
     if (!chave) {
       console.error("[JessiV2] ERRO CRÍTICO: Nenhuma chave de IA configurada.");

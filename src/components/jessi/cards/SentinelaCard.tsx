@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { abrirWhatsApp } from "@/lib/whatsapp";
-import { SentinelaExecucaoGeral } from "@/lib/ia-v2/adapters/sentinelas.adapter";
+import { SentinelaExecucaoGeral, type AlertaAtrasoSentinela } from "@/lib/ia-v2/adapters/sentinelas.adapter";
 
 interface SentinelaCardProps {
   data: SentinelaExecucaoGeral | any;

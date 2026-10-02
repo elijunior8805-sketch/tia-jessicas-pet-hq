@@ -966,7 +966,7 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     nomeInterno: "sugerir_resposta",
     descricao: "Gera sugestão de resposta profissional para mensagem de cliente via WhatsApp",
     intencoes: ["sugerir_resposta", "responder_cliente", "mensagem_whatsapp"],
-    area: "comunicacao_notificacoes",
+    area: "comunicacao_mensagens",
     parametros: {
       mensagemCliente: { tipo: "string", obrigatorio: true, descricao: "Mensagem recebida do cliente" },
       clienteNome: { tipo: "string", obrigatorio: false, descricao: "Nome do cliente" },

@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
 import { JessiV2QueryResult, JessiV2MutationResult } from "../contracts/jessi-v2-contracts";
+import { ClientesPetsAdapter } from "./clientes-pets.adapter";
 
 /**
  * Adaptador Oficial da Agenda para a Jessi V2 (Seção 15)
