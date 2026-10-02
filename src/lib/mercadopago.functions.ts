@@ -33,29 +33,75 @@ export const gerarPixMercadoPagoFn = createServerFn({ method: "POST" })
 
     const res = await criarCobrancaPixMercadoPago(data);
 
-    // Se o Pix foi gerado com sucesso, registra a pendência na tabela de pagamentos do Supabase
+    // Se o Pix foi gerado com sucesso, vincula o ID da transação ao registro existente de pagamento (idempotência)
     if (res.sucesso && res.paymentId) {
       try {
-        const payloadInsert: any = {
-          valor_total: data.valor,
-          valor_pago: 0,
-          forma: "pix",
-          status: "pendente",
-          categoria_receita: "servico",
-          descricao: data.descricao,
-          id_transacao_bancaria: String(res.paymentId),
-          observacoes: `Pix Mercado Pago: ID ${res.paymentId} - ${data.descricao}`,
-          atendimento_id: data.agendamentoId || null,
-          cliente_id: data.clienteId || null,
-          vencimento: new Date().toISOString().slice(0, 10),
-        };
+        const idTransacaoStr = String(res.paymentId);
+        let pagamentoAtualizado = false;
 
-        const { error: errInsert } = await (supabase as any).from("pagamentos").insert(payloadInsert);
-        if (errInsert) {
-          console.warn("[MercadoPago] Aviso ao registrar pagamento pendente:", errInsert);
+        // 1. Se foi passado cobrancaId (id da linha de pagamentos)
+        if (data.cobrancaId) {
+          const { data: existCobranca } = await (supabase as any)
+            .from("pagamentos")
+            .select("id")
+            .eq("id", data.cobrancaId)
+            .maybeSingle();
+
+          if (existCobranca) {
+            await (supabase as any)
+              .from("pagamentos")
+              .update({
+                id_transacao_bancaria: idTransacaoStr,
+                forma: "pix",
+                observacoes: `Pix Mercado Pago ID ${idTransacaoStr}`,
+              })
+              .eq("id", existCobranca.id);
+            pagamentoAtualizado = true;
+          }
+        }
+
+        // 2. Se não foi por cobrancaId mas tem agendamentoId / atendimento_id
+        if (!pagamentoAtualizado && data.agendamentoId) {
+          const { data: existAtend } = await (supabase as any)
+            .from("pagamentos")
+            .select("id")
+            .eq("atendimento_id", data.agendamentoId)
+            .eq("status", "pendente")
+            .maybeSingle();
+
+          if (existAtend) {
+            await (supabase as any)
+              .from("pagamentos")
+              .update({
+                id_transacao_bancaria: idTransacaoStr,
+                forma: "pix",
+                observacoes: `Pix Mercado Pago ID ${idTransacaoStr}`,
+              })
+              .eq("id", existAtend.id);
+            pagamentoAtualizado = true;
+          }
+        }
+
+        // 3. Apenas se NÃO existir nenhum lançamento pendente vinculado é que insere um novo
+        if (!pagamentoAtualizado) {
+          const payloadInsert: any = {
+            valor_total: data.valor,
+            valor_pago: 0,
+            forma: "pix",
+            status: "pendente",
+            categoria_receita: "servico",
+            descricao: data.descricao,
+            id_transacao_bancaria: idTransacaoStr,
+            observacoes: `Pix Mercado Pago: ID ${idTransacaoStr} - ${data.descricao}`,
+            atendimento_id: data.agendamentoId || null,
+            cliente_id: data.clienteId || null,
+            vencimento: new Date().toISOString().slice(0, 10),
+          };
+
+          await (supabase as any).from("pagamentos").insert(payloadInsert);
         }
       } catch (errDb) {
-        console.warn("[MercadoPago] Erro ao registrar pagamento pendente:", errDb);
+        console.warn("[MercadoPago] Erro ao sincronizar pagamento pendente:", errDb);
       }
     }
 
@@ -170,24 +216,34 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
           formaNormalizada = "credito";
         }
 
-        // Verifica se já existe o pagamento registrado pelo id de transação ou por atendimento/cobrança
-        let query = (supabase as any)
-          .from("pagamentos")
-          .select("id, status, valor_total, observacoes")
-          .or(`observacoes.ilike.%${idTransacao}%,id_transacao_bancaria.eq.${idTransacao}`);
-
+        // Busca registros de pagamentos correspondentes pelo id da transação, cobrancaId ou atendimento_id
+        const condicoes: string[] = [];
+        if (idTransacao) {
+          condicoes.push(`id_transacao_bancaria.eq.${idTransacao}`);
+          condicoes.push(`observacoes.ilike.%${idTransacao}%`);
+        }
+        if (data.cobrancaId) {
+          condicoes.push(`id.eq.${data.cobrancaId}`);
+        }
         if (data.agendamentoId) {
-          query = (supabase as any)
-            .from("pagamentos")
-            .select("id, status, valor_total, observacoes")
-            .or(`observacoes.ilike.%${idTransacao}%,id_transacao_bancaria.eq.${idTransacao},atendimento_id.eq.${data.agendamentoId}`);
+          condicoes.push(`atendimento_id.eq.${data.agendamentoId}`);
         }
 
-        const { data: pagExistente } = await query.maybeSingle();
+        let pagamentosEncontrados: any[] = [];
+        if (condicoes.length > 0) {
+          const { data: pags } = await (supabase as any)
+            .from("pagamentos")
+            .select("id, status, valor_total, observacoes, atendimento_id, cliente_id")
+            .or(condicoes.join(","));
+          pagamentosEncontrados = pags || [];
+        }
 
-        if (pagExistente) {
-          const valorFinal = valorPagoNum > 0 ? valorPagoNum : Number(pagExistente.valor_total || 0);
-          const { error: errUpdate } = await (supabase as any)
+        if (pagamentosEncontrados.length > 0) {
+          // Atualiza o registro principal para 'pago'
+          const principal = pagamentosEncontrados[0];
+          const valorFinal = valorPagoNum > 0 ? valorPagoNum : Number(principal.valor_total || 0);
+
+          await (supabase as any)
             .from("pagamentos")
             .update({
               status: "pago",
@@ -195,17 +251,23 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
               forma: formaNormalizada,
               id_transacao_bancaria: idTransacao,
               data_pagamento: dataAprovacaoIso.slice(0, 10),
-              observacoes: pagExistente.observacoes
-                ? `${pagExistente.observacoes} | Confirmado em tempo real (${formaNormalizada.toUpperCase()})`
+              observacoes: principal.observacoes
+                ? `${principal.observacoes} | Confirmado Mercado Pago (${formaNormalizada.toUpperCase()})`
                 : `Confirmado Mercado Pago ID ${idTransacao} (${formaNormalizada.toUpperCase()})`,
             })
-            .eq("id", pagExistente.id);
+            .eq("id", principal.id);
 
-          if (errUpdate) {
-            console.error("[MercadoPago] Erro ao atualizar pagamento para pago:", errUpdate);
+          // Se houver registros duplicados pendentes com mesmo atendimento_id ou id_transacao, remove a duplicidade para limpar a tela
+          if (pagamentosEncontrados.length > 1) {
+            const idsDuplicados = pagamentosEncontrados.slice(1).map((p: any) => p.id);
+            await (supabase as any)
+              .from("pagamentos")
+              .delete()
+              .in("id", idsDuplicados);
           }
         } else {
-          const { error: errInsert } = await (supabase as any).from("pagamentos").insert({
+          // Caso não tenha encontrado registro anterior, insere como pago
+          await (supabase as any).from("pagamentos").insert({
             valor_total: valorPagoNum,
             valor_pago: valorPagoNum,
             forma: formaNormalizada,
@@ -219,17 +281,18 @@ export const verificarStatusPixMercadoPagoFn = createServerFn({ method: "POST" }
             atendimento_id: data.agendamentoId || null,
             cliente_id: data.clienteId || null,
           });
-
-          if (errInsert) {
-            console.error("[MercadoPago] Erro ao inserir novo pagamento pago:", errInsert);
-          }
         }
 
-        // Se houver agendamento vinculado, confirma o agendamento
+        // Se houver agendamento/atendimento vinculado, confirma ou finaliza
         if (data.agendamentoId) {
           await (supabase as any)
             .from("agendamentos")
-            .update({ status: "confirmado" })
+            .update({ status: "finalizado" })
+            .eq("id", data.agendamentoId);
+
+          await (supabase as any)
+            .from("atendimentos")
+            .update({ pagamento_status: "pago", pagamento_forma: formaNormalizada, valor_pago: valorPagoNum })
             .eq("id", data.agendamentoId);
         }
       } catch (errUp) {

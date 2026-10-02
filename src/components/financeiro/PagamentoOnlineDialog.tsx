@@ -84,6 +84,7 @@ export function PagamentoOnlineDialog({
   const valorFormatado = valor.toFixed(2).replace(".", ",");
   const descricaoFinal = descricao || "Atendimento Spa de Pet Tia Jéssica";
   const primeiroNome = (clienteNome || "Tutor").split(" ")[0];
+  const targetCobrancaId = cobrancaId || pagamentoId || undefined;
 
   // Gerar Pix + Link em paralelo ao abrir
   const gerarLinksOnline = useCallback(async () => {
@@ -106,7 +107,7 @@ export function PagamentoOnlineDialog({
             clienteNome: clienteNome || undefined,
             clienteEmail: clienteEmail || undefined,
             agendamentoId: agendamentoId || undefined,
-            cobrancaId: cobrancaId || undefined,
+            cobrancaId: targetCobrancaId,
             clienteId: clienteId || undefined,
           },
         }),
@@ -117,7 +118,7 @@ export function PagamentoOnlineDialog({
             clienteNome: clienteNome || undefined,
             clienteEmail: clienteEmail || undefined,
             agendamentoId: agendamentoId || undefined,
-            cobrancaId: cobrancaId || undefined,
+            cobrancaId: targetCobrancaId,
             clienteId: clienteId || undefined,
           },
         }),
@@ -145,7 +146,7 @@ export function PagamentoOnlineDialog({
     } finally {
       setCarregando(false);
     }
-  }, [valor, descricaoFinal, clienteNome, clienteEmail, agendamentoId, cobrancaId, clienteId]);
+  }, [valor, descricaoFinal, clienteNome, clienteEmail, agendamentoId, targetCobrancaId, clienteId]);
 
   useEffect(() => {
     if (open && valor > 0) {
@@ -173,7 +174,7 @@ export function PagamentoOnlineDialog({
           data: {
             paymentId: pixPaymentId || undefined,
             agendamentoId: agendamentoId || undefined,
-            cobrancaId: cobrancaId || undefined,
+            cobrancaId: targetCobrancaId,
             clienteId: clienteId || undefined,
           },
         });
@@ -186,7 +187,7 @@ export function PagamentoOnlineDialog({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [open, pagoComSucesso, pixPaymentId, agendamentoId, cobrancaId, clienteId, linkCartao]);
+  }, [open, pagoComSucesso, pixPaymentId, agendamentoId, targetCobrancaId, clienteId, linkCartao]);
 
   // Contagem regressiva
   useEffect(() => {

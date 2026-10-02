@@ -90,22 +90,23 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
           const valorTotalNum = Number(pagamentoMp.valor || 0);
 
           // 1. Atualiza ou insere registro na tabela de pagamentos
-          let query = admin
+          const condicoes: string[] = [
+            `id_transacao_bancaria.eq.${paymentId}`,
+            `observacoes.ilike.%${paymentId}%`,
+          ];
+          if (cobrancaId) condicoes.push(`id.eq.${cobrancaId}`);
+          if (agendamentoId) condicoes.push(`atendimento_id.eq.${agendamentoId}`);
+
+          const { data: pagsExistentes } = await admin
             .from("pagamentos")
             .select("id, status, valor_total, observacoes")
-            .or(`observacoes.ilike.%${paymentId}%,id_transacao_bancaria.eq.${paymentId}`);
+            .or(condicoes.join(","));
 
-          if (agendamentoId) {
-            query = admin
-              .from("pagamentos")
-              .select("id, status, valor_total, observacoes")
-              .or(`observacoes.ilike.%${paymentId}%,id_transacao_bancaria.eq.${paymentId},atendimento_id.eq.${agendamentoId}`);
-          }
+          const listaPags = pagsExistentes || [];
 
-          const { data: pagamentoExistente } = await query.maybeSingle();
-
-          if (pagamentoExistente) {
-            const valorFinal = valorTotalNum > 0 ? valorTotalNum : Number(pagamentoExistente.valor_total || 0);
+          if (listaPags.length > 0) {
+            const principal = listaPags[0];
+            const valorFinal = valorTotalNum > 0 ? valorTotalNum : Number(principal.valor_total || 0);
             const { error: errUpdate } = await admin
               .from("pagamentos")
               .update({
@@ -114,14 +115,20 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
                 data_pagamento: dataPagoIso.slice(0, 10),
                 forma: formaNormalizada,
                 id_transacao_bancaria: String(paymentId),
-                observacoes: pagamentoExistente.observacoes
-                  ? `${pagamentoExistente.observacoes} | Baixa automática via Webhook (${formaNormalizada.toUpperCase()})`
+                observacoes: principal.observacoes
+                  ? `${principal.observacoes} | Baixa automática via Webhook (${formaNormalizada.toUpperCase()})`
                   : `Baixa automática via Webhook Mercado Pago ID ${paymentId} (${formaNormalizada.toUpperCase()})`,
               } as any)
-              .eq("id", pagamentoExistente.id);
+              .eq("id", principal.id);
 
             if (errUpdate) {
               console.error("[Webhook MercadoPago] Erro ao atualizar pagamento:", errUpdate);
+            }
+
+            // Remove duplicatas pendentes se houver
+            if (listaPags.length > 1) {
+              const idsDuplicados = listaPags.slice(1).map((p: any) => p.id);
+              await admin.from("pagamentos").delete().in("id", idsDuplicados);
             }
           } else {
             // Cria o pagamento caso não tenha sido pré-registrado
@@ -145,11 +152,16 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
             }
           }
 
-          // 2. Se houver agendamento vinculado, confirma o atendimento na grade
+          // 2. Se houver agendamento/atendimento vinculado, confirma o atendimento na grade
           if (agendamentoId) {
             await admin
               .from("agendamentos")
-              .update({ status: "confirmado" })
+              .update({ status: "finalizado" })
+              .eq("id", agendamentoId);
+
+            await admin
+              .from("atendimentos")
+              .update({ pagamento_status: "pago", pagamento_forma: formaNormalizada, valor_pago: valorTotalNum })
               .eq("id", agendamentoId);
           }
 

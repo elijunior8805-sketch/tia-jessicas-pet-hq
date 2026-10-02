@@ -88,7 +88,26 @@ export const listarPagamentosAbertos = createServerFn({ method: "POST" })
     hoje.setUTCHours(0, 0, 0, 0);
     const hojeMs = hoje.getTime();
 
-    const itens: PagamentoAbertoDTO[] = (rows ?? []).map((r: any) => {
+    // 1. Filtrar registros já quitados ou com saldo zerado
+    const linhasValidas = (rows ?? []).filter((r: any) => {
+      if (r.status === "pago" || r.status === "cancelado") return false;
+      const valorTotal = valorTotalReceita(r);
+      const valorPago = Number(r.valor_pago ?? 0);
+      return (valorTotal - valorPago) > 0.01;
+    });
+
+    // 2. Deduplicação defensiva por atendimento_id para evitar clonagem visual
+    const atendimentosVistos = new Set<string>();
+    const linhasDeduplicadas = linhasValidas.filter((r: any) => {
+      if (!r.atendimento_id) return true;
+      if (atendimentosVistos.has(r.atendimento_id)) {
+        return false;
+      }
+      atendimentosVistos.add(r.atendimento_id);
+      return true;
+    });
+
+    const itens: PagamentoAbertoDTO[] = linhasDeduplicadas.map((r: any) => {
       const valorTotal = valorTotalReceita(r);
       const valorPago = Number(r.valor_pago ?? 0);
       const saldo = Math.max(0, valorTotal - valorPago);
