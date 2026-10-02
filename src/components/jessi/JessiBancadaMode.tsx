@@ -83,20 +83,6 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
   const pendingAction = lastAssistantMsg?.pendingAction;
 
   useEffect(() => {
-    if (isOpen) {
-      // Desbloqueia contexto de áudio do navegador
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        try {
-          window.speechSynthesis.resume();
-        } catch {}
-      }
-      if (!isListening) {
-        onToggleListening();
-      }
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose();
@@ -132,7 +118,7 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
                 Jessi · Modo Bancada Mãos-Livres
               </span>
               <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[11px] font-semibold animate-pulse">
-                {isListening ? "Microfone Ativo (Mãos-Livres)" : "Áudio Pausado"}
+                Áudio Contínuo Ativo
               </Badge>
             </div>
             <p className="text-xs text-white/70">
@@ -197,16 +183,16 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
               onClick={onToggleListening}
               className={`h-20 w-20 sm:h-24 sm:w-24 rounded-full flex items-center justify-center shadow-2xl transition-all transform hover:scale-105 active:scale-95 cursor-pointer z-10 border-2 ${
                 isSpeaking
-                  ? "bg-[#C8A951] text-[#123F2A] border-[#F5E6BE] shadow-[#C8A951]/40 shadow-xl"
+                  ? "bg-[#C8A951] text-[#123F2A] border-[#F5E6BE]"
                   : isListening
-                  ? "bg-emerald-600 text-white border-emerald-300 shadow-emerald-500/40 shadow-xl"
+                  ? "bg-emerald-600 text-white border-emerald-300"
                   : "bg-zinc-800 text-zinc-400 border-zinc-700"
               }`}
             >
               {isSpeaking ? (
                 <Volume2 className="h-10 w-10 sm:h-12 sm:w-12 animate-pulse" />
               ) : isListening ? (
-                <Mic className="h-10 w-10 sm:h-12 sm:w-12 animate-bounce" />
+                <Mic className="h-10 w-10 sm:h-12 sm:w-12" />
               ) : (
                 <MicOff className="h-10 w-10 sm:h-12 sm:w-12" />
               )}
@@ -222,7 +208,7 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
             )}
             <span className="text-sm sm:text-base font-bold tracking-wide uppercase text-[#F5E6BE] block">
               {isLoading
-                ? "Jessi consultando sistema..."
+                ? "Jessi consultando dados..."
                 : isInterrupted
                 ? "Interrompida · Ouvindo você..."
                 : isSpeaking
@@ -236,25 +222,24 @@ export const JessiBancadaMode: React.FC<JessiBancadaModeProps> = ({
                 ? "⚠️ Ação preparada! Diga \"Pode confirmar\" ou \"Cancelar\""
                 : isListening
                 ? "Fale naturalmente enquanto atende o pet — interrompa quando quiser"
-                : "Toque no microfone para reativar a escuta contínua"}
+                : "Toque no microfone para reativar"}
             </p>
 
             {/* Barras de Equalizador de Volume em Tempo Real */}
             {isListening && (
-              <div className="flex items-center justify-center gap-1.5 pt-2 h-5">
-                {[...Array(11)].map((_, i) => {
-                  const baseLevel = audioLevel > 5 ? audioLevel : 20;
-                  const dynamicHeight = Math.max(
+              <div className="flex items-center justify-center gap-1 pt-2 h-4">
+                {[...Array(9)].map((_, i) => {
+                  const barHeight = Math.max(
                     4,
-                    Math.min(22, Math.round((baseLevel / 100) * (14 + (i % 4) * 3) + Math.random() * 3))
+                    Math.min(24, Math.round((audioLevel / 100) * (20 + (i % 3) * 4) + Math.random() * 2))
                   );
                   return (
                     <div
                       key={i}
                       className="w-1 rounded-full bg-[#C8A951] transition-all duration-75"
                       style={{
-                        height: `${dynamicHeight}px`,
-                        opacity: audioLevel > 5 ? 0.95 : 0.4,
+                        height: `${barHeight}px`,
+                        opacity: audioLevel > 5 ? 0.9 : 0.25,
                       }}
                     />
                   );
