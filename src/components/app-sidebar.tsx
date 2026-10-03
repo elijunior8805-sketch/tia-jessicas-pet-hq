@@ -98,7 +98,7 @@ export function AppSidebar() {
  const pathname = useRouterState({ select: (r) => r.location.pathname });
  const isActive = (u: string) => pathname === u || pathname.startsWith(u + "/");
  const { data: access } = useMyAccess();
- const visibleGroups = access?.canManageUsers? [.groups, adminGroup]: groups;
+ const visibleGroups = access?.canManageUsers ? [...groups, adminGroup] : groups;
 
  return (
  <Sidebar collapsible="icon" className="border-r border-sidebar-border hidden lg:flex">

@@ -148,7 +148,7 @@ export const JessiLayout: React.FC = () => {
  try {
  const res = await processarMensagemFn({ data: { mensagem: "confirmar", contexto, acaoConfirmada: acao } as any });
  if (res?.mensagem) {
- setMessages((prev) => [.prev, res.mensagem as JessiMessage]);
+ setMessages((prev) => [...prev, res.mensagem as JessiMessage]);
  if (res.contexto) setContexto(res.contexto);
  }
  toast.success("Ação confirmada!");
@@ -161,8 +161,8 @@ export const JessiLayout: React.FC = () => {
  };
 
  const handleCancelAction = () => {
- setContexto((prev) => ({.prev, operacaoPreparada: undefined }));
- setMessages((prev) => [.prev, { id: `cancel_${Date.now()}`, role: "assistant", content: "Tudo bem, cancelei a operação pendente." } as JessiMessage]);
+ setContexto((prev) => ({ ...prev, operacaoPreparada: undefined }));
+ setMessages((prev) => [...prev, { id: `cancel_${Date.now()}`, role: "assistant", content: "Tudo bem, cancelei a operação pendente." } as JessiMessage]);
  toast.info("Operação cancelada.");
  if (isContinuousMode) resumeListening();
  };
@@ -194,7 +194,7 @@ export const JessiLayout: React.FC = () => {
  role: "user",
  content: selectedFile? `[Arquivo: ${selectedFile.name}] ${textToSend}`: textToSend,
  } as JessiMessage;
- setMessages((prev) => [.prev, userMsg]);
+ setMessages((prev) => [...prev, userMsg]);
  setInputText("");
  setSelectedFile(null);
  setFilePreview(null);
@@ -205,7 +205,7 @@ export const JessiLayout: React.FC = () => {
  const res = await processarMensagemFn({ data: { mensagem: textToSend, contexto } as any });
  if (controller.signal.aborted) return;
  if (res?.mensagem) {
- setMessages((prev) => [.prev, res.mensagem as JessiMessage]);
+ setMessages((prev) => [...prev, res.mensagem as JessiMessage]);
  const textoResposta = (res.mensagem as any)?.content || "";
  if (textoResposta && ttsEnabled) falarResposta(textoResposta);
  }

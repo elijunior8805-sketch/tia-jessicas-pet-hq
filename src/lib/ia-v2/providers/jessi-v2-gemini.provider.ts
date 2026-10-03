@@ -31,7 +31,7 @@ import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_CONFIG = {
-  TIMEOUT_MS: 4000,
+  TIMEOUT_MS: 30000,
   MAX_RETRIES: 1,
   MODEL: "google/gemini-1.5-flash",
   GROQ_MODEL: "openai/gpt-oss-120b",
