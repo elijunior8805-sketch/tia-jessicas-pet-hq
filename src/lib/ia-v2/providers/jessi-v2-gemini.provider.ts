@@ -175,8 +175,22 @@ export const OPENAI_TOOLS_SCHEMA: any[] = [
   {
     type: "function",
     function: {
+      name: "sugerir_clientes_para_encaixe",
+      description: "Sugere clientes com alta probabilidade de conversão para preencher horários vagos hoje ou na data especificada, analisando clientes habituais do dia da semana (ex: sextas-feiras) e ciclo de retorno recente (10 a 30 dias).",
+      parameters: {
+        type: "object",
+        properties: {
+          data: { type: "string", description: "Data YYYY-MM-DD para buscar encaixes (padrão: hoje)" },
+          horarioVago: { type: "string", description: "Horário vago a preencher HH:mm (ex: '14:00')" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "identificar_clientes_retorno",
-      description: "Identifica clientes e pets ausentes há mais de 25 dias para campanhas de reativação e retorno.",
+      description: "Identifica clientes e pets no ciclo de retorno para encaixes e contato via WhatsApp.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -1602,17 +1616,22 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     }
 
     // =========================================================================
-    // 7. CLIENTES PARA ENCAIXE / REATIVAÇÃO / PREENCHER GRADE (PRIORITÁRIO)
+    // 7. CLIENTES PARA ENCAIXE / PREENCHER GRADE / SUGESTÃO INTELIGENTE
     // =========================================================================
     if (
       msg.includes("sugerir cliente") ||
       msg.includes("sugerir clientes") ||
       msg.includes("sugerir encaixe") ||
       msg.includes("sugerir encaixes") ||
+      msg.includes("clientes para horario vago") ||
+      msg.includes("clientes para horarios vagos") ||
+      msg.includes("clientes para vaga") ||
       msg.includes("preencher grade") ||
       msg.includes("preencher horario") ||
       msg.includes("preencher horário") ||
       msg.includes("clientes para preencher") ||
+      msg.includes("quem sugerir") ||
+      msg.includes("quem chamar") ||
       msg.includes("convidar cliente") ||
       msg.includes("convidar clientes") ||
       msg.includes("inativ") ||
@@ -1622,16 +1641,16 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       msg.includes("sumido") ||
       msg.includes("saudade")
     ) {
-      const resRet = await despacharFerramentaV2(sb, "identificar_clientes_retorno", {});
+      const resRet = await despacharFerramentaV2(sb, "sugerir_clientes_para_encaixe", { data: hojeStr });
       const d = resRet?.data || resRet;
-      const lista = Array.isArray(d) ? d : d?.clientes || d?.sugestoes || [];
+      const lista = Array.isArray(d) ? d : d?.data || d?.clientes || d?.sugestoes || [];
 
       return {
-        texto: `Identifiquei **${lista.length} cliente(s)** com alto potencial para preencher os horários livres da grade, ${nomeOp}! Preparei os cartões com mensagens de carinho prontas para envio no WhatsApp.`,
+        texto: `Identifiquei os clientes habituais deste dia da semana com ciclo ideal de retorno. Você pode enviar os convites no WhatsApp diretamente pelos cards abaixo.`,
         card: {
           type: "reativacao",
           title: "Clientes Sugeridos para Encaixe",
-          subtitle: `${lista.length} tutores com potencial de retorno`,
+          subtitle: `${lista.length} cliente(s) habitual(is) no ciclo ideal`,
           data: lista,
         },
       };
@@ -2147,12 +2166,14 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
         });
         break;
       }
+      case "sugerir_clientes_para_encaixe":
+      case "sugerir_encaixes_reativacao":
       case "identificar_clientes_retorno": {
-        const lista = Array.isArray(data) ? data : data?.clientes || [];
+        const lista = Array.isArray(data) ? data : data?.data || data?.clientes || data?.sugestoes || [];
         cards.push({
           type: "reativacao",
-          title: "Clientes Ausentes com Potencial de Retorno",
-          subtitle: `${lista.length} cliente(s) identificado(s)`,
+          title: "Clientes Sugeridos para Encaixe",
+          subtitle: `${lista.length} cliente(s) habitual(is) no ciclo ideal`,
           data: lista,
         });
         break;
