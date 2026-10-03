@@ -8,7 +8,7 @@ import { JessiInputBar } from "./JessiInputBar";
 import { JessiContextPanel } from "./JessiContextPanel";
 import { JessiStatusIndicator, JessiStatus } from "./JessiStatusIndicator";
 import { processarMensagemJessi, obterCentralOperacionalJessiFn } from "@/lib/ia/jessi-agent.functions";
-import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
+ import { JessiMessage, JessiPendingAction, JessiProactiveCentral } from "@/lib/ia/jessi-contracts";
 import { JessiContextState, criarSessaoInicial } from "@/lib/ia/jessi-session";
 import { useJessiVoice } from "@/lib/ia/useJessiVoice";
 import { JessiBancadaMode } from "./JessiBancadaMode";
@@ -148,7 +148,7 @@ export const JessiLayout: React.FC = () => {
  try {
  const res = await processarMensagemFn({ data: { mensagem: "confirmar", contexto, confirmacaoAcaoPendenteId: acao.id, dadosConfirmacao: { tool: acao.tool, params: acao.params } } });
  setMessages((prev) => [...prev, { id: `confirm_${Date.now()}`, role: "assistant", content: res.respostaTexto, timestamp: new Date().toISOString(), cards: res.cards, pendingAction: res.pendingAction } as JessiMessage]);
- if (res.novoContexto) setContexto((prev) => ({ ...prev, ...res.novoContexto }));
+ if ("novoContexto" in res && res.novoContexto) setContexto((prev) => ({ ...prev, ...res.novoContexto }));
  if (isContinuousMode) resumeListening();
  } catch (e: any) {
  toast.error(e?.message || "Falha ao confirmar ação");
@@ -203,7 +203,7 @@ export const JessiLayout: React.FC = () => {
  if (controller.signal.aborted) return;
  setMessages((prev) => [...prev, { id: `response_${Date.now()}`, role: "assistant", content: res.respostaTexto, timestamp: new Date().toISOString(), cards: res.cards, pendingAction: res.pendingAction } as JessiMessage]);
  if (res.respostaTexto && ttsEnabled) falarResposta(res.respostaTexto);
- if (res.novoContexto) setContexto((prev) => ({ ...prev, ...res.novoContexto }));
+ if ("novoContexto" in res && res.novoContexto) setContexto((prev) => ({ ...prev, ...res.novoContexto }));
  } catch (e: any) {
  if (e?.name === "AbortError") return;
  toast.error(e?.message || "Erro ao processar mensagem");
@@ -221,14 +221,14 @@ export const JessiLayout: React.FC = () => {
  return (
  <div className="flex w-full min-w-0 flex-col lg:flex-row h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)] overflow-hidden bg-background">
  <div className="hidden lg:flex lg:w-[280px] lg:shrink-0 border-r border-border overflow-hidden">
- <JessiSidebar centralData={centralData} isLoadingCentral={isLoadingCentral} moduloAtivo={moduloAtivo} onSelectModulo={setModuloAtivo} onNovaConversa={handleNovaConversa} />
+ <JessiSidebar moduloAtivo={moduloAtivo} onSelecionarModulo={setModuloAtivo} onNovaConversa={handleNovaConversa} />
  </div>
  <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
  <div className="flex items-center justify-between gap-2 border-b border-border bg-card/50 px-4 sm:px-6 py-2 shrink-0 min-w-0">
  <div className="flex items-center gap-2 min-w-0">
  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"><Sparkles className="h-4 w-4" /></span>
  <span className="font-display text-sm font-semibold truncate">Jessi — Assistente Operacional</span>
- <JessiStatusIndicator status={status} detalhe={statusDetalhe} />
+ <JessiStatusIndicator status={status} statusDetalhe={statusDetalhe} />
  </div>
  <div className="flex items-center gap-1 shrink-0">
  <Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setIsContextOpen((v) =>!v)} aria-label="Painel contextual">
@@ -247,32 +247,33 @@ export const JessiLayout: React.FC = () => {
  <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
  <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4">
  {showWelcome? (
- <JessiWelcome onSugestao={(t) => handleSendMessage(t)} centralData={centralData} />
+ <JessiWelcome onQuickAction={(t) => handleSendMessage(t)} centralData={centralData} isLoadingCentral={isLoadingCentral} onOpenBancadaMode={() => setIsBancadaModeOpen(true)} />
  ): (
  <JessiChat messages={messages} isLoading={isLoading} onConfirmAction={handleConfirmAction} onCancelAction={handleCancelAction} onCancelProcessing={handleCancelProcessing} />
  )}
  </div>
  <div className="border-t border-border bg-card/50 p-3 sm:p-4 shrink-0">
  <JessiInputBar
- value={inputText}
- onChange={setInputText}
+ inputText={inputText}
+ setInputText={setInputText}
  onSend={() => handleSendMessage()}
  isLoading={isLoading}
- isListening={isListening}
+ voiceStatus={voiceStatus}
+ isContinuousMode={isContinuousMode}
+ onToggleContinuousVoice={toggleContinuousMode}
+ onCancelVoice={cancelListening}
  interimTranscript={interimTranscript}
- onStartListening={startListening}
- onStopListening={stopListening}
+ ttsEnabled={ttsEnabled}
+ onToggleTts={() => setTtsEnabled(!ttsEnabled)}
  selectedFile={selectedFile}
- onSelectFile={setSelectedFile}
- filePreview={filePreview}
- setFilePreview={setFilePreview}
- onCancelProcessing={handleCancelProcessing}
+ onSelectFile={(event) => setSelectedFile(event.target.files?.[0] || null)}
+ onRemoveFile={() => setSelectedFile(null)}
  />
  </div>
  </div>
  {isContextOpen && (
  <div className="w-full lg:w-[340px] shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card overflow-y-auto overflow-x-hidden max-h-[40vh] lg:max-h-none">
- <JessiContextPanel contexto={contexto} centralData={centralData} onClose={() => setIsContextOpen(false)} />
+ <JessiContextPanel contexto={contexto} isOpen={isContextOpen} onClose={() => setIsContextOpen(false)} />
  </div>
  )}
  </div>
