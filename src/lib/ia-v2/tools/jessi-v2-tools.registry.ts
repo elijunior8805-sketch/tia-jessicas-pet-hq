@@ -649,7 +649,7 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
   },
   identificar_clientes_retorno: {
     nomeInterno: "identificar_clientes_retorno",
-    descricao: "Identifica clientes no ciclo de retorno para encaixes",
+    descricao: "Identifica clientes inativos para reativação",
     intencoes: ["identificar_clientes_retorno", "clientes_saudade", "reativacao_clientes"],
     area: "clientes_pets",
     parametros: {},
@@ -658,34 +658,11 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     tipo: "consulta",
     nivelRisco: "baixo",
     confirmacaoNecessaria: false,
-    adaptador: "ProativoAdapter.sugerirClientesParaEncaixeInteligente",
+    adaptador: "ProativoAdapter.identificarClientesParaRetorno",
     featureFlag: "ai_v2_proactive",
-    timeoutMs: 8000,
+    timeoutMs: 5000,
     politicaRepeticao: "retry_1x_se_leitura",
     idempotencia: false,
-    verificacaoPosterior: false,
-  },
-  sugerir_clientes_para_encaixe: {
-    nomeInterno: "sugerir_clientes_para_encaixe",
-    descricao: "Sugere clientes com alta conversão para preenchimento de horários vagos com base no dia da semana habitual e ciclo recente",
-    intencoes: ["sugerir_clientes_para_encaixe", "clientes_para_horario_vago", "quem_chamar_hoje", "preencher_grade", "clientes_para_retorno", "sugerir_clientes"],
-    area: "agenda",
-    parametros: {
-      data: { tipo: "string", obrigatorio: false, descricao: "Data YYYY-MM-DD" },
-      horarioVago: { tipo: "string", obrigatorio: false, descricao: "Horário vago HH:mm" },
-    },
-    retorno: "Lista ranqueada de clientes habituais do dia da semana com link WhatsApp",
-    permissoes: ["agenda", "admin"],
-    tipo: "consulta",
-    nivelRisco: "baixo",
-    confirmacaoNecessaria: false,
-    adaptador: "ProativoAdapter.sugerirClientesParaEncaixeInteligente",
-    featureFlag: "ai_v2_proactive",
-    timeoutMs: 8000,
-    politicaRepeticao: "retry_1x_se_leitura",
-    idempotencia: false,
-    verificacaoPosterior: false,
-  },
     verificacaoPosterior: false,
   },
   registrar_envio_whatsapp: {
@@ -1153,12 +1130,18 @@ export async function despacharFerramentaV2(
       case "identificar_horarios_vagos":
         return await ProativoAdapter.identificarHorariosVagos(sb, params.data);
 
-      case "sugerir_clientes_para_encaixe":
-      case "sugerir_encaixes_reativacao":
       case "identificar_clientes_retorno":
       case "consultar_clientes_inativos":
       case "consultar_reativacao":
-        return await ProativoAdapter.sugerirClientesParaEncaixeInteligente(sb, params);
+        return await ProativoAdapter.identificarClientesParaRetorno(sb);
+
+      case "otimizar_rotas_leva_traz":
+      case "consultar_leva_traz":
+      case "consultar_rota_leva_traz":
+        return await otimizarRotasLevaTrazJessi(sb, params);
+
+      case "sugerir_encaixes_reativacao":
+        return await sugerirEncaixesReativacaoJessi(sb, params);
 
       case "processar_comprovante":
       case "analisar_comprovante":

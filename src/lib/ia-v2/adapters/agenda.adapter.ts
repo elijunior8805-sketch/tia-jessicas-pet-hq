@@ -488,21 +488,6 @@ export class AgendaAdapter {
       } catch {}
     }
 
-    if (!agendamentoAlvo) {
-      try {
-        const { data: listaRecente } = await sb
-          .from("agendamentos")
-          .select("id, data, hora, status, pet_id, cliente_id, pets(id, nome), clientes(id, nome), servicos(id, nome)")
-          .neq("status", "cancelado")
-          .order("created_at", { ascending: false })
-          .limit(5);
-
-        if (listaRecente && listaRecente.length > 0) {
-          agendamentoAlvo = listaRecente[0];
-        }
-      } catch {}
-    }
-
     const petNomeFinal = (agendamentoAlvo?.pets as any)?.nome || params.petNome || "Pet";
     const clienteNomeFinal = (agendamentoAlvo?.clientes as any)?.nome || params.clienteNome || "Cliente";
     const servicoNomeFinal = (agendamentoAlvo?.servicos as any)?.nome || "Atendimento";
@@ -581,21 +566,6 @@ export class AgendaAdapter {
             const nomeC = ((a.clientes as any)?.nome || "").toLowerCase();
             return (params.petNome && nomeP.includes(termo)) || (params.clienteNome && nomeC.includes(termo));
           }) || lista[0];
-        }
-      } catch {}
-    }
-
-    if (!agendamentoAlvo) {
-      try {
-        const { data: listaRecente } = await sb
-          .from("agendamentos")
-          .select("id, data, hora, status, pet_id, cliente_id, pets(id, nome), clientes(id, nome), servicos(id, nome)")
-          .neq("status", "cancelado")
-          .order("created_at", { ascending: false })
-          .limit(5);
-
-        if (listaRecente && listaRecente.length > 0) {
-          agendamentoAlvo = listaRecente[0];
         }
       } catch {}
     }

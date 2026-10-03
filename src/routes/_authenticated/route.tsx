@@ -14,80 +14,77 @@ import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { SyncStatusBadge } from "@/components/sync-status";
 import { AssistenteIaBotao } from "@/components/ia/AssistenteIaBotao";
 
-
-
-
 export const Route = createFileRoute("/_authenticated")({
-  ssr: false,
-  beforeLoad: async () => {
-    try {
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data?.user) throw redirect({ to: "/auth" });
-      return { user: data.user };
-    } catch (err: any) {
-      if (err && typeof err === 'object' && ('to' in err || 'isRedirect' in err || 'statusCode' in err)) {
-        throw err;
-      }
-      throw redirect({ to: "/auth" });
-    }
-  },
-  component: AuthenticatedLayout,
+ ssr: false,
+ beforeLoad: async () => {
+ try {
+ const { data, error } = await supabase.auth.getUser();
+ if (error ||!data?.user) throw redirect({ to: "/auth" });
+ return { user: data.user };
+ } catch (err: any) {
+ if (err && typeof err === 'object' && ('to' in err || 'isRedirect' in err || 'statusCode' in err)) {
+ throw err;
+ }
+ throw redirect({ to: "/auth" });
+ }
+ },
+ component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { data: profile } = useMyProfile();
-  const name = displayName(profile);
-  const syncStatus = useRealtimeSync();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isJessiRoute = pathname === "/jessi" || pathname.startsWith("/jessi");
+ const navigate = useNavigate();
+ const queryClient = useQueryClient();
+ const { data: profile } = useMyProfile();
+ const name = displayName(profile);
+ const syncStatus = useRealtimeSync();
+ const pathname = useRouterState({ select: (s) => s.location.pathname });
+ const isJessiRoute = pathname === "/jessi" || pathname.startsWith("/jessi");
 
-  async function handleSignOut() {
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    await supabase.auth.signOut();
-    toast.success("Até logo!");
-    navigate({ to: "/auth", replace: true });
-  }
+ async function handleSignOut() {
+ await queryClient.cancelQueries();
+ queryClient.clear();
+ await supabase.auth.signOut();
+ toast.success("Até logo!");
+ navigate({ to: "/auth", replace: true });
+ }
 
-  return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full" data-sidebar-wrapper="">
-        <AppSidebar />
-        <SidebarInset className="flex flex-col min-w-0 flex-1">
-          <header className="h-14 border-b border-border bg-card/60 backdrop-blur flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
-            <div className="flex items-center gap-2 min-w-0">
-              <SidebarTrigger />
-              <span className="font-display text-base sm:text-lg font-semibold text-primary truncate">
-                Spa de Pet
-              </span>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <SyncStatusBadge status={syncStatus} />
-              <NotificationBell />
+ return (
+ <SidebarProvider>
+ <div className="min-h-screen flex w-full overflow-x-hidden" data-sidebar-wrapper="">
+ <AppSidebar />
+ <SidebarInset className="flex flex-col min-w-0 flex-1 w-full overflow-x-hidden bg-background">
+ <header className="h-14 min-h-14 border-b border-border bg-card/60 backdrop-blur flex items-center justify-between gap-2 px-4 sm:px-6 sticky top-0 z-30 w-full min-w-0">
+ <div className="flex items-center gap-2 min-w-0 flex-1">
+ <SidebarTrigger className="shrink-0 touch-manipulation min-h-11 min-w-11 lg:min-h-7 lg:min-w-7" />
+ <span className="font-display text-base sm:text-lg font-semibold text-primary truncate">
+ Spa de Pet
+ </span>
+ </div>
+ <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+ <SyncStatusBadge status={syncStatus} />
+ <NotificationBell />
+ <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-border/60 min-w-0">
+ <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+ {initials(profile)}
+ </div>
+ <div className="text-sm font-medium text-foreground truncate max-w-[120px] lg:max-w-[160px] hidden lg:block">{name}</div>
+ </div>
+ <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2 min-h-11 sm:min-h-9 px-2 sm:px-3 touch-manipulation shrink-0">
+ <LogOut className="h-4 w-4" />
+ <span className="hidden sm:inline">Sair</span>
+ </Button>
+ </div>
+ </header>
 
-              <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-border/60">
-                <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {initials(profile)}
-                </div>
-                <div className="text-sm font-medium text-foreground truncate max-w-[160px]">{name}</div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sair</span>
-              </Button>
-            </div>
-          </header>
-
-          <main className="flex-1 min-w-0">
-            <Outlet />
-          </main>
-          <MobileNav />
-          {!isJessiRoute && <AssistenteIaBotao />}
-        </SidebarInset>
-
-      </div>
-    </SidebarProvider>
-  );
+ <main className="flex-1 min-w-0 w-full overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+ <div className="w-full min-w-0 overflow-x-hidden">
+ <Outlet />
+ </div>
+ </main>
+ <MobileNav />
+ {!isJessiRoute && <AssistenteIaBotao />}
+ </SidebarInset>
+ </div>
+ </SidebarProvider>
+ );
 }

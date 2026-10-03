@@ -246,184 +246,103 @@ export class ProativoAdapter {
   }
 
   /**
-   * Vetor 5: Sugestão Inteligente de Clientes para Encaixes / Horários Vagos
-   * FOCADO EM ALTA CONVERSÃO REAL:
-   * 1. Identifica clientes que costumam vir no mesmo dia da semana (ex: sextas-feiras).
-   * 2. Recência ativa e saudável (último atendimento entre 7 e 35 dias).
-   * 3. Exclui clientes que já têm agendamento futuro ou que estão inativos há mais de 45 dias.
-   * 4. Gera link de WhatsApp com mensagem contextual pronta.
+   * Vetor 5: Clientes para Retorno (Reativação e Saudade com view pets_reativacao)
    */
-  static async sugerirClientesParaEncaixeInteligente(
-    sb: SupabaseClient<Database>,
-    params?: { data?: string; horarioVago?: string }
-  ): Promise<JessiV2QueryResult> {
-    const dataAlvoStr =
-      params?.data ||
-      new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Sao_Paulo",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-
-    const dataAlvoObj = new Date(`${dataAlvoStr}T12:00:00`);
-    const diaSemanaAlvo = dataAlvoObj.getDay();
-    const nomesDias = ["domingos", "segundas-feiras", "terças-feiras", "quartas-feiras", "quintas-feiras", "sextas-feiras", "sábados"];
-    const nomeDiaSemana = nomesDias[diaSemanaAlvo] || "neste dia";
-
+  static async identificarClientesParaRetorno(sb: SupabaseClient<Database>): Promise<JessiV2QueryResult> {
     try {
-      // 1. Busca agendamentos futuros para NÃO sugerir quem já tem horário marcado
-      const { data: agendamentosFuturos } = await sb
-        .from("agendamentos")
-        .select("cliente_id, pet_id")
-        .gte("data", dataAlvoStr)
-        .neq("status", "cancelado");
+      const { data: reativacoes } = await sb
+        .from("pets_reativacao")
+        .select("cliente_id, cliente_nome, cliente_telefone, cliente_whatsapp, pet_id, pet_nome, dias_inativo, faixa, ticket_medio, ultimo_atendimento_em")
+        .order("dias_inativo", { ascending: false })
+        .limit(10);
 
-      const clientesJaAgendados = new Set((agendamentosFuturos || []).map((a: any) => a.cliente_id).filter(Boolean));
-      const petsJaAgendados = new Set((agendamentosFuturos || []).map((a: any) => a.pet_id).filter(Boolean));
-
-      // 2. Histórico recente dos últimos 90 dias
-      const dataLimite = new Date();
-      dataLimite.setDate(dataLimite.getDate() - 90);
-      const dataLimiteStr = dataLimite.toISOString().split("T")[0];
-
-      const { data: historico } = await sb
-        .from("agendamentos")
-        .select("id, data, hora, status, cliente_id, pet_id, clientes(id, nome, whatsapp, telefone), pets(id, nome, raca, porte)")
-        .gte("data", dataLimiteStr)
-        .lt("data", dataAlvoStr)
-        .neq("status", "cancelado")
-        .order("data", { ascending: false });
-
-      if (!historico || historico.length === 0) {
-        return {
-          success: true,
-          source: "encaixe_inteligente",
-          data: [],
-          total_count: 0,
-          summary: `Não há histórico suficiente nos últimos 90 dias para calcular o padrão de frequência por dia da semana.`,
-          executed_at: new Date().toISOString(),
-        };
-      }
-
-      const statsPorPet: Record<
-        string,
-        {
-          cliente: any;
-          pet: any;
-          totalAtendimentos: number;
-          atendimentosNesseDiaSemana: number;
-          ultimaData: string;
-          diasDesdeUltimo: number;
-        }
-      > = {};
-
-      const hojeMs = new Date().getTime();
-
-      for (const ag of historico) {
-        if (!ag.cliente_id || !ag.pet_id) continue;
-        if (clientesJaAgendados.has(ag.cliente_id) || petsJaAgendados.has(ag.pet_id)) continue;
-
-        const chave = `${ag.cliente_id}_${ag.pet_id}`;
-        const dataAg = new Date(`${ag.data}T12:00:00`);
-        const diaSemana = dataAg.getDay();
-        const diffDias = Math.max(1, Math.round((hojeMs - dataAg.getTime()) / (1000 * 60 * 60 * 24)));
-
-        if (!statsPorPet[chave]) {
-          statsPorPet[chave] = {
-            cliente: ag.clientes,
-            pet: ag.pets,
-            totalAtendimentos: 0,
-            atendimentosNesseDiaSemana: 0,
-            ultimaData: ag.data,
-            diasDesdeUltimo: diffDias,
-          };
-        }
-
-        statsPorPet[chave].totalAtendimentos += 1;
-        if (diaSemana === diaSemanaAlvo) {
-          statsPorPet[chave].atendimentosNesseDiaSemana += 1;
-        }
-        if (diffDias < statsPorPet[chave].diasDesdeUltimo) {
-          statsPorPet[chave].diasDesdeUltimo = diffDias;
-          statsPorPet[chave].ultimaData = ag.data;
-        }
-      }
-
-      // 3. Filtra clientes ativos e pontua conversão
-      const candidatos = Object.values(statsPorPet)
-        .filter((item) => item.diasDesdeUltimo >= 7 && item.diasDesdeUltimo <= 40)
-        .map((item) => {
-          let score = 0;
-          const proporcaoDia = item.totalAtendimentos > 0 ? item.atendimentosNesseDiaSemana / item.totalAtendimentos : 0;
-          if (item.atendimentosNesseDiaSemana > 0) score += 40 * proporcaoDia;
-          if (item.diasDesdeUltimo >= 10 && item.diasDesdeUltimo <= 22) score += 35;
-          else if (item.diasDesdeUltimo >= 7 && item.diasDesdeUltimo <= 35) score += 20;
-          score += Math.min(15, item.totalAtendimentos * 3);
-
-          const tel = item.cliente?.whatsapp || item.cliente?.telefone || "";
-          const horarioStr = params?.horarioVago ? ` às ${params.horarioVago}` : "";
-          const msgTexto = `Olá, ${item.cliente?.nome || "Tutor"}! Tudo bem? 🐾 Sobrou uma vaga hoje${horarioStr} no Spa de Pet Tia Jéssica para o(a) ${item.pet?.nome || "seu pet"}. Como vocês costumam vir às ${nomeDiaSemana}, quer que eu reserve esse horário?`;
-          const linkWa = tel ? (gerarLinkWhatsApp(tel, msgTexto) ?? undefined) : undefined;
+      if (reativacoes && reativacoes.length > 0) {
+        const sugestoes = reativacoes.map((r: any) => {
+          const tel = r.cliente_whatsapp || r.cliente_telefone || "";
+          const msgGen = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+            telefoneDestino: tel,
+            nomeCliente: r.cliente_nome || "Cliente",
+            nomePet: r.pet_nome || "seu pet",
+            tipoMensagem: "reativacao_carinho",
+          });
 
           return {
             cliente: {
-              id: item.cliente?.id,
-              nome: item.cliente?.nome,
+              id: r.cliente_id,
+              nome: r.cliente_nome,
               telefone: tel,
             },
             pet: {
-              id: item.pet?.id,
-              nome: item.pet?.nome,
-              raca: item.pet?.raca,
+              id: r.pet_id,
+              nome: r.pet_nome,
             },
-            diasInativo: item.diasDesdeUltimo,
-            frequenciaDiaSemana: item.atendimentosNesseDiaSemana,
-            totalAtendimentos: item.totalAtendimentos,
-            scoreConversao: Math.round(score),
-            motivoSugestao: `Costuma vir às ${nomeDiaSemana} (${item.atendimentosNesseDiaSemana}x) • Último banho há ${item.diasDesdeUltimo} dias`,
+            diasInativo: r.dias_inativo,
+            faixaRisco: r.faixa,
+            ultimoAtendimento: r.ultimo_atendimento_em,
             mensagemSugerida: {
-              textoMensagem: msgTexto,
-              mensagemFormatada: msgTexto,
-              urlWhatsApp: linkWa,
-              telefoneDestino: tel,
+              textoMensagem: msgGen.mensagemFormatada,
+              mensagemFormatada: msgGen.mensagemFormatada,
+              urlWhatsApp: msgGen.urlWhatsApp,
+              telefoneDestino: msgGen.telefoneFormatado,
             },
           };
-        })
-        .sort((a, b) => b.scoreConversao - a.scoreConversao)
-        .slice(0, 6);
+        });
 
-      const summary =
-        candidatos.length > 0
-          ? `Localizei ${candidatos.length} cliente(s) habituais de ${nomeDiaSemana} com ciclo ideal para preenchimento de vaga.`
-          : `Não há clientes habituais de ${nomeDiaSemana} no momento com ciclo de retorno aberto.`;
-
-      return {
-        success: true,
-        source: "encaixes_inteligentes_conversao",
-        data: candidatos,
-        total_count: candidatos.length,
-        summary,
-        executed_at: new Date().toISOString(),
-      };
-    } catch (err: any) {
-      console.error("[ProativoAdapter] Erro ao sugerir encaixes inteligentes:", err);
-      return {
-        success: false,
-        source: "encaixes_inteligentes_conversao",
-        data: [],
-        total_count: 0,
-        summary: `Erro ao identificar clientes para encaixe: ${err.message}`,
-        executed_at: new Date().toISOString(),
-      };
+        return {
+          success: true,
+          source: "pets_reativacao",
+          data: sugestoes,
+          total_count: sugestoes.length,
+          summary: `Identificados ${sugestoes.length} cliente(s) e pet(s) inativos com alto potencial de reativação (VIEW pets_reativacao).`,
+          executed_at: new Date().toISOString(),
+        };
+      }
+    } catch (err) {
+      console.warn("Aviso: fallback na busca de reativação de clientes:", err);
     }
-  }
 
-  /**
-   * Vetor 5: Clientes para Retorno (Compatibilidade com busca de reativação)
-   */
-  static async identificarClientesParaRetorno(sb: SupabaseClient<Database>): Promise<JessiV2QueryResult> {
-    return this.sugerirClientesParaEncaixeInteligente(sb);
+    // Fallback caso a view esteja sem dados
+    const { data: clientes } = await sb
+      .from("clientes")
+      .select("id, nome, telefone, whatsapp, pets(id, nome, raca)")
+      .limit(10);
+
+    const sugestoes = (clientes || []).map((c: any) => {
+      const pet = Array.isArray(c.pets) && c.pets.length > 0 ? c.pets[0] : null;
+      const tel = c.whatsapp || c.telefone || "";
+      const msgGen = MensagensWhatsAppAdapter.gerarMensagemWhatsApp({
+        telefoneDestino: tel,
+        nomeCliente: c.nome,
+        nomePet: pet?.nome || "seu pet",
+        tipoMensagem: "reativacao_carinho",
+      });
+
+      return {
+        cliente: {
+          id: c.id,
+          nome: c.nome,
+          telefone: tel,
+        },
+        pet: pet ? { id: pet.id, nome: pet.nome, raca: pet.raca } : undefined,
+        diasInativo: 25,
+        faixaRisco: "alerta",
+        mensagemSugerida: {
+          textoMensagem: msgGen.mensagemFormatada,
+          mensagemFormatada: msgGen.mensagemFormatada,
+          urlWhatsApp: msgGen.urlWhatsApp,
+          telefoneDestino: msgGen.telefoneFormatado,
+        },
+      };
+    });
+
+    return {
+      success: true,
+      source: "clientes_para_retorno",
+      data: sugestoes,
+      total_count: sugestoes.length,
+      summary: `Localizados ${sugestoes.length} cliente(s) com sugestões de contato personalizadas.`,
+      executed_at: new Date().toISOString(),
+    };
   }
 
   /**
