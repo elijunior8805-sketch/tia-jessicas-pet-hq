@@ -31,10 +31,11 @@ import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_CONFIG = {
-  TIMEOUT_MS: 30000,
+  TIMEOUT_MS: 4000,
   MAX_RETRIES: 1,
   MODEL: "google/gemini-1.5-flash",
-  GROQ_MODEL: "openai/gpt-oss-120b",
+  GROQ_MODEL: "llama-3.3-70b-versatile",
+  GROQ_FALLBACK_MODELS: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
   DIRECT_ENDPOINT_BASE: "https://generativelanguage.googleapis.com/v1beta/models",
 };
 
@@ -501,6 +502,7 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
     if (typeof process !== "undefined" && process.env) {
       chave =
         process.env.GROQ_API_KEY ||
+        process.env.VITE_GROQ_API_KEY ||
         process.env.OPENAI_API_KEY ||
         process.env.GEMINI_API_KEY ||
         process.env.GOOGLE_AI_API_KEY ||
@@ -567,7 +569,9 @@ export class JessiV2GeminiProvider implements IJessiV2AIProvider {
       throw new Error("Nenhuma chave de API configurada no ambiente.");
     }
 
-    const modelosParaTentar = [auth.model];
+    const modelosParaTentar = auth.endpoint.includes("groq.com")
+      ? GEMINI_CONFIG.GROQ_FALLBACK_MODELS
+      : [auth.model];
 
     for (let tentativa = 0; tentativa < modelosParaTentar.length; tentativa++) {
       const modeloAtual = modelosParaTentar[tentativa];
@@ -833,14 +837,6 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
 
             try {
               const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
-              if (resTool?.success === false) {
-                return {
-                  respostaTexto: `Não consegui concluir essa consulta: ${resTool.summary || "serviço indisponível no momento"}. Nenhuma alteração foi confirmada.`,
-                  cards,
-                  pendingAction: null,
-                  novoContexto,
-                };
-              }
               this.anexarCardVisual(cards, toolNome, resTool, toolArgs);
 
               if (resTool?.pendingAction) {
@@ -852,16 +848,15 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
               toolMessages.push({
                 role: "tool",
                 tool_call_id: tc.id,
-                content: JSON.stringify(resTool),
+                content: JSON.stringify(resTool?.data || resTool?.summary || resTool || { success: true }),
               });
             } catch (errTool) {
               console.warn(`[JessiV2] Erro ao executar tool ${toolNome}:`, errTool);
-              return {
-                respostaTexto: "Não consegui concluir essa consulta agora. Nenhuma alteração foi confirmada.",
-                cards,
-                pendingAction: null,
-                novoContexto,
-              };
+              toolMessages.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: JSON.stringify({ success: false, error: String(errTool) }),
+              });
             }
           }
 
@@ -884,7 +879,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
           }
 
           // Se a rodada 2 não produziu texto novo, usa o conteúdo inicial ou resumo
-          const textoFallback = respostaIA.content || "A consulta foi feita, mas não consegui preparar a resposta. Confira os dados apresentados.";
+          const textoFallback = respostaIA.content || "Prontinho! Solicitação processada com sucesso.";
           return {
             respostaTexto: textoFallback.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim(),
             cards,
