@@ -146,12 +146,9 @@ export const JessiLayout: React.FC = () => {
  const handleConfirmAction = async (acao: JessiPendingAction) => {
  setIsLoading(true);
  try {
- const res = await processarMensagemFn({ data: { mensagem: "confirmar", contexto, acaoConfirmada: acao } as any });
- if (res?.mensagem) {
- setMessages((prev) => [...prev, res.mensagem as JessiMessage]);
- if (res.contexto) setContexto(res.contexto);
- }
- toast.success("Ação confirmada!");
+ const res = await processarMensagemFn({ data: { mensagem: "confirmar", contexto, confirmacaoAcaoPendenteId: acao.id, dadosConfirmacao: { tool: acao.tool, params: acao.params } } });
+ setMessages((prev) => [...prev, { id: `confirm_${Date.now()}`, role: "assistant", content: res.respostaTexto, timestamp: new Date().toISOString(), cards: res.cards, pendingAction: res.pendingAction } as JessiMessage]);
+ if (res.novoContexto) setContexto((prev) => ({ ...prev, ...res.novoContexto }));
  if (isContinuousMode) resumeListening();
  } catch (e: any) {
  toast.error(e?.message || "Falha ao confirmar ação");
@@ -202,14 +199,11 @@ export const JessiLayout: React.FC = () => {
  const controller = new AbortController();
  abortControllerRef.current = controller;
  try {
- const res = await processarMensagemFn({ data: { mensagem: textToSend, contexto } as any });
+ const res = await processarMensagemFn({ data: { mensagem: textToSend, contexto, historico: messages.slice(-12) as any, canal: isContinuousMode || isBancadaModeOpen ? "voz" : "texto", modoBancada: isBancadaModeOpen } });
  if (controller.signal.aborted) return;
- if (res?.mensagem) {
- setMessages((prev) => [...prev, res.mensagem as JessiMessage]);
- const textoResposta = (res.mensagem as any)?.content || "";
- if (textoResposta && ttsEnabled) falarResposta(textoResposta);
- }
- if (res?.contexto) setContexto(res.contexto);
+ setMessages((prev) => [...prev, { id: `response_${Date.now()}`, role: "assistant", content: res.respostaTexto, timestamp: new Date().toISOString(), cards: res.cards, pendingAction: res.pendingAction } as JessiMessage]);
+ if (res.respostaTexto && ttsEnabled) falarResposta(res.respostaTexto);
+ if (res.novoContexto) setContexto((prev) => ({ ...prev, ...res.novoContexto }));
  } catch (e: any) {
  if (e?.name === "AbortError") return;
  toast.error(e?.message || "Erro ao processar mensagem");
@@ -255,7 +249,7 @@ export const JessiLayout: React.FC = () => {
  {showWelcome? (
  <JessiWelcome onSugestao={(t) => handleSendMessage(t)} centralData={centralData} />
  ): (
- <JessiChat messages={messages} isLoading={isLoading} onConfirm={handleConfirmAction} onCancel={handleCancelAction} onCancelProcessing={handleCancelProcessing} />
+ <JessiChat messages={messages} isLoading={isLoading} onConfirmAction={handleConfirmAction} onCancelAction={handleCancelAction} onCancelProcessing={handleCancelProcessing} />
  )}
  </div>
  <div className="border-t border-border bg-card/50 p-3 sm:p-4 shrink-0">
@@ -284,7 +278,7 @@ export const JessiLayout: React.FC = () => {
  </div>
  </div>
  {isBancadaModeOpen && (
- <JessiBancadaMode open={isBancadaModeOpen} onClose={() => setIsBancadaModeOpen(false)} />
+ <JessiBancadaMode isOpen={isBancadaModeOpen} onClose={() => setIsBancadaModeOpen(false)} voiceStatus={voiceStatus} isListening={isListening} isSpeaking={isSpeaking} interimTranscript={interimTranscript} finalTranscript={finalTranscript} audioLevel={audioLevel} isInterrupted={isInterrupted} ttsEnabled={ttsEnabled} onToggleTts={() => setTtsEnabled(!ttsEnabled)} onToggleListening={toggleContinuousMode} onSendMessage={handleSendMessage} onConfirmAction={handleConfirmAction} onCancelAction={handleCancelAction} messages={messages} isLoading={isLoading} />
  )}
  </div>
  );
