@@ -125,7 +125,7 @@ export const JessiInboxPanel: React.FC<JessiInboxPanelProps> = ({
                   Jessi · Copiloto de Atendimento & Conversão
                 </span>
                 <Badge className="bg-[#C8A951]/30 text-[#F5E6BE] border-[#C8A951]/50 text-[10px] py-0 px-2 font-medium">
-                  IA Generativa Gemini 1.5
+                  IA Generativa Groq LLaMA 3.3
                 </Badge>
                 {clienteSelecionado && (
                   <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">

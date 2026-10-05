@@ -42,9 +42,9 @@ export type IaConfig = {
 
 export const IA_CONFIG_PADRAO: IaConfig = {
   ia_ativa: true,
-  provedor: "lovable",
-  modelo_principal: "google/gemini-1.5-flash",
-  modelo_alternativo: "google/gemini-1.5-flash",
+  provedor: "groq",
+  modelo_principal: "llama-3.3-70b-versatile",
+  modelo_alternativo: "llama-3.1-8b-instant",
   criatividade: 0.6,
   limite_caracteres: 600,
   timeout_ms: 25000,
@@ -174,7 +174,7 @@ async function chamadaUnica(
 
     if (apiKey.startsWith("gsk_")) {
       endpoint = "https://api.groq.com/openai/v1/chat/completions";
-      modeloFinal = "openai/gpt-oss-120b";
+      modeloFinal = "llama-3.3-70b-versatile";
     } else if (apiKey.startsWith("AIzaSy")) {
       endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
       modeloFinal = "gemini-1.5-flash";

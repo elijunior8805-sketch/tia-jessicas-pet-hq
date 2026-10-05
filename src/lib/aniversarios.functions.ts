@@ -367,12 +367,12 @@ DIRETRIZES:
 - Inclua chamada para agendamento carinhosa.
 - Retorne APENAS o texto da mensagem final sem aspas ou cabeçalhos.`;
 
-        let endpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
-        let model = "google/gemini-1.5-flash";
+        let endpoint = "https://api.groq.com/openai/v1/chat/completions";
+        let model = "llama-3.3-70b-versatile";
 
         if (apiKey.startsWith("gsk_")) {
           endpoint = "https://api.groq.com/openai/v1/chat/completions";
-          model = "openai/gpt-oss-120b";
+          model = "llama-3.3-70b-versatile";
         } else if (apiKey.startsWith("AIzaSy")) {
           endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
           model = "gemini-1.5-flash";

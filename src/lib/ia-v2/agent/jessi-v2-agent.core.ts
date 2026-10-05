@@ -7,7 +7,7 @@ import {
   JessiV2PendingAction,
 } from "../contracts/jessi-v2-contracts";
 import { JessiV2ContextState, criarSessaoV2 } from "../session/jessi-v2-session";
-import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
+import { JessiV2GroqProvider } from "../providers/jessi-v2-groq.provider";
 import { normalizarTexto, ClientesPetsAdapter } from "../adapters/clientes-pets.adapter";
 import { despacharFerramentaV2 } from "../tools/jessi-v2-tools.registry";
 import { registrarAuditoriaV2 } from "../tracing/jessi-v2-audit";
@@ -15,10 +15,10 @@ import { humanizarRespostaParaVoz } from "@/lib/ia/ia-voz-conversational";
 
 /**
  * Motor Core de Orquestração da Jessi V2 (Agente Autônomo com Tool Calling)
- * Desenvolvido para entregar 100% da capacidade do modelo de linguagem (Gemini 1.5 Flash)
+ * Desenvolvido para entregar 100% da capacidade do modelo de linguagem (Groq LLaMA 3.3 70B)
  */
 
-const geminiProvider = new JessiV2GeminiProvider();
+const groqProvider = new JessiV2GroqProvider();
 
 export async function processarMensagemJessiV2Core(
   sb: SupabaseClient<Database>,
@@ -323,7 +323,7 @@ export async function processarMensagemJessiV2Core(
     }
 
     // 2. EXECUÇÃO DIRETA PELO MOTOR DO AGENTE AUTÔNOMO COM TOOL CALLING
-    const resultadoAgente = await geminiProvider.executarAgenteAutonomo({
+    const resultadoAgente = await groqProvider.executarAgenteAutonomo({
       sb,
       mensagemUsuario: textoLimpo,
       contexto: {
@@ -384,7 +384,7 @@ export async function processarMensagemJessiV2Core(
         entidades: {},
         requerConfirmacao: Boolean(pendingAction),
         ferramentaSugerida: pendingAction?.tool || null,
-        explicacaoRaciocinio: "Processado com autonomia e Tool Calling pelo Gemini 1.5 Flash.",
+        explicacaoRaciocinio: "Processado com autonomia e Tool Calling pelo Groq LLaMA 3.3 70B.",
       },
       tempoProcessamentoMs: Date.now() - inicioMs,
       correlationId,

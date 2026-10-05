@@ -309,7 +309,7 @@ export const JessiCampanhasProativasCopilot: React.FC<Props> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-xs text-[#F5E6BE] font-bold">
             <Wand2 className="h-4 w-4 text-[#C8A951]" />
-            Gerar Campanha com Inteligência Artificial (Gemini 1.5):
+            Gerar Campanha com Inteligência Artificial (Groq LLaMA 3.3):
           </div>
 
           <div className="flex items-center gap-1">

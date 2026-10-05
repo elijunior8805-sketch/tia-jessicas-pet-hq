@@ -5,7 +5,7 @@ import {
   JessiGuardrailViolationError,
   JessiIdempotencyConflictError,
 } from "../errors/jessi-v2-errors";
-import { JessiV2GeminiProvider } from "../providers/jessi-v2-gemini.provider";
+import { JessiV2GroqProvider } from "../providers/jessi-v2-groq.provider";
 import {
   criarSessaoV2,
   adicionarMensagemSessaoV2,

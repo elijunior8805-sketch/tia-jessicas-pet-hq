@@ -1,11 +1,11 @@
-﻿import {
+import {
   IJessiV2AIProvider,
   JessiV2NLURequest,
   JessiV2NLUResponse,
   JessiV2GenerativeRequest,
   JessiV2GenerativeResponse,
 } from "./jessi-v2-provider.interface";
-import { JessiV2GeminiProvider } from "./jessi-v2-gemini.provider";
+import { JessiV2GroqProvider } from "./jessi-v2-groq.provider";
 
 /**
  * Provedor de Fallback Deterministico e Resiliente para a Jessi V2
@@ -14,11 +14,11 @@ import { JessiV2GeminiProvider } from "./jessi-v2-gemini.provider";
 
 export class JessiV2FallbackProvider implements IJessiV2AIProvider {
   readonly nome = "Deterministic-Rule-Fallback-V2";
-  private geminiProvider = new JessiV2GeminiProvider();
+  private groqProvider = new JessiV2GroqProvider();
 
   async classificarIntencao(req: JessiV2NLURequest): Promise<JessiV2NLUResponse> {
     try {
-      const res = await this.geminiProvider.classificarIntencao(req);
+      const res = await this.groqProvider.classificarIntencao(req);
       return {
         ...res,
         provedorUtilizado: this.nome,
@@ -44,6 +44,6 @@ export class JessiV2FallbackProvider implements IJessiV2AIProvider {
   }
 
   async gerarResposta(req: JessiV2GenerativeRequest): Promise<JessiV2GenerativeResponse> {
-    return this.geminiProvider.gerarResposta(req);
+    return this.groqProvider.gerarResposta(req);
   }
 }
