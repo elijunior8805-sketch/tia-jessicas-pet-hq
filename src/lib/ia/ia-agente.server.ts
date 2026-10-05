@@ -28,7 +28,7 @@ export interface IAMessage {
 }
 
 /**
- * Classifica a intenção do usuário usando o modelo Gemini.
+ * Classifica a intenção do usuário usando o motor Groq LLaMA 3.3 70B.
  */
 export async function classificarComandoIA(texto: string, contexto?: any): Promise<IAIntent> {
   const lowercaseTexto = (texto || "").toLowerCase().trim();
