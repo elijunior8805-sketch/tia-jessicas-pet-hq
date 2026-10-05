@@ -54,10 +54,11 @@ export function AssistenteIaSidebar({ isOpen, onClose }: AssistenteIaSidebarProp
         moduloNome: "Agenda & Grade",
         saudacaoContextual: "Olá, Eli! Estou conectada à Agenda do Spa. Posso verificar horários livres, checar confirmações ou agendar um novo atendimento.",
         sugestoesContextuais: [
+          { label: "Ocupar Vagas (Hábitos)", icon: Sparkles, command: "quais clientes para ocupar as vagas da grade" },
           { label: "Vagas livres hoje", icon: Clock, command: "consultar horarios livres hoje" },
           { label: "Confirmar amanhã", icon: Calendar, command: "preparar lembretes de confirmacao para amanha" },
           { label: "Leva e Traz de hoje", icon: Car, command: "consultar rota leva e traz de hoje" },
-          { label: "Criar Agendamento", icon: Sparkles, command: "criar agendamento" },
+          { label: "Criar Agendamento", icon: Scissors, command: "criar agendamento" },
         ],
       };
     }
