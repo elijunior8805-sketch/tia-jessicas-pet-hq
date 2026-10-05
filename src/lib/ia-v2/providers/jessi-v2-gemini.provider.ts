@@ -1688,14 +1688,14 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
 
       if (lista.length === 0) {
         return {
-          texto: `Realizei a vistoria no histórico dos clientes, ${primeiroNomeOp}! No momento, todos os clientes habituais deste dia já estão agendados ou com atendimento recente em dia.`,
+          texto: `Para a grade de **${diaRotulo}**, todos os clientes habituais já estão com atendimentos em dia ou agendados, ${primeiroNomeOp}!`,
         };
       }
 
       const nomesTop = lista.slice(0, 3).map((item: any) => `**${item.pet?.nome || item.petNome || "Pet"}** (${(item.cliente?.nome || item.clienteNome || "Tutor").split(" ")[0]})`).join(", ");
 
       return {
-        texto: `Fiz uma auditoria no histórico dos clientes, ${primeiroNomeOp}! Para preencher a grade de ${diaRotulo}, selecionei os tutores que costumam vir nesse dia e já estão no ciclo ideal de retorno, como ${nomesTop}. Preparei os cartões abaixo com a mensagem de WhatsApp pronta para você convidar com 1 clique!`,
+        texto: `Para preencher a grade de **${diaRotulo}**, os pets com preferência pelo dia e no ciclo ideal de banho são ${nomesTop}, ${primeiroNomeOp}. Os cartões de WhatsApp já estão prontos na tela para você convidar com 1 toque!`,
         card: {
           type: "reativacao",
           title: `Sugestão Inteligente para Vagas (${diaRotulo})`,

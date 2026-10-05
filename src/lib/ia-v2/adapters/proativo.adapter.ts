@@ -262,37 +262,72 @@ export class ProativoAdapter {
 
     try {
       const hoje = new Date();
+      // Obtém hora e dia no fuso de São Paulo
+      const spTimeParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Sao_Paulo",
+        hour: "numeric",
+        hour12: false,
+        weekday: "short",
+      }).formatToParts(hoje);
+      
+      const horaAtual = parseInt(spTimeParts.find(p => p.type === "hour")?.value || String(hoje.getHours()), 10);
+      const diaSemanaHojeIndex = hoje.getDay(); // 0 = Domingo, 1 = Segunda, etc.
+
       const diasSemanaNomes = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
       const diasSemanaLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
       // Determina a data e o dia da semana alvo
       let dataAlvoStr = params?.data;
-      let diaSemanaAlvoIndex = hoje.getDay(); // 0 = Domingo, 1 = Segunda, etc.
+      let diaSemanaAlvoIndex = diaSemanaHojeIndex;
 
-      if (params?.diaSemana) {
+      if (params?.diaSemana && params.diaSemana !== "hoje") {
         const diaNorm = params.diaSemana.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const idx = diasSemanaNomes.findIndex((d) => diaNorm.includes(d) || (d === "terca" && diaNorm.includes("terc")));
-        if (idx !== -1) {
-          diaSemanaAlvoIndex = idx;
-          // Calcula a próxima data que cai nesse dia da semana
-          const diasAte = (idx - hoje.getDay() + 7) % 7;
-          const dataAlvoDate = new Date(hoje.getTime() + (diasAte === 0 ? 0 : diasAte) * 86400000);
+        if (diaNorm.includes("amanha")) {
+          // Amanhã: avança 1 dia (ou 2 se hoje for sábado)
+          const diasAvançar = diaSemanaHojeIndex === 6 ? 2 : (diaSemanaHojeIndex === 0 ? 1 : 1);
+          const dataAlvoDate = new Date(hoje.getTime() + diasAvançar * 86400000);
           dataAlvoStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dataAlvoDate);
+          diaSemanaAlvoIndex = dataAlvoDate.getDay();
+        } else {
+          const idx = diasSemanaNomes.findIndex((d) => diaNorm.includes(d) || (d === "terca" && diaNorm.includes("terc")));
+          if (idx !== -1) {
+            diaSemanaAlvoIndex = idx;
+            // Calcula a próxima data que cai nesse dia da semana
+            const diasAte = (idx - diaSemanaHojeIndex + 7) % 7;
+            const dataAlvoDate = new Date(hoje.getTime() + (diasAte === 0 ? 0 : diasAte) * 86400000);
+            dataAlvoStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dataAlvoDate);
+          }
         }
+      }
+
+      // Se não especificou dia ou se caiu no Domingo (spa fechado) ou noite (após 18h):
+      if (!params?.diaSemana || params.diaSemana === "hoje") {
+        if (diaSemanaHojeIndex === 0) {
+          // Domingo -> Pet spa fechado, preenche a grade de Segunda-feira!
+          diaSemanaAlvoIndex = 1;
+          const dataAlvoDate = new Date(hoje.getTime() + 86400000);
+          dataAlvoStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dataAlvoDate);
+        } else if (horaAtual >= 18) {
+          // Noite (após expediente) -> Preenche a grade de amanhã (ou segunda se for sábado)
+          const diasAvançar = diaSemanaHojeIndex === 6 ? 2 : 1;
+          const dataAlvoDate = new Date(hoje.getTime() + diasAvançar * 86400000);
+          dataAlvoStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dataAlvoDate);
+          diaSemanaAlvoIndex = dataAlvoDate.getDay();
+        } else {
+          dataAlvoStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(hoje);
+        }
+      }
+
+      // Se por algum motivo ainda for domingo, ajusta para segunda-feira
+      if (diaSemanaAlvoIndex === 0) {
+        diaSemanaAlvoIndex = 1;
       }
 
       if (!dataAlvoStr) {
         dataAlvoStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(hoje);
       }
 
-      // Se a data já foi definida, recalcula o dia da semana da data alvo
-      if (dataAlvoStr) {
-        const [ano, mes, dia] = dataAlvoStr.split("-").map(Number);
-        const dObj = new Date(ano, mes - 1, dia);
-        diaSemanaAlvoIndex = dObj.getDay();
-      }
-
-      const diaSemanaLabel = diasSemanaLabels[diaSemanaAlvoIndex] || "o dia solicitado";
+      const diaSemanaLabel = diasSemanaLabels[diaSemanaAlvoIndex] || "Segunda-feira";
 
       // 1. Coleta histórico de agendamentos dos últimos 120 dias, clientes ativos e planos do clubinho
       const dataLimiteHistorico = new Date(Date.now() - 120 * 86400000).toISOString().split("T")[0];
