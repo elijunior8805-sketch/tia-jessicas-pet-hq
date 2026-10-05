@@ -165,9 +165,57 @@ export const Route = createFileRoute("/api/public/hooks/mercadopago")({
               .eq("id", agendamentoId);
           }
 
+          // 3. Obtém dados do cliente e pet para emitir notificação detalhada
+          let nomeCliente = "Cliente";
+          let nomePet = "";
+          try {
+            if (clienteId) {
+              const { data: cData } = await admin.from("clientes").select("nome").eq("id", clienteId).maybeSingle();
+              if (cData?.nome) nomeCliente = cData.nome;
+            }
+            if (agendamentoId) {
+              const { data: aData } = await admin.from("agendamentos").select("pets(nome), clientes(nome)").eq("id", agendamentoId).maybeSingle();
+              if ((aData as any)?.pets?.nome) nomePet = (aData as any).pets.nome;
+              if ((aData as any)?.clientes?.nome && nomeCliente === "Cliente") nomeCliente = (aData as any).clientes.nome;
+            }
+          } catch (eInfo) {
+            console.warn("[Webhook MercadoPago] Aviso ao obter dados adicionais do cliente/pet:", eInfo);
+          }
+
+          // 4. Insere notificação instantânea para os operadores do sistema (sino / central de alertas)
+          try {
+            const { data: usersData } = await admin.auth.admin.listUsers();
+            const users = usersData?.users || [];
+            const valorFormatado = valorTotalNum > 0 ? `R$ ${valorTotalNum.toFixed(2).replace(".", ",")}` : "";
+            const descricaoPet = nomePet ? ` (Pet: ${nomePet})` : "";
+            const notifMsg = `Pagamento de ${valorFormatado} recebido via ${formaNormalizada.toUpperCase()} de ${nomeCliente}${descricaoPet}. Baixa realizada automaticamente!`;
+
+            const notifInserts = users.map((u: any) => ({
+              user_id: u.id,
+              titulo: `💰 Pagamento Confirmado: ${valorFormatado}`,
+              mensagem: notifMsg,
+              tipo: "pagamento_aprovado",
+              link: "/pagamentos-abertos",
+              lida: false,
+              payload: {
+                paymentId: String(paymentId),
+                valor: valorTotalNum,
+                forma: formaNormalizada,
+                clienteId,
+                agendamentoId,
+              },
+            }));
+
+            if (notifInserts.length > 0) {
+              await admin.from("notificacoes").insert(notifInserts as any);
+            }
+          } catch (notifErr) {
+            console.warn("[Webhook MercadoPago] Aviso ao emitir notificações aos operadores:", notifErr);
+          }
+
           // Nota: a tabela cobrancas é sincronizada automaticamente pelo trigger trg_pag_sync_cobranca no PostgreSQL
 
-          console.log(`[Webhook MercadoPago] Sucesso! Baixa automática realizada para o pagamento ${paymentId} (${formaNormalizada}).`);
+          console.log(`[Webhook MercadoPago] Sucesso! Baixa automática realizada para o pagamento ${paymentId} (${formaNormalizada}) de ${nomeCliente}.`);
           return new Response(
             JSON.stringify({
               ok: true,
