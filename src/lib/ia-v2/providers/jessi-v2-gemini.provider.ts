@@ -982,7 +982,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     hojeStr: string,
     operadorNome: string
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any; pendingAction?: any } | null> {
-    const nomeOp = operadorNome || "Eli";
+    const nomeOp = (operadorNome || "Eli").split(" ")[0];
 
     // Normalização da mensagem
     let msgTrabalho = mensagemUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -1500,15 +1500,26 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     ) {
       const periodo = msg.includes("hoje") ? "hoje" : msg.includes("semana") ? "semana" : "mes";
       const resFin = await FinanceiroRelatoriosAdapter.consultarResumoConsolidado(sb, periodo);
-      if (!resFin.success) return { texto: "Não consegui consultar o financeiro agora. Tente novamente em instantes." };
+      if (!resFin.success) return { texto: `Não consegui consultar o financeiro agora, ${nomeOp}. Tente novamente em instantes.` };
       const d = resFin.data;
       const totalRecebido = Number(d.valoresRecebidos || 0);
       const totalPendente = Number(d.valoresAReceber || 0) + Number(d.valoresVencidosDevedores || 0);
       const ticketMedio = Number(d?.ticketMedio || 0);
+      const periodoLabel = periodo === "hoje" ? "hoje" : periodo === "semana" ? "esta semana" : "deste mês";
 
-      let textoFin = `Aqui está o panorama financeiro de **${periodo === "hoje" ? "hoje" : periodo === "semana" ? "esta semana" : "deste mês"}**, ${nomeOp}: já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}** e temos **R$ ${totalPendente.toFixed(2).replace(".", ",")}** a receber (ticket médio: R$ ${ticketMedio.toFixed(2).replace(".", ",")}).`;
-      if (totalPendente > 0) {
-        textoFin += ` Você pode consultar a lista de pagamentos em aberto para agilizar a entrada desses valores.`;
+      let textoFin = "";
+      if (totalRecebido > 0 && totalPendente > 0) {
+        textoFin = `No financeiro de **${periodoLabel}**, já foram recebidos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}** e temos **R$ ${totalPendente.toFixed(2).replace(".", ",")}** a receber, ${nomeOp}.`;
+      } else if (totalRecebido > 0 && totalPendente === 0) {
+        textoFin = `No financeiro de **${periodoLabel}**, faturamos **R$ ${totalRecebido.toFixed(2).replace(".", ",")}** com 100% dos pagamentos quitados, ${nomeOp}!`;
+      } else if (totalRecebido === 0 && totalPendente > 0) {
+        textoFin = `Ainda não tivemos entradas registradas para ${periodoLabel}, ${nomeOp}, mas temos **R$ ${totalPendente.toFixed(2).replace(".", ",")}** em aberto para receber.`;
+      } else {
+        textoFin = `O caixa de **${periodoLabel}** não possui lançamentos registrados no momento, ${nomeOp}.`;
+      }
+
+      if (ticketMedio > 0 && totalRecebido > 0) {
+        textoFin += ` O ticket médio está em **R$ ${ticketMedio.toFixed(2).replace(".", ",")}**.`;
       }
 
       return {
@@ -2056,7 +2067,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
 
     // Guia inteligente quando o termo não é um cadastro específico
     return {
-      texto: `Entendido, ${nomeOp}! Estou pronta para te apoiar. Você pode me pedir:\n\n• **"Como está a agenda de hoje?"** ou **"Próximos pets para atendimento"**\n• **"Horários livres para amanhã"** ou **"Lembretes de confirmação"**\n• **"Resumo do faturamento deste mês"** ou **"Pagamentos pendentes dos clientes"**\n• **"Clientes sumidos para reativar"** ou o nome de qualquer tutor/pet.`,
+      texto: `Estou à disposição, ${nomeOp}! Você pode me pedir a agenda do dia, consultar o faturamento, verificar horários livres ou sugerir clientes para preencher a grade.`,
     };
   }
 
@@ -2064,7 +2075,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
    * Sintetiza uma resposta natural, calorosa e fluida em português a partir dos dados retornados por qualquer ferramenta
    */
   private sintetizarResultadoLocal(toolNome: string, dados: any, operadorNome: string): string {
-    const nomeOp = operadorNome || "Eli";
+    const nomeOp = (operadorNome || "Eli").split(" ")[0];
     if (!dados) return `Prontinho, ${nomeOp}! Consultei as informações diretamente no sistema.`;
 
     switch (toolNome) {
