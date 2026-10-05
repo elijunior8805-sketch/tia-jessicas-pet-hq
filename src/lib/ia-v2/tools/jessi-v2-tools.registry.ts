@@ -707,6 +707,28 @@ export const JESSI_V2_TOOLS_CATALOG: Record<string, JessiV2ToolDefinition> = {
     idempotencia: false,
     verificacaoPosterior: false,
   },
+  sugerir_clientes_para_vagas: {
+    nomeInterno: "sugerir_clientes_para_vagas",
+    descricao: "Audita histórico de agendamentos, hábitos por dia da semana (segunda a sábado), ciclo de banho e clubinho para sugerir clientes ideais para ocupar vagas",
+    intencoes: ["sugerir_clientes_para_vagas", "sugerir_clientes_vagas", "clientes_para_grade", "auditar_habitos_clientes", "sugestoes_segunda", "sugerir_clientes"],
+    area: "agenda",
+    parametros: {
+      data: { tipo: "string", obrigatorio: false, descricao: "Data em formato YYYY-MM-DD" },
+      diaSemana: { tipo: "string", obrigatorio: false, descricao: "Dia da semana (ex: 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado')" },
+      limite: { tipo: "number", obrigatorio: false, descricao: "Quantidade máxima de sugestões" },
+    },
+    retorno: "Lista ranqueada de clientes por propensão de conversão para o dia",
+    permissoes: ["agenda", "admin"],
+    tipo: "consulta",
+    nivelRisco: "baixo",
+    confirmacaoNecessaria: false,
+    adaptador: "ProativoAdapter.sugerirClientesParaVagas",
+    featureFlag: "ai_v2_proactive",
+    timeoutMs: 8000,
+    politicaRepeticao: "retry_1x_se_leitura",
+    idempotencia: false,
+    verificacaoPosterior: false,
+  },
   sugerir_encaixes_reativacao: {
     nomeInterno: "sugerir_encaixes_reativacao",
     descricao: "Cruza horários vagos com clientes sumidos para sugerir encaixes",
@@ -1126,6 +1148,12 @@ export async function despacharFerramentaV2(
 
       case "gerar_central_proativa":
         return await ProativoAdapter.gerarCentralProativa(sb);
+
+      case "sugerir_clientes_para_vagas":
+      case "sugerir_clientes_vagas":
+      case "auditar_habitos_clientes":
+      case "clientes_para_grade":
+        return await ProativoAdapter.sugerirClientesParaVagas(sb, params);
 
       case "identificar_horarios_vagos":
         return await ProativoAdapter.identificarHorariosVagos(sb, params.data);

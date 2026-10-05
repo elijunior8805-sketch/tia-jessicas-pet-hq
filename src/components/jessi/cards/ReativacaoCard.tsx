@@ -21,16 +21,25 @@ interface ReativacaoItem {
     id?: string;
     nome?: string;
     telefone?: string;
+    bairro?: string;
   };
   pet?: {
     id?: string;
     nome?: string;
+    raca?: string;
+    porte?: string;
   };
   diasInativo?: number;
   faixaRisco?: string;
+  diaHabitual?: string;
+  motivoInteligente?: string;
+  probabilidadeConversao?: string;
+  temClubinho?: boolean;
+  creditosClubinho?: number;
   ultimoAtendimento?: string;
   mensagemSugerida?: {
     textoMensagem?: string;
+    mensagemFormatada?: string;
     urlWhatsApp?: string;
     telefoneDestino?: string;
   };
@@ -41,7 +50,14 @@ interface ReativacaoCardProps {
   onActionClick?: (comando: string) => void;
 }
 
-const getFaixaBadge = (dias: number) => {
+const getFaixaBadge = (item: ReativacaoItem) => {
+  if (item.probabilidadeConversao) {
+    return {
+      label: item.probabilidadeConversao,
+      color: "bg-emerald-500/15 text-emerald-800 border-emerald-500/30 font-semibold",
+    };
+  }
+  const dias = item.diasInativo || 0;
   if (dias >= 120) return { label: `${dias}d (Crítico)`, color: "bg-red-500/15 text-red-700 border-red-500/30" };
   if (dias >= 90) return { label: `${dias}d (Prioridade)`, color: "bg-orange-500/15 text-orange-700 border-orange-500/30" };
   if (dias >= 60) return { label: `${dias}d (Atenção)`, color: "bg-amber-500/15 text-amber-700 border-amber-500/30" };
@@ -55,20 +71,28 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.itens)) return data.itens;
     if (Array.isArray(data?.data)) return data.data;
-    if (Array.isArray(data?.clientes)) return data.clientes;
+    if (Array.isArray(data?.candidatos)) return data.candidatos;
     if (Array.isArray(data?.sugestoes)) {
       return data.sugestoes.map((s: any) => ({
         cliente: {
           id: s.clienteId || s.cliente?.id,
           nome: s.clienteNome || s.cliente?.nome || "Cliente",
           telefone: s.telefone || s.cliente?.telefone,
+          bairro: s.bairro || s.cliente?.bairro,
         },
         pet: {
           id: s.petId || s.pet?.id,
           nome: s.petNome || s.pet?.nome || "Pet",
+          raca: s.petRaca || s.pet?.raca,
+          porte: s.petPorte || s.pet?.porte,
         },
-        diasInativo: s.diasInativo || 25,
+        diasInativo: s.diasInativo || s.diasSemVir || 14,
         faixaRisco: s.faixaRisco || "alerta",
+        diaHabitual: s.diaHabitual,
+        motivoInteligente: s.motivoInteligente,
+        probabilidadeConversao: s.probabilidadeConversao,
+        temClubinho: s.temClubinho,
+        creditosClubinho: s.creditosClubinho,
         ultimoAtendimento: s.ultimoAtendimento,
         mensagemSugerida: {
           textoMensagem: s.mensagemWhatsapp || s.mensagemSugerida?.textoMensagem || s.mensagemSugerida?.mensagemFormatada,
@@ -83,13 +107,21 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
           id: data.clienteId || data.cliente?.id,
           nome: data.clienteNome || data.cliente?.nome || "Cliente",
           telefone: data.telefone || data.cliente?.telefone,
+          bairro: data.bairro || data.cliente?.bairro,
         },
         pet: {
           id: data.petId || data.pet?.id,
           nome: data.petNome || data.pet?.nome || "Pet",
+          raca: data.petRaca || data.pet?.raca,
+          porte: data.petPorte || data.pet?.porte,
         },
-        diasInativo: data.diasInativo || 25,
+        diasInativo: data.diasInativo || data.diasSemVir || 14,
         faixaRisco: data.faixaRisco || "alerta",
+        diaHabitual: data.diaHabitual,
+        motivoInteligente: data.motivoInteligente,
+        probabilidadeConversao: data.probabilidadeConversao,
+        temClubinho: data.temClubinho,
+        creditosClubinho: data.creditosClubinho,
         ultimoAtendimento: data.ultimoAtendimento,
         mensagemSugerida: {
           textoMensagem: data.mensagemWhatsapp || data.mensagemSugerida?.textoMensagem || data.mensagemSugerida?.mensagemFormatada,
@@ -138,20 +170,26 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
     }
   };
 
+  const ehSugestaoVagas = Boolean(data?.diaSemana || lista.some((item) => item.motivoInteligente || item.probabilidadeConversao));
+  const tituloCard = ehSugestaoVagas ? `Sugestão para Vagas (${data?.diaSemana || "Grade"})` : "Reativação de Clientes";
+  const subTituloCard = ehSugestaoVagas
+    ? "Clientes frequentes ranqueados por hábito e ciclo ideal"
+    : "Dispare mensagens carinhosas com 1 clique";
+
   return (
     <div className="rounded-2xl border border-purple-200/80 bg-linear-to-br from-purple-50/40 via-background to-background p-3.5 md:p-4 space-y-3.5 text-xs shadow-xs">
       {/* Cabeçalho do Card */}
       <div className="flex items-center justify-between border-b border-purple-100/80 pb-2.5">
         <div className="flex items-center gap-2">
           <div className="h-7 w-7 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700 shadow-2xs">
-            <HeartHandshake className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
           </div>
           <div>
             <span className="font-semibold text-foreground flex items-center gap-1.5 text-xs">
-              Reativação de Clientes
+              {tituloCard}
             </span>
             <span className="text-[10px] text-muted-foreground">
-              Dispare mensagens carinhosas com 1 clique
+              {subTituloCard}
             </span>
           </div>
         </div>
@@ -164,14 +202,13 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
       <div className="space-y-2 max-h-[380px] overflow-y-auto pr-0.5">
         {lista.map((item, idx) => {
           const key = item.pet?.id || item.cliente?.id || `reativa-${idx}`;
-          const dias = item.diasInativo || 0;
-          const badgeInfo = getFaixaBadge(dias);
+          const badgeInfo = getFaixaBadge(item);
           const isCopied = copiedId === key;
 
           return (
             <div
               key={key}
-              className="p-3 rounded-xl border border-border/70 bg-card hover:border-purple-300 transition-all space-y-2.5 shadow-2xs"
+              className="p-3 rounded-xl border border-border/70 bg-card hover:border-purple-300 transition-all space-y-2 shadow-2xs"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -189,10 +226,18 @@ export const ReativacaoCard: React.FC<ReativacaoCardProps> = ({ data, onActionCl
                     </div>
                   </div>
                 </div>
-                <Badge variant="outline" className={`text-[10px] py-0 shrink-0 font-medium ${badgeInfo.color}`}>
+                <Badge variant="outline" className={`text-[10px] py-0.5 px-2 shrink-0 ${badgeInfo.color}`}>
                   {badgeInfo.label}
                 </Badge>
               </div>
+
+              {/* Explicação Inteligente / Hábitos de Agendamento */}
+              {item.motivoInteligente && (
+                <div className="bg-purple-50/60 dark:bg-purple-950/30 rounded-lg p-1.5 px-2 text-[11px] text-purple-900 dark:text-purple-200 flex items-center gap-1.5 border border-purple-100 dark:border-purple-900/50">
+                  <Clock className="h-3 w-3 text-purple-600 shrink-0" />
+                  <span className="truncate">{item.motivoInteligente}</span>
+                </div>
+              )}
 
               {/* Botões de Ação Direta */}
               <div className="flex items-center gap-2 pt-0.5">

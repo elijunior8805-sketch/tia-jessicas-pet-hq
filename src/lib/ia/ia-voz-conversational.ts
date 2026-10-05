@@ -26,8 +26,8 @@ export function humanizarRespostaParaVoz(
     .replace(/\s+/g, " ")
     .trim();
 
-  // Se o texto for longo (> 200 caracteres), prioriza as 2 primeiras frases principais para fala dinâmica
-  if (fala.length > 200) {
+  // Se o texto for longo (> 200 caracteres), prioriza as 2 a 3 frases principais para fala dinâmica e ágil
+  if (fala.length > 220) {
     const sentencas = fala.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 0);
     if (sentencas.length > 2) {
       fala = `${sentencas[0]} ${sentencas[1]}`;
@@ -38,7 +38,7 @@ export function humanizarRespostaParaVoz(
 }
 
 /**
- * Remove marcações técnicas, markdown, asteriscos, emojis e quebras de linha para áudio cristalino
+ * Remove marcações técnicas, markdown, asteriscos, emojis, parênteses plurais e quebras de linha para áudio cristalino
  */
 export function limparMarcacaoTexto(texto: string): string {
   let t = texto;
@@ -55,10 +55,21 @@ export function limparMarcacaoTexto(texto: string): string {
   t = t.replace(/\[id:[^\]]+\]/gi, "");
   t = t.replace(/\[(.*?)\]\([^)]+\)/g, "$1");
 
+  // Remove parênteses plurais que soam robóticos no sintetizador de voz (TTS)
+  t = t.replace(/\bcliente\(s\)/gi, "clientes");
+  t = t.replace(/\bpet\(s\)/gi, "pets");
+  t = t.replace(/\batendimento\(s\)/gi, "atendimentos");
+  t = t.replace(/\bhorário\(s\)/gi, "horários");
+  t = t.replace(/\bhorario\(s\)/gi, "horários");
+  t = t.replace(/\btutor\(es\)/gi, "tutores");
+  t = t.replace(/\bopção\(ões\)/gi, "opções");
+  t = t.replace(/\(\s*s\s*\)/gi, "s");
+  t = t.replace(/\(\s*es\s*\)/gi, "es");
+
   // Remove tabelas markdown
   t = t.replace(/\|[^\n]+\|/g, "");
 
-  // Substitui emojis conhecidos por pausas ou remove se causarem ruído no TTS
+  // Substitui emojis por pausas ou remove se causarem ruído no TTS
   t = t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "");
 
   // Normaliza quebras de linha para vírgulas/pausas naturais
