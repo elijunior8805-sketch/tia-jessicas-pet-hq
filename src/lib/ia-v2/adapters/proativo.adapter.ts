@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
+import { calcularSaldoContrato } from "@/lib/programas-contratos-calc";
 import { JessiV2QueryResult } from "../contracts/jessi-v2-contracts";
 import { AgendaAdapter } from "./agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "./financeiro-relatorios.adapter";
@@ -400,14 +401,10 @@ export class ProativoAdapter {
       const mapaClubinhoPet: Record<string, { creditos: number }> = {};
       for (const contrato of todosContratos) {
         if (!contrato.pet_id) continue;
-        const saldo = (movimentacoesClubinho || [])
-          .filter((movimento) => movimento.programa_contratado_id === contrato.id)
-          .reduce((total, movimento) => {
-            const quantidade = Number(movimento.quantidade) || 0;
-            return movimento.tipo === "consumo" || movimento.tipo === "estorno"
-              ? total - quantidade
-              : total + quantidade;
-          }, 0);
+        const saldos = calcularSaldoContrato(
+          (movimentacoesClubinho || []).filter((movimento) => movimento.programa_contratado_id === contrato.id)
+        );
+        const saldo = Object.values(saldos).reduce((total, item) => total + item.disponivel, 0);
         mapaClubinhoPet[contrato.pet_id] = {
           creditos: (mapaClubinhoPet[contrato.pet_id]?.creditos || 0) + Math.max(saldo, 0),
         };

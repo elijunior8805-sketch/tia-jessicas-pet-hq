@@ -1065,7 +1065,8 @@ export async function despacharFerramentaV2(
   sb: SupabaseClient<Database>,
   toolNome: string,
   params: Record<string, any>,
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  user?: { id: string; cargo?: string; permissoes?: string[] }
 ): Promise<JessiV2QueryResult | JessiV2MutationResult | any> {
   const toolCanonical = TOOL_ALIASES[toolNome] || toolNome;
   const toolDef = JESSI_V2_TOOLS_CATALOG[toolCanonical] || JESSI_V2_TOOLS_CATALOG[toolNome];
@@ -1079,6 +1080,23 @@ export async function despacharFerramentaV2(
       error_code: "TOOL_NOT_REGISTERED",
       correlation_id: `tool_not_found_${Date.now()}`,
     };
+  }
+
+  if (user) {
+    const permissoes = new Set(user.permissoes || []);
+    const cargo = (user.cargo || "").toLowerCase();
+    const ehAdmin = permissoes.has("admin") || cargo.includes("admin") || cargo.includes("propriet");
+    const autorizado = ehAdmin || toolDef.permissoes.some((permissao) => permissoes.has(permissao));
+    if (!autorizado) {
+      return {
+        success: false,
+        source: "tools_registry_security",
+        summary: `Acesso negado para a operação "${toolNome}".`,
+        error_code: "PERMISSION_DENIED",
+        executed_at: new Date().toISOString(),
+        correlation_id: `permission_denied_${Date.now()}`,
+      };
+    }
   }
 
   if (toolDef.tipo === "mutacao_supervisionada") {

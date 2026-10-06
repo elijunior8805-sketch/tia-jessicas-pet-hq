@@ -807,7 +807,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
             }
 
             try {
-              const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
+              const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs, undefined, user);
               this.anexarCardVisual(cards, toolNome, resTool, toolArgs);
 
               if (resTool?.success === false) {
@@ -881,7 +881,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
               const toolParams = parsedAction.params || {};
               textoLimpo = textoLimpo.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim();
 
-              const resTool = await despacharFerramentaV2(sb, toolAlvo, toolParams);
+              const resTool = await despacharFerramentaV2(sb, toolAlvo, toolParams, undefined, user);
               this.anexarCardVisual(cards, toolAlvo, resTool, toolParams);
               if (resTool?.pendingAction) pendingAction = resTool.pendingAction;
             } catch {}
