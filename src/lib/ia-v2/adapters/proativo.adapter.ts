@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types";
+import { calcularSaldoContrato } from "@/lib/programas-contratos-calc";
 import { JessiV2QueryResult } from "../contracts/jessi-v2-contracts";
 import { AgendaAdapter } from "./agenda.adapter";
 import { FinanceiroRelatoriosAdapter } from "./financeiro-relatorios.adapter";
@@ -340,9 +341,9 @@ export class ProativoAdapter {
         sb.from("clientes")
           .select("id, nome, telefone, whatsapp, bairro, ativo, pets(id, nome, raca, porte)")
           .eq("ativo", true),
-        sb.from("programas_contratos")
-          .select("id, cliente_id, pet_id, status, creditos_disponiveis")
-          .eq("status", "ativo"),
+        sb.from("programas_contratados")
+          .select("id, cliente_id, pet_id, status_do_programa")
+          .eq("status_do_programa", "ativo"),
         sb.from("agendamentos")
           .select("pet_id, cliente_id")
           .eq("data", dataAlvoStr),
@@ -389,11 +390,24 @@ export class ProativoAdapter {
       }
 
       // Mapa de contratos ativos do clubinho
+      const contratosIds = todosContratos.map((c) => c.id);
+      const { data: movimentacoesClubinho } = contratosIds.length
+        ? await sb
+            .from("programas_creditos_movimentacoes")
+            .select("programa_contratado_id, tipo, quantidade")
+            .in("programa_contratado_id", contratosIds)
+        : { data: [] };
+
       const mapaClubinhoPet: Record<string, { creditos: number }> = {};
-      for (const c of todosContratos) {
-        if (c.pet_id) {
-          mapaClubinhoPet[c.pet_id] = { creditos: c.creditos_disponiveis || 0 };
-        }
+      for (const contrato of todosContratos) {
+        if (!contrato.pet_id) continue;
+        const saldos = calcularSaldoContrato(
+          (movimentacoesClubinho || []).filter((movimento) => movimento.programa_contratado_id === contrato.id)
+        );
+        const saldo = Object.values(saldos).reduce((total, item) => total + item.disponivel, 0);
+        mapaClubinhoPet[contrato.pet_id] = {
+          creditos: (mapaClubinhoPet[contrato.pet_id]?.creditos || 0) + Math.max(saldo, 0),
+        };
       }
 
       // 3. Pontua e audita cada cliente/pet para a vaga
@@ -537,7 +551,7 @@ export class ProativoAdapter {
             clienteId: cliente.id,
             clienteNome: cliente.nome,
             telefone: tel,
-            bairro: cliente.bairro,
+            bairro: cliente.bairro || undefined,
             petId: pet.id,
             petNome: pet.nome,
             petRaca: pet.raca,

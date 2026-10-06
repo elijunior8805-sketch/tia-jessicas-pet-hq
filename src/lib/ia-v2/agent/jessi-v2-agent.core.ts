@@ -134,7 +134,7 @@ export async function processarMensagemJessiV2Core(
         toolEfetivo = "executar_recebimento";
       }
 
-      mutationResult = await despacharFerramentaV2(sb, toolEfetivo, params, idempotencyKey);
+      mutationResult = await despacharFerramentaV2(sb, toolEfetivo, params, idempotencyKey, user);
       recordIdReal = mutationResult?.affected_record_id || mutationResult?.entity_id || null;
 
       const sucesso = mutationResult ? Boolean(mutationResult.success) : true;

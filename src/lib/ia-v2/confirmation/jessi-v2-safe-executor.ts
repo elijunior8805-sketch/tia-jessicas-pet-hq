@@ -74,7 +74,8 @@ export class JessiV2SafeExecutor {
         sb,
         proposta.acao,
         proposta.estadoProposto,
-        idempotencyKey
+        idempotencyKey,
+        user
       );
 
       // 5. Verificar se a gravação real foi confirmada (Read-Back)

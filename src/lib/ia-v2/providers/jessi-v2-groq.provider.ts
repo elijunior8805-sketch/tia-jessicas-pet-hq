@@ -24,16 +24,15 @@ import { SentinelasAdapter } from "../adapters/sentinelas.adapter";
 import { AnalyticsAdapter } from "../adapters/analytics.adapter";
 
 /**
- * Provedor de IA Conversacional e Agente Autônomo com Tool Calling (Groq LLaMA 3.3 70B)
+ * Provedor de IA Conversacional e Agente Autônomo com Tool Calling (Groq)
  * Desenvolvido para entregar 100% da capacidade cognitiva e operacional da Jessi
  */
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_CONFIG = {
-  TIMEOUT_MS: 5000,
+  TIMEOUT_MS: 30000,
   MAX_RETRIES: 1,
-  MODEL: "llama-3.3-70b-versatile",
-  FALLBACK_MODELS: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+  MODEL: "openai/gpt-oss-120b",
 };
 
 /**
@@ -498,10 +497,10 @@ export const OPENAI_TOOLS_SCHEMA: any[] = [
 ];
 
 export class JessiV2GroqProvider implements IJessiV2AIProvider {
-  readonly nome = "Groq-LLaMA-3.3-70B-Autonomous-Agent";
+  readonly nome = "Groq-GPT-OSS-120B-Autonomous-Agent";
 
   /**
-   * Obtém a chave de API do ambiente do servidor, Vite env ou variáveis de runtime (Prioridade Groq)
+   * Obtém a chave de API exclusivamente do ambiente seguro do servidor.
    */
   public obterApiKeyServidor(): {
     key: string;
@@ -509,33 +508,8 @@ export class JessiV2GroqProvider implements IJessiV2AIProvider {
     endpoint: string;
     model: string;
   } | null {
-    let chave = "";
-
-    const k1 = ["g", "s", "k", "_", "b", "0", "B", "l", "O", "9", "f", "x"].join("");
-    const k2 = ["V", "e", "z", "j", "h", "y", "E", "j", "x", "J", "C", "R", "W", "G", "d", "y", "b", "3", "F", "Y"].join("");
-    const k3 = ["i", "H", "j", "U", "W", "4", "s", "S", "H", "Q", "I", "l", "e", "T", "0", "l", "M", "D", "X", "G", "V", "O", "Z", "9"].join("");
-    const runtimeGroqKey = `${k1}${k2}${k3}`;
-
-    // 1. Verifica no import.meta.env (Vite / Navegador) - Prioridade Groq
-    if (typeof import.meta !== "undefined" && (import.meta as any).env) {
-      chave =
-        (import.meta as any).env.VITE_GROQ_API_KEY ||
-        (import.meta as any).env.GROQ_API_KEY ||
-        "";
-    }
-
-    // 2. Verifica no process.env (Node / SSR / Server functions) - Prioridade Groq
-    if (!chave && typeof process !== "undefined" && process.env) {
-      chave =
-        process.env.GROQ_API_KEY ||
-        process.env.VITE_GROQ_API_KEY ||
-        "";
-    }
-
-    // 3. Fallback garantido e primário para a chave nativa do Groq LLaMA 3.3
-    if (!chave) {
-      chave = runtimeGroqKey;
-    }
+    const chave = typeof process !== "undefined" ? process.env.GROQ_API_KEY || "" : "";
+    if (!chave) return null;
 
     return {
       key: chave,
@@ -546,7 +520,7 @@ export class JessiV2GroqProvider implements IJessiV2AIProvider {
   }
 
   /**
-   * Executa chamada segura com suporte a Tool Calling nativo (Groq LLaMA 3.3)
+   * Executa chamada segura com suporte a Tool Calling nativo do Groq.
    */
   private async executarRequisicaoIAComTools(
     messages: Array<any>,
@@ -568,7 +542,7 @@ export class JessiV2GroqProvider implements IJessiV2AIProvider {
       throw new Error("Nenhuma chave de API configurada no ambiente.");
     }
 
-    const modelosParaTentar = GROQ_CONFIG.FALLBACK_MODELS;
+    const modelosParaTentar = [auth.model];
 
     for (let tentativa = 0; tentativa < modelosParaTentar.length; tentativa++) {
       const modeloAtual = modelosParaTentar[tentativa];
@@ -833,8 +807,17 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
             }
 
             try {
-              const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs);
+              const resTool = await despacharFerramentaV2(sb, toolNome, toolArgs, undefined, user);
               this.anexarCardVisual(cards, toolNome, resTool, toolArgs);
+
+              if (resTool?.success === false) {
+                toolMessages.push({
+                  role: "tool",
+                  tool_call_id: tc.id,
+                  content: JSON.stringify(resTool),
+                });
+                continue;
+              }
 
               if (resTool?.pendingAction) {
                 pendingAction = resTool.pendingAction;
@@ -898,7 +881,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
               const toolParams = parsedAction.params || {};
               textoLimpo = textoLimpo.replace(/<<<ACTION:[\s\S]*?>>>/, "").trim();
 
-              const resTool = await despacharFerramentaV2(sb, toolAlvo, toolParams);
+              const resTool = await despacharFerramentaV2(sb, toolAlvo, toolParams, undefined, user);
               this.anexarCardVisual(cards, toolAlvo, resTool, toolParams);
               if (resTool?.pendingAction) pendingAction = resTool.pendingAction;
             } catch {}
@@ -919,7 +902,7 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
 
     // 3. DISPATCHER RESILIENTE DE BACKUP (caso a rede/IA esteja offline)
     // Garante que mesmo offline ou sem resposta do gateway, o comando é executado com dados reais do Supabase e fala humanizada!
-    const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli");
+    const despachoResiliente = await this.executarDespachoResiliente(sb, mensagemUsuario, hojeStr, user?.nome || "Eli", true);
     if (despachoResiliente) {
       if (despachoResiliente.card) {
         cards.push(despachoResiliente.card);
@@ -947,7 +930,8 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
     sb: SupabaseClient<Database>,
     mensagemUsuario: string,
     hojeStr: string,
-    operadorNome: string
+    operadorNome: string,
+    modoSomenteConsulta = false
   ): Promise<{ texto: string; card?: JessiV2Card; novoContexto?: any; pendingAction?: any } | null> {
     const nomeOp = (operadorNome || "Eli").split(" ")[0];
 
@@ -963,6 +947,15 @@ DIRETRIZES DE AUTONOMIA E OBJETIVIDADE:
       }
     }
     const msg = msgTrabalho;
+
+    if (
+      modoSomenteConsulta &&
+      /\b(criar|cadastrar|agendar|marcar|cancelar|desmarcar|reagendar|remarcar|alterar|gerar\s+(?:pix|cobran[cç]a|link)|registrar|receber|pagar|estornar|conciliar|consumir)\b/i.test(msg)
+    ) {
+      return {
+        texto: `O motor Groq está indisponível no momento, ${nomeOp}. Mantive apenas as consultas seguras ativas e não preparei nem executei nenhuma gravação.`,
+      };
+    }
 
     // =========================================================================
     // 0.0 TRATAMENTO DE SELEÇÃO DIRETA DE ID [id:uuid] OU OPÇÃO DE DESAMBIGUAÇÃO
