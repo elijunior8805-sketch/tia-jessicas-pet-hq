@@ -19,3 +19,5 @@ All coding agents working on this project must follow the defined skills when bu
 - **Brainstorming & Planning**: Use `brainstorming` and `writing-plans` prior to writing non-trivial code.
 - **Quality & TDD**: Adhere to `test-driven-development` and `systematic-debugging`.
 - **Review & Verification**: Validate behavior with `verification-before-completion` and follow `requesting-code-review` and `receiving-code-review` practices.
+
+- Jessi V2 uses Groq as its sole autonomous tool-calling engine; when unavailable, only deterministic read-only consultation may continue, because writes require the primary engine and explicit confirmation.

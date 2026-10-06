@@ -50,29 +50,19 @@ export async function despacharMensagemJessi(
     const res = await processarMensagemJessiV2Core(sb, input, user);
     return res;
   } catch (err) {
-    // 3. Fallback seguro antes de qualquer mutação física
-    console.warn("Falha de execução na Jessi V2. Acionando fallback automático para V1:", err);
-
-    try {
-      const { processarMensagemJessiCore } = await import("../../ia/jessi-agent.server");
-      const v1Result = await processarMensagemJessiCore(sb, input as any, user);
-      const respostaTextoFinal = ehCanalVoz
-        ? humanizarRespostaParaVoz(v1Result.respostaTexto, v1Result.cards, input.modoBancada, user?.nome)
-        : v1Result.respostaTexto;
-
-      return {
-        versao: "v1_fallback",
-        respostaTexto: respostaTextoFinal,
-        cards: v1Result.cards as any,
-        pendingAction: v1Result.pendingAction as any,
-        novoContexto: v1Result.novoContexto as any,
-        tempoProcessamentoMs: Date.now() - inicioMs,
-        correlationId,
-        fallbackAcionado: true,
-      };
-    } catch (fallbackErr) {
-      console.error("Falha crítica no fallback V1:", fallbackErr);
-      throw fallbackErr;
-    }
+    console.error("Falha de execução na Jessi V2. Gravações bloqueadas sem o motor principal:", err);
+    const respostaBase = "A Jessi está temporariamente sem o motor principal. Nenhuma alteração foi feita; tente novamente para continuar com segurança.";
+    return {
+      versao: "v2",
+      respostaTexto: ehCanalVoz
+        ? humanizarRespostaParaVoz(respostaBase, [], input.modoBancada, user?.nome)
+        : respostaBase,
+      cards: [],
+      pendingAction: null,
+      novoContexto: input.contexto || {},
+      tempoProcessamentoMs: Date.now() - inicioMs,
+      correlationId,
+      fallbackAcionado: true,
+    };
   }
 }

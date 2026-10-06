@@ -11,7 +11,6 @@
 import {
   sintetizarVozNeural,
   NeuralVoiceConfig,
-  obterChavesNeuralTTS,
 } from "./ia-voz-neural.service";
 
 /**
